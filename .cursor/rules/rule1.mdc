@@ -1,0 +1,5 @@
+---
+description:我们正在为项目添加一部分功能,请尽可能不影响我们没有提到的功能,并减少新旧代码的耦合性
+globs:
+alwaysApply: false
+---

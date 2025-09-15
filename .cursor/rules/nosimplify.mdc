@@ -1,0 +1,5 @@
+---
+description:你生成的代码不应该有简化实现或模拟实现. 不应该硬编码返回结果或编造虚假的过程.生成的代码需要真实可用.并且不要使用emoji
+globs:
+alwaysApply: false
+---

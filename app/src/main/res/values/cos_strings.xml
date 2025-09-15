@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- COS Settings -->
+    <string name="CosSettingsFragment__cloud_object_storage">Cloud Object Storage</string>
+    <string name="CosSettingsFragment__cos_settings">COS Settings</string>
+    <string name="CosSettingsFragment__provider">Provider</string>
+    <string name="CosSettingsFragment__secret_id">Secret ID</string>
+    <string name="CosSettingsFragment__secret_key">Secret Key</string>
+    <string name="CosSettingsFragment__region">Region</string>
+    <string name="CosSettingsFragment__bucket_name">Bucket Name</string>
+    <string name="CosSettingsFragment__save">Save</string>
+    <string name="CosSettingsFragment__saved">Settings saved</string>
+    <string name="CosSettingsFragment__error_saving">Error saving settings</string>
+    <string name="CosSettingsFragment__configure_cloud_storage">Configure cloud object storage for message delivery</string>
+    <string name="CosSettingsFragment__aws_s3">AWS S3</string>
+    <string name="CosSettingsFragment__tencent_cos">Tencent COS</string>
+
+    <!-- CAM凭证信息 -->
+    <string name="CosSettingsFragment__cam_info">CAM Credentials</string>
+    <string name="CosSettingsFragment__cam_info_summary">Now using long-term CAM credentials for enhanced security and reliability. No expiration time needed.</string>
+
+    <!-- 输入提示 -->
+    <string name="CosSettingsFragment__enter_secret_id">Enter your Secret ID</string>
+    <string name="CosSettingsFragment__enter_secret_key">Enter your Secret Key</string>
+    <string name="CosSettingsFragment__enter_region">Enter region (e.g., us-east-1)</string>
+    <string name="CosSettingsFragment__enter_bucket_name">Enter bucket name</string>
+
+    <!-- 聊天菜单 -->
+    <string name="conversation__menu_use_v2_mode">Use v2 mode</string>
+    <string name="conversation__menu_disable_v2_mode">Disable v2 mode</string>
+
+    <!-- COS请求对话框 -->
+    <string name="cos_request_dialog_title">COS v2 Mode Request</string>
+    <string name="cos_request_dialog_message">Do you want to enable COS v2 mode for this conversation? This will allow secure communication through your configured cloud storage when Signal servers are unavailable.</string>
+    <string name="cos_request_dialog_agree">Agree</string>
+    <string name="cos_request_dialog_cancel">Cancel</string>
+
+    <!-- COS响应对话框 -->
+    <string name="cos_response_dialog_title">COS v2 Mode Request</string>
+    <string name="cos_response_dialog_message">%s wants to enable COS v2 mode for this conversation. This will allow secure communication through cloud storage when Signal servers are unavailable.</string>
+    <string name="cos_response_dialog_agree">Accept</string>
+    <string name="cos_response_dialog_reject">Reject</string>
+
+    <!-- COS断开连接对话框 -->
+    <string name="cos_disconnect_dialog_title">Disable COS v2 Mode</string>
+    <string name="cos_disconnect_dialog_message">Do you want to disable COS v2 mode for this conversation? This will return to normal Signal server communication.</string>
+    <string name="cos_disconnect_dialog_confirm">Disable</string>
+    <string name="cos_disconnect_dialog_cancel">Cancel</string>
+
+    <!-- COS状态消息 -->
+    <string name="cos_request_sent">COS v2 mode request sent</string>
+    <string name="cos_request_accepted">COS v2 mode enabled</string>
+    <string name="cos_request_rejected">COS v2 mode request rejected</string>
+    <string name="cos_request_failed">Failed to send COS v2 mode request</string>
+    <string name="cos_disconnect_sent">COS v2 mode disabled</string>
+    <string name="cos_disconnect_failed">Failed to disable COS v2 mode</string>
+</resources>
