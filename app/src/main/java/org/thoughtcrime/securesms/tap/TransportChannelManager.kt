@@ -21,6 +21,8 @@ class TransportChannelManager private constructor(private val context: Context) 
     
     companion object {
         private const val TAG = "TransportChannelManager"
+        
+        @Volatile
         private var INSTANCE: TransportChannelManager? = null
         
         /**
@@ -29,7 +31,26 @@ class TransportChannelManager private constructor(private val context: Context) 
         @JvmStatic
         fun getInstance(context: Context): TransportChannelManager {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: TransportChannelManager(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: TransportChannelManager(context.applicationContext).also { 
+                    INSTANCE = it
+                    Log.d(TAG, "创建TransportChannelManager实例: ${it.hashCode()}")
+                }
+            }
+        }
+        
+        /**
+         * 重置单例实例（仅用于测试）
+         */
+        @JvmStatic
+        internal fun resetInstance() {
+            synchronized(this) {
+                INSTANCE?.let { instance ->
+                    runBlocking {
+                        instance.cleanup()
+                    }
+                }
+                INSTANCE = null
+                Log.d(TAG, "重置TransportChannelManager实例")
             }
         }
         

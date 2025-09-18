@@ -12,6 +12,7 @@ import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlinx.coroutines.*
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.core.type.TypeReference
 
 /**
@@ -24,6 +25,8 @@ class TransportTokenPool private constructor(private val context: Context) {
     
     companion object {
         private const val TAG = "TransportTokenPool"
+        
+        @Volatile
         private var INSTANCE: TransportTokenPool? = null
         
         /**
@@ -32,7 +35,26 @@ class TransportTokenPool private constructor(private val context: Context) {
         @JvmStatic
         fun getInstance(context: Context): TransportTokenPool {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: TransportTokenPool(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: TransportTokenPool(context.applicationContext).also { 
+                    INSTANCE = it
+                    Log.d(TAG, "创建TransportTokenPool实例: ${it.hashCode()}")
+                }
+            }
+        }
+        
+        /**
+         * 重置单例实例（仅用于测试）
+         */
+        @JvmStatic
+        internal fun resetInstance() {
+            synchronized(this) {
+                INSTANCE?.let { instance ->
+                    runBlocking {
+                        instance.cleanup()
+                    }
+                }
+                INSTANCE = null
+                Log.d(TAG, "重置TransportTokenPool实例")
             }
         }
         
@@ -45,6 +67,9 @@ class TransportTokenPool private constructor(private val context: Context) {
         // 缓存相关常量
         private const val DEFAULT_CACHE_SIZE = 1000
         private const val DEFAULT_CLEANUP_INTERVAL_MS = 300000L // 5分钟
+        
+        // 清理间隔：24小时
+        private const val CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000L
     }
     
     // Token存储
@@ -56,9 +81,15 @@ class TransportTokenPool private constructor(private val context: Context) {
     private val tokenLock = ReentrantReadWriteLock()
     private val configLock = ReentrantReadWriteLock()
     
-    // 持久化存储
-    private val sharedPreferences: SharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-    private val objectMapper = ObjectMapper()
+    // 持久化存储（参考SubAccountPoolManager的实现）
+    private val sharedPreferences: SharedPreferences by lazy {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
+    
+    private val objectMapper = ObjectMapper().apply {
+        // 忽略未知属性，确保向后兼容性
+        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
     
     // 配置和状态
     private var config: TransportTokenConfig = TransportTokenConfig()
@@ -693,65 +724,84 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
-     * 从存储加载Token
+     * 从持久化存储加载Token
      */
     private fun loadTokensFromStorage() {
         try {
+            Log.d(TAG, "开始加载持久化的Token数据")
+            
             // 加载接收Token
             val receivedTokensJson = sharedPreferences.getString(KEY_RECEIVED_TOKENS, null)
-            if (receivedTokensJson != null) {
+            if (!receivedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
                 val receivedTokensData = objectMapper.readValue(receivedTokensJson, type)
                 
+                receivedTokens.clear()
                 receivedTokensData.forEach { (recipientId, providerTokens) ->
                     val tokenMap = mutableMapOf<String, TransportToken>()
                     providerTokens.forEach { (providerType, tokenData) ->
                         val token = createTokenFromData(tokenData)
-                        if (token != null) {
+                        if (token != null && !token.isExpired) {
                             tokenMap[providerType] = token
+                        } else if (token?.isExpired == true) {
+                            Log.d(TAG, "跳过过期Token: ${token.tokenId}")
                         }
                     }
                     if (tokenMap.isNotEmpty()) {
                         receivedTokens[recipientId] = tokenMap
                     }
                 }
+                Log.d(TAG, "加载接收Token数据: ${receivedTokens.size}个条目")
             }
             
             // 加载共享Token
             val sharedTokensJson = sharedPreferences.getString(KEY_SHARED_TOKENS, null)
-            if (sharedTokensJson != null) {
+            if (!sharedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
                 val sharedTokensData = objectMapper.readValue(sharedTokensJson, type)
                 
+                sharedTokens.clear()
                 sharedTokensData.forEach { (recipientId, providerTokens) ->
                     val tokenMap = mutableMapOf<String, TransportToken>()
                     providerTokens.forEach { (providerType, tokenData) ->
                         val token = createTokenFromData(tokenData)
-                        if (token != null) {
+                        if (token != null && !token.isExpired) {
                             tokenMap[providerType] = token
+                        } else if (token?.isExpired == true) {
+                            Log.d(TAG, "跳过过期Token: ${token.tokenId}")
                         }
                     }
                     if (tokenMap.isNotEmpty()) {
                         sharedTokens[recipientId] = tokenMap
                     }
                 }
+                Log.d(TAG, "加载共享Token数据: ${sharedTokens.size}个条目")
             }
             
             // 重建Token元数据
             rebuildTokenMetadata()
             
-            Log.i(TAG, "从存储加载Token完成")
+            Log.i(TAG, "持久化Token数据加载完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}")
+            
+            // 执行清理检查
+            performCleanupIfNeeded()
             
         } catch (e: Exception) {
-            Log.e(TAG, "从存储加载Token失败", e)
+            Log.e(TAG, "加载持久化Token数据失败", e)
+            // 清空可能损坏的数据
+            receivedTokens.clear()
+            sharedTokens.clear()
+            tokenMetadata.clear()
         }
     }
     
     /**
-     * 保存Token到存储
+     * 持久化Token到存储
      */
     private fun saveTokensToStorage() {
         try {
+            Log.d(TAG, "开始持久化Token数据")
+            
             val editor = sharedPreferences.edit()
             
             // 保存接收Token
@@ -768,10 +818,15 @@ class TransportTokenPool private constructor(private val context: Context) {
             val sharedTokensJson = objectMapper.writeValueAsString(sharedTokensData)
             editor.putString(KEY_SHARED_TOKENS, sharedTokensJson)
             
+            // 更新最后保存时间
+            editor.putLong("last_save_time", System.currentTimeMillis())
+            
             editor.apply()
             
+            Log.d(TAG, "Token数据持久化完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "保存Token到存储失败", e)
+            Log.e(TAG, "持久化Token到存储失败", e)
         }
     }
     
@@ -986,6 +1041,25 @@ class TransportTokenPool private constructor(private val context: Context) {
                         Log.w(TAG, "刷新Token异常: ${token.tokenId}", e)
                     }
                 }
+            }
+        }
+    }
+    
+    /**
+     * 如果需要则执行清理
+     */
+    private fun performCleanupIfNeeded() {
+        val lastCleanupTime = sharedPreferences.getLong("last_cleanup_time", 0)
+        val currentTime = System.currentTimeMillis()
+        
+        if (currentTime - lastCleanupTime > CLEANUP_INTERVAL_MS) {
+            Log.d(TAG, "执行定期清理检查")
+            poolScope.launch {
+                cleanExpiredTokens()
+                // 更新最后清理时间
+                sharedPreferences.edit()
+                    .putLong("last_cleanup_time", currentTime)
+                    .apply()
             }
         }
     }
