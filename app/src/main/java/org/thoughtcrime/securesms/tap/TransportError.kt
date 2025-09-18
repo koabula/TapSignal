@@ -124,6 +124,14 @@ enum class TransportError(
         description = "消息加密或解密失败"
     ),
     
+    /** 超时错误 */
+    TIMEOUT_ERROR(
+        displayName = "操作超时",
+        errorCode = "TIMEOUT_ERROR",
+        isRetryable = true,
+        description = "操作超时，请稍后重试"
+    ),
+    
     /** 未知错误 */
     UNKNOWN_ERROR(
         displayName = "未知错误",
