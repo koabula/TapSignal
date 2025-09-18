@@ -1,0 +1,26 @@
+{
+  "provider": {
+    "type": "cos",
+    "name": "云对象存储 (COS)",
+    "description": "支持AWS S3和腾讯云COS的云存储服务，提供永久凭证管理和群组消息传输功能",
+    "version": "1.0.0",
+    "author": "Signal Tap Team",
+    "supportsAuth": true,
+    "supportsGroup": true,
+    "supportsConfigTest": true,
+    "registrarClass": "org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar",
+    "configDescriptorClass": "org.thoughtcrime.securesms.tap.provider.cos.CosProviderConfigDescriptor",
+    "icon": "cos_provider_icon.png"
+  },
+  "requirements": {
+    "minApiLevel": 21,
+    "permissions": [
+      "INTERNET", 
+      "ACCESS_NETWORK_STATE"
+    ],
+    "dependencies": [
+      "okhttp3",
+      "jackson-databind"
+    ]
+  }
+} 
