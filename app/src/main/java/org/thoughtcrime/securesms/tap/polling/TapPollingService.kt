@@ -146,6 +146,11 @@ class TapPollingService(private val context: Context) {
                 Log.i(TAG, "停止Tap轮询服务...")
                 
                 isRunning.set(false)
+                
+                // 优雅停止：等待正在执行的任务完成
+                gracefulShutdown()
+                
+                // 清理资源
                 cleanup()
                 
                 Log.i(TAG, "Tap轮询服务已停止")
@@ -153,6 +158,46 @@ class TapPollingService(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(TAG, "停止轮询服务时发生错误", e)
             }
+        }
+    }
+    
+    /**
+     * 优雅停止轮询任务
+     */
+    private fun gracefulShutdown() {
+        try {
+            // 取消所有轮询任务
+            val tasks = pollingTasks.values.toList()
+            Log.d(TAG, "取消 ${tasks.size} 个轮询任务")
+            
+            tasks.forEach { taskInfo ->
+                taskInfo.task?.cancel(false) // 不中断正在运行的任务
+            }
+            
+            // 等待线程池安全关闭
+            pollingExecutor?.let { executor ->
+                executor.shutdown()
+                try {
+                    // 等待30秒让任务自然结束
+                    if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                        Log.w(TAG, "轮询任务未在30秒内完成，强制停止")
+                        executor.shutdownNow()
+                        // 再等待10秒
+                        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                            Log.e(TAG, "无法停止轮询线程池")
+                        }
+                    }
+                } catch (ie: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    executor.shutdownNow()
+                }
+            }
+            
+            // 清理任务信息
+            pollingTasks.clear()
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "优雅停止轮询任务时出错", e)
         }
     }
     

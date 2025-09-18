@@ -302,15 +302,61 @@ class TransportTokenPool private constructor(private val context: Context) {
                 // 清理过期的共享Token
                 cleanedCount += cleanExpiredSharedTokens()
                 
+                // 检查是否超过内存限制，如果是则强制清理
+                val totalCount = getTotalReceivedTokens() + getTotalSharedTokens()
+                if (totalCount > config.cacheSize) {
+                    val excessCount = totalCount - config.cacheSize
+                    cleanedCount += forceClearExcessTokens(excessCount)
+                }
+                
                 // 持久化存储
                 if (cleanedCount > 0) {
                     saveTokensToStorage()
-                    Log.i(TAG, "清理过期Token数量: $cleanedCount")
+                    Log.i(TAG, "清理Token数量: $cleanedCount (过期 + 多余)")
                 }
                 
                 cleanedCount
             }
         }
+    }
+    
+    /**
+     * 强制清理多余Token（当达到缓存限制时）
+     */
+    private fun forceClearExcessTokens(excessCount: Int): Int {
+        if (excessCount <= 0) return 0
+        
+        Log.i(TAG, "内存限制清理，需清理Token数量: $excessCount")
+        
+        // 按优先级清理Token：最后访问时间早的、添加时间早的
+        val allTokenMetadata = tokenMetadata.values
+            .sortedWith(compareBy<TokenMetadata> { it.lastAccessedAt }
+                .thenBy { it.addedAt }) // 然后按添加时间排序
+        
+        val tokensToRemove = allTokenMetadata.take(excessCount)
+        var removedCount = 0
+        
+        tokensToRemove.forEach { metadata ->
+            when (metadata.tokenType) {
+                TokenType.RECEIVED -> {
+                    if (receivedTokens[metadata.recipientId]?.remove(metadata.providerType) != null) {
+                        removedCount++
+                    }
+                }
+                TokenType.SHARED -> {
+                    if (sharedTokens[metadata.recipientId]?.remove(metadata.providerType) != null) {
+                        removedCount++
+                    }
+                }
+            }
+            tokenMetadata.remove(metadata.tokenId)
+            Log.d(TAG, "内存限制移除Token: ${metadata.tokenId} (最后访问: ${metadata.lastAccessedAt})")
+        }
+        
+        // 清理空的映射
+        cleanupEmptyMaps()
+        
+        return removedCount
     }
     
     /**

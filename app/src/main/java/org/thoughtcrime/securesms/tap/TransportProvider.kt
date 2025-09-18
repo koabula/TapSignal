@@ -106,11 +106,7 @@ interface TransportProvider {
      * @return 生成的访问Token，如果不支持权限管理则返回null
      */
     suspend fun generateToken(request: TransportTokenRequest): TransportToken? {
-        return if (supportsAuth) {
-            throw NotImplementedError("支持权限管理的Provider必须实现generateToken方法")
-        } else {
-            null
-        }
+        return null // 默认实现返回null，支持权限管理的Provider需要重写此方法
     }
     
     /**
@@ -120,13 +116,20 @@ interface TransportProvider {
      * @return 验证结果，如果不支持权限管理则返回true
      */
     suspend fun validateToken(token: TransportToken): Boolean {
+        // 基本验证：Provider类型匹配和Token有效性
+        if (token.providerType != providerType) {
+            return false
+        }
+        
+        if (token.isExpired || !token.validate()) {
+            return false
+        }
+        
         return if (supportsAuth) {
-            if (token.providerType != providerType) {
-                false
-            } else {
-                !token.isExpired && token.validate()
-            }
+            // 支持权限管理的Provider可以重写此方法进行更严格的验证
+            true
         } else {
+            // 不支持权限管理的Provider也需要基本验证
             true
         }
     }
@@ -138,11 +141,7 @@ interface TransportProvider {
      * @return 撤销结果，如果不支持权限管理则返回true
      */
     suspend fun revokeToken(token: TransportToken): Boolean {
-        return if (supportsAuth) {
-            throw NotImplementedError("支持权限管理的Provider必须实现revokeToken方法")
-        } else {
-            true
-        }
+        return !supportsAuth // 不支持权限管理的Provider返回true，支持的Provider需要重写此方法
     }
     
     /**

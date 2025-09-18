@@ -267,7 +267,31 @@ class TransportManager private constructor(private val context: Context) {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "发送消息异常", e)
-                TransportResult.fromException(e, true)
+                val isRetryable = when (e) {
+                    is SecurityException,
+                    is IllegalArgumentException,
+                    is IllegalStateException -> false // 配置或权限问题不可重试
+                    is java.net.UnknownHostException,
+                    is java.net.SocketTimeoutException,
+                    is java.net.ConnectException,
+                    is java.io.IOException -> true // 网络问题可重试
+                    is InterruptedException,
+                    is CancellationException -> false // 取消操作不重试
+                    else -> {
+                        // 未知异常，根据消息内容判断
+                        val message = e.message?.lowercase() ?: ""
+                        when {
+                            message.contains("permission") || 
+                            message.contains("unauthorized") ||
+                            message.contains("forbidden") -> false
+                            message.contains("timeout") ||
+                            message.contains("connection") ||
+                            message.contains("network") -> true
+                            else -> false // 保守策略：未知错误不重试
+                        }
+                    }
+                }
+                TransportResult.fromException(e, isRetryable)
             }
         }
     }
@@ -309,6 +333,13 @@ class TransportManager private constructor(private val context: Context) {
                 
             } catch (e: Exception) {
                 Log.e(TAG, "轮询消息异常", e)
+                // 记录异常统计，用于监控和调试
+                when (e) {
+                    is SecurityException -> Log.w(TAG, "轮询权限问题，检查Token状态")
+                    is java.net.SocketTimeoutException -> Log.d(TAG, "轮询网络超时，稍后重试")
+                    is CancellationException -> Log.d(TAG, "轮询任务被取消")
+                    else -> Log.w(TAG, "轮询遇到未知异常: ${e.javaClass.simpleName}")
+                }
                 emptyList()
             }
         }
@@ -345,32 +376,42 @@ class TransportManager private constructor(private val context: Context) {
      */
     suspend fun updateConfig(newConfig: TransportConfig): Boolean {
         return withContext(Dispatchers.IO) {
-            initializationLock.write {
-                try {
-                    val validationResult = newConfig.validate()
-                    if (!validationResult.isValid && validationResult is TransportConfigValidationResult.Invalid) {
-                        Log.e(TAG, "新配置无效: ${validationResult.errors.joinToString(", ")}")
-                        return@withContext false
-                    }
-                    
-                    val oldConfig = currentConfig
-                    currentConfig = newConfig
-                    
-                    // 更新子组件配置
-                    channelManager.value.updateConfig(newConfig.channelConfig)
-                    tokenPool.value.updateConfig(newConfig.tokenConfig)
-                    routingManager.value.updateRoutingPolicy(newConfig.routingPolicy)
-                    
-                    // 处理Provider启用状态变化
-                    handleProviderStatusChange(oldConfig, newConfig)
-                    
-                    Log.i(TAG, "传输配置更新完成")
-                    true
-                    
-                } catch (e: Exception) {
-                    Log.e(TAG, "更新传输配置失败", e)
-                    false
+            // 先验证配置，避免在锁内进行复杂操作
+            val validationResult = newConfig.validate()
+            if (!validationResult.isValid && validationResult is TransportConfigValidationResult.Invalid) {
+                Log.e(TAG, "新配置无效: ${validationResult.errors.joinToString(", ")}")
+                return@withContext false
+            }
+            
+            val oldConfig = initializationLock.write {
+                val old = currentConfig
+                currentConfig = newConfig
+                old
+            }
+            
+            try {
+                // 在锁外更新子组件配置，避免嵌套锁死锁
+                val updateTasks = listOf(
+                    async { channelManager.value.updateConfig(newConfig.channelConfig) },
+                    async { tokenPool.value.updateConfig(newConfig.tokenConfig) },
+                    async { routingManager.value.updateRoutingPolicy(newConfig.routingPolicy) }
+                )
+                
+                updateTasks.awaitAll()
+                
+                // 处理Provider启用状态变化
+                handleProviderStatusChange(oldConfig, newConfig)
+                
+                Log.i(TAG, "传输配置更新完成")
+                true
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "更新传输配置失败，回滚配置", e)
+                // 回滚配置
+                initializationLock.write {
+                    currentConfig = oldConfig
                 }
+                false
             }
         }
     }

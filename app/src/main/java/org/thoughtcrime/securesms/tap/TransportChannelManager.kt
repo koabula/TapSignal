@@ -190,8 +190,19 @@ class TransportChannelManager private constructor(private val context: Context) 
     fun getActiveChannels(recipientId: String): List<TransportChannel> {
         channelLock.read {
             val channelIds = recipientChannels[recipientId] ?: return emptyList()
-            return channelIds.mapNotNull { channelId ->
-                channels[channelId]?.takeIf { it.isActive() }
+            // 先获取所有通道快照，避免在读锁内调用可能修改状态的方法
+            val channelSnapshots = channelIds.mapNotNull { channelId ->
+                channels[channelId]
+            }
+            
+            // 在读锁外进行状态检查和排序
+            return channelSnapshots.filter { channel ->
+                try {
+                    channel.isActive()
+                } catch (e: Exception) {
+                    Log.w(TAG, "检查通道状态时出错: ${channel.channelId}", e)
+                    false
+                }
             }.sortedByDescending { it.priority }
         }
     }

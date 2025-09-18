@@ -1,5 +1,7 @@
 package org.thoughtcrime.securesms.tap
 
+import android.util.Log
+
 /**
  * 传输元数据接口
  * 
@@ -79,15 +81,44 @@ data class CosTransportMetadata(
          */
         fun fromMap(data: Map<String, Any>): CosTransportMetadata? {
             return try {
-                val recipientId = data["recipientId"] as? String ?: return null
-                val address = data["address"] as? String ?: return null
-                val path = data["path"] as? String ?: return null
-                val providerType = data["providerType"] as? String ?: "cos"
-                val region = data["region"] as? String ?: return null
-                val bucketName = data["bucketName"] as? String ?: return null
+                // 安全的类型检查和转换
+                val recipientId = data["recipientId"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
                 
-                // Token暂时设为null，等TransportToken实现后再处理
-                val token: TransportToken? = null
+                val address = data["address"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val path = data["path"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val providerType = data["providerType"]?.let {
+                    if (it is String && it.isNotBlank()) it else "cos"
+                } ?: "cos"
+                
+                val region = data["region"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val bucketName = data["bucketName"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                // 验证Provider类型
+                if (providerType != "cos") {
+                    return null
+                }
+                
+                // 处理Token数据
+                val token: TransportToken? = data["token"]?.let { tokenData ->
+                    if (tokenData is Map<*, *>) {
+                        @Suppress("UNCHECKED_CAST")
+                        val tokenMap = tokenData as Map<String, Any>
+                        CosTransportToken.fromMap(tokenMap)
+                    } else null
+                }
                 
                 CosTransportMetadata(
                     recipientId = recipientId,
@@ -98,7 +129,11 @@ data class CosTransportMetadata(
                     region = region,
                     bucketName = bucketName
                 )
+            } catch (e: ClassCastException) {
+                Log.e("CosTransportMetadata", "类型转换错误", e)
+                null
             } catch (e: Exception) {
+                Log.e("CosTransportMetadata", "反序列化失败", e)
                 null
             }
         }
@@ -217,19 +252,75 @@ data class EmailTransportMetadata(
     companion object {
         fun fromMap(data: Map<String, Any>): EmailTransportMetadata? {
             return try {
-                val recipientId = data["recipientId"] as? String ?: return null
-                val address = data["address"] as? String ?: return null
-                val path = data["path"] as? String ?: return null
-                val providerType = data["providerType"] as? String ?: "email"
-                val smtpServer = data["smtpServer"] as? String ?: return null
-                val imapServer = data["imapServer"] as? String ?: return null
-                val port = (data["port"] as? Number)?.toInt() ?: return null
-                val useSSL = data["useSSL"] as? Boolean ?: true
+                // 安全的类型检查和转换
+                val recipientId = data["recipientId"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val address = data["address"]?.let { 
+                    if (it is String && it.contains("@")) it else return null 
+                } ?: return null
+                
+                val path = data["path"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val providerType = data["providerType"]?.let {
+                    if (it is String && it.isNotBlank()) it else "email"
+                } ?: "email"
+                
+                val smtpServer = data["smtpServer"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val imapServer = data["imapServer"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val port = data["port"]?.let { portValue ->
+                    when (portValue) {
+                        is Number -> {
+                            val intPort = portValue.toInt()
+                            if (intPort in 1..65535) intPort else return null
+                        }
+                        is String -> {
+                            try {
+                                val intPort = portValue.toInt()
+                                if (intPort in 1..65535) intPort else return null
+                            } catch (e: NumberFormatException) {
+                                return null
+                            }
+                        }
+                        else -> return null
+                    }
+                } ?: return null
+                
+                val useSSL = data["useSSL"]?.let {
+                    when (it) {
+                        is Boolean -> it
+                        is String -> it.toBoolean()
+                        else -> true
+                    }
+                } ?: true
+                
+                // 验证Provider类型
+                if (providerType != "email") {
+                    return null
+                }
+                
+                // 处理Token数据
+                val token: TransportToken? = data["token"]?.let { tokenData ->
+                    if (tokenData is Map<*, *>) {
+                        @Suppress("UNCHECKED_CAST")
+                        val tokenMap = tokenData as Map<String, Any>
+                        EmailTransportToken.fromMap(tokenMap)
+                    } else null
+                }
                 
                 EmailTransportMetadata(
                     recipientId = recipientId,
                     address = address,
-                    token = null, // 暂时设为null
+                    token = token,
                     path = path,
                     providerType = providerType,
                     smtpServer = smtpServer,
@@ -237,7 +328,11 @@ data class EmailTransportMetadata(
                     port = port,
                     useSSL = useSSL
                 )
+            } catch (e: ClassCastException) {
+                Log.e("EmailTransportMetadata", "类型转换错误", e)
+                null
             } catch (e: Exception) {
+                Log.e("EmailTransportMetadata", "反序列化失败", e)
                 null
             }
         }

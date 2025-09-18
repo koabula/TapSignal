@@ -82,29 +82,58 @@ data class TransportConfig(
     fun validate(): TransportConfigValidationResult {
         val errors = mutableListOf<String>()
         
+        // 验证Provider类型名称格式
+        enabledProviders.forEach { providerType ->
+            if (providerType.isBlank()) {
+                errors.add("Provider类型不能为空")
+            } else if (!providerType.matches(Regex("^[a-zA-Z][a-zA-Z0-9_-]*$"))) {
+                errors.add("Provider类型格式无效: '$providerType' (只能包含字母、数字、下划线和连字符，且必须以字母开头)")
+            } else if (providerType.length > 50) {
+                errors.add("Provider类型名称过长: '$providerType' (最大50字符)")
+            }
+        }
+        
         // 检查默认Provider是否在启用列表中
         defaultProvider?.let { default ->
-            if (!enabledProviders.contains(default)) {
+            if (default.isBlank()) {
+                errors.add("默认传输提供者不能为空字符串")
+            } else if (!enabledProviders.contains(default)) {
                 errors.add("默认传输提供者 '$default' 未在启用列表中")
             }
+        }
+        
+        // 验证启用Provider数量限制
+        if (enabledProviders.size > 10) {
+            errors.add("启用的Provider数量过多: ${enabledProviders.size} (最大支持10个)")
+        }
+        
+        // 验证路由策略兼容性
+        if (routingPolicy == TransportRoutingPolicy.TRANSPORT_ONLY && enabledProviders.isEmpty()) {
+            errors.add("选择'仅传输服务'路由策略时必须启用至少一个Provider")
         }
         
         // 验证轮询配置
         val pollingValidation = pollingConfig.validate()
         if (!pollingValidation.isValid && pollingValidation is TransportConfigValidationResult.Invalid) {
-            errors.addAll(pollingValidation.errors)
+            errors.addAll(pollingValidation.errors.map { "轮询配置: $it" })
         }
         
         // 验证通道配置
         val channelValidation = channelConfig.validate()
         if (!channelValidation.isValid && channelValidation is TransportConfigValidationResult.Invalid) {
-            errors.addAll(channelValidation.errors)
+            errors.addAll(channelValidation.errors.map { "通道配置: $it" })
         }
         
         // 验证Token配置
         val tokenValidation = tokenConfig.validate()
         if (!tokenValidation.isValid && tokenValidation is TransportConfigValidationResult.Invalid) {
-            errors.addAll(tokenValidation.errors)
+            errors.addAll(tokenValidation.errors.map { "Token配置: $it" })
+        }
+        
+        // 验证重试配置
+        val retryValidation = retryConfig.validate()
+        if (!retryValidation.isValid && retryValidation is TransportConfigValidationResult.Invalid) {
+            errors.addAll(retryValidation.errors.map { "重试配置: $it" })
         }
         
         return if (errors.isEmpty()) {
@@ -394,7 +423,49 @@ data class TransportRetryConfig(
         TransportError.PROVIDER_UNAVAILABLE,
         TransportError.TIMEOUT_ERROR
     )
-)
+) {
+    
+    /**
+     * 验证重试配置
+     */
+    fun validate(): TransportConfigValidationResult {
+        val errors = mutableListOf<String>()
+        
+        if (maxRetries < 0) {
+            errors.add("最大重试次数不能为负数")
+        } else if (maxRetries > 10) {
+            errors.add("最大重试次数不能超过10次")
+        }
+        
+        if (baseRetryInterval < 100L) {
+            errors.add("基础重试间隔不能小于100毫秒")
+        } else if (baseRetryInterval > 300000L) { // 5分钟
+            errors.add("基础重试间隔不能超过5分钟")
+        }
+        
+        if (retryMultiplier < 1.0) {
+            errors.add("重试间隔倍数不能小于1.0")
+        } else if (retryMultiplier > 10.0) {
+            errors.add("重试间隔倍数不能超过10.0")
+        }
+        
+        if (maxRetryInterval < baseRetryInterval) {
+            errors.add("最大重试间隔不能小于基础重试间隔")
+        } else if (maxRetryInterval > 3600000L) { // 1小时
+            errors.add("最大重试间隔不能超过1小时")
+        }
+        
+        if (retryableErrors.isEmpty()) {
+            errors.add("至少需要设置一种可重试的错误类型")
+        }
+        
+        return if (errors.isEmpty()) {
+            TransportConfigValidationResult.Valid
+        } else {
+            TransportConfigValidationResult.Invalid(errors)
+        }
+    }
+}
 
 /**
  * 传输配置验证结果
