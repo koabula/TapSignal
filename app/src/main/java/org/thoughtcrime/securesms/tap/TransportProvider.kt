@@ -283,29 +283,7 @@ interface TransportProviderFactory {
     }
 }
 
-/**
- * 配置验证结果
- */
-sealed class ConfigValidationResult {
-    /** 验证通过 */
-    object Valid : ConfigValidationResult()
-    
-    /** 验证失败 */
-    data class Invalid(val errors: Map<String, String>) : ConfigValidationResult()
-    
-    /**
-     * 检查是否有效
-     */
-    fun isValid(): Boolean = this is Valid
-    
-    /**
-     * 获取错误消息 - 避免与data class自动生成的getter冲突，使用不同的方法名
-     */
-    fun getValidationErrors(): Map<String, String> = when (this) {
-        is Invalid -> errors
-        else -> emptyMap()
-    }
-}
+
 
 /**
  * 传输提供者注册器接口
