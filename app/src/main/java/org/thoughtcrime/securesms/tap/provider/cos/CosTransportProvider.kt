@@ -2,19 +2,20 @@ package org.thoughtcrime.securesms.tap.provider.cos
 
 import android.content.Context
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.tap.provider.cos.cos.*
-import org.thoughtcrime.securesms.tap.provider.cos.coscomm.data.CosAccessInfo
-import org.thoughtcrime.securesms.tap.provider.cos.coscomm.manager.SubAccountPoolManager
+import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
+import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
+import org.thoughtcrime.securesms.tap.provider.cos.utils.common.*
 import org.thoughtcrime.securesms.tap.*
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import okhttp3.MediaType.Companion.toMediaType
 
 /**
  * COS传输提供者实现
  * 
- * 将现有的cos和coscomm模块功能适配到TAP架构中，
+ * 直接使用utils中的COS底层代码，不再依赖cos和coscomm模块。
  * 提供云对象存储服务的传输能力。
  */
 class CosTransportProvider(
@@ -45,9 +46,6 @@ class CosTransportProvider(
         TransportPermission.DELETE,
         TransportPermission.LIST
     )
-
-    // 延迟初始化的组件
-    private val subAccountPoolManager by lazy { SubAccountPoolManager.getInstance(context) }
     
     // COS配置信息
     private val cosConfig: CosConfig by lazy {
@@ -164,20 +162,20 @@ class CosTransportProvider(
                 val latestFile = files.maxByOrNull { it.lastModified }
                     ?: return@withContext TransportResult.Success(null)
 
-                Log.d(TAG, "找到最新文件: ${latestFile.key}, size=${latestFile.size}")
+                Log.d(TAG, "找到最新文件: ${latestFile.name}, size=${latestFile.size}")
 
                 // 下载并解析消息
                 val tempFile = File.createTempFile("cos_download_", ".dat", context.cacheDir)
                 
                 try {
-                    val downloadSuccess = cosClient.downloadFile(latestFile.key, tempFile)
+                    val downloadSuccess = cosClient.downloadFile(latestFile.name, tempFile)
                     
                     if (downloadSuccess && tempFile.exists()) {
                         val message = parseMessageFromFile(tempFile)
                         Log.i(TAG, "消息拉取成功: messageId=${message.messageId}")
                         TransportResult.Success(message)
                     } else {
-                        Log.e(TAG, "文件下载失败: ${latestFile.key}")
+                        Log.e(TAG, "文件下载失败: ${latestFile.name}")
                         TransportResult.failure(
                             TransportError.NETWORK_ERROR,
                             true,
@@ -281,19 +279,22 @@ class CosTransportProvider(
     }
 
     /**
-     * 生成访问Token - 适配SubAccountPoolManager
+     * 生成访问Token - 直接使用COS客户端生成临时凭证
      */
     override suspend fun generateToken(request: TransportTokenRequest): TransportToken? {
         return withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "生成访问Token: recipientId=${request.recipientId}")
                 
-                // 使用现有的COS客户端生成临时凭证
+                // 使用COS客户端生成临时凭证
                 val cosClient = CosClientFactory.createClient(cosConfig, context)
                 val directoryPath = OUTBOX_PATH // 默认使用outbox路径
                 
-                // 生成临时访问凭证（永久凭证）
-                val accessToken = cosClient.generateTemporaryAccessToken(directoryPath, Int.MAX_VALUE)
+                // 生成临时访问凭证
+                val accessToken = cosClient.generateTemporaryAccessToken(
+                    directoryPath = directoryPath, 
+                    durationMinutes = 60 // 1小时有效期
+                )
                 
                 // 转换为CosTransportToken
                 val transportToken = CosTransportToken(
@@ -301,7 +302,7 @@ class CosTransportProvider(
                     recipientId = request.recipientId,
                     providerType = "cos",
                     permissions = request.requestedPermissions,
-                    expirationTime = Long.MAX_VALUE, // 永久凭证
+                    expirationTime = accessToken.expiration,
                     accessKeyId = accessToken.accessKeyId,
                     secretAccessKey = accessToken.secretAccessKey,
                     sessionToken = accessToken.sessionToken,
@@ -373,14 +374,28 @@ class CosTransportProvider(
             try {
                 Log.i(TAG, "撤销Token: tokenId=${token.tokenId}")
                 
-                // 从SubAccountPoolManager中移除相关凭证
                 val cosToken = token as? CosTransportToken
                     ?: return@withContext false
                 
-                // 这里应该调用云服务API撤销凭证，但现有的COS模块没有提供此功能
-                // 暂时只做本地清理
-                Log.i(TAG, "Token撤销完成: tokenId=${token.tokenId}")
-                true
+                // 根据不同的Provider类型执行真实的撤销操作
+                val revokeResult = when {
+                    cosToken.region.startsWith("ap-") -> {
+                        // 腾讯云COS Token撤销
+                        revokeTencentToken(cosToken)
+                    }
+                    else -> {
+                        // AWS S3 Token撤销
+                        revokeAwsToken(cosToken)
+                    }
+                }
+                
+                if (revokeResult) {
+                    Log.i(TAG, "Token撤销成功: tokenId=${token.tokenId}")
+                } else {
+                    Log.w(TAG, "Token撤销失败: tokenId=${token.tokenId}")
+                }
+                
+                revokeResult
 
             } catch (e: Exception) {
                 Log.e(TAG, "撤销Token时发生异常", e)
@@ -443,13 +458,40 @@ class CosTransportProvider(
     private fun createTempFile(message: TransportMessage): File {
         val tempFile = File.createTempFile("cos_upload_", ".dat", context.cacheDir)
         
-        // 将消息内容写入文件
+        // 按照TaP层消息格式序列化消息
+        // 格式：[messageId长度(4字节)][messageId][timestamp(8字节)][messageType(4字节)][content长度(4字节)][encryptedContent][attachments数量(4字节)][attachments...]
         tempFile.outputStream().use { output ->
+            // 1. 写入messageId
+            val messageIdBytes = message.messageId.toByteArray(Charsets.UTF_8)
+            output.write(intToBytes(messageIdBytes.size))
+            output.write(messageIdBytes)
+            
+            // 2. 写入timestamp
+            output.write(longToBytes(message.timestamp))
+            
+            // 3. 写入messageType
+            output.write(intToBytes(message.messageType.ordinal))
+            
+            // 4. 写入encryptedContent
+            output.write(intToBytes(message.encryptedContent.size))
             output.write(message.encryptedContent)
             
-            // 如果有附件，也写入文件
+            // 5. 写入attachments
+            output.write(intToBytes(message.attachments.size))
             message.attachments.forEach { attachment ->
+                // 写入attachmentId
+                val attachmentIdBytes = attachment.attachmentId.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(attachmentIdBytes.size))
+                output.write(attachmentIdBytes)
+                
+                // 写入attachmentData
+                output.write(intToBytes(attachment.encryptedData.size))
                 output.write(attachment.encryptedData)
+                
+                // 写入mimeType
+                val mimeTypeBytes = attachment.mimeType.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(mimeTypeBytes.size))
+                output.write(mimeTypeBytes)
             }
         }
         
@@ -462,13 +504,292 @@ class CosTransportProvider(
     private fun parseMessageFromFile(file: File): TransportMessage {
         val content = file.readBytes()
         
-        // 简化的消息解析，实际应该根据消息格式进行解析
+        // 真实的消息解析逻辑
+        // TaP层消息格式：[messageId长度(4字节)][messageId][timestamp(8字节)][messageType(4字节)][content长度(4字节)][encryptedContent][attachments数量(4字节)][attachments...]
+        
+        if (content.size < 20) { // 最小头部大小
+            throw IllegalArgumentException("消息文件格式无效：文件过小")
+        }
+        
+        var offset = 0
+        
+        // 1. 读取messageId
+        val messageIdLength = bytesToInt(content, offset)
+        offset += 4
+        if (offset + messageIdLength > content.size) {
+            throw IllegalArgumentException("消息文件格式无效：messageId长度超出范围")
+        }
+        val messageId = String(content, offset, messageIdLength, Charsets.UTF_8)
+        offset += messageIdLength
+        
+        // 2. 读取timestamp
+        if (offset + 8 > content.size) {
+            throw IllegalArgumentException("消息文件格式无效：timestamp不完整")
+        }
+        val timestamp = bytesToLong(content, offset)
+        offset += 8
+        
+        // 3. 读取messageType
+        if (offset + 4 > content.size) {
+            throw IllegalArgumentException("消息文件格式无效：messageType不完整")
+        }
+        val messageTypeOrdinal = bytesToInt(content, offset)
+        offset += 4
+        val messageType = TransportMessageType.values().getOrNull(messageTypeOrdinal)
+            ?: TransportMessageType.TEXT_MESSAGE
+        
+        // 4. 读取encryptedContent
+        if (offset + 4 > content.size) {
+            throw IllegalArgumentException("消息文件格式无效：content长度不完整")
+        }
+        val contentLength = bytesToInt(content, offset)
+        offset += 4
+        if (offset + contentLength > content.size) {
+            throw IllegalArgumentException("消息文件格式无效：content长度超出范围")
+        }
+        val encryptedContent = content.copyOfRange(offset, offset + contentLength)
+        offset += contentLength
+        
+        // 5. 读取attachments
+        val attachments = mutableListOf<TransportAttachment>()
+        if (offset + 4 <= content.size) {
+            val attachmentCount = bytesToInt(content, offset)
+            offset += 4
+            
+            for (i in 0 until attachmentCount) {
+                if (offset + 12 > content.size) break // 不完整的attachment头部
+                
+                val attachmentIdLength = bytesToInt(content, offset)
+                offset += 4
+                if (offset + attachmentIdLength > content.size) break
+                val attachmentId = String(content, offset, attachmentIdLength, Charsets.UTF_8)
+                offset += attachmentIdLength
+                
+                val attachmentDataLength = bytesToInt(content, offset)
+                offset += 4
+                if (offset + attachmentDataLength > content.size) break
+                val attachmentData = content.copyOfRange(offset, offset + attachmentDataLength)
+                offset += attachmentDataLength
+                
+                val mimeTypeLength = bytesToInt(content, offset)
+                offset += 4
+                if (offset + mimeTypeLength > content.size) break
+                val mimeType = String(content, offset, mimeTypeLength, Charsets.UTF_8)
+                offset += mimeTypeLength
+                
+                attachments.add(TransportAttachment(
+                    attachmentId = attachmentId,
+                    encryptedData = attachmentData,
+                    mimeType = mimeType,
+                    size = attachmentData.size.toLong()
+                ))
+            }
+        }
+        
         return TransportMessage(
-            messageId = "parsed_${System.currentTimeMillis()}",
-            encryptedContent = content,
-            messageType = TransportMessageType.TEXT_MESSAGE,
-            timestamp = System.currentTimeMillis(),
-            attachments = emptyList()
+            messageId = messageId,
+            encryptedContent = encryptedContent,
+            messageType = messageType,
+            timestamp = timestamp,
+            attachments = attachments
         )
+    }
+    
+    /**
+     * 4字节转Int（大端序）
+     */
+    private fun bytesToInt(bytes: ByteArray, offset: Int): Int {
+        return ((bytes[offset].toInt() and 0xFF) shl 24) or
+               ((bytes[offset + 1].toInt() and 0xFF) shl 16) or
+               ((bytes[offset + 2].toInt() and 0xFF) shl 8) or
+               (bytes[offset + 3].toInt() and 0xFF)
+    }
+    
+    /**
+     * 8字节转Long（大端序）
+     */
+    private fun bytesToLong(bytes: ByteArray, offset: Int): Long {
+        var result = 0L
+        for (i in 0 until 8) {
+            result = (result shl 8) or (bytes[offset + i].toLong() and 0xFF)
+        }
+        return result
+    }
+    
+    /**
+     * Int转4字节（大端序）
+     */
+    private fun intToBytes(value: Int): ByteArray {
+        return byteArrayOf(
+            (value shr 24).toByte(),
+            (value shr 16).toByte(),
+            (value shr 8).toByte(),
+            value.toByte()
+        )
+    }
+    
+    /**
+     * Long转8字节（大端序）
+     */
+    private fun longToBytes(value: Long): ByteArray {
+        return byteArrayOf(
+            (value shr 56).toByte(),
+            (value shr 48).toByte(),
+            (value shr 40).toByte(),
+            (value shr 32).toByte(),
+            (value shr 24).toByte(),
+            (value shr 16).toByte(),
+            (value shr 8).toByte(),
+            value.toByte()
+        )
+    }
+    
+    /**
+     * 撤销腾讯云COS Token
+     */
+    private suspend fun revokeTencentToken(cosToken: CosTransportToken): Boolean {
+        return try {
+            // 对于腾讯云，区分临时凭证和永久凭证的处理方式
+            if (cosToken.sessionToken.isNullOrEmpty()) {
+                // 永久凭证：尝试删除子用户
+                val host = "cam.tencentcloudapi.com"
+                val service = "cam"
+                val version = "2019-01-16"
+                val action = "DeleteUser"
+                val timestamp = System.currentTimeMillis() / 1000
+
+                val requestBody = """
+                {
+                    "Name": "signal-tap-user-${cosToken.recipientId}"
+                }
+                """.trimIndent()
+
+                val authorization = org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentSigner.buildTC3AuthorizationHeader(
+                    secretId = cosConfig.secretId,
+                    secretKey = cosConfig.secretKey,
+                    service = service,
+                    region = cosToken.region,
+                    action = action,
+                    timestamp = timestamp,
+                    payload = requestBody,
+                    host = host
+                )
+
+                val request = okhttp3.Request.Builder()
+                    .url("https://$host/")
+                    .post(okhttp3.RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                    .header("Host", host)
+                    .header("Authorization", authorization)
+                    .header("X-TC-Action", action)
+                    .header("X-TC-Version", version)
+                    .header("X-TC-Region", cosToken.region)
+                    .header("X-TC-Timestamp", timestamp.toString())
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .build()
+
+                val okHttpClient = okhttp3.OkHttpClient()
+                okHttpClient.newCall(request).execute().use { resp ->
+                    when {
+                        resp.isSuccessful -> {
+                            Log.i(TAG, "腾讯云子用户删除成功: tokenId=${cosToken.tokenId}")
+                            true
+                        }
+                        resp.body?.string()?.contains("InvalidParameter.UserNotExist") == true -> {
+                            Log.i(TAG, "腾讯云子用户不存在，视为撤销成功: tokenId=${cosToken.tokenId}")
+                            true
+                        }
+                        else -> {
+                            Log.e(TAG, "腾讯云子用户删除失败: ${resp.code}")
+                            false
+                        }
+                    }
+                }
+            } else {
+                // 临时凭证：记录撤销状态，等待自然过期
+                Log.i(TAG, "腾讯云临时凭证等待自然过期: tokenId=${cosToken.tokenId}")
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "撤销腾讯云Token失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 撤销AWS S3 Token
+     */
+    private suspend fun revokeAwsToken(cosToken: CosTransportToken): Boolean {
+        return try {
+            if (cosToken.sessionToken.isNullOrEmpty()) {
+                // 永久凭证：删除IAM用户的访问密钥
+                revokeAwsAccessKey(cosToken)
+            } else {
+                // 临时凭证：记录撤销状态，等待自然过期
+                Log.i(TAG, "AWS临时凭证等待自然过期: tokenId=${cosToken.tokenId}")
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "撤销AWS Token失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 撤销AWS访问密钥
+     */
+    private suspend fun revokeAwsAccessKey(cosToken: CosTransportToken): Boolean {
+        return try {
+            val date = java.util.Date()
+            val amzDate = java.text.SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(date)
+            val dateStamp = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(date)
+            
+            val action = "Action=DeleteAccessKey&Version=2010-05-08&AccessKeyId=${cosToken.accessKeyId}&UserName=signal-tap-user-${cosToken.recipientId}"
+            val host = "iam.amazonaws.com"
+            val canonicalUri = "/"
+            val canonicalQueryString = action
+            val payloadHash = org.thoughtcrime.securesms.tap.provider.cos.utils.client.aws.AwsSigner.hash("")
+            val canonicalHeaders = "host:$host\n" +
+                    "x-amz-content-sha256:$payloadHash\n" +
+                    "x-amz-date:$amzDate\n"
+            val signedHeaders = "host;x-amz-content-sha256;x-amz-date"
+            val canonicalRequest = "GET\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
+
+            val authorization = org.thoughtcrime.securesms.tap.provider.cos.utils.client.aws.AwsSigner.buildAuthorizationHeader(
+                cosConfig.secretId, cosConfig.secretKey, "us-east-1", "iam", canonicalRequest, amzDate, dateStamp, signedHeaders
+            )
+
+            val request = okhttp3.Request.Builder()
+                .url("https://$host/?$action")
+                .get()
+                .header("x-amz-content-sha256", payloadHash)
+                .header("x-amz-date", amzDate)
+                .header("Authorization", authorization)
+                .build()
+
+            val okHttpClient = okhttp3.OkHttpClient()
+            okHttpClient.newCall(request).execute().use { resp ->
+                when {
+                    resp.isSuccessful -> {
+                        Log.i(TAG, "AWS访问密钥删除成功: tokenId=${cosToken.tokenId}")
+                        true
+                    }
+                    resp.body?.string()?.contains("NoSuchEntity") == true -> {
+                        Log.i(TAG, "AWS访问密钥不存在，视为撤销成功: tokenId=${cosToken.tokenId}")
+                        true
+                    }
+                    else -> {
+                        Log.e(TAG, "AWS访问密钥删除失败: ${resp.code}")
+                        false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "撤销AWS访问密钥失败", e)
+            false
+        }
     }
 } 

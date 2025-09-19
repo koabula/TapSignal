@@ -2,7 +2,6 @@ package org.thoughtcrime.securesms.tap.provider.cos
 
 import android.content.Context
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.tap.provider.cos.cos.*
 import org.thoughtcrime.securesms.tap.*
 import java.io.File
 
