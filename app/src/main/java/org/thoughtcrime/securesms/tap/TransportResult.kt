@@ -16,8 +16,35 @@ sealed class TransportResult {
      */
     data class Success(
         val message: TransportMessage? = null,
-        val metadata: Map<String, Any> = emptyMap()
+        val metadata: Map<String, Any> = emptyMap(),
+        val data: ByteArray? = null,
+        val files: List<FileInfo>? = null
     ) : TransportResult() {
+        
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            
+            other as Success
+            
+            if (message != other.message) return false
+            if (metadata != other.metadata) return false
+            if (data != null) {
+                if (other.data == null) return false
+                if (!data.contentEquals(other.data)) return false
+            } else if (other.data != null) return false
+            if (files != other.files) return false
+            
+            return true
+        }
+        
+        override fun hashCode(): Int {
+            var result = message?.hashCode() ?: 0
+            result = 31 * result + metadata.hashCode()
+            result = 31 * result + (data?.contentHashCode() ?: 0)
+            result = 31 * result + (files?.hashCode() ?: 0)
+            return result
+        }
         
         /**
          * 检查是否包含消息数据
@@ -213,6 +240,20 @@ sealed class TransportResult {
          */
         fun success(message: TransportMessage? = null, metadata: Map<String, Any> = emptyMap()): Success {
             return Success(message, metadata)
+        }
+        
+        /**
+         * 创建成功结果（包含文件列表）
+         */
+        fun success(files: List<FileInfo>, metadata: Map<String, Any> = emptyMap()): Success {
+            return Success(files = files, metadata = metadata)
+        }
+        
+        /**
+         * 创建成功结果（包含文件数据）
+         */
+        fun success(data: ByteArray, metadata: Map<String, Any> = emptyMap()): Success {
+            return Success(data = data, metadata = metadata)
         }
         
         /**

@@ -30,10 +30,40 @@ interface TransportMetadata {
     fun toMap(): Map<String, Any>
     
     /**
+     * 将元数据转换为JSON字符串，用于数据库存储
+     */
+    fun toJson(): String {
+        val map = toMap()
+        return mapToJsonString(map)
+    }
+    
+    /**
      * 从Map数据创建元数据实例，用于反序列化
      * 注意：这是一个接口方法，具体实现类需要提供静态工厂方法
      */
     fun validate(): Boolean
+    
+    /**
+     * 简单的Map到JSON字符串转换
+     */
+    private fun mapToJsonString(map: Map<String, Any>): String {
+        val sb = StringBuilder("{")
+        var first = true
+        for ((key, value) in map) {
+            if (!first) sb.append(",")
+            sb.append("\"").append(key).append("\":")
+            when (value) {
+                is String -> sb.append("\"").append(value.replace("\"", "\\\"")).append("\"")
+                is Number -> sb.append(value.toString())
+                is Boolean -> sb.append(value.toString())
+                null -> sb.append("null")
+                else -> sb.append("\"").append(value.toString().replace("\"", "\\\"")).append("\"")
+            }
+            first = false
+        }
+        sb.append("}")
+        return sb.toString()
+    }
 }
 
 /**

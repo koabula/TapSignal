@@ -80,6 +80,9 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
   val inAppPaymentSubscriberTable: InAppPaymentSubscriberTable = InAppPaymentSubscriberTable(context, this)
   val chatFoldersTable: ChatFolderTables = ChatFolderTables(context, this)
   val backupMediaSnapshotTable: BackupMediaSnapshotTable = BackupMediaSnapshotTable(context, this)
+  val transportChannelTable: org.thoughtcrime.securesms.tap.database.TransportChannelTable = org.thoughtcrime.securesms.tap.database.TransportChannelTable(context, this)
+  val transportPollingStateTable: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable = org.thoughtcrime.securesms.tap.database.TransportPollingStateTable(context, this)
+  val transportTokenTable: org.thoughtcrime.securesms.tap.database.TransportTokenTable = org.thoughtcrime.securesms.tap.database.TransportTokenTable(context, this)
 
   override fun onOpen(db: net.zetetic.database.sqlcipher.SQLiteDatabase) {
     db.setForeignKeyConstraintsEnabled(true)
@@ -582,5 +585,20 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     @get:JvmName("backupMediaSnapshots")
     val backupMediaSnapshots: BackupMediaSnapshotTable
       get() = instance!!.backupMediaSnapshotTable
+
+    @get:JvmStatic
+    @get:JvmName("transportChannels")
+    val transportChannels: org.thoughtcrime.securesms.tap.database.TransportChannelTable
+      get() = instance!!.transportChannelTable
+
+    @get:JvmStatic
+    @get:JvmName("transportPollingStates")
+    val transportPollingStates: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable
+      get() = instance!!.transportPollingStateTable
+
+    @get:JvmStatic
+    @get:JvmName("transportTokens")
+    val transportTokens: org.thoughtcrime.securesms.tap.database.TransportTokenTable
+      get() = instance!!.transportTokenTable
   }
 }

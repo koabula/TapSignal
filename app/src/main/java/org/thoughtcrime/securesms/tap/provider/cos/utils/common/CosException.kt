@@ -3,10 +3,10 @@ package org.thoughtcrime.securesms.tap.provider.cos.utils.common
 /**
  * COS操作异常
  */
-class CosException(
+open class CosException(
     message: String,
     cause: Throwable? = null
-) : Exception(message, cause)
+) : RuntimeException(message, cause)
 
 /**
  * COS认证异常

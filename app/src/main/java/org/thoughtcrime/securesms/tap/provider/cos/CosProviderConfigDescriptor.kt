@@ -3,6 +3,10 @@ package org.thoughtcrime.securesms.tap.provider.cos
 import android.content.Context
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
+import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
+import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
+import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
+import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 import java.io.File
 
 /**
@@ -243,17 +247,17 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
             
             // 创建测试客户端
             val cosClient = try {
-                CosClientFactory.createClient(cosConfig)
+                CosClientFactory.createClient(cosConfig, null)
             } catch (e: Exception) {
-                return ConfigTestResult.Failed("无法创建COS客户端", e.message)
+                return ConfigTestResult.Failed("无法创建COS客户端", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
             }
             
             // 执行连接测试
             performConnectionTest(cosClient, cosConfig)
             
         } catch (e: Exception) {
-            Log.e(TAG, "测试配置时发生异常", e)
-            ConfigTestResult.Failed("配置测试失败", e.message)
+            Log.e(TAG, "测试配置时发生异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            ConfigTestResult.Failed("配置测试失败", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
         }
     }
     
@@ -291,11 +295,11 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                     )
                 }
                 
-                Log.i(TAG, "文件上传成功: $uploadPath")
+                Log.i(TAG, "文件上传成功: ${LogSanitizer.sanitize(uploadPath, "path")}")
                 
                 // 3. 测试目录列举
                 val files = cosClient.listFiles(testPath)
-                val uploadedFile = files.find { it.key.contains(testFileName) }
+                val uploadedFile = files.find { it.name.contains(testFileName) }
                 if (uploadedFile == null) {
                     return ConfigTestResult.Warning(
                         "文件列举测试异常",
@@ -303,7 +307,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                     )
                 }
                 
-                Log.i(TAG, "文件列举成功，找到测试文件: ${uploadedFile.key}")
+                Log.i(TAG, "文件列举成功，找到测试文件: ${LogSanitizer.sanitize(uploadedFile.name, "filename")}")
                 
                 // 4. 测试文件下载
                 val downloadFile = File.createTempFile("tap_download", ".txt")
@@ -334,12 +338,22 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                     }
                 }
                 
-                // 6. 清理测试文件
-                // 注意：这里没有提供删除API，但上传和下载都成功了
+                // 6. 清理远端测试文件
+                val deleteSuccess = try {
+                    cosClient.deleteFile(uploadPath)
+                } catch (e: Exception) {
+                    Log.w(TAG, "删除测试文件时出现异常（非致命）: ${LogSanitizer.sanitizeThrowable(e)}")
+                    false
+                }
+                
+                if (!deleteSuccess) {
+                    Log.w(TAG, "无法删除远端测试文件: ${LogSanitizer.sanitize(uploadPath, "path")} - 请手动清理")
+                }
                 
                 ConfigTestResult.Success(
                     "COS配置测试成功！存储服务连接正常，文件上传下载功能正常。" +
-                    "提供商: ${config.provider.name}，区域: ${config.region}，存储桶: ${config.bucketName}"
+                    "提供商: ${config.provider.name}，区域: ${LogSanitizer.sanitize(config.region, "region")}，" +
+                    "存储桶: ${LogSanitizer.sanitize(config.bucketName, "bucket")}"
                 )
                 
             } finally {
@@ -350,8 +364,8 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
             }
             
         } catch (e: Exception) {
-            Log.e(TAG, "连接测试过程中发生异常", e)
-            ConfigTestResult.Failed("连接测试失败", e.message)
+            Log.e(TAG, "连接测试过程中发生异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            ConfigTestResult.Failed("连接测试失败", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
         }
     }
 

@@ -1,8 +1,8 @@
 package org.thoughtcrime.securesms.tap
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
+import org.thoughtcrime.securesms.keyvalue.SignalStore
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.concurrent.Executors
@@ -81,10 +81,8 @@ class TransportTokenPool private constructor(private val context: Context) {
     private val tokenLock = ReentrantReadWriteLock()
     private val configLock = ReentrantReadWriteLock()
     
-    // 持久化存储（参考SubAccountPoolManager的实现）
-    private val sharedPreferences: SharedPreferences by lazy {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-    }
+    // 安全持久化存储（使用Signal的加密存储）
+    private val tapValues by lazy { SignalStore.tap }
     
     private val objectMapper = ObjectMapper().apply {
         // 忽略未知属性，确保向后兼容性
@@ -731,7 +729,7 @@ class TransportTokenPool private constructor(private val context: Context) {
             Log.d(TAG, "开始加载持久化的Token数据")
             
             // 加载接收Token
-            val receivedTokensJson = sharedPreferences.getString(KEY_RECEIVED_TOKENS, null)
+            val receivedTokensJson = tapValues.getReceivedTokens()
             if (!receivedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
                 val receivedTokensData = objectMapper.readValue(receivedTokensJson, type)
@@ -755,7 +753,7 @@ class TransportTokenPool private constructor(private val context: Context) {
             }
             
             // 加载共享Token
-            val sharedTokensJson = sharedPreferences.getString(KEY_SHARED_TOKENS, null)
+            val sharedTokensJson = tapValues.getSharedTokens()
             if (!sharedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
                 val sharedTokensData = objectMapper.readValue(sharedTokensJson, type)
@@ -802,26 +800,19 @@ class TransportTokenPool private constructor(private val context: Context) {
         try {
             Log.d(TAG, "开始持久化Token数据")
             
-            val editor = sharedPreferences.edit()
-            
             // 保存接收Token
             val receivedTokensData = receivedTokens.mapValues { (_, providerTokens) ->
                 providerTokens.mapValues { (_, token) -> token.toMap() }
             }
             val receivedTokensJson = objectMapper.writeValueAsString(receivedTokensData)
-            editor.putString(KEY_RECEIVED_TOKENS, receivedTokensJson)
+            tapValues.setReceivedTokens(receivedTokensJson)
             
             // 保存共享Token
             val sharedTokensData = sharedTokens.mapValues { (_, providerTokens) ->
                 providerTokens.mapValues { (_, token) -> token.toMap() }
             }
             val sharedTokensJson = objectMapper.writeValueAsString(sharedTokensData)
-            editor.putString(KEY_SHARED_TOKENS, sharedTokensJson)
-            
-            // 更新最后保存时间
-            editor.putLong("last_save_time", System.currentTimeMillis())
-            
-            editor.apply()
+            tapValues.setSharedTokens(sharedTokensJson)
             
             Log.d(TAG, "Token数据持久化完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}")
             
@@ -1049,7 +1040,7 @@ class TransportTokenPool private constructor(private val context: Context) {
      * 如果需要则执行清理
      */
     private fun performCleanupIfNeeded() {
-        val lastCleanupTime = sharedPreferences.getLong("last_cleanup_time", 0)
+        val lastCleanupTime = tapValues.getLastCleanupTime()
         val currentTime = System.currentTimeMillis()
         
         if (currentTime - lastCleanupTime > CLEANUP_INTERVAL_MS) {
@@ -1057,9 +1048,7 @@ class TransportTokenPool private constructor(private val context: Context) {
             poolScope.launch {
                 cleanExpiredTokens()
                 // 更新最后清理时间
-                sharedPreferences.edit()
-                    .putLong("last_cleanup_time", currentTime)
-                    .apply()
+                tapValues.setLastCleanupTime(currentTime)
             }
         }
     }

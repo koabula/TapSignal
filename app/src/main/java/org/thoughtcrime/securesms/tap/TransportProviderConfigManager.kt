@@ -1,28 +1,27 @@
 package org.thoughtcrime.securesms.tap
 
 import android.content.Context
-import androidx.core.content.edit
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.keyvalue.SignalStore
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Transport Provider配置管理器
  * 
  * 负责Provider配置的持久化存储、读取、验证和管理。
- * 参考CosConfigStorage的实现方式，使用SharedPreferences进行配置存储。
+ * 使用Signal的安全KeyValueStore进行配置存储，确保敏感配置数据的安全性。
  */
 class TransportProviderConfigManager private constructor(private val context: Context) {
     
     companion object {
         private val TAG = Log.tag(TransportProviderConfigManager::class.java)
         
-        // SharedPreferences相关常量
-        private const val PREFS_NAME = "transport_provider_configs"
-        private const val KEY_PROVIDER_CONFIGS = "provider_configs"
-        private const val KEY_ENABLED_PROVIDERS = "enabled_providers"
-        private const val KEY_CONFIG_VERSION = "config_version"
+        // 安全存储相关常量
+        private const val KEY_PROVIDER_CONFIGS = "tap.provider_configs"
+        private const val KEY_ENABLED_PROVIDERS = "tap.enabled_providers"
+        private const val KEY_CONFIG_VERSION = "tap.config_version"
         private const val CURRENT_CONFIG_VERSION = 1
         
         // 单例实例
@@ -41,7 +40,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
         }
     }
     
-    private val sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val tapValues by lazy { SignalStore.tap }
     private val objectMapper = ObjectMapper()
     private val mapType = object : TypeReference<Map<String, Any>>() {}
     private val configsMapType = object : TypeReference<Map<String, Map<String, Any>>>() {}
@@ -61,18 +60,12 @@ class TransportProviderConfigManager private constructor(private val context: Co
         return try {
             Log.i(TAG, "保存Provider配置: $providerType")
             
-            // 获取所有现有配置
-            val allConfigs = getAllConfigs().toMutableMap()
+            // 获取所有现有配置并更新
+            val allConfigs = tapValues.getProviderConfigs().toMutableMap()
             allConfigs[providerType] = config
             
-            // 序列化配置数据
-            val configJson = objectMapper.writeValueAsString(allConfigs)
-            
-            // 保存到SharedPreferences
-            sharedPreferences.edit {
-                putString(KEY_PROVIDER_CONFIGS, configJson)
-                putInt(KEY_CONFIG_VERSION, CURRENT_CONFIG_VERSION)
-            }
+            // 保存到安全存储
+            tapValues.setProviderConfigs(allConfigs)
             
             // 更新缓存
             updateCache(allConfigs)
@@ -108,25 +101,15 @@ class TransportProviderConfigManager private constructor(private val context: Co
      */
     fun getAllConfigs(): Map<String, Map<String, Any>> {
         return try {
-            val currentVersion = sharedPreferences.getInt(KEY_CONFIG_VERSION, 0)
+            val currentVersion = tapValues.getConfigVersion()
             
             // 检查缓存是否有效
             if (cacheVersion == currentVersion && configCache.isNotEmpty()) {
                 return configCache.mapValues { it.value.toMap() }
             }
             
-            // 从SharedPreferences读取
-            val configJson = sharedPreferences.getString(KEY_PROVIDER_CONFIGS, null)
-            val configs = if (configJson != null && configJson.isNotBlank()) {
-                try {
-                    objectMapper.readValue(configJson, configsMapType)
-                } catch (e: Exception) {
-                    Log.w(TAG, "解析配置JSON失败，返回空配置", e)
-                    emptyMap()
-                }
-            } else {
-                emptyMap()
-            }
+            // 从安全存储读取
+            val configs = tapValues.getProviderConfigs()
             
             // 更新缓存
             updateCache(configs)
@@ -153,11 +136,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
             val removed = allConfigs.remove(providerType)
             
             if (removed != null) {
-                val configJson = objectMapper.writeValueAsString(allConfigs)
-                sharedPreferences.edit {
-                    putString(KEY_PROVIDER_CONFIGS, configJson)
-                    putInt(KEY_CONFIG_VERSION, CURRENT_CONFIG_VERSION)
-                }
+                tapValues.setProviderConfigs(allConfigs)
                 
                 // 更新缓存
                 updateCache(allConfigs)
@@ -247,7 +226,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
      */
     fun getEnabledProviders(): Set<String> {
         return try {
-            sharedPreferences.getStringSet(KEY_ENABLED_PROVIDERS, emptySet()) ?: emptySet()
+            tapValues.getEnabledProviders()
         } catch (e: Exception) {
             Log.e(TAG, "获取已启用Provider列表失败", e)
             emptySet()
@@ -317,11 +296,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
         return try {
             Log.w(TAG, "清空所有Provider配置")
             
-            sharedPreferences.edit {
-                remove(KEY_PROVIDER_CONFIGS)
-                remove(KEY_ENABLED_PROVIDERS)
-                putInt(KEY_CONFIG_VERSION, CURRENT_CONFIG_VERSION)
-            }
+            tapValues.clearProviderConfigs()
             
             // 清空缓存
             configCache.clear()
@@ -379,12 +354,8 @@ class TransportProviderConfigManager private constructor(private val context: Co
             val enabled = (importData["enabled"] as? List<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet()
             
             // 保存配置
-            val configJson = objectMapper.writeValueAsString(configs)
-            sharedPreferences.edit {
-                putString(KEY_PROVIDER_CONFIGS, configJson)
-                putStringSet(KEY_ENABLED_PROVIDERS, enabled)
-                putInt(KEY_CONFIG_VERSION, CURRENT_CONFIG_VERSION)
-            }
+            tapValues.setProviderConfigs(configs as Map<String, Map<String, Any>>)
+            tapValues.setEnabledProviders(enabled)
             
             // 更新缓存
             @Suppress("UNCHECKED_CAST")
@@ -411,7 +382,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
             totalEnabled = enabledProviders.size,
             configuredProviders = allConfigs.keys.toList(),
             enabledProviders = enabledProviders.toList(),
-            configVersion = sharedPreferences.getInt(KEY_CONFIG_VERSION, 0)
+            configVersion = tapValues.getConfigVersion()
         )
     }
     
@@ -419,8 +390,10 @@ class TransportProviderConfigManager private constructor(private val context: Co
      * 保存已启用Provider列表
      */
     private fun saveEnabledProviders(providers: Set<String>) {
-        sharedPreferences.edit {
-            putStringSet(KEY_ENABLED_PROVIDERS, providers)
+        try {
+            tapValues.setEnabledProviders(providers)
+        } catch (e: Exception) {
+            Log.e(TAG, "保存已启用Provider列表失败", e)
         }
     }
     

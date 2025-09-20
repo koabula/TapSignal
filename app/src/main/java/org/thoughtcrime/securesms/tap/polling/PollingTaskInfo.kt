@@ -65,7 +65,12 @@ data class PollingTaskInfo(
     /**
      * 轮询统计信息
      */
-    val statistics: PollingTaskStatistics = PollingTaskStatistics()
+    val statistics: PollingTaskStatistics = PollingTaskStatistics(),
+    
+    /**
+     * 最近一次轮询处理的文件列表（用于更新数据库状态）
+     */
+    var lastProcessedFiles: Set<String> = emptySet()
 ) {
     
     companion object {

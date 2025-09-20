@@ -37,6 +37,7 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
   val storyValues = StoryValues(store)
   val apkUpdateValues = ApkUpdateValues(store)
   val backupValues = BackupValues(store)
+  val tapValues = TapValues(store)
 
   val plainTextValues = PlainTextSharedPrefsDataStore(context)
 
@@ -257,6 +258,9 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
     @get:JvmName("backup")
     val backup: BackupValues
       get() = instance!!.backupValues
+    
+    val tap: TapValues
+      get() = instance!!.tapValues
 
     val groupsV2AciAuthorizationCache: GroupsV2AuthorizationSignalStoreCache
       get() = GroupsV2AuthorizationSignalStoreCache.createAciCache(instance!!.store)

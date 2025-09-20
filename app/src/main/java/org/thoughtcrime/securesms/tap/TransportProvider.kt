@@ -43,7 +43,9 @@ interface TransportProvider {
      * 
      * @param metadata 传输元数据（源地址、路径等）
      * @return 拉取结果和消息内容
+     * @deprecated 使用 listFiles + downloadFile 替代
      */
+    @Deprecated("使用 listFiles + downloadFile 替代，将在后续版本中移除")
     suspend fun pull(metadata: TransportMetadata): TransportResult
     
     /**
@@ -77,7 +79,9 @@ interface TransportProvider {
      * 
      * @param groupMetadata 群组传输元数据
      * @return 拉取结果和消息列表
+     * @deprecated 使用 listFiles + downloadFile 替代
      */
+    @Deprecated("使用 listFiles + downloadFile 替代，将在后续版本中移除")
     suspend fun groupPull(groupMetadata: GroupTransportMetadata): List<TransportResult> {
         if (!supportsGroup) {
             return listOf(
@@ -97,6 +101,76 @@ interface TransportProvider {
         }
         
         return results
+    }
+    
+    /**
+     * 列出指定路径下的文件
+     * 
+     * @param path 文件路径
+     * @param metadata 传输元数据
+     * @return 文件列表结果
+     */
+    suspend fun listFiles(path: String, metadata: TransportMetadata): TransportResult {
+        // 默认实现：通过pull方法来保持向下兼容
+        return pull(metadata)
+    }
+    
+    /**
+     * 下载指定文件
+     * 
+     * @param fileInfo 文件信息
+     * @param metadata 传输元数据
+     * @return 下载结果和文件数据
+     */
+    suspend fun downloadFile(fileInfo: FileInfo, metadata: TransportMetadata): TransportResult {
+        // 默认实现：通过pull方法来保持向下兼容
+        return pull(metadata)
+    }
+    
+    /**
+     * 上传文件数据
+     * 
+     * @param data 文件数据
+     * @param path 目标路径
+     * @param metadata 传输元数据
+     * @return 上传结果
+     */
+    suspend fun uploadFile(data: ByteArray, path: String, metadata: TransportMetadata): TransportResult {
+        // 需要基于data创建TransportMessage，然后调用push
+        // 这里提供一个基本的实现，具体Provider应该重写这个方法
+        try {
+            // 从路径中提取消息ID和时间戳
+            val fileName = path.substringAfterLast('/')
+            val messageId = fileName.substringBefore('_')
+            val timestamp = fileName.substringAfter('_').substringBefore('.').toLongOrNull() ?: System.currentTimeMillis()
+            
+            // 将数据转换为Base64编码的signalCiphertext
+            val signalCiphertext = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+            
+            // 创建内容元数据
+            val contentMetadata = TransportContentMetadata(
+                originalSize = data.size.toLong(),
+                compressionType = TransportCompressionType.NONE
+            )
+            
+            val message = TransportMessage(
+                messageId = messageId,
+                timestamp = timestamp,
+                senderId = "", // 上传文件时无法确定发送者，留空
+                recipientId = "", // 上传文件时无法确定接收者，留空  
+                messageType = TransportMessageType.TEXT_MESSAGE,
+                signalCiphertext = signalCiphertext,
+                contentMetadata = contentMetadata
+            )
+            
+            return push(message, metadata)
+        } catch (e: Exception) {
+            return TransportResult.failure(
+                TransportError.INVALID_FORMAT,
+                false,
+                "无法从数据创建消息: ${e.message}"
+            )
+        }
     }
     
     /**
@@ -185,7 +259,7 @@ interface TransportProvider {
     fun isMessageTooLarge(message: TransportMessage): Boolean {
         return if (maxMessageSize > 0) {
             val totalSize = message.encryptedContent.size + 
-                           message.attachments.sumOf { it.encryptedData.size }
+                           message.attachments.sumOf { it.size }
             totalSize > maxMessageSize
         } else {
             false

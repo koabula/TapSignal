@@ -7,6 +7,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlinx.coroutines.*
+import org.thoughtcrime.securesms.tap.factory.DefaultTransportProviderFactory
+import org.thoughtcrime.securesms.tap.FileInfo
 
 /**
  * 传输管理器 - 核心传输层管理组件
@@ -108,6 +110,9 @@ class TransportManager private constructor(private val context: Context) {
                     
                     // 初始化路由配置
                     routingPolicy = config.routingPolicy
+                    
+                    // 注册默认Provider工厂
+                    registerProviderFactory(DefaultTransportProviderFactory(context))
                     
                     // 加载已配置的Providers
                     loadConfiguredProviders()
@@ -572,24 +577,63 @@ class TransportManager private constructor(private val context: Context) {
                 return emptyList()
             }
             
-            val result = provider.pull(channel.metadata)
-            when (result) {
+            Log.d(TAG, "轮询通道消息: ${channel.channelId} (${channel.providerType})")
+            
+            // 使用新接口：listFiles + downloadFile
+            val listResult = provider.listFiles(channel.metadata.path, channel.metadata)
+            when (listResult) {
                 is TransportResult.Success -> {
-                    channelManager.value.updateChannelSuccess(channel.channelId)
-                    listOfNotNull(result.message)
+                    val fileInfos = listResult.data as? List<*> ?: emptyList<Any>()
+                    val messages = mutableListOf<TransportMessage>()
+                    
+                    Log.d(TAG, "找到文件数量: ${fileInfos.size}")
+                    
+                    // 下载所有文件
+                    for (fileInfo in fileInfos) {
+                        if (fileInfo is FileInfo) {
+                            try {
+                                val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
+                                when (downloadResult) {
+                                    is TransportResult.Success -> {
+                                        downloadResult.message?.let { message ->
+                                            messages.add(message)
+                                            Log.d(TAG, "下载消息成功: ${message.messageId}")
+                                        }
+                                    }
+                                    is TransportResult.Failed -> {
+                                        Log.w(TAG, "下载文件失败: ${fileInfo.name}, 错误: ${downloadResult.error}")
+                                    }
+                                    else -> {
+                                        Log.d(TAG, "下载文件结果: ${downloadResult.javaClass.simpleName}")
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "下载文件异常: ${fileInfo.name}", e)
+                            }
+                        }
+                    }
+                    
+                    if (messages.isNotEmpty()) {
+                        channelManager.value.updateChannelSuccess(channel.channelId)
+                    }
+                    
+                    messages
                 }
                 is TransportResult.Failed -> {
-                    channelManager.value.updateChannelFailure(channel.channelId, result.error)
+                    channelManager.value.updateChannelFailure(channel.channelId, listResult.error)
+                    Log.w(TAG, "列出文件失败: ${listResult.error}")
                     emptyList()
                 }
                 is TransportResult.RetryScheduled -> {
                     // 轮询重试由轮询服务处理
+                    Log.d(TAG, "列出文件需要重试: ${listResult.retryAfter}ms")
                     emptyList()
                 }
                 is TransportResult.PartialSuccess -> {
+                    // 处理部分成功的情况
                     channelManager.value.updateChannelSuccess(channel.channelId)
-                    // 从PartialSuccess的results中提取成功的消息
-                    result.getSuccesses().mapNotNull { it.message }
+                    Log.d(TAG, "列出文件部分成功")
+                    emptyList()
                 }
             }
         } catch (e: Exception) {
@@ -841,12 +885,14 @@ class TransportManager private constructor(private val context: Context) {
                 TransportMessageType.TEXT_MESSAGE -> 0.7       // 文本消息也可以
                 TransportMessageType.CONTROL_MESSAGE -> 0.8    // 控制消息适合
                 TransportMessageType.RATCHET_UPDATE -> 0.6     // 密钥更新一般
+                TransportMessageType.CALL_MESSAGE -> 0.7       // 通话消息也适合
             }
             "email" -> when (message.messageType) {
                 TransportMessageType.TEXT_MESSAGE -> 0.8       // 邮件适合文本
                 TransportMessageType.MEDIA_MESSAGE -> 0.6      // 媒体文件有大小限制
                 TransportMessageType.CONTROL_MESSAGE -> 0.7    // 控制消息可以
                 TransportMessageType.RATCHET_UPDATE -> 0.5     // 密钥更新不太适合
+                TransportMessageType.CALL_MESSAGE -> 0.6       // 通话消息可以通过邮件
             }
             else -> 0.5
         }

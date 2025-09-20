@@ -462,30 +462,35 @@ class TransportRoutingManager private constructor(private val context: Context) 
                 TransportMessageType.TEXT_MESSAGE -> 0.7       // 文本消息也可以
                 TransportMessageType.CONTROL_MESSAGE -> 0.8    // 控制消息适合
                 TransportMessageType.RATCHET_UPDATE -> 0.6     // 密钥更新一般
+                TransportMessageType.CALL_MESSAGE -> 0.7       // 通话消息也适合
             }
             "email" -> when (message.messageType) {
                 TransportMessageType.TEXT_MESSAGE -> 0.8       // 邮件适合文本
                 TransportMessageType.MEDIA_MESSAGE -> 0.6      // 媒体文件有大小限制
                 TransportMessageType.CONTROL_MESSAGE -> 0.7    // 控制消息可以
                 TransportMessageType.RATCHET_UPDATE -> 0.5     // 密钥更新不太适合
+                TransportMessageType.CALL_MESSAGE -> 0.6       // 通话消息可以通过邮件
             }
             "ipfs" -> when (message.messageType) {
                 TransportMessageType.MEDIA_MESSAGE -> 1.0      // IPFS非常适合大文件
                 TransportMessageType.TEXT_MESSAGE -> 0.6       // 文本消息可以但不是最优
                 TransportMessageType.CONTROL_MESSAGE -> 0.7    // 控制消息适合
                 TransportMessageType.RATCHET_UPDATE -> 0.8     // 密钥更新适合分布式
+                TransportMessageType.CALL_MESSAGE -> 0.8       // 通话消息适合分布式
             }
             "git" -> when (message.messageType) {
                 TransportMessageType.TEXT_MESSAGE -> 0.7       // Git适合文本
                 TransportMessageType.CONTROL_MESSAGE -> 0.9    // 控制消息很适合
                 TransportMessageType.RATCHET_UPDATE -> 0.8     // 密钥更新适合版本控制
                 TransportMessageType.MEDIA_MESSAGE -> 0.4      // 大文件不太适合
+                TransportMessageType.CALL_MESSAGE -> 0.7       // 通话消息可以版本控制
             }
             "nas" -> when (message.messageType) {
                 TransportMessageType.MEDIA_MESSAGE -> 0.8      // NAS适合大文件存储
                 TransportMessageType.TEXT_MESSAGE -> 0.6       // 文本消息可以
                 TransportMessageType.CONTROL_MESSAGE -> 0.5    // 控制消息一般
                 TransportMessageType.RATCHET_UPDATE -> 0.5     // 密钥更新一般
+                TransportMessageType.CALL_MESSAGE -> 0.6       // 通话消息可以存储
             }
             else -> 0.5
         }
@@ -496,7 +501,7 @@ class TransportRoutingManager private constructor(private val context: Context) 
      */
     private fun shouldUseTransportIntelligent(recipientId: String, message: TransportMessage): Boolean {
         // 基于消息类型、大小、网络状况等因素决定
-        val messageSize = message.encryptedContent.size + message.attachments.sumOf { it.encryptedData.size }
+        val messageSize = message.encryptedContent.size + message.attachments.sumOf { it.size }
         
         // 大文件倾向于使用传输服务
         if (messageSize > 1024 * 1024) { // 1MB以上

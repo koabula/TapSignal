@@ -132,7 +132,10 @@ data class TransportChannel(
     val config: Map<String, Any> = emptyMap(),
     
     /** 通道优先级（1-10，数字越大优先级越高） */
-    val priority: Int = 5
+    val priority: Int = 5,
+    
+    /** 版本号（用于乐观锁） */
+    val version: Long = 1
 ) {
     
     /**
