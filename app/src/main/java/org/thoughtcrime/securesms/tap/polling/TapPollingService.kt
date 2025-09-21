@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator
+import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
 import org.thoughtcrime.securesms.database.SignalDatabase
 import java.util.concurrent.*
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -66,6 +67,7 @@ class TapPollingService(private val context: Context) {
     private val channelManager = TransportChannelManager.getInstance(context)
     private val tokenPool = TransportTokenPool.getInstance(context)
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
+    private val messageProcessor = TapMessageProcessor.getInstance(context)
     
     // 数据库访问
     private val pollingStateTable = SignalDatabase.transportPollingStates
@@ -609,14 +611,16 @@ class TapPollingService(private val context: Context) {
                 return FilePollingResult.success(emptySet(), 0)
             }
             
-            // 过滤新文件（未处理的文件）
+            // 修复2：轮询侧文件识别收敛 - 移除启发式二次过滤，交由Provider过滤+解析结果判定
             val allFiles = FileInfo.sortByTime(listResult.files, ascending = true)
             val processedFiles = pollingState?.processedFiles ?: emptySet()
             
+            // 修复2：仅基于处理状态和时间过滤，不再进行文件名/类型的启发式过滤
+            // Provider的listFiles已经按isMessageFile()过滤，这里只需过滤处理状态
             val newFiles = allFiles.filter { file ->
                 !processedFiles.contains(file.name) && 
-                file.isMessageFile() &&
                 file.lastModified > (pollingState?.lastProcessedTime ?: 0)
+                // 移除file.isMessageFile()二次过滤，交由Provider侧和解析结果判定
             }
             
             if (newFiles.isEmpty()) {
@@ -637,20 +641,24 @@ class TapPollingService(private val context: Context) {
                     }
                     
                     if (downloadResult is TransportResult.Success && downloadResult.data != null) {
-                        // 验证文件内容是否为有效的TaP消息
-                        if (!file.validateMessageFileContent(downloadResult.data)) {
-                            Log.w(TAG, "文件内容验证失败，跳过: ${file.name}")
-                            continue
-                        }
+                        // 修复2：移除文件内容的强校验，交由解析结果判定
+                        // 注释掉validateMessageFileContent，避免提前丢弃文件
+                        // if (!file.validateMessageFileContent(downloadResult.data)) {
+                        //     Log.w(TAG, "文件内容验证失败，跳过: ${file.name}")
+                        //     continue
+                        // }
                         
-                        // 解析并处理消息
+                        // 修复2：基于解析结果判定是否为消息文件
                         val message = parseTransportMessage(downloadResult.data, file)
                         if (message != null) {
                             // 将消息传递给Signal主程序处理
                             deliverMessageToSignal(message, taskInfo)
                             messagesProcessed++
                             Log.d(TAG, "消息处理成功: ${file.name}")
+                        } else {
+                            Log.d(TAG, "文件解析失败，可能不是消息文件: ${file.name}")
                         }
+                        // 修复2：无论解析成功与否都标记为已处理，避免重复下载
                         newProcessedFiles.add(file.name)
                     } else {
                         Log.w(TAG, "文件下载失败: ${file.name}")
@@ -672,107 +680,26 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
-     * 解析传输消息 - 使用统一的JSON格式，兼容coscomm模块
+     * 解析传输消息 - 使用统一的二进制格式
      * 
-     * 支持两种格式：
-     * 1. 新的JSON格式（基于coscomm的CosMessage）
-     * 2. 旧的二进制格式（向后兼容）
+     * 已统一为严格的二进制格式，禁用JSON回退和猜测式补全
      */
     private fun parseTransportMessage(data: ByteArray, fileInfo: FileInfo): TransportMessage? {
         return try {
             Log.d(TAG, "开始解析传输消息: ${fileInfo.name}, size=${data.size}")
             
-            // 首先尝试JSON格式解析
-            val jsonResult = parseJsonMessage(data, fileInfo)
-            if (jsonResult != null) {
-                Log.d(TAG, "成功解析JSON格式消息: messageId=${jsonResult.messageId}")
-                return jsonResult
-            }
-            
-            // 回退到旧的二进制格式（向后兼容）
-            Log.d(TAG, "尝试解析旧的二进制格式: ${fileInfo.name}")
-            return parseLegacyBinaryMessage(data, fileInfo)
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "解析传输消息失败: ${fileInfo.name} - ${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitizeThrowable(e)}")
-            null
-        }
-    }
-    
-    /**
-     * 解析JSON格式消息（兼容coscomm模块）
-     */
-    private fun parseJsonMessage(data: ByteArray, fileInfo: FileInfo): TransportMessage? {
-        return try {
-            // 将字节数据转换为JSON字符串
-            val jsonString = String(data, Charsets.UTF_8)
-            
-            // 使用TransportMessage的反序列化方法
+            // 使用统一的二进制格式解析
             val message = TransportMessage.deserialize(data)
-            
-            // 从文件名中提取发送者和接收者信息（如果JSON中没有）
-            val fileNameParts = parseFileNameForRecipients(fileInfo.name)
-            val finalMessage = if (message.senderId.isBlank() || message.recipientId.isBlank()) {
-                // 补充缺失的发送者/接收者信息
-                message.copy(
-                    senderId = fileNameParts?.senderId ?: message.senderId,
-                    recipientId = fileNameParts?.recipientId ?: message.recipientId
-                )
-            } else {
-                message
-            }
-            
-            Log.d(TAG, "成功解析JSON消息: messageId=${finalMessage.messageId}, type=${finalMessage.messageType}")
-            finalMessage
-            
-        } catch (e: Exception) {
-            Log.d(TAG, "JSON格式解析失败，尝试其他格式: ${e.message}")
-            null
-        }
-    }
-    
-    /**
-     * 解析旧的二进制格式消息（向后兼容）
-     */
-    private fun parseLegacyBinaryMessage(data: ByteArray, fileInfo: FileInfo): TransportMessage? {
-        return try {
-            if (data.size < 20) {
-                Log.w(TAG, "二进制消息文件格式无效：文件过小: ${fileInfo.name}")
-                return null
-            }
-            
-            // 从文件名中提取基本信息作为回退方案
-            val fileNameInfo = parseFileNameForRecipients(fileInfo.name)
-            val messageId = fileNameInfo?.messageId ?: java.util.UUID.randomUUID().toString()
-            val timestamp = fileNameInfo?.timestamp ?: fileInfo.lastModified
-            
-            // 对于旧格式，将整个数据视为加密内容
-            val signalCiphertext = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
-            
-            // 创建默认的内容元数据
-            val contentMetadata = TransportContentMetadata(
-                originalSize = data.size.toLong(),
-                compressionType = TransportCompressionType.NONE
-            )
-            
-            val message = TransportMessage(
-                messageId = messageId,
-                timestamp = timestamp,
-                senderId = fileNameInfo?.senderId ?: "",
-                recipientId = fileNameInfo?.recipientId ?: "",
-                messageType = TransportMessageType.TEXT_MESSAGE,
-                signalCiphertext = signalCiphertext,
-                contentMetadata = contentMetadata
-            )
-            
-            Log.d(TAG, "成功解析二进制格式消息: messageId=$messageId")
+            Log.d(TAG, "成功解析二进制格式消息: messageId=${message.messageId}")
             message
             
         } catch (e: Exception) {
-            Log.e(TAG, "解析二进制格式消息失败: ${fileInfo.name}", e)
+            Log.w(TAG, "解析传输消息失败: ${fileInfo.name} - ${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitizeThrowable(e)}")
             null
         }
     }
+    
+
     
     /**
      * 从文件名中解析发送者和接收者信息
@@ -833,29 +760,7 @@ class TapPollingService(private val context: Context) {
         val recipientId: String
     )
     
-    /**
-     * 字节数组转int（大端序）
-     */
-    private fun bytesToInt(data: ByteArray, offset: Int): Int {
-        return ((data[offset].toInt() and 0xFF) shl 24) or
-               ((data[offset + 1].toInt() and 0xFF) shl 16) or
-               ((data[offset + 2].toInt() and 0xFF) shl 8) or
-               (data[offset + 3].toInt() and 0xFF)
-    }
-    
-    /**
-     * 字节数组转long（大端序）
-     */
-    private fun bytesToLong(data: ByteArray, offset: Int): Long {
-        return ((data[offset].toLong() and 0xFF) shl 56) or
-               ((data[offset + 1].toLong() and 0xFF) shl 48) or
-               ((data[offset + 2].toLong() and 0xFF) shl 40) or
-               ((data[offset + 3].toLong() and 0xFF) shl 32) or
-               ((data[offset + 4].toLong() and 0xFF) shl 24) or
-               ((data[offset + 5].toLong() and 0xFF) shl 16) or
-               ((data[offset + 6].toLong() and 0xFF) shl 8) or
-               (data[offset + 7].toLong() and 0xFF)
-    }
+
     
     /**
      * 将消息传递给Signal主程序处理
@@ -865,7 +770,6 @@ class TapPollingService(private val context: Context) {
             Log.i(TAG, "开始传递消息到Signal: messageId=${message.messageId}, recipient=${taskInfo.recipientId}")
             
             // 1. 检查消息去重
-            val messageProcessor = org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.getInstance(context)
             if (messageProcessor.isDuplicateMessage(message.messageId, taskInfo.recipientId)) {
                 Log.d(TAG, "跳过重复消息: messageId=${message.messageId}")
                 return

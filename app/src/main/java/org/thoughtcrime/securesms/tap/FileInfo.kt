@@ -103,85 +103,26 @@ data class FileInfo(
     /**
      * 验证文件是否为有效的TaP消息文件（通过内容检查）
      * 
-     * 这个方法需要文件内容，由调用方在下载后调用
+     * 使用统一的二进制格式验证，通过尝试完整反序列化来确保格式正确性
      */
     fun validateMessageFileContent(data: ByteArray): Boolean {
         return try {
-            if (data.size < 20) {
-                return false
-            }
-            
-            var offset = 0
-            
-            // 1. 验证messageId长度是否合理
-            val messageIdLength = bytesToInt(data, offset)
-            if (messageIdLength <= 0 || messageIdLength > 200) {
-                return false
-            }
-            offset += 4 + messageIdLength
-            
-            // 2. 验证timestamp是否合理
-            if (offset + 8 > data.size) return false
-            val timestamp = bytesToLong(data, offset)
-            val currentTime = System.currentTimeMillis()
-            if (timestamp <= 0 || timestamp > currentTime + 60000) { // 不能是未来时间
-                return false
-            }
-            offset += 8
-            
-            // 3. 验证messageType是否在有效范围内
-            if (offset + 4 > data.size) return false
-            val messageTypeOrdinal = bytesToInt(data, offset)
-            if (messageTypeOrdinal < 0 || messageTypeOrdinal >= TransportMessageType.values().size) {
-                return false
-            }
-            offset += 4
-            
-            // 4. 验证content长度是否合理
-            if (offset + 4 > data.size) return false
-            val contentLength = bytesToInt(data, offset)
-            if (contentLength <= 0 || contentLength > 50 * 1024 * 1024) { // 不超过50MB
-                return false
-            }
-            offset += 4
-            
-            // 5. 验证总体文件大小是否一致
-            if (offset + contentLength > data.size) {
-                return false
-            }
+            // 使用统一的二进制反序列化来验证格式
+            TransportMessage.deserializeFromBinary(data)
             
             Log.d("FileInfo", "TaP消息文件验证通过: $name")
             true
             
+        } catch (e: TransportException) {
+            Log.d("FileInfo", "TaP消息文件格式无效: $name - ${e.message}")
+            false
         } catch (e: Exception) {
             Log.e("FileInfo", "验证TaP消息文件内容失败: $name", e)
             false
         }
     }
     
-    /**
-     * 字节数组转int（大端序）- 与轮询服务一致
-     */
-    private fun bytesToInt(data: ByteArray, offset: Int): Int {
-        return ((data[offset].toInt() and 0xFF) shl 24) or
-               ((data[offset + 1].toInt() and 0xFF) shl 16) or
-               ((data[offset + 2].toInt() and 0xFF) shl 8) or
-               (data[offset + 3].toInt() and 0xFF)
-    }
-    
-    /**
-     * 字节数组转long（大端序）- 与轮询服务一致
-     */
-    private fun bytesToLong(data: ByteArray, offset: Int): Long {
-        return ((data[offset].toLong() and 0xFF) shl 56) or
-               ((data[offset + 1].toLong() and 0xFF) shl 48) or
-               ((data[offset + 2].toLong() and 0xFF) shl 40) or
-               ((data[offset + 3].toLong() and 0xFF) shl 32) or
-               ((data[offset + 4].toLong() and 0xFF) shl 24) or
-               ((data[offset + 5].toLong() and 0xFF) shl 16) or
-               ((data[offset + 6].toLong() and 0xFF) shl 8) or
-               (data[offset + 7].toLong() and 0xFF)
-    }
+
     
     /**
      * 从文件名提取消息ID

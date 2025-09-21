@@ -98,7 +98,7 @@ class TransportManager private constructor(private val context: Context) {
                     // 验证配置
                     val validationResult = config.validate()
                     if (!validationResult.isValid && validationResult is TransportConfigValidationResult.Invalid) {
-                        Log.e(TAG, "传输配置无效: ${validationResult.errors.joinToString(", ")}")
+                        Log.e(TAG, "传输配置无效: ${validationResult.joinToString(", ")}")
                         return@withContext false
                     }
                     
@@ -413,7 +413,7 @@ class TransportManager private constructor(private val context: Context) {
             // 先验证配置，避免在锁内进行复杂操作
             val validationResult = newConfig.validate()
             if (!validationResult.isValid && validationResult is TransportConfigValidationResult.Invalid) {
-                Log.e(TAG, "新配置无效: ${validationResult.errors.joinToString(", ")}")
+                Log.e(TAG, "新配置无效: ${validationResult.joinToString(", ")}")
                 return@withContext false
             }
             

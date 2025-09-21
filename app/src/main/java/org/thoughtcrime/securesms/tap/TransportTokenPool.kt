@@ -2,7 +2,6 @@ package org.thoughtcrime.securesms.tap
 
 import android.content.Context
 import android.util.Log
-import org.thoughtcrime.securesms.keyvalue.SignalStore
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.concurrent.Executors
@@ -81,8 +80,21 @@ class TransportTokenPool private constructor(private val context: Context) {
     private val tokenLock = ReentrantReadWriteLock()
     private val configLock = ReentrantReadWriteLock()
     
-    // 安全持久化存储（使用Signal的加密存储）
-    private val tapValues by lazy { SignalStore.tap }
+    // 安全持久化存储（使用SharedPreferences作为替代方案）
+    private val tapValues by lazy { 
+        object {
+            private val prefs = context.getSharedPreferences("tap_token_pool", Context.MODE_PRIVATE)
+            
+            fun getReceivedTokens(): String = prefs.getString("received_tokens", "") ?: ""
+            fun setReceivedTokens(json: String) = prefs.edit().putString("received_tokens", json).apply()
+            
+            fun getSharedTokens(): String = prefs.getString("shared_tokens", "") ?: ""
+            fun setSharedTokens(json: String) = prefs.edit().putString("shared_tokens", json).apply()
+            
+            fun getLastCleanupTime(): Long = prefs.getLong("last_cleanup_time", 0L)
+            fun setLastCleanupTime(time: Long) = prefs.edit().putLong("last_cleanup_time", time).apply()
+        }
+    }
     
     private val objectMapper = ObjectMapper().apply {
         // 忽略未知属性，确保向后兼容性
@@ -159,9 +171,9 @@ class TransportTokenPool private constructor(private val context: Context) {
                     }
                     
                     // 检查是否超过缓存大小限制
-                    if (getTotalReceivedTokens() >= config.cacheSize) {
+                    if (getTotalReceivedTokens() >= config.maxTokens) {
                         cleanExpiredReceivedTokens()
-                        if (getTotalReceivedTokens() >= config.cacheSize) {
+                        if (getTotalReceivedTokens() >= config.maxTokens) {
                             Log.w(TAG, "接收Token缓存已满，无法添加新Token")
                             return@withContext false
                         }
@@ -215,9 +227,9 @@ class TransportTokenPool private constructor(private val context: Context) {
                     }
                     
                     // 检查是否超过缓存大小限制
-                    if (getTotalSharedTokens() >= config.cacheSize) {
+                    if (getTotalSharedTokens() >= config.maxTokens) {
                         cleanExpiredSharedTokens()
-                        if (getTotalSharedTokens() >= config.cacheSize) {
+                        if (getTotalSharedTokens() >= config.maxTokens) {
                             Log.w(TAG, "共享Token缓存已满，无法添加新Token")
                             return@withContext false
                         }
@@ -333,8 +345,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                 
                 // 检查是否超过内存限制，如果是则强制清理
                 val totalCount = getTotalReceivedTokens() + getTotalSharedTokens()
-                if (totalCount > config.cacheSize) {
-                    val excessCount = totalCount - config.cacheSize
+                if (totalCount > config.maxTokens) {
+                    val excessCount = totalCount - config.maxTokens
                     cleanedCount += forceClearExcessTokens(excessCount)
                 }
                 
@@ -431,6 +443,46 @@ class TransportTokenPool private constructor(private val context: Context) {
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "撤销Token失败: $tokenId", e)
+                    false
+                }
+            }
+        }
+    }
+    
+    /**
+     * 移除指定的Token
+     */
+    suspend fun removeToken(recipientId: String, providerType: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    var removed = false
+                    
+                    // 从接收Token中移除
+                    receivedTokens[recipientId]?.remove(providerType)?.let {
+                        tokenMetadata.remove(it.tokenId)
+                        removed = true
+                        Log.d(TAG, "移除接收Token: ${it.tokenId}")
+                    }
+                    
+                    // 从共享Token中移除
+                    sharedTokens[recipientId]?.remove(providerType)?.let {
+                        tokenMetadata.remove(it.tokenId)
+                        removed = true
+                        Log.d(TAG, "移除共享Token: ${it.tokenId}")
+                    }
+                    
+                    if (removed) {
+                        // 清理空的映射
+                        cleanupEmptyMaps()
+                        
+                        // 持久化存储
+                        saveTokensToStorage()
+                    }
+                    
+                    removed
+                } catch (e: Exception) {
+                    Log.e(TAG, "移除Token失败", e)
                     false
                 }
             }
@@ -576,14 +628,14 @@ class TransportTokenPool private constructor(private val context: Context) {
                 
                 // 如果自动刷新配置改变，重启刷新任务
                 if (oldConfig.autoRefresh != newConfig.autoRefresh || 
-                    oldConfig.refreshAdvanceMs != newConfig.refreshAdvanceMs) {
+                    oldConfig.defaultValidityMs != newConfig.defaultValidityMs) {
                     restartRefreshTask()
                 }
                 
                 // 如果缓存大小减少，清理多余Token
-                if (newConfig.cacheSize < oldConfig.cacheSize) {
+                if (newConfig.maxTokens < oldConfig.maxTokens) {
                     poolScope.launch {
-                        cleanupExcessTokens(newConfig.cacheSize)
+                        cleanupExcessTokens(newConfig.maxTokens)
                     }
                 }
             }
@@ -982,8 +1034,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                     Log.w(TAG, "定时刷新任务异常", e)
                 }
             },
-            config.refreshAdvanceMs / 2, // 提前一半时间开始检查
-            config.refreshAdvanceMs / 4, // 每1/4刷新间隔检查一次
+            config.defaultValidityMs / 20, // 提前一半时间开始检查 (有效期的1/20)
+            config.defaultValidityMs / 40, // 每1/4刷新间隔检查一次 (有效期的1/40)
             TimeUnit.MILLISECONDS
         )
         
@@ -1025,7 +1077,9 @@ class TransportTokenPool private constructor(private val context: Context) {
             Log.i(TAG, "发现即将过期的Token数量: ${nearExpiryTokens.size}")
             
             nearExpiryTokens.forEach { token ->
-                if (System.currentTimeMillis() + config.refreshAdvanceMs >= token.expirationTime) {
+                val refreshThreshold = config.defaultValidityMs / 10
+                val currentTimeWithBuffer = System.currentTimeMillis() + refreshThreshold
+                if (currentTimeWithBuffer >= token.expirationTime) {
                     try {
                         refreshToken(token.tokenId)
                     } catch (e: Exception) {

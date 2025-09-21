@@ -59,7 +59,7 @@ data class TransportMessage(
         const val CURRENT_VERSION = "1.0"
         
         // Jackson ObjectMapper配置
-        private val objectMapper = ObjectMapper().apply {
+        val objectMapper = ObjectMapper().apply {
             registerModule(KotlinModule.Builder().build())
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         }
@@ -70,35 +70,449 @@ data class TransportMessage(
         fun generateMessageId(): String = UUID.randomUUID().toString()
         
         /**
-         * 序列化消息为二进制格式
+         * 序列化消息为二进制格式（统一使用二进制格式）
          */
         fun serialize(message: TransportMessage): ByteArray {
+            return serializeToBinary(message)
+        }
+        
+        /**
+         * 序列化消息为二进制格式（TaP专用格式，用于特殊场景）
+         */
+        fun serializeToBinary(message: TransportMessage): ByteArray {
             return try {
-                val jsonString = objectMapper.writeValueAsString(message)
-                jsonString.toByteArray(Charsets.UTF_8)
+                val output = java.io.ByteArrayOutputStream()
+                
+                // 写入版本信息
+                output.write(message.version.toByteArray(Charsets.UTF_8))
+                output.write(0) // null terminator
+                
+                // 写入messageId长度和内容
+                val messageIdBytes = message.messageId.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(messageIdBytes.size))
+                output.write(messageIdBytes)
+                
+                // 写入timestamp
+                output.write(longToBytes(message.timestamp))
+                
+                // 写入senderId长度和内容
+                val senderIdBytes = message.senderId.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(senderIdBytes.size))
+                output.write(senderIdBytes)
+                
+                // 写入recipientId长度和内容
+                val recipientIdBytes = message.recipientId.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(recipientIdBytes.size))
+                output.write(recipientIdBytes)
+                
+                // 写入messageType
+                output.write(intToBytes(message.messageType.ordinal))
+                
+                // 写入signalCiphertext长度和内容
+                val ciphertextBytes = message.signalCiphertext.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(ciphertextBytes.size))
+                output.write(ciphertextBytes)
+                
+                // 写入signalCiphertextType
+                output.write(intToBytes(message.signalCiphertextType))
+                
+                // 写入contentMetadata（JSON格式）
+                val metadataJson = objectMapper.writeValueAsString(message.contentMetadata)
+                val metadataBytes = metadataJson.toByteArray(Charsets.UTF_8)
+                output.write(intToBytes(metadataBytes.size))
+                output.write(metadataBytes)
+                
+                // 写入attachments数量
+                output.write(intToBytes(message.attachments.size))
+                
+                // 写入每个attachment
+                for (attachment in message.attachments) {
+                    val attachmentJson = objectMapper.writeValueAsString(attachment)
+                    val attachmentBytes = attachmentJson.toByteArray(Charsets.UTF_8)
+                    output.write(intToBytes(attachmentBytes.size))
+                    output.write(attachmentBytes)
+                }
+                
+                output.toByteArray()
             } catch (e: Exception) {
                 throw TransportException(
                     TransportError.INVALID_FORMAT,
-                    "消息序列化失败: ${e.message}",
+                    "消息二进制序列化失败: ${e.message}",
                     e
                 )
             }
         }
         
         /**
+         * Int转4字节（大端序）
+         */
+        private fun intToBytes(value: Int): ByteArray {
+            return byteArrayOf(
+                (value shr 24).toByte(),
+                (value shr 16).toByte(),
+                (value shr 8).toByte(),
+                value.toByte()
+            )
+        }
+        
+        /**
+         * Long转8字节（大端序）
+         */
+        private fun longToBytes(value: Long): ByteArray {
+            return byteArrayOf(
+                (value shr 56).toByte(),
+                (value shr 48).toByte(),
+                (value shr 40).toByte(),
+                (value shr 32).toByte(),
+                (value shr 24).toByte(),
+                (value shr 16).toByte(),
+                (value shr 8).toByte(),
+                value.toByte()
+            )
+        }
+        
+        /**
          * 从二进制格式反序列化消息
          */
         fun deserialize(data: ByteArray): TransportMessage {
+            return deserializeFromBinary(data)
+        }
+        
+        /**
+         * 从二进制格式严格反序列化消息
+         * 
+         * 此方法实现严格的二进制格式解析，按照既定的字段顺序和长度进行读取，
+         * 不允许任何猜测式补全或格式回退。如果格式不符合规范，将抛出异常。
+         * 
+         * 二进制格式规范：
+         * 1. version: UTF-8字符串 + null terminator (0x00)
+         * 2. messageId: 4字节长度 + UTF-8字符串内容
+         * 3. timestamp: 8字节长整型（大端序）
+         * 4. senderId: 4字节长度 + UTF-8字符串内容
+         * 5. recipientId: 4字节长度 + UTF-8字符串内容
+         * 6. messageType: 4字节整型（枚举序号，大端序）
+         * 7. signalCiphertext: 4字节长度 + UTF-8字符串内容
+         * 8. signalCiphertextType: 4字节整型（大端序）
+         * 9. contentMetadata: 4字节长度 + JSON字符串内容
+         * 10. attachments: 4字节数量 + 每个attachment的(4字节长度 + JSON字符串内容)
+         */
+        fun deserializeFromBinary(data: ByteArray): TransportMessage {
             return try {
-                val jsonString = String(data, Charsets.UTF_8)
-                objectMapper.readValue<TransportMessage>(jsonString)
+                var offset = 0
+                
+                // 1. 读取版本信息（以null terminator结尾）
+                var versionEndIndex = -1
+                for (i in offset until data.size) {
+                    if (data[i] == 0.toByte()) {
+                        versionEndIndex = i
+                        break
+                    }
+                }
+                if (versionEndIndex == -1) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：版本信息缺少null terminator"
+                    )
+                }
+                if (versionEndIndex == offset) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：版本信息为空"
+                    )
+                }
+                val version = String(data, offset, versionEndIndex - offset, Charsets.UTF_8)
+                offset = versionEndIndex + 1
+                
+                // 2. 读取messageId
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：messageId长度字段不完整"
+                    )
+                }
+                val messageIdLength = bytesToInt(data, offset)
+                offset += 4
+                
+                if (messageIdLength <= 0 || messageIdLength > 200) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：messageId长度无效 ($messageIdLength)"
+                    )
+                }
+                if (offset + messageIdLength > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：messageId内容不完整"
+                    )
+                }
+                val messageId = String(data, offset, messageIdLength, Charsets.UTF_8)
+                offset += messageIdLength
+                
+                // 3. 读取timestamp
+                if (offset + 8 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：timestamp字段不完整"
+                    )
+                }
+                val timestamp = bytesToLong(data, offset)
+                offset += 8
+                
+                // 验证timestamp合理性
+                val currentTime = System.currentTimeMillis()
+                if (timestamp <= 0 || timestamp > currentTime + 300000) { // 允许5分钟的时间偏差
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：timestamp无效 ($timestamp)"
+                    )
+                }
+                
+                // 4. 读取senderId
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：senderId长度字段不完整"
+                    )
+                }
+                val senderIdLength = bytesToInt(data, offset)
+                offset += 4
+                
+                if (senderIdLength <= 0 || senderIdLength > 200) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：senderId长度无效 ($senderIdLength)"
+                    )
+                }
+                if (offset + senderIdLength > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：senderId内容不完整"
+                    )
+                }
+                val senderId = String(data, offset, senderIdLength, Charsets.UTF_8)
+                offset += senderIdLength
+                
+                // 5. 读取recipientId
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：recipientId长度字段不完整"
+                    )
+                }
+                val recipientIdLength = bytesToInt(data, offset)
+                offset += 4
+                
+                if (recipientIdLength <= 0 || recipientIdLength > 200) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：recipientId长度无效 ($recipientIdLength)"
+                    )
+                }
+                if (offset + recipientIdLength > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：recipientId内容不完整"
+                    )
+                }
+                val recipientId = String(data, offset, recipientIdLength, Charsets.UTF_8)
+                offset += recipientIdLength
+                
+                // 6. 读取messageType
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：messageType字段不完整"
+                    )
+                }
+                val messageTypeOrdinal = bytesToInt(data, offset)
+                offset += 4
+                
+                if (messageTypeOrdinal < 0 || messageTypeOrdinal >= TransportMessageType.values().size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：messageType无效 ($messageTypeOrdinal)"
+                    )
+                }
+                val messageType = TransportMessageType.values()[messageTypeOrdinal]
+                
+                // 7. 读取signalCiphertext
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：signalCiphertext长度字段不完整"
+                    )
+                }
+                val ciphertextLength = bytesToInt(data, offset)
+                offset += 4
+                
+                if (ciphertextLength <= 0 || ciphertextLength > 10 * 1024 * 1024) { // 最大10MB
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：signalCiphertext长度无效 ($ciphertextLength)"
+                    )
+                }
+                if (offset + ciphertextLength > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：signalCiphertext内容不完整"
+                    )
+                }
+                val signalCiphertext = String(data, offset, ciphertextLength, Charsets.UTF_8)
+                offset += ciphertextLength
+                
+                // 8. 读取signalCiphertextType
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：signalCiphertextType字段不完整"
+                    )
+                }
+                val signalCiphertextType = bytesToInt(data, offset)
+                offset += 4
+                
+                // 9. 读取contentMetadata
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：contentMetadata长度字段不完整"
+                    )
+                }
+                val metadataLength = bytesToInt(data, offset)
+                offset += 4
+                
+                if (metadataLength <= 0 || metadataLength > 1024 * 1024) { // 最大1MB
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：contentMetadata长度无效 ($metadataLength)"
+                    )
+                }
+                if (offset + metadataLength > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：contentMetadata内容不完整"
+                    )
+                }
+                val metadataJson = String(data, offset, metadataLength, Charsets.UTF_8)
+                offset += metadataLength
+                
+                val contentMetadata = try {
+                    objectMapper.readValue(metadataJson, TransportContentMetadata::class.java)
+                } catch (e: Exception) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：contentMetadata JSON解析失败",
+                        e
+                    )
+                }
+                
+                // 10. 读取attachments
+                if (offset + 4 > data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：attachments数量字段不完整"
+                    )
+                }
+                val attachmentCount = bytesToInt(data, offset)
+                offset += 4
+                
+                if (attachmentCount < 0 || attachmentCount > 100) { // 最大100个附件
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：attachments数量无效 ($attachmentCount)"
+                    )
+                }
+                
+                val attachments = mutableListOf<TransportAttachment>()
+                for (i in 0 until attachmentCount) {
+                    if (offset + 4 > data.size) {
+                        throw TransportException(
+                            TransportError.INVALID_FORMAT,
+                            "二进制消息格式错误：attachment[$i]长度字段不完整"
+                        )
+                    }
+                    
+                    val attachmentLength = bytesToInt(data, offset)
+                    offset += 4
+                    
+                    if (attachmentLength <= 0 || attachmentLength > 1024 * 1024) { // 最大1MB JSON
+                        throw TransportException(
+                            TransportError.INVALID_FORMAT,
+                            "二进制消息格式错误：attachment[$i]长度无效 ($attachmentLength)"
+                        )
+                    }
+                    if (offset + attachmentLength > data.size) {
+                        throw TransportException(
+                            TransportError.INVALID_FORMAT,
+                            "二进制消息格式错误：attachment[$i]内容不完整"
+                        )
+                    }
+                    
+                    val attachmentJson = String(data, offset, attachmentLength, Charsets.UTF_8)
+                    offset += attachmentLength
+                    
+                    val attachment = try {
+                        objectMapper.readValue(attachmentJson, TransportAttachment::class.java)
+                    } catch (e: Exception) {
+                        throw TransportException(
+                            TransportError.INVALID_FORMAT,
+                            "二进制消息格式错误：attachment[$i] JSON解析失败",
+                            e
+                        )
+                    }
+                    attachments.add(attachment)
+                }
+                
+                // 验证是否消费了所有数据（不允许有多余数据）
+                if (offset != data.size) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：存在未消费的数据 (${data.size - offset} bytes)"
+                    )
+                }
+                
+                TransportMessage(
+                    version = version,
+                    messageId = messageId,
+                    timestamp = timestamp,
+                    senderId = senderId,
+                    recipientId = recipientId,
+                    messageType = messageType,
+                    signalCiphertext = signalCiphertext,
+                    signalCiphertextType = signalCiphertextType,
+                    contentMetadata = contentMetadata,
+                    attachments = attachments
+                )
+                
+            } catch (e: TransportException) {
+                throw e
             } catch (e: Exception) {
                 throw TransportException(
                     TransportError.INVALID_FORMAT,
-                    "消息反序列化失败: ${e.message}",
+                    "二进制消息反序列化失败: ${e.message}",
                     e
                 )
             }
+        }
+        
+        /**
+         * 4字节转Int（大端序）
+         */
+        private fun bytesToInt(data: ByteArray, offset: Int): Int {
+            return ((data[offset].toInt() and 0xFF) shl 24) or
+                   ((data[offset + 1].toInt() and 0xFF) shl 16) or
+                   ((data[offset + 2].toInt() and 0xFF) shl 8) or
+                   (data[offset + 3].toInt() and 0xFF)
+        }
+        
+        /**
+         * 8字节转Long（大端序）
+         */
+        private fun bytesToLong(data: ByteArray, offset: Int): Long {
+            var result = 0L
+            for (i in 0 until 8) {
+                result = (result shl 8) or (data[offset + i].toLong() and 0xFF)
+            }
+            return result
         }
     }
     
