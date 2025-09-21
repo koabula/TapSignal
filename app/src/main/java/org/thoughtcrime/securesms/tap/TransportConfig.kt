@@ -83,17 +83,34 @@ data class TransportChannelConfig(
  */
 data class TransportTokenConfig(
     /** 最大Token数量 */
-    val maxTokens: Int = 10000,
+    val maxTokens: Int = 1000,
     
-    /** Token清理间隔（毫秒） */
-    val cleanupIntervalMs: Long = 3600000L, // 1小时
+    /** 默认Token有效期（毫秒） */
+    val defaultValidityMs: Long = 24 * 60 * 60 * 1000L, // 24小时
     
-    /** 自动刷新Token */
+    /** 是否自动刷新即将过期的Token */
     val autoRefresh: Boolean = true,
     
-    /** Token有效期（毫秒） */
-    val defaultValidityMs: Long = 86400000L // 24小时
-)
+    /** 清理间隔（毫秒） */
+    val cleanupIntervalMs: Long = 60 * 60 * 1000L, // 1小时
+    
+    /** Token刷新提前时间（毫秒） */
+    val refreshAdvanceMs: Long = 60 * 60 * 1000L, // 1小时
+    
+    /** 是否启用Token统计 */
+    val enableStatistics: Boolean = true
+) {
+    
+    /**
+     * 验证配置有效性
+     */
+    fun validate(): Boolean {
+        return maxTokens > 0 && 
+               defaultValidityMs > 0 && 
+               cleanupIntervalMs > 0 && 
+               refreshAdvanceMs >= 0
+    }
+}
 
 /**
  * 传输路由策略

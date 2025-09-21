@@ -51,8 +51,8 @@ public interface MessageTypes {
   long THREAD_MERGE_TYPE                     = 16;
   long SMS_EXPORT_TYPE                       = 17;
   long SESSION_SWITCHOVER_TYPE               = 18;
-  long COS_V2_MODE_DISABLED_TYPE             = 19;
-  long COS_V2_MODE_ENABLED_TYPE              = 20;
+  long TAP_V2_MODE_DISABLED_TYPE             = 19;
+  long TAP_V2_MODE_ENABLED_TYPE              = 20;
 
   long BASE_INBOX_TYPE                    = 21;
   long BASE_OUTBOX_TYPE                   = 22;
@@ -377,11 +377,11 @@ public interface MessageTypes {
     return (type & GROUP_V2_LEAVE_BITS) == GROUP_V2_LEAVE_BITS;
   }
 
-  static boolean isCosV2ModeDisabled(long type) {
-    return type == COS_V2_MODE_DISABLED_TYPE;
+  static boolean isTapV2ModeDisabled(long type) {
+    return type == TAP_V2_MODE_DISABLED_TYPE;
   }
 
-  static boolean isCosV2ModeEnabled(long type) {
-    return type == COS_V2_MODE_ENABLED_TYPE;
+  static boolean isTapV2ModeEnabled(long type) {
+    return type == TAP_V2_MODE_ENABLED_TYPE;
   }
 }

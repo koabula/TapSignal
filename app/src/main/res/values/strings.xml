@@ -2115,10 +2115,10 @@
     <string name="MessageRecord_you_blocked_this_group">You blocked this group</string>
     <!-- Update message shown in chat after you unblock a group -->
     <string name="MessageRecord_you_unblocked_this_group">You unblocked this group</string>
-    <!-- Update message shown in chat when COS v2 mode is disabled -->
-    <string name="MessageRecord_cos_v2_mode_disabled">v2 mode disabled</string>
-    <!-- Update message shown in chat when COS v2 mode is enabled -->
-    <string name="MessageRecord_cos_v2_mode_enabled">v2 mode enabled</string>
+    <!-- Update message shown in chat when Tap v2 mode is disabled -->
+    <string name="MessageRecord_tap_v2_mode_disabled">Tap v2 mode disabled</string>
+    <!-- Update message shown in chat when Tap v2 mode is enabled -->
+    <string name="MessageRecord_tap_v2_mode_enabled">Tap v2 mode enabled</string>
 
     <!-- MessageRequestBottomView -->
     <string name="MessageRequestBottomView_accept">Accept</string>

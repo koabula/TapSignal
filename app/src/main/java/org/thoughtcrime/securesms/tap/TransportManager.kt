@@ -580,7 +580,7 @@ class TransportManager private constructor(private val context: Context) {
             Log.d(TAG, "轮询通道消息: ${channel.channelId} (${channel.providerType})")
             
             // 使用新接口：listFiles + downloadFile
-            val listResult = provider.listFiles(channel.metadata.path, channel.metadata)
+            val listResult = provider.listFiles(channel.metadata.getReceiveMetadata().path, channel.metadata)
             when (listResult) {
                 is TransportResult.Success -> {
                     val fileInfos = listResult.data as? List<*> ?: emptyList<Any>()

@@ -999,24 +999,24 @@ object DataMessageProcessor {
 
     val body = message.body ?: ""
 
-    // 检查是否为COS控制消息（请求/响应/撤销）
-    val cosMessageProcessor = org.thoughtcrime.securesms.coscomm.processor.CosSignalMessageProcessor.getInstance(context)
-    if (cosMessageProcessor.isCosMessage(body)) {
-      log(envelope.timestamp!!, "🎛️ 检测到COS控制消息，特殊处理: bodyLength=${body.length}")
+    // 检查是否为Tap传输层控制消息（请求/响应/撤销）
+    val tapMessageProcessor = org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.getInstance(context)
+    if (tapMessageProcessor.isTapMessage(body)) {
+      log(envelope.timestamp!!, "🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=${body.length}")
 
-      // 处理COS控制消息（请求/响应/撤销）
-      val result = cosMessageProcessor.processCosMessage(senderRecipient.id.toString(), body)
-      log(envelope.timestamp!!, "🎛️ COS控制消息处理完成，不插入消息数据库")
+      // 处理Tap传输层控制消息（请求/响应/撤销）
+      val result = tapMessageProcessor.processTapMessage(senderRecipient.id.toString(), body)
+      log(envelope.timestamp!!, "🎛️ Tap传输层控制消息处理完成，不插入消息数据库")
 
-      // COS控制消息不插入普通消息数据库，而是显示为特殊UI
+      // Tap传输层控制消息不插入普通消息数据库，而是显示为特殊UI
       // 这里我们返回null，表示不需要插入普通消息
       return null
     }
 
-    // 检查是否为通过COS传输的普通聊天消息
+    // 检查是否为通过Tap传输层传输的普通聊天消息
     // 这些消息应该正常处理和显示，不应该被拦截
-    if (isCosDeliveredMessage(envelope)) {
-      log(envelope.timestamp!!, "📨 检测到COS传输的聊天消息，正常处理: serverGuid=${envelope.serverGuid}")
+    if (isTapDeliveredMessage(envelope)) {
+      log(envelope.timestamp!!, "📨 检测到Tap传输层传输的聊天消息，正常处理: serverGuid=${envelope.serverGuid}")
       // 继续正常的消息处理流程，不返回null
     } else {
       log(envelope.timestamp!!, "📨 普通Signal消息，正常处理")
@@ -1270,16 +1270,16 @@ object DataMessageProcessor {
   }
 
   /**
-   * 检查消息是否为通过COS传输的普通聊天消息
+   * 检查消息是否为通过Tap传输层传输的普通聊天消息
    * 这些消息应该正常处理和显示，不应该被拦截
    */
-  private fun isCosDeliveredMessage(envelope: Envelope): Boolean {
-    // 通过COS传输的消息会有特殊的serverGuid格式
-    // COS消息的serverGuid通常是COS消息ID，而不是Signal服务器的UUID格式
+  private fun isTapDeliveredMessage(envelope: Envelope): Boolean {
+    // 通过Tap传输层传输的消息会有特殊的serverGuid格式
+    // Tap传输层消息的serverGuid通常是Tap消息ID，而不是Signal服务器的UUID格式
     val serverGuid = envelope.serverGuid
     if (serverGuid != null) {
-      // COS消息ID格式通常是时间戳+随机数，不是标准UUID格式
-      // 如果不是标准UUID格式，可能是COS消息
+      // Tap传输层消息ID格式通常是时间戳+随机数，不是标准UUID格式
+      // 如果不是标准UUID格式，可能是Tap传输层消息
       return !isStandardUuid(serverGuid)
     }
     return false
@@ -1304,8 +1304,8 @@ object DataMessageProcessor {
    */
   private fun isCosV2ModeMessage(context: Context, envelope: Envelope, senderRecipient: Recipient): Boolean {
     return try {
-      // 首先检查是否为COS传输的消息
-      if (!isCosDeliveredMessage(envelope)) {
+      // 首先检查是否为Tap传输层传输的消息
+      if (!isTapDeliveredMessage(envelope)) {
         return false
       }
 

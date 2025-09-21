@@ -301,6 +301,99 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
+     * 获取对端Token信息
+     * 
+     * 对端Token是指我们接收到的、用于访问对端存储的Token
+     */
+    fun getPeerTokenInfo(recipientId: String, providerType: String): PeerTokenInfo? {
+        tokenLock.read {
+            val receivedToken = receivedTokens[recipientId]?.get(providerType)
+            if (receivedToken != null && !receivedToken.isExpired && receivedToken.validate()) {
+                // 从Token中提取对端信息
+                return extractPeerInfo(receivedToken)
+            }
+            return null
+        }
+    }
+    
+    /**
+     * 从Token中提取对端信息
+     */
+    private fun extractPeerInfo(token: TransportToken): PeerTokenInfo {
+        return when (token) {
+            is CosTransportToken -> {
+                PeerTokenInfo(
+                    address = constructCosAddress(token.region, token.bucketName),
+                    token = token,
+                    region = token.region,
+                    bucketName = token.bucketName,
+                    endpoint = null
+                )
+            }
+            else -> {
+                // 对于其他类型的Token，提供基础信息
+                PeerTokenInfo(
+                    address = "unknown://${token.providerType}",
+                    token = token,
+                    region = null,
+                    bucketName = null,
+                    endpoint = null
+                )
+            }
+        }
+    }
+    
+    /**
+     * 构建COS地址
+     */
+    private fun constructCosAddress(region: String, bucketName: String): String {
+        // 根据region和bucketName构建标准的COS地址
+        // 这里假设是腾讯云COS，具体可能需要根据Provider配置调整
+        return "https://$bucketName.cos.$region.myqcloud.com"
+    }
+    
+    /**
+     * 获取本端Token信息
+     * 
+     * 本端Token是指我们共享给对端的、用于对方访问我们存储的Token
+     */
+    fun getMyTokenInfo(recipientId: String, providerType: String): MyTokenInfo? {
+        tokenLock.read {
+            val sharedToken = sharedTokens[recipientId]?.get(providerType)
+            if (sharedToken != null && !sharedToken.isExpired && sharedToken.validate()) {
+                return extractMyInfo(sharedToken)
+            }
+            return null
+        }
+    }
+    
+    /**
+     * 从共享Token中提取本端信息
+     */
+    private fun extractMyInfo(token: TransportToken): MyTokenInfo {
+        return when (token) {
+            is CosTransportToken -> {
+                MyTokenInfo(
+                    address = constructCosAddress(token.region, token.bucketName),
+                    token = token,
+                    region = token.region,
+                    bucketName = token.bucketName,
+                    endpoint = null
+                )
+            }
+            else -> {
+                MyTokenInfo(
+                    address = "unknown://${token.providerType}",
+                    token = token,
+                    region = null,
+                    bucketName = null,
+                    endpoint = null
+                )
+            }
+        }
+    }
+    
+    /**
      * 获取即将过期的Token列表
      */
     fun getNearExpiryTokens(): List<TransportToken> {
@@ -1194,3 +1287,43 @@ data class TokenProviderStatistics(
         return if (totalCount > 0) validCount.toDouble() / totalCount else 0.0
     }
 } 
+
+/**
+ * 对端Token信息
+ */
+data class PeerTokenInfo(
+    /** 对端地址 */
+    val address: String,
+    
+    /** 对端Token */
+    val token: TransportToken,
+    
+    /** 地域信息（COS等云服务） */
+    val region: String?,
+    
+    /** 存储桶名称（COS等云服务） */
+    val bucketName: String?,
+    
+    /** 服务端点（自定义服务） */
+    val endpoint: String?
+)
+
+/**
+ * 本端Token信息
+ */
+data class MyTokenInfo(
+    /** 本端地址 */
+    val address: String,
+    
+    /** 本端Token */
+    val token: TransportToken,
+    
+    /** 地域信息（COS等云服务） */
+    val region: String?,
+    
+    /** 存储桶名称（COS等云服务） */
+    val bucketName: String?,
+    
+    /** 服务端点（自定义服务） */
+    val endpoint: String?
+) 

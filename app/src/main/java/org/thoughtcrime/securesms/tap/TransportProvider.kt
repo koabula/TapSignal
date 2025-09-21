@@ -279,6 +279,144 @@ interface TransportProvider {
     fun canPerformOperation(operation: TransportOperation): Boolean {
         return operation.isPermissionSufficient(supportedPermissions)
     }
+    
+    /**
+     * 判断文件是否为消息文件
+     * 
+     * 不同Provider可能有不同的文件命名和识别策略
+     * 
+     * @param fileInfo 文件信息
+     * @return 是否为消息文件
+     */
+    fun isMessageFile(fileInfo: FileInfo): Boolean {
+        // 默认实现：基于文件扩展名判断
+        val name = fileInfo.name.lowercase()
+        return name.endsWith(".dat") || name.endsWith(".msg") || name.endsWith(".enc")
+    }
+    
+    /**
+     * 解析文件名获取消息信息
+     * 
+     * 不同Provider可能有不同的文件命名策略
+     * 
+     * @param fileName 文件名
+     * @return 解析的消息信息，解析失败返回null
+     */
+    fun parseMessageFileName(fileName: String): MessageFileInfo? {
+        return try {
+            // 默认实现：支持标准格式 messageId_timestamp.dat
+            val baseName = fileName.substringBeforeLast('.')
+            val parts = baseName.split('_')
+            
+            when (parts.size) {
+                2 -> {
+                    // messageId_timestamp格式
+                    MessageFileInfo(
+                        messageId = parts[0],
+                        timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = "",
+                        recipientId = ""
+                    )
+                }
+                3 -> {
+                    // senderId_messageId_timestamp格式
+                    MessageFileInfo(
+                        messageId = parts[1],
+                        timestamp = parts[2].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = parts[0],
+                        recipientId = ""
+                    )
+                }
+                4 -> {
+                    // senderId_recipientId_messageId_timestamp格式
+                    MessageFileInfo(
+                        messageId = parts[2],
+                        timestamp = parts[3].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = parts[0],
+                        recipientId = parts[1]
+                    )
+                }
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * 从文件数据解析传输消息
+     * 
+     * @param fileData 文件二进制数据
+     * @param fileInfo 文件信息
+     * @param metadata 传输元数据
+     * @return 解析的传输消息，解析失败返回null
+     */
+    suspend fun parseTransportMessage(fileData: ByteArray, fileInfo: FileInfo, metadata: TransportMetadata): TransportMessage? {
+        return try {
+            // 默认实现：假设文件直接包含序列化的TransportMessage
+            // 具体Provider应该重写此方法实现自己的解析逻辑
+            
+            // 从文件名解析基本信息
+            val messageFileInfo = parseMessageFileName(fileInfo.name) ?: return null
+            
+            // 简单的二进制格式解析（实际应该有版本、长度、校验等）
+            val signalCiphertext = android.util.Base64.encodeToString(fileData, android.util.Base64.NO_WRAP)
+            
+            TransportMessage(
+                messageId = messageFileInfo.messageId,
+                timestamp = messageFileInfo.timestamp,
+                senderId = messageFileInfo.senderId,
+                recipientId = messageFileInfo.recipientId,
+                messageType = TransportMessageType.TEXT_MESSAGE,
+                signalCiphertext = signalCiphertext,
+                contentMetadata = TransportContentMetadata(
+                    originalSize = fileData.size.toLong(),
+                    compressionType = TransportCompressionType.NONE
+                )
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * 获取发送路径策略
+     * 
+     * 不同Provider可能有不同的路径组织策略
+     * 
+     * @param recipientId 接收者ID
+     * @param messageType 消息类型
+     * @return 发送路径
+     */
+    fun getSendPath(recipientId: String, messageType: TransportMessageType = TransportMessageType.TEXT_MESSAGE): String {
+        // 默认实现：/outbox/recipientId/
+        return "/outbox/$recipientId/"
+    }
+    
+    /**
+     * 获取接收路径策略
+     * 
+     * 不同Provider可能有不同的路径组织策略
+     * 
+     * @param recipientId 发送者ID（从其路径接收消息）
+     * @param messageType 消息类型
+     * @return 接收路径
+     */
+    fun getReceivePath(recipientId: String, messageType: TransportMessageType = TransportMessageType.TEXT_MESSAGE): String {
+        // 默认实现：/outbox/recipientId/（从对方的outbox接收）
+        return "/outbox/$recipientId/"
+    }
+    
+    /**
+     * 获取Provider特定的地址格式
+     * 
+     * @param config Provider配置
+     * @return 格式化的地址
+     */
+    fun formatAddress(config: Map<String, Any>): String {
+        // 默认实现：provider://type
+        return "provider://$providerType"
+    }
 }
 
 /**
@@ -361,44 +499,116 @@ interface TransportProviderFactory {
 /**
  * 传输提供者注册器接口
  * 
- * 用于向系统注册传输提供者。
+ * 用于注册和管理传输提供者的生命周期。
  */
 interface TransportProviderRegistrar {
+    
+    /** 支持的提供者类型 */
+    val supportedProviderTypes: Set<String>
+    
+    /** 注册器的显示名称 */
+    val displayName: String
+    
+    /** 注册器的优先级（数字越大优先级越高） */
+    val priority: Int get() = 0
     
     /**
      * 注册传输提供者
      * 
-     * @param provider 提供者实例
+     * @param factory 提供者工厂
+     * @return 注册是否成功
      */
-    fun registerProvider(provider: TransportProvider)
+    suspend fun register(factory: TransportProviderFactory): Boolean
     
     /**
      * 注销传输提供者
      * 
      * @param providerType 提供者类型
+     * @return 注销是否成功
      */
-    fun unregisterProvider(providerType: String)
+    suspend fun unregister(providerType: String): Boolean
     
     /**
-     * 获取已注册的提供者
+     * 获取已注册的提供者列表
      * 
-     * @param providerType 提供者类型
-     * @return 提供者实例，如果未注册则返回null
+     * @return 提供者类型列表
      */
-    fun getProvider(providerType: String): TransportProvider?
-    
-    /**
-     * 获取所有已注册的提供者
-     * 
-     * @return 提供者类型到实例的映射
-     */
-    fun getAllProviders(): Map<String, TransportProvider>
+    fun getRegisteredProviders(): Set<String>
     
     /**
      * 检查提供者是否已注册
+     * 
+     * @param providerType 提供者类型
+     * @return 是否已注册
      */
-    fun isProviderRegistered(providerType: String): Boolean
+    fun isProviderRegistered(providerType: String): Boolean {
+        return getRegisteredProviders().contains(providerType)
+    }
+    
+    /**
+     * 获取提供者的详细信息
+     * 
+     * @param providerType 提供者类型
+     * @return 提供者信息，如果未注册则返回null
+     */
+    fun getProviderInfo(providerType: String): TransportProviderInfo?
+    
+    /**
+     * 清理资源
+     */
+    suspend fun cleanup()
 }
+
+/**
+ * 传输提供者信息
+ */
+data class TransportProviderInfo(
+    /** 提供者类型 */
+    val providerType: String,
+    
+    /** 显示名称 */
+    val displayName: String,
+    
+    /** 描述信息 */
+    val description: String,
+    
+    /** 是否支持权限管理 */
+    val supportsAuth: Boolean,
+    
+    /** 是否支持群组传输 */
+    val supportsGroup: Boolean,
+    
+    /** 支持的最大消息大小 */
+    val maxMessageSize: Long,
+    
+    /** 支持的权限列表 */
+    val supportedPermissions: Set<TransportPermission>,
+    
+    /** 注册时间 */
+    val registeredAt: Long = System.currentTimeMillis(),
+    
+    /** 额外信息 */
+    val additionalInfo: Map<String, Any> = emptyMap()
+)
+
+/**
+ * 消息文件信息
+ * 
+ * 从文件名解析出的消息基本信息
+ */
+data class MessageFileInfo(
+    /** 消息ID */
+    val messageId: String,
+    
+    /** 时间戳 */
+    val timestamp: Long,
+    
+    /** 发送者ID */
+    val senderId: String,
+    
+    /** 接收者ID */
+    val recipientId: String
+)
 
 /**
  * 抽象传输提供者基类
@@ -445,8 +655,13 @@ abstract class AbstractTransportProvider : TransportProvider {
         
         // 验证Token（如果支持权限管理）
         if (supportsAuth) {
-            val token = metadata.token
-            if (token != null && !validateToken(token)) {
+            // 根据操作类型验证相应的token
+            val sendToken = metadata.getSendMetadata().token
+            val receiveToken = metadata.getReceiveMetadata().token
+            
+            // 优先验证发送token，如果不存在则验证接收token
+            val tokenToValidate = sendToken ?: receiveToken
+            if (tokenToValidate != null && !validateToken(tokenToValidate)) {
                 return TransportResult.failure(
                     TransportError.AUTH_ERROR,
                     true,

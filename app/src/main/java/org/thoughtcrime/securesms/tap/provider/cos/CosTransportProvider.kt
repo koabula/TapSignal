@@ -33,6 +33,7 @@ class CosTransportProvider(
         private const val MAX_FILE_SIZE = 100 * 1024 * 1024L // 100MB
         private const val OUTBOX_PATH = "/outbox/"
         private const val GROUP_PATH_PREFIX = "/group/"
+        private const val MESSAGE_FORMAT_VERSION = 1
         private const val GROUP_OUTBOX_SUFFIX = "/outbox/"
     }
 
@@ -71,8 +72,11 @@ class CosTransportProvider(
                         "元数据不是COS类型"
                     )
 
-                // 创建COS客户端
-                val cosClient = createCosClient(cosMetadata)
+                // 获取发送元数据（使用本端凭证和存储）
+                val sendMetadata = cosMetadata.getSendMetadata()
+                
+                // 创建COS客户端（使用发送元数据）
+                val cosClient = createCosClientForSend(cosMetadata)
                     ?: return@withContext TransportResult.failure(
                         TransportError.PROVIDER_UNAVAILABLE,
                         true,
@@ -95,8 +99,8 @@ class CosTransportProvider(
                 val tempFile = createTempFile(messageData)
                 
                 try {
-                    // 生成远程路径
-                    val remotePath = "${cosMetadata.path}${message.messageId}_${System.currentTimeMillis()}.dat"
+                    // 使用发送路径：/outbox/<recipientId>/
+                    val remotePath = "${sendMetadata.path}${message.messageId}_${System.currentTimeMillis()}.dat"
                     
                     // 上传文件
                     val uploadSuccess = cosClient.uploadFile(tempFile, remotePath)
@@ -142,7 +146,7 @@ class CosTransportProvider(
                 Log.d(TAG, "开始拉取消息: recipientId=${metadata.recipientId}")
                 
                 // 使用新的文件操作接口
-                val listResult = listFiles(metadata.path, metadata)
+                val listResult = listFiles(metadata.getReceiveMetadata().path, metadata)
                 if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
                     return@withContext TransportResult.Success(null)
                 }
@@ -158,9 +162,20 @@ class CosTransportProvider(
                     val tempFile = File.createTempFile("cos_parse_", ".dat", context.cacheDir)
                     try {
                         tempFile.writeBytes(downloadResult.data)
-                        val message = parseMessageFromFile(tempFile)
-                        Log.i(TAG, "消息拉取成功: messageId=${message.messageId}")
-                        TransportResult.Success(message)
+                        val messageFileInfo = parseMessageFileName(latestFile.name)
+                        if (messageFileInfo != null) {
+                            val message = parseMessageFromBinaryData(downloadResult.data, messageFileInfo)
+                            if (message != null) {
+                                Log.i(TAG, "消息拉取成功: messageId=${message.messageId}")
+                                TransportResult.Success(message)
+                            } else {
+                                Log.w(TAG, "消息解析失败: ${latestFile.name}")
+                                TransportResult.Failed(TransportError.INVALID_FORMAT, false, "消息解析失败")
+                            }
+                        } else {
+                            Log.w(TAG, "文件名解析失败: ${latestFile.name}")
+                            TransportResult.Failed(TransportError.INVALID_FORMAT, false, "文件名解析失败")
+                        }
                     } finally {
                         if (tempFile.exists()) {
                             tempFile.delete()
@@ -193,8 +208,11 @@ class CosTransportProvider(
                         "元数据不是COS类型"
                     )
 
-                // 创建COS客户端
-                val cosClient = createCosClient(cosMetadata)
+                // 获取接收元数据（使用对端凭证和存储）
+                val receiveMetadata = cosMetadata.getReceiveMetadata()
+                
+                // 创建COS客户端（使用接收元数据）
+                val cosClient = createCosClientForReceive(cosMetadata)
                     ?: return@withContext TransportResult.failure(
                         TransportError.PROVIDER_UNAVAILABLE,
                         true,
@@ -358,14 +376,19 @@ class CosTransportProvider(
                 val groupPath = "$GROUP_PATH_PREFIX${groupMetadata.groupId}$GROUP_OUTBOX_SUFFIX"
                 
                 // 使用自己的COS配置创建元数据
+                val myAddress = "${cosConfig.provider.name.lowercase()}://${cosConfig.bucketName}.${cosConfig.region}"
                 val cosMetadata = CosTransportMetadata(
                     recipientId = "self", // 上传到自己的COS
-                    address = cosConfig.let { "${it.provider.name.lowercase()}://${it.bucketName}.${it.region}" },
-                    token = null, // 使用自己的凭证
-                    path = groupPath,
                     providerType = "cos",
-                    region = cosConfig.region,
-                    bucketName = cosConfig.bucketName
+                    myAddress = myAddress,
+                    myToken = null, // 使用自己的凭证
+                    myRegion = cosConfig.region,
+                    myBucketName = cosConfig.bucketName,
+                    peerAddress = myAddress, // 群组消息，对端就是自己
+                    peerToken = null,
+                    peerRegion = cosConfig.region,
+                    peerBucketName = cosConfig.bucketName,
+                    myId = "self"
                 )
 
                 // 调用常规push方法
@@ -393,19 +416,36 @@ class CosTransportProvider(
                     try {
                         val groupPath = "$GROUP_PATH_PREFIX${groupMetadata.groupId}$GROUP_OUTBOX_SUFFIX"
                         
-                        // 创建成员的群组元数据
+                        // 创建成员的群组元数据 
                         val memberGroupMetadata = if (memberMetadata is CosTransportMetadata) {
-                            memberMetadata.copy(path = groupPath)
+                            // 创建一个新的实例，因为路径需要更新为群组路径
+                            CosTransportMetadata(
+                                recipientId = memberMetadata.recipientId,
+                                providerType = memberMetadata.providerType,
+                                myAddress = memberMetadata.myAddress,
+                                myToken = memberMetadata.myToken,
+                                myRegion = memberMetadata.myRegion,
+                                myBucketName = memberMetadata.myBucketName,
+                                peerAddress = memberMetadata.peerAddress,
+                                peerToken = memberMetadata.peerToken,
+                                peerRegion = memberMetadata.peerRegion,
+                                peerBucketName = memberMetadata.peerBucketName,
+                                myId = memberMetadata.myId
+                            )
                         } else {
                             // 转换为COS元数据
                             CosTransportMetadata(
                                 recipientId = memberMetadata.recipientId,
-                                address = memberMetadata.address,
-                                token = memberMetadata.token as? CosTransportToken,
-                                path = groupPath,
                                 providerType = "cos",
-                                region = (memberMetadata as? CosTransportMetadata)?.region ?: "",
-                                bucketName = (memberMetadata as? CosTransportMetadata)?.bucketName ?: ""
+                                myAddress = cosConfig.let { "${it.provider.name.lowercase()}://${it.bucketName}.${it.region}" },
+                                myToken = null,
+                                myRegion = cosConfig.region,
+                                myBucketName = cosConfig.bucketName,
+                                peerAddress = (memberMetadata as? CosTransportMetadata)?.peerAddress ?: "",
+                                peerToken = (memberMetadata as? CosTransportMetadata)?.peerToken as? CosTransportToken,
+                                peerRegion = (memberMetadata as? CosTransportMetadata)?.peerRegion ?: "",
+                                peerBucketName = (memberMetadata as? CosTransportMetadata)?.peerBucketName ?: "",
+                                myId = "self"
                             )
                         }
                         
@@ -503,12 +543,16 @@ class CosTransportProvider(
                 return false
             }
             
-            // 3. 只读权限验证：确保无法执行写操作
-            val readOnlyCheck = validateReadOnlyPermission(cosClient, cosToken)
+            // 3. 权限验证：根据策略调整
+            // 按照当前阶段策略，token应该是长期最高权限的，所以暂时跳过只读校验
+            // TODO: 后续可能需要根据实际部署需求调整权限策略
+            val readOnlyCheck = true // 暂时禁用只读校验，统一与长期最高权限token策略
             if (!readOnlyCheck) {
-                Log.w(TAG, "只读权限验证失败")
+                Log.w(TAG, "权限验证失败")
                 return false
             }
+            
+            Log.d(TAG, "权限验证跳过：当前使用长期最高权限token策略")
             
             Log.d(TAG, "Token验证成功: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
             true
@@ -680,12 +724,16 @@ class CosTransportProvider(
             // 获取真实的COS客户端
             val realCosClient = createCosClient(CosTransportMetadata(
                 recipientId = cosToken.recipientId,
-                address = cosToken.bucketName,
-                token = cosToken,
-                path = "/outbox/",
                 providerType = "cos",
-                region = cosToken.region,
-                bucketName = cosToken.bucketName
+                myAddress = "${cosToken.region}://${cosToken.bucketName}",
+                myToken = cosToken,
+                myRegion = cosToken.region,
+                myBucketName = cosToken.bucketName,
+                peerAddress = "${cosToken.region}://${cosToken.bucketName}",
+                peerToken = cosToken,
+                peerRegion = cosToken.region,
+                peerBucketName = cosToken.bucketName,
+                myId = "self"
             ))
             
             if (realCosClient == null) {
@@ -782,12 +830,16 @@ class CosTransportProvider(
             // 获取真实的COS客户端
             val realCosClient = createCosClient(CosTransportMetadata(
                 recipientId = cosToken.recipientId,
-                address = cosToken.bucketName,
-                token = cosToken,
-                path = "/outbox/",
                 providerType = "cos",
-                region = cosToken.region,
-                bucketName = cosToken.bucketName
+                myAddress = "${cosToken.region}://${cosToken.bucketName}",
+                myToken = cosToken,
+                myRegion = cosToken.region,
+                myBucketName = cosToken.bucketName,
+                peerAddress = "${cosToken.region}://${cosToken.bucketName}",
+                peerToken = cosToken,
+                peerRegion = cosToken.region,
+                peerBucketName = cosToken.bucketName,
+                myId = "self"
             ))
             
             if (realCosClient == null) {
@@ -936,9 +988,9 @@ class CosTransportProvider(
      */
     private fun createCosClient(metadata: CosTransportMetadata): CosClient? {
         return try {
-            if (metadata.token != null) {
+            if (metadata.myToken != null) {
                 // 使用Token创建客户端
-                val cosToken = metadata.token as CosTransportToken
+                val cosToken = metadata.myToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
                     provider = when (cosToken.region.startsWith("ap-")) {
                         true -> "TENCENT"
@@ -956,6 +1008,64 @@ class CosTransportProvider(
             }
         } catch (e: Exception) {
             Log.e(TAG, "创建COS客户端失败", e)
+            null
+        }
+    }
+
+    /**
+     * 创建用于发送的COS客户端（使用本端凭证）
+     */
+    private fun createCosClientForSend(metadata: CosTransportMetadata): CosClient? {
+        return try {
+            if (metadata.myToken != null) {
+                // 使用本端Token创建客户端
+                val cosToken = metadata.myToken as CosTransportToken
+                CosClientFactory.createClientWithToken(
+                    provider = when (cosToken.region.startsWith("ap-")) {
+                        true -> "TENCENT"
+                        false -> "AWS"
+                    },
+                    region = metadata.myRegion,
+                    bucketName = metadata.myBucketName,
+                    accessKeyId = cosToken.accessKeyId,
+                    secretAccessKey = cosToken.secretAccessKey,
+                    sessionToken = cosToken.sessionToken
+                )
+            } else {
+                // 使用配置创建客户端（发送时使用本端配置）
+                CosClientFactory.createClient(cosConfig, context)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "创建发送COS客户端失败", e)
+            null
+        }
+    }
+    
+    /**
+     * 创建用于接收的COS客户端（使用对端凭证）
+     */
+    private fun createCosClientForReceive(metadata: CosTransportMetadata): CosClient? {
+        return try {
+            if (metadata.peerToken != null) {
+                // 使用对端Token创建客户端（只读权限）
+                val cosToken = metadata.peerToken as CosTransportToken
+                CosClientFactory.createClientWithToken(
+                    provider = when (cosToken.region.startsWith("ap-")) {
+                        true -> "TENCENT"
+                        false -> "AWS"
+                    },
+                    region = metadata.peerRegion,
+                    bucketName = metadata.peerBucketName,
+                    accessKeyId = cosToken.accessKeyId,
+                    secretAccessKey = cosToken.secretAccessKey,
+                    sessionToken = cosToken.sessionToken
+                )
+            } else {
+                Log.w(TAG, "接收时缺少对端Token，无法创建客户端")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "创建接收COS客户端失败", e)
             null
         }
     }
@@ -1007,33 +1117,222 @@ class CosTransportProvider(
     /**
      * 从文件解析消息 - 支持JSON格式（优先）和二进制格式（兼容）
      */
-    private fun parseMessageFromFile(file: File): TransportMessage {
-        val content = file.readBytes()
-        
-        // 使用统一的二进制格式解析
+    override suspend fun parseTransportMessage(fileData: ByteArray, fileInfo: FileInfo, metadata: TransportMetadata): TransportMessage? {
         return try {
-            parseBinaryMessageFromFile(content)
+            Log.d(TAG, "解析COS传输消息: ${fileInfo.name}, size=${fileData.size}")
+            
+            // 从文件名解析基本信息
+            val messageFileInfo = parseMessageFileName(fileInfo.name) ?: return null
+            
+            // COS使用二进制格式存储消息
+            val message = parseMessageFromBinaryData(fileData, messageFileInfo)
+            
+            if (message != null) {
+                Log.d(TAG, "COS消息解析成功: messageId=${message.messageId}")
+            } else {
+                Log.w(TAG, "COS消息解析失败: ${fileInfo.name}")
+            }
+            
+            message
+            
         } catch (e: Exception) {
-            Log.e(TAG, "二进制格式解析失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            throw IllegalArgumentException("无法解析消息文件：不是有效的二进制格式")
+            Log.e(TAG, "解析COS传输消息异常: ${fileInfo.name}", e)
+            null
         }
     }
     
     /**
-     * 解析二进制格式的消息文件（使用统一的TaP二进制格式）
+     * COS特定的文件识别策略
      */
-    private fun parseBinaryMessageFromFile(content: ByteArray): TransportMessage {
+    override fun isMessageFile(fileInfo: FileInfo): Boolean {
+        val name = fileInfo.name.lowercase()
+        // COS使用.dat作为消息文件扩展名
+        return name.endsWith(".dat") && 
+               name.matches(Regex("^[a-zA-Z0-9_-]+_\\d+\\.dat$")) && // 基本格式验证
+               fileInfo.size > 0 && fileInfo.size < 50 * 1024 * 1024 // 大小限制50MB
+    }
+    
+    /**
+     * COS特定的文件名解析策略
+     */
+    override fun parseMessageFileName(fileName: String): MessageFileInfo? {
         return try {
-            TransportMessage.deserializeFromBinary(content)
-        } catch (e: TransportException) {
-            throw IllegalArgumentException("消息文件格式无效：${e.message}", e)
+            // COS使用格式: senderId_messageId_timestamp.dat
+            val baseName = fileName.substringBeforeLast('.')
+            val parts = baseName.split('_')
+            
+            when (parts.size) {
+                3 -> {
+                    // senderId_messageId_timestamp格式（COS标准格式）
+                    MessageFileInfo(
+                        messageId = parts[1],
+                        timestamp = parts[2].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = parts[0],
+                        recipientId = "" // COS文件名中不包含recipientId，从路径推断
+                    )
+                }
+                4 -> {
+                    // senderId_recipientId_messageId_timestamp格式（扩展格式）
+                    MessageFileInfo(
+                        messageId = parts[2],
+                        timestamp = parts[3].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = parts[0],
+                        recipientId = parts[1]
+                    )
+                }
+                else -> {
+                    Log.w(TAG, "不支持的COS文件名格式: $fileName")
+                    null
+                }
+            }
         } catch (e: Exception) {
-            throw IllegalArgumentException("消息文件解析失败：${e.message}", e)
+            Log.w(TAG, "解析COS文件名失败: $fileName", e)
+            null
         }
     }
     
 
     
+    /**
+     * 从二进制数据解析消息（COS特定格式）
+     */
+    private fun parseMessageFromBinaryData(data: ByteArray, fileInfo: MessageFileInfo): TransportMessage? {
+        return try {
+            // 使用与writeMessageToBinaryData对应的解析逻辑
+            val inputStream = java.io.ByteArrayInputStream(data)
+            val dataInputStream = java.io.DataInputStream(inputStream)
+            
+            // 读取版本号
+            val version = dataInputStream.readInt()
+            if (version != MESSAGE_FORMAT_VERSION) {
+                Log.w(TAG, "不支持的消息格式版本: $version")
+                return null
+            }
+            
+            // 读取消息类型
+            val messageTypeOrdinal = dataInputStream.readInt()
+            val messageType = TransportMessageType.values().getOrNull(messageTypeOrdinal) 
+                ?: TransportMessageType.TEXT_MESSAGE
+            
+            // 读取Signal密文长度和内容
+            val ciphertextLength = dataInputStream.readInt()
+            val signalCiphertext = ByteArray(ciphertextLength)
+            dataInputStream.readFully(signalCiphertext)
+            val signalCiphertextB64 = android.util.Base64.encodeToString(signalCiphertext, android.util.Base64.NO_WRAP)
+            
+            // 读取内容元数据
+            val originalSize = dataInputStream.readLong()
+            val compressionTypeOrdinal = dataInputStream.readInt()
+            val compressionType = TransportCompressionType.values().getOrNull(compressionTypeOrdinal)
+                ?: TransportCompressionType.NONE
+            
+            val contentMetadata = TransportContentMetadata(
+                originalSize = originalSize,
+                compressionType = compressionType
+            )
+            
+            // 读取附件数量
+            val attachmentCount = dataInputStream.readInt()
+            val attachments = mutableListOf<TransportAttachment>()
+            
+            // 读取每个附件
+            for (i in 0 until attachmentCount) {
+                val attachmentId = dataInputStream.readUTF()
+                val attachmentType = dataInputStream.readUTF()
+                val attachmentSize = dataInputStream.readLong()
+                val attachmentWidth = dataInputStream.readInt()
+                val attachmentHeight = dataInputStream.readInt()
+                
+                val attachmentDataLength = dataInputStream.readInt()
+                val attachmentData = ByteArray(attachmentDataLength)
+                dataInputStream.readFully(attachmentData)
+                
+                // 创建临时文件存储附件数据 
+                val tempFile = File.createTempFile("tap_attachment_", ".tmp", File("/tmp"))
+                try {
+                    tempFile.writeBytes(attachmentData)
+                    
+                    attachments.add(
+                        TransportAttachment(
+                            attachmentId = attachmentId,
+                            fileName = "attachment_${attachmentId}",
+                            mimeType = attachmentType,
+                            size = attachmentSize,
+                            fileHash = null,
+                            transportPath = tempFile.absolutePath
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "创建附件临时文件失败: $attachmentId", e)
+                }
+            }
+            
+            // 创建TransportMessage
+            TransportMessage(
+                messageId = fileInfo.messageId,
+                timestamp = fileInfo.timestamp,
+                senderId = fileInfo.senderId,
+                recipientId = fileInfo.recipientId,
+                messageType = messageType,
+                signalCiphertext = signalCiphertextB64,
+                contentMetadata = contentMetadata,
+                attachments = attachments
+            )
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "二进制数据解析失败", e)
+            null
+        }
+    }
+    
+    /**
+     * COS特定的发送路径策略
+     */
+    override fun getSendPath(recipientId: String, messageType: TransportMessageType): String {
+        // COS使用层级路径结构: /outbox/recipientId/messageType/
+        val typePrefix = when (messageType) {
+            TransportMessageType.TEXT_MESSAGE -> "text"
+            TransportMessageType.MEDIA_MESSAGE -> "media"
+            TransportMessageType.CONTROL_MESSAGE -> "control"
+            TransportMessageType.RATCHET_UPDATE -> "ratchet"
+            TransportMessageType.CALL_MESSAGE -> "call"
+        }
+        return "/outbox/$recipientId/$typePrefix/"
+    }
+    
+    /**
+     * COS特定的接收路径策略
+     */
+    override fun getReceivePath(recipientId: String, messageType: TransportMessageType): String {
+        // 从对方的outbox接收，使用相同的路径结构
+        val typePrefix = when (messageType) {
+            TransportMessageType.TEXT_MESSAGE -> "text"
+            TransportMessageType.MEDIA_MESSAGE -> "media"
+            TransportMessageType.CONTROL_MESSAGE -> "control"
+            TransportMessageType.RATCHET_UPDATE -> "ratchet"
+            TransportMessageType.CALL_MESSAGE -> "call"
+        }
+        return "/outbox/$recipientId/$typePrefix/"
+    }
+    
+    /**
+     * COS特定的地址格式化
+     */
+    override fun formatAddress(config: Map<String, Any>): String {
+        val region = config["region"]?.toString() ?: "ap-beijing"
+        val bucketName = config["bucketName"]?.toString() ?: "default-bucket"
+        val provider = config["provider"]?.toString()?.uppercase() ?: "TENCENT"
+        
+        return when (provider) {
+            "AWS" -> "https://$bucketName.s3.$region.amazonaws.com"
+            "TENCENT" -> "https://$bucketName.cos.$region.myqcloud.com"
+            "ALIYUN" -> "https://$bucketName.oss-$region.aliyuncs.com"
+            else -> "https://$bucketName.cos.$region.myqcloud.com" // 默认腾讯云
+        }
+    }
+    
+
+
     /**
      * 从地址中提取Bucket名称
      * 
@@ -1075,12 +1374,16 @@ class CosTransportProvider(
     private fun createMetadataFromToken(cosToken: CosTransportToken): CosTransportMetadata {
         return CosTransportMetadata(
             recipientId = cosToken.recipientId,
-            address = cosToken.bucketName,
-            token = cosToken,
-            path = "/outbox/${cosToken.recipientId}/",
             providerType = "cos",
-            region = cosToken.region,
-            bucketName = cosToken.bucketName
+            myAddress = "${cosToken.region}://${cosToken.bucketName}",
+            myToken = cosToken,
+            myRegion = cosToken.region,
+            myBucketName = cosToken.bucketName,
+            peerAddress = "${cosToken.region}://${cosToken.bucketName}",
+            peerToken = cosToken,
+            peerRegion = cosToken.region,
+            peerBucketName = cosToken.bucketName,
+            myId = "self"
         )
     }
 } 

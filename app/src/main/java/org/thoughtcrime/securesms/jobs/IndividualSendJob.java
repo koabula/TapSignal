@@ -35,10 +35,10 @@ import org.thoughtcrime.securesms.transport.UndeliverableMessageException;
 import org.thoughtcrime.securesms.util.MessageUtil;
 import org.thoughtcrime.securesms.util.SignalLocalMetrics;
 import org.thoughtcrime.securesms.util.Util;
-import org.thoughtcrime.securesms.coscomm.integration.SignalMessageSendIntegrator;
-import org.thoughtcrime.securesms.coscomm.integration.SignalSenderCallback;
-import org.thoughtcrime.securesms.coscomm.integration.SignalSendResult;
-import org.thoughtcrime.securesms.coscomm.integration.IntegratedSendResult;
+import org.thoughtcrime.securesms.tap.integration.TapMessageSendIntegrator;
+import org.thoughtcrime.securesms.tap.integration.TapSenderCallback;
+import org.thoughtcrime.securesms.tap.integration.TapSendResult;
+import org.thoughtcrime.securesms.tap.integration.IntegratedTapSendResult;
 import org.whispersystems.signalservice.api.SignalServiceMessageSender;
 import org.whispersystems.signalservice.api.SignalServiceMessageSender.IndividualSendEvents;
 import org.whispersystems.signalservice.api.crypto.ContentHint;
@@ -169,29 +169,34 @@ public class IndividualSendJob extends PushSendJob {
       byte[]                 profileKey = recipient.getProfileKey();
       SealedSenderAccessMode accessMode = recipient.getSealedSenderAccessMode();
 
-      // 检查是否为COS控制消息，如果是则强制使用Signal Server
+      // 检查是否为TAP控制消息，如果是则强制使用Signal Server
       boolean unidentified = false;
       String messageBody = message.getBody();
-      boolean isCosControlMessage = messageBody != null && messageBody.startsWith("COS_MSG:");
+      boolean isTapControlMessage = messageBody != null && (
+          messageBody.startsWith("TAP_REQ:") || 
+          messageBody.startsWith("TAP_RESP:") || 
+          messageBody.startsWith("TAP_REVOKE:") || 
+          messageBody.startsWith("TAP_MSG:")
+      );
 
-      if (isCosControlMessage) {
-        Log.i(TAG, "检测到COS控制消息，强制使用Signal Server发送: messageId=" + messageId);
+      if (isTapControlMessage) {
+        Log.i(TAG, "检测到TAP控制消息，强制使用Signal Server发送: messageId=" + messageId);
         unidentified = deliver(message, originalEditedMessage);
       } else {
-        // 检查是否可以使用COS发送普通消息
+        // 检查是否可以使用Tap传输层发送普通消息
         try {
-          SignalMessageSendIntegrator integrator = SignalMessageSendIntegrator.Companion.getInstance(context);
-          boolean canUseCos = integrator.canUseCosForSending(recipient.getId());
+          TapMessageSendIntegrator integrator = TapMessageSendIntegrator.Companion.getInstance(context);
+          boolean canUseTap = integrator.canUseTapForSending(recipient.getId());
 
-          if (canUseCos) {
-            Log.i(TAG, "检测到COS v2通道，通过COS发送: messageId=" + messageId);
-            unidentified = sendMessageViaCosIntegration(messageId, recipient, message, originalEditedMessage);
+          if (canUseTap) {
+            Log.i(TAG, "检测到Tap v2通道，通过Tap传输层发送: messageId=" + messageId);
+            unidentified = sendMessageViaTapIntegration(messageId, recipient, message, originalEditedMessage);
           } else {
-            Log.d(TAG, "未检测到COS v2通道，使用Signal Server发送: messageId=" + messageId);
+            Log.d(TAG, "未检测到Tap v2通道，使用Signal Server发送: messageId=" + messageId);
             unidentified = deliver(message, originalEditedMessage);
           }
         } catch (Exception e) {
-          Log.w(TAG, "COS检查异常，回退到原生发送: messageId=" + messageId, e);
+          Log.w(TAG, "Tap检查异常，回退到原生发送: messageId=" + messageId, e);
           unidentified = deliver(message, originalEditedMessage);
         }
       }
@@ -460,8 +465,8 @@ public class IndividualSendJob extends PushSendJob {
   }
 
   /**
-   * 通过COS集成发送消息
-   * 使用SignalMessageSendIntegrator进行智能路由和发送
+   * 通过Tap传输层集成发送消息
+   * 使用TapMessageSendIntegrator进行智能路由和发送
    *
    * @param messageId 消息ID
    * @param recipient 接收方
@@ -469,24 +474,24 @@ public class IndividualSendJob extends PushSendJob {
    * @param originalEditedMessage 原始编辑消息（如果是编辑消息）
    * @return 是否发送成功（用于unidentified标记）
    */
-  private boolean sendMessageViaCosIntegration(long messageId, Recipient recipient, OutgoingMessage message, MessageRecord originalEditedMessage) {
+  private boolean sendMessageViaTapIntegration(long messageId, Recipient recipient, OutgoingMessage message, MessageRecord originalEditedMessage) {
     try {
-      Log.i(TAG, "开始COS集成发送: messageId=" + messageId + ", recipient=" + recipient.getId());
+      Log.i(TAG, "开始Tap传输层集成发送: messageId=" + messageId + ", recipient=" + recipient.getId());
 
-      // 获取COS集成器实例
-      SignalMessageSendIntegrator integrator = SignalMessageSendIntegrator.Companion.getInstance(context);
+      // 获取Tap集成器实例
+      TapMessageSendIntegrator integrator = TapMessageSendIntegrator.Companion.getInstance(context);
 
-      // v2 mode设计：COS发送失败时不回退到Signal Server
-      SignalSenderCallback signalCallback = new SignalSenderCallback() {
+      // v2 mode设计：Tap发送失败时不回退到Signal Server
+      TapSenderCallback signalCallback = new TapSenderCallback() {
         @Override
-        public SignalSendResult sendMessage(long callbackMessageId, Recipient callbackRecipient, OutgoingMessage callbackMessage) {
-          Log.w(TAG, "COS发送失败，v2 mode不回退到Signal Server: messageId=" + callbackMessageId);
-          return new SignalSendResult(false, "COS发送失败，v2 mode不支持回退");
+        public TapSendResult sendMessage(long callbackMessageId, Recipient callbackRecipient, OutgoingMessage callbackMessage) {
+          Log.w(TAG, "Tap发送失败，v2 mode不回退到Signal Server: messageId=" + callbackMessageId);
+          return new TapSendResult(false, "Tap发送失败，v2 mode不支持回退");
         }
       };
 
       // 执行集成发送
-      IntegratedSendResult result = integrator.sendMessage(
+      IntegratedTapSendResult result = integrator.sendMessage(
         messageId,
         recipient,
         message,
@@ -495,48 +500,48 @@ public class IndividualSendJob extends PushSendJob {
       ).get(); // 同步等待结果
 
       // 处理发送结果
-      if (result instanceof IntegratedSendResult.Success) {
-        IntegratedSendResult.Success successResult = (IntegratedSendResult.Success) result;
-        Log.i(TAG, "COS集成发送成功: messageId=" + messageId +
+      if (result instanceof IntegratedTapSendResult.Success) {
+        IntegratedTapSendResult.Success successResult = (IntegratedTapSendResult.Success) result;
+        Log.i(TAG, "Tap传输层集成发送成功: messageId=" + messageId +
               ", method=" + successResult.getMethod() +
               ", path=" + successResult.getPath());
 
         // 根据发送方法决定unidentified标记
-        // COS发送通常不支持sealed sender，所以返回false
+        // Tap传输层发送通常不支持sealed sender，所以返回false
         // Signal Server发送则根据实际情况返回
         return successResult.getMethod().toString().equals("SIGNAL_SERVER");
 
-      } else if (result instanceof IntegratedSendResult.Failed) {
-        IntegratedSendResult.Failed failedResult = (IntegratedSendResult.Failed) result;
-        Log.e(TAG, "COS集成发送失败: messageId=" + messageId + ", reason=" + failedResult.getReason());
+      } else if (result instanceof IntegratedTapSendResult.Failed) {
+        IntegratedTapSendResult.Failed failedResult = (IntegratedTapSendResult.Failed) result;
+        Log.e(TAG, "Tap传输层集成发送失败: messageId=" + messageId + ", reason=" + failedResult.getReason());
 
         // 发送失败，抛出异常让上层处理
-        throw new IOException("COS集成发送失败: " + failedResult.getReason());
+        throw new IOException("Tap传输层集成发送失败: " + failedResult.getReason());
 
-      } else if (result instanceof IntegratedSendResult.RetryScheduled) {
-        IntegratedSendResult.RetryScheduled retryResult = (IntegratedSendResult.RetryScheduled) result;
-        Log.i(TAG, "COS集成发送重试已安排: messageId=" + messageId + ", message=" + retryResult.getMessage());
+      } else if (result instanceof IntegratedTapSendResult.RetryScheduled) {
+        IntegratedTapSendResult.RetryScheduled retryResult = (IntegratedTapSendResult.RetryScheduled) result;
+        Log.i(TAG, "Tap传输层集成发送重试已安排: messageId=" + messageId + ", message=" + retryResult.getMessage());
 
         // 重试已安排，暂时返回false，等待重试结果
         // 这种情况下消息状态会由重试机制处理
         return false;
 
       } else {
-        Log.e(TAG, "COS集成发送返回未知结果类型: messageId=" + messageId + ", result=" + result);
-        throw new IOException("COS集成发送返回未知结果类型");
+        Log.e(TAG, "Tap传输层集成发送返回未知结果类型: messageId=" + messageId + ", result=" + result);
+        throw new IOException("Tap传输层集成发送返回未知结果类型");
       }
 
     } catch (Exception e) {
-      Log.e(TAG, "COS集成发送异常: messageId=" + messageId, e);
+      Log.e(TAG, "Tap传输层集成发送异常: messageId=" + messageId, e);
 
-      // v2 mode设计：COS发送异常时不回退到Signal Server，直接失败
-      Log.w(TAG, "COS发送异常，v2 mode不回退到Signal Server: messageId=" + messageId);
+      // v2 mode设计：Tap发送异常时不回退到Signal Server，直接失败
+      Log.w(TAG, "Tap发送异常，v2 mode不回退到Signal Server: messageId=" + messageId);
       
       // 直接抛出原始异常，不进行回退
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;
       } else {
-        throw new RuntimeException("COS发送失败，v2 mode不支持回退", e);
+        throw new RuntimeException("Tap发送失败，v2 mode不支持回退", e);
       }
     }
   }

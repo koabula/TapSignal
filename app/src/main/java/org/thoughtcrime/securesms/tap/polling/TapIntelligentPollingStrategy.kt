@@ -80,7 +80,7 @@ class TapIntelligentPollingStrategy(private val context: Context) {
             }
             
             // 2. Token过期检查
-            if (isTokenNearExpiry(metadata.token)) {
+            if (isTokenNearExpiry(metadata.getReceiveMetadata().token)) {
                 Log.d(TAG, "Token即将过期，降低轮询频率")
                 return TransportActivityLevel.BACKGROUND.baseIntervalMs
             }
@@ -136,7 +136,7 @@ class TapIntelligentPollingStrategy(private val context: Context) {
         channel: TransportChannel?
     ): Boolean {
         // 1. 检查Token是否已过期
-        if (isTokenExpired(metadata.token)) {
+        if (isTokenExpired(metadata.getReceiveMetadata().token)) {
             Log.d(TAG, "跳过轮询: Token已过期 - recipient=$recipientId")
             return true
         }

@@ -7,22 +7,27 @@ import android.util.Log
  * 
  * 定义了传输层需要的元数据信息，包括目标地址、Token、路径等。
  * 不同的TransportProvider可以通过实现这个接口来提供自己的元数据结构。
+ * 
+ * 修正：支持发送和接收的分离元数据
+ * - 发送：使用本端凭证+本端bucket+/outbox/<recipientId>/
+ * - 接收：使用对端凭证+对端bucket+/outbox/<myId>/
  */
 interface TransportMetadata {
     /** 接收者ID */
     val recipientId: String
     
-    /** 传输服务地址（COS bucket url, email, etc.） */
-    val address: String
-    
-    /** 可选的访问Token */
-    val token: TransportToken?
-    
-    /** 消息存储路径 */
-    val path: String
-    
     /** 传输提供者类型 */
     val providerType: String
+    
+    /**
+     * 获取发送元数据（本端到对端）
+     */
+    fun getSendMetadata(): SendMetadata
+    
+    /**
+     * 获取接收元数据（从对端拉取）
+     */
+    fun getReceiveMetadata(): ReceiveMetadata
     
     /**
      * 将元数据转换为Map格式，用于序列化存储
@@ -67,42 +72,130 @@ interface TransportMetadata {
 }
 
 /**
+ * 发送元数据
+ * 用于发送消息时的元数据，使用本端凭证和存储
+ */
+data class SendMetadata(
+    /** 本端服务地址（如本端COS bucket URL） */
+    val address: String,
+    
+    /** 本端访问凭证 */
+    val token: TransportToken?,
+    
+    /** 发送路径（格式：/outbox/<recipientId>/） */
+    val path: String,
+    
+    /** 接收者ID */
+    val recipientId: String
+) {
+    fun validate(): Boolean {
+        return address.isNotBlank() && 
+               path.isNotBlank() && 
+               recipientId.isNotBlank() &&
+               path.contains("/outbox/$recipientId/")
+    }
+}
+
+/**
+ * 接收元数据  
+ * 用于轮询接收消息时的元数据，使用对端凭证和存储
+ */
+data class ReceiveMetadata(
+    /** 对端服务地址（如对端COS bucket URL） */
+    val address: String,
+    
+    /** 对端访问凭证（只读权限） */
+    val token: TransportToken?,
+    
+    /** 接收路径（格式：/outbox/<myId>/，从对端存储拉取） */
+    val path: String,
+    
+    /** 本端ID（作为接收者） */
+    val myId: String
+) {
+    fun validate(): Boolean {
+        return address.isNotBlank() && 
+               path.isNotBlank() && 
+               myId.isNotBlank() &&
+               path.contains("/outbox/$myId/")
+    }
+}
+
+/**
  * COS传输元数据实现
  * 
  * 用于COS（云对象存储）服务的传输元数据，包含COS特有的region和bucketName信息。
+ * 支持发送和接收的分离元数据。
  */
 data class CosTransportMetadata(
     override val recipientId: String,
-    override val address: String,        // COS bucket URL
-    override val token: TransportToken?,
-    override val path: String,
     override val providerType: String = "cos",
-    val region: String,
-    val bucketName: String
+    
+    // 本端COS配置（用于发送）
+    val myAddress: String,         // 本端COS bucket URL
+    val myToken: TransportToken?,  // 本端访问凭证
+    val myRegion: String,
+    val myBucketName: String,
+    
+    // 对端COS配置（用于接收）
+    val peerAddress: String,       // 对端COS bucket URL  
+    val peerToken: TransportToken?, // 对端访问凭证（只读）
+    val peerRegion: String,
+    val peerBucketName: String,
+    
+    // 本端用户ID（用于构建接收路径）
+    val myId: String
 ) : TransportMetadata {
+    
+    override fun getSendMetadata(): SendMetadata {
+        return SendMetadata(
+            address = myAddress,
+            token = myToken,
+            path = "/outbox/$recipientId/",
+            recipientId = recipientId
+        )
+    }
+    
+    override fun getReceiveMetadata(): ReceiveMetadata {
+        return ReceiveMetadata(
+            address = peerAddress,
+            token = peerToken,
+            path = "/outbox/$myId/",
+            myId = myId
+        )
+    }
     
     override fun toMap(): Map<String, Any> {
         val map = mutableMapOf<String, Any>(
             "recipientId" to recipientId,
-            "address" to address,
-            "path" to path,
             "providerType" to providerType,
-            "region" to region,
-            "bucketName" to bucketName
+            "myAddress" to myAddress,
+            "myRegion" to myRegion,
+            "myBucketName" to myBucketName,
+            "peerAddress" to peerAddress,
+            "peerRegion" to peerRegion,
+            "peerBucketName" to peerBucketName,
+            "myId" to myId
         )
         
-        token?.let { map["token"] = it.toMap() }
+        myToken?.let { map["myToken"] = it.toMap() }
+        peerToken?.let { map["peerToken"] = it.toMap() }
         
         return map
     }
     
     override fun validate(): Boolean {
         return recipientId.isNotBlank() &&
-               address.isNotBlank() &&
-               path.isNotBlank() &&
-               region.isNotBlank() &&
-               bucketName.isNotBlank() &&
-               providerType == "cos"
+               myAddress.isNotBlank() &&
+               myRegion.isNotBlank() &&
+               myBucketName.isNotBlank() &&
+               peerAddress.isNotBlank() &&
+               peerRegion.isNotBlank() &&
+               peerBucketName.isNotBlank() &&
+               myId.isNotBlank() &&
+               providerType == "cos" &&
+               getSendMetadata().validate() &&
+               getReceiveMetadata().validate()
     }
     
     companion object {
@@ -116,33 +209,55 @@ data class CosTransportMetadata(
                     if (it is String && it.isNotBlank()) it else return null 
                 } ?: return null
                 
-                val address = data["address"]?.let { 
-                    if (it is String && it.isNotBlank()) it else return null 
-                } ?: return null
-                
-                val path = data["path"]?.let { 
-                    if (it is String && it.isNotBlank()) it else return null 
-                } ?: return null
-                
                 val providerType = data["providerType"]?.let {
                     if (it is String && it.isNotBlank()) it else "cos"
                 } ?: "cos"
-                
-                val region = data["region"]?.let { 
-                    if (it is String && it.isNotBlank()) it else return null 
-                } ?: return null
-                
-                val bucketName = data["bucketName"]?.let { 
-                    if (it is String && it.isNotBlank()) it else return null 
-                } ?: return null
                 
                 // 验证Provider类型
                 if (providerType != "cos") {
                     return null
                 }
                 
+                // 本端配置
+                val myAddress = data["myAddress"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val myRegion = data["myRegion"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val myBucketName = data["myBucketName"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                // 对端配置
+                val peerAddress = data["peerAddress"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val peerRegion = data["peerRegion"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val peerBucketName = data["peerBucketName"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
+                val myId = data["myId"]?.let { 
+                    if (it is String && it.isNotBlank()) it else return null 
+                } ?: return null
+                
                 // 处理Token数据
-                val token: TransportToken? = data["token"]?.let { tokenData ->
+                val myToken: TransportToken? = data["myToken"]?.let { tokenData ->
+                    if (tokenData is Map<*, *>) {
+                        @Suppress("UNCHECKED_CAST")
+                        val tokenMap = tokenData as Map<String, Any>
+                        CosTransportToken.fromMap(tokenMap)
+                    } else null
+                }
+                
+                val peerToken: TransportToken? = data["peerToken"]?.let { tokenData ->
                     if (tokenData is Map<*, *>) {
                         @Suppress("UNCHECKED_CAST")
                         val tokenMap = tokenData as Map<String, Any>
@@ -152,12 +267,16 @@ data class CosTransportMetadata(
                 
                 CosTransportMetadata(
                     recipientId = recipientId,
-                    address = address,
-                    token = token,
-                    path = path,
                     providerType = providerType,
-                    region = region,
-                    bucketName = bucketName
+                    myAddress = myAddress,
+                    myToken = myToken,
+                    myRegion = myRegion,
+                    myBucketName = myBucketName,
+                    peerAddress = peerAddress,
+                    peerToken = peerToken,
+                    peerRegion = peerRegion,
+                    peerBucketName = peerBucketName,
+                    myId = myId
                 )
             } catch (e: ClassCastException) {
                 Log.e("CosTransportMetadata", "类型转换错误", e)
@@ -242,15 +361,33 @@ data class BasicGroupTransportMetadata(
  */
 data class EmailTransportMetadata(
     override val recipientId: String,
-    override val address: String,        // Email地址
-    override val token: TransportToken?, // 邮箱认证Token（可选）
-    override val path: String,           // 邮件主题或文件夹路径
     override val providerType: String = "email",
+    val address: String,        // Email地址
+    val token: TransportToken?, // 邮箱认证Token（可选）
+    val path: String,           // 邮件主题或文件夹路径
     val smtpServer: String,
     val imapServer: String,
     val port: Int,
     val useSSL: Boolean = true
 ) : TransportMetadata {
+    
+    override fun getSendMetadata(): SendMetadata {
+        return SendMetadata(
+            address = address,
+            token = token,
+            path = path,
+            recipientId = recipientId
+        )
+    }
+    
+    override fun getReceiveMetadata(): ReceiveMetadata {
+        return ReceiveMetadata(
+            address = address,
+            token = token,
+            path = path,
+            myId = "self" // 简化处理
+        )
+    }
     
     override fun toMap(): Map<String, Any> {
         val map = mutableMapOf<String, Any>(

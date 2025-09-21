@@ -193,7 +193,7 @@ public class ApplicationContext extends Application implements AppForegroundObse
                             .addNonBlocking(this::initializePendingRetryReceiptManager)
                             .addNonBlocking(this::initializeScheduledMessageManager)
                             .addNonBlocking(this::initializeFcmCheck)
-                            .addNonBlocking(this::initializeCosPollingService)
+                            .addNonBlocking(this::initializeTapModule)
                             .addNonBlocking(PreKeysSyncJob::enqueueIfNeeded)
                             .addNonBlocking(this::initializePeriodicTasks)
                             .addNonBlocking(this::initializeCircumvention)
@@ -554,29 +554,18 @@ public class ApplicationContext extends Application implements AppForegroundObse
     });
   }
 
-  private void initializeCosPollingService() {
+  private void initializeTapModule() {
     try {
-      // 初始化COS轮询服务
-      org.thoughtcrime.securesms.coscomm.manager.CosPollingManager pollingManager =
-          org.thoughtcrime.securesms.coscomm.manager.CosPollingManager.Companion.getInstance(this);
-      pollingManager.initialize();
-
-      // 延迟启动轮询服务，避免应用启动时的资源竞争
-      SignalExecutors.BOUNDED.execute(() -> {
-        try {
-          Thread.sleep(5000); // 等待5秒让应用完全启动
-          boolean started = pollingManager.startPolling();
-          if (started) {
-            Log.i(TAG, "COS轮询服务启动成功");
-          } else {
-            Log.i(TAG, "COS轮询服务未启动（可能没有活跃通道）");
-          }
-        } catch (Exception e) {
-          Log.w(TAG, "启动COS轮询服务失败", e);
-        }
-      });
+      // 使用完整的TaP模块初始化器
+      org.thoughtcrime.securesms.tap.integration.TapModuleInitializer tapInitializer =
+          org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance((android.content.Context) this);
+      
+      // 执行初始化（异步进行，避免阻塞应用启动）
+      tapInitializer.initialize(false);
+      
+      Log.i(TAG, "Tap传输层模块初始化已启动");
     } catch (Exception e) {
-      Log.w(TAG, "初始化COS轮询服务失败", e);
+      Log.w(TAG, "初始化Tap传输层模块失败", e);
     }
   }
 

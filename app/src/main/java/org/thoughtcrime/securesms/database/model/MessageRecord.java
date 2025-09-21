@@ -291,10 +291,10 @@ public abstract class MessageRecord extends DisplayRecord {
       return staticUpdateDescription(context.getString(isGroupV2() ? R.string.MessageRecord_you_blocked_this_group : R.string.MessageRecord_you_blocked_this_person), Glyph.BLOCK);
     } else if (isUnblocked()) {
       return staticUpdateDescription(context.getString(isGroupV2() ? R.string.MessageRecord_you_unblocked_this_group : R.string.MessageRecord_you_unblocked_this_person) , Glyph.THREAD);
-    } else if (isCosV2ModeDisabled()) {
-      return staticUpdateDescription(context.getString(R.string.MessageRecord_cos_v2_mode_disabled), Glyph.INFO);
-    } else if (isCosV2ModeEnabled()) {
-      return staticUpdateDescription(context.getString(R.string.MessageRecord_cos_v2_mode_enabled), Glyph.INFO);
+    } else if (isTapV2ModeDisabled()) {
+      return staticUpdateDescription(context.getString(R.string.MessageRecord_tap_v2_mode_disabled), Glyph.INFO);
+    } else if (isTapV2ModeEnabled()) {
+      return staticUpdateDescription(context.getString(R.string.MessageRecord_tap_v2_mode_enabled), Glyph.INFO);
     }
 
     return null;
@@ -720,12 +720,12 @@ public abstract class MessageRecord extends DisplayRecord {
     return MessageTypes.isGroupV1MigrationEvent(type);
   }
 
-  public boolean isCosV2ModeDisabled() {
-    return MessageTypes.isCosV2ModeDisabled(type);
+  public boolean isTapV2ModeDisabled() {
+    return MessageTypes.isTapV2ModeDisabled(type);
   }
 
-  public boolean isCosV2ModeEnabled() {
-    return MessageTypes.isCosV2ModeEnabled(type);
+  public boolean isTapV2ModeEnabled() {
+    return MessageTypes.isTapV2ModeEnabled(type);
   }
 
   public @NonNull GroupMigrationMembershipChange getGroupV1MigrationMembershipChanges() {
@@ -742,7 +742,7 @@ public abstract class MessageRecord extends DisplayRecord {
            isProfileChange() || isGroupV1MigrationEvent() || isChatSessionRefresh() || isBadDecryptType() ||
            isChangeNumber() || isReleaseChannelDonationRequest() || isThreadMergeEventType() || isSmsExportType() || isSessionSwitchoverEventType() ||
            isPaymentsRequestToActivate() || isPaymentsActivated() || isReportedSpam() || isMessageRequestAccepted() ||
-           isBlocked() || isUnblocked() || isCosV2ModeDisabled() || isCosV2ModeEnabled();
+           isBlocked() || isUnblocked() || isTapV2ModeDisabled() || isTapV2ModeEnabled();
   }
 
   public boolean isMediaPending() {

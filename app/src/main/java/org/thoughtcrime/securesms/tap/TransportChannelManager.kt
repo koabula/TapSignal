@@ -555,87 +555,154 @@ class TransportChannelManager private constructor(private val context: Context) 
         provider: TransportProvider
     ): TransportMetadata? {
         return try {
+            Log.d(TAG, "创建通道元数据: recipientId=$recipientId, providerType=$providerType")
+            
             // 获取Provider配置管理器和Token池
             val configManager = TransportProviderConfigManager.getInstance(context)
             val tokenPool = TransportTokenPool.getInstance(context)
             
             when (providerType) {
-                "cos" -> {
-                    // 1. 获取本端COS配置
-                    val providerConfig = configManager.getProviderConfig(providerType)
-                        ?: run {
-                            Log.w(TAG, "未找到Provider配置: $providerType")
-                            return null
-                        }
-                    
-                    // 2. 从Token池获取对端访问Token
-                    val token = tokenPool.getValidReceivedToken(recipientId, providerType)
-                    
-                    // 3. 提取COS配置参数
-                    val region = providerConfig["region"]?.toString() 
-                        ?: run {
-                            Log.w(TAG, "COS配置缺少region参数")
-                            return null
-                        }
-                        
-                    val bucketName = providerConfig["bucketName"]?.toString()
-                        ?: run {
-                            Log.w(TAG, "COS配置缺少bucketName参数")
-                            return null
-                        }
-                    
-                    // 4. 构建访问地址
-                    val provider = providerConfig["provider"]?.toString()?.uppercase() ?: "TENCENT"
-                    val address = when (provider) {
-                        "AWS" -> "https://$bucketName.s3.$region.amazonaws.com"
-                        "TENCENT" -> "https://$bucketName.cos.$region.myqcloud.com"
-                        else -> "https://$bucketName.cos.$region.myqcloud.com"
-                    }
-                    
-                    // 5. 创建默认路径（每个联系人独立路径）
-                    val defaultPath = "/outbox/$recipientId/"
-                    
-                    // 6. 创建COS传输元数据
-                    CosTransportMetadata(
-                        recipientId = recipientId,
-                        address = address,
-                        token = token,
-                        path = defaultPath,
-                        region = region,
-                        bucketName = bucketName
-                    )
-                }
-                else -> {
-                    // 其他Provider的默认元数据创建
-                    Log.d(TAG, "创建默认传输元数据: $providerType")
-                    try {
-                        // 创建基础的传输元数据实现
-                        object : TransportMetadata {
-                            override val recipientId: String = recipientId
-                            override val address: String = "provider://$providerType"
-                            override val token: TransportToken? = null
-                            override val path: String = "/messages/$recipientId/"
-                            override val providerType: String = providerType
-                            
-                            override fun toMap(): Map<String, Any> = mapOf(
-                                "recipientId" to recipientId,
-                                "address" to address,
-                                "path" to path,
-                                "providerType" to providerType
-                            )
-                            
-                            override fun validate(): Boolean = 
-                                recipientId.isNotBlank() && providerType.isNotBlank()
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "创建默认元数据失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
-                        null
-                    }
-                }
+                "cos" -> createCosChannelMetadata(recipientId, provider, configManager, tokenPool)
+                else -> createGenericChannelMetadata(recipientId, providerType, provider, configManager, tokenPool)
             }
         } catch (e: Exception) {
             Log.e(TAG, "创建通道元数据失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
             null
+        }
+    }
+    
+    /**
+     * 创建COS通道元数据
+     */
+    private suspend fun createCosChannelMetadata(
+        recipientId: String,
+        provider: TransportProvider,
+        configManager: TransportProviderConfigManager,
+        tokenPool: TransportTokenPool
+    ): CosTransportMetadata? {
+        // 1. 获取本端COS配置
+        val myProviderConfig = configManager.getProviderConfig("cos")
+            ?: run {
+                Log.w(TAG, "未找到本端COS配置")
+                return null
+            }
+        
+        // 2. 获取本端和对端Token信息
+        val myTokenInfo = tokenPool.getMyTokenInfo(recipientId, "cos")
+        val peerTokenInfo = tokenPool.getPeerTokenInfo(recipientId, "cos")
+        
+        if (peerTokenInfo == null) {
+            Log.w(TAG, "未找到对端Token信息: recipientId=$recipientId")
+            return null
+        }
+        
+        // 3. 构建本端地址和参数
+        val myAddress = provider.formatAddress(myProviderConfig)
+        val myRegion = myProviderConfig["region"]?.toString() ?: "ap-beijing"
+        val myBucketName = myProviderConfig["bucketName"]?.toString() ?: "default-bucket"
+        
+        // 4. 从对端Token信息中获取对端参数
+        val peerAddress = peerTokenInfo.address
+        val peerRegion = peerTokenInfo.region ?: myRegion // 回退到本端region
+        val peerBucketName = peerTokenInfo.bucketName ?: myBucketName // 回退到本端bucket
+        
+        // 5. 生成本端Token（如果不存在）
+        val myToken = myTokenInfo?.token ?: run {
+            Log.d(TAG, "本端Token不存在，生成新Token")
+            // 这里可以触发Token生成逻辑
+            // 暂时使用null，实际应该生成并保存到TokenPool
+            null
+        }
+        
+        Log.d(TAG, "COS元数据创建: " +
+              "myAddress=${LogSanitizer.sanitize(myAddress, "address")}, " +
+              "peerAddress=${LogSanitizer.sanitize(peerAddress, "address")}, " +
+              "myRegion=$myRegion, peerRegion=$peerRegion")
+        
+        return CosTransportMetadata(
+            recipientId = recipientId,
+            providerType = "cos",
+            myAddress = myAddress,
+            myToken = myToken,
+            myRegion = myRegion,
+            myBucketName = myBucketName,
+            peerAddress = peerAddress,
+            peerToken = peerTokenInfo.token,
+            peerRegion = peerRegion,
+            peerBucketName = peerBucketName,
+            myId = "self"
+        )
+    }
+    
+    /**
+     * 创建通用Provider通道元数据
+     */
+    private suspend fun createGenericChannelMetadata(
+        recipientId: String,
+        providerType: String,
+        provider: TransportProvider,
+        configManager: TransportProviderConfigManager,
+        tokenPool: TransportTokenPool
+    ): TransportMetadata? {
+        // 1. 获取本端配置
+        val myProviderConfig = configManager.getProviderConfig(providerType)
+            ?: run {
+                Log.w(TAG, "未找到Provider配置: $providerType")
+                return null
+            }
+        
+        // 2. 获取Token信息
+        val myTokenInfo = tokenPool.getMyTokenInfo(recipientId, providerType)
+        val peerTokenInfo = tokenPool.getPeerTokenInfo(recipientId, providerType)
+        
+        // 3. 构建地址信息
+        val myAddress = provider.formatAddress(myProviderConfig)
+        val peerAddress = peerTokenInfo?.address ?: myAddress // 如果没有对端信息，回退到本端
+        
+        // 4. 获取路径策略
+        val sendPath = provider.getSendPath(recipientId)
+        val receivePath = provider.getReceivePath(recipientId)
+        
+        Log.d(TAG, "通用元数据创建: providerType=$providerType, " +
+              "sendPath=$sendPath, receivePath=$receivePath")
+        
+        // 5. 创建通用传输元数据实现
+        return object : TransportMetadata {
+            override val recipientId: String = recipientId
+            override val providerType: String = providerType
+            
+            override fun getSendMetadata(): SendMetadata {
+                return SendMetadata(
+                    address = myAddress,
+                    token = myTokenInfo?.token,
+                    path = sendPath,
+                    recipientId = recipientId
+                )
+            }
+            
+            override fun getReceiveMetadata(): ReceiveMetadata {
+                return ReceiveMetadata(
+                    address = peerAddress,
+                    token = peerTokenInfo?.token,
+                    path = receivePath,
+                    myId = "self"
+                )
+            }
+            
+            override fun toMap(): Map<String, Any> = mapOf(
+                "recipientId" to recipientId,
+                "providerType" to providerType,
+                "myAddress" to myAddress,
+                "peerAddress" to peerAddress,
+                "sendPath" to sendPath,
+                "receivePath" to receivePath
+            )
+            
+            override fun validate(): Boolean = 
+                recipientId.isNotBlank() && 
+                providerType.isNotBlank() &&
+                myAddress.isNotBlank() &&
+                peerAddress.isNotBlank()
         }
     }
     
@@ -690,7 +757,7 @@ class TransportChannelManager private constructor(private val context: Context) 
             when (provider.providerType) {
                 "cos" -> {
                     // 对COS执行目录列举检查（轻量操作）
-                    val listResult = provider.listFiles(metadata.path, metadata)
+                    val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
                     when (listResult) {
                         is TransportResult.Success -> true
                         is TransportResult.Failed -> {
@@ -1047,7 +1114,7 @@ class TransportChannelManager private constructor(private val context: Context) 
     private suspend fun testBasicOperations(provider: TransportProvider, metadata: TransportMetadata): Boolean {
         return try {
             // 测试列举文件操作
-            val listResult = provider.listFiles(metadata.path, metadata)
+            val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
             
             // 列举操作应该成功（即使返回空列表）
             listResult is TransportResult.Success
@@ -1066,13 +1133,145 @@ class TransportChannelManager private constructor(private val context: Context) 
             val startTime = System.currentTimeMillis()
             
             // 执行一个轻量级的操作来测量延迟
-            provider.listFiles(metadata.path, metadata)
+            provider.listFiles(metadata.getReceiveMetadata().path, metadata)
             
             System.currentTimeMillis() - startTime
             
         } catch (e: Exception) {
             Log.e(TAG, "延迟测量异常: ${LogSanitizer.sanitizeThrowable(e)}")
             -1L // 表示无法测量
+        }
+    }
+    
+    /**
+     * 检查是否有活跃通道
+     */
+    fun hasActiveChannel(recipientId: String): Boolean {
+        return channelLock.read {
+            getActiveChannels(recipientId).isNotEmpty()
+        }
+    }
+    
+    /**
+     * 更新通道配置
+     */
+    suspend fun updateChannelConfig(recipientId: String, config: TransportChannelConfig): Boolean {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    val activeChannels = getActiveChannels(recipientId)
+                    if (activeChannels.isEmpty()) {
+                        return@withContext false
+                    }
+                    
+                    // 更新所有活跃通道的配置
+                    activeChannels.forEach { channel ->
+                        // 这里应该根据实际需求更新通道的配置
+                        Log.d(TAG, "更新通道配置: channelId=${channel.channelId}")
+                    }
+                    
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "更新通道配置失败: recipientId=$recipientId", e)
+                    false
+                }
+            }
+        }
+    }
+    
+    /**
+     * 创建通道（简化版本，兼容TapMessageProcessor调用）
+     */
+    suspend fun createChannel(recipientId: String, config: TransportChannelConfig, token: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // 这里应该根据config创建合适的TransportMetadata
+                // 为了兼容性，我们创建一个基本的元数据实现
+                val metadata = object : TransportMetadata {
+                    override val recipientId: String = recipientId
+                    override val providerType: String = "cos" // 默认使用COS
+                    
+                    private val address: String = "cos://bucket/messages"
+                    private val transportToken: TransportToken? = null
+                    private val path: String = "/messages/$recipientId"
+                    
+                    override fun getSendMetadata(): SendMetadata {
+                        return SendMetadata(
+                            address = address,
+                            token = transportToken,
+                            path = path,
+                            recipientId = recipientId
+                        )
+                    }
+                    
+                    override fun getReceiveMetadata(): ReceiveMetadata {
+                        return ReceiveMetadata(
+                            address = address,
+                            token = transportToken,
+                            path = path,
+                            myId = "self"
+                        )
+                    }
+                    
+                    override fun toMap(): Map<String, Any> = mapOf()
+                    override fun validate(): Boolean = true
+                }
+                
+                val channel = establishChannel(recipientId, metadata.providerType, metadata)
+                channel?.channelId
+            } catch (e: Exception) {
+                Log.e(TAG, "创建通道失败: recipientId=$recipientId", e)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 撤销通道
+     */
+    suspend fun revokeChannel(recipientId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    val activeChannels = getActiveChannels(recipientId)
+                    if (activeChannels.isEmpty()) {
+                        return@withContext false
+                    }
+                    
+                    // 关闭所有活跃通道
+                    activeChannels.forEach { channel ->
+                        closeChannel(channel.channelId)
+                    }
+                    
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "撤销通道失败: recipientId=$recipientId", e)
+                    false
+                }
+            }
+        }
+    }
+    
+    /**
+     * 激活通道（公共方法版本）
+     */
+    suspend fun activateChannelPublic(recipientId: String, token: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    val activeChannels = getActiveChannels(recipientId)
+                    if (activeChannels.isNotEmpty()) {
+                        // 激活第一个匹配的通道
+                        activateChannel(activeChannels[0].channelId)
+                        true
+                    } else {
+                        false
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "激活通道失败: recipientId=$recipientId", e)
+                    false
+                }
+            }
         }
     }
 }

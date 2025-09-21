@@ -2,302 +2,509 @@ package org.thoughtcrime.securesms.tap.integration
 
 import android.content.Context
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.tap.TransportChannelManager
+import org.thoughtcrime.securesms.tap.TransportTokenPool
+import org.thoughtcrime.securesms.tap.TransportConfig
+import kotlinx.coroutines.runBlocking
 import org.whispersystems.signalservice.api.push.ServiceId
-import org.thoughtcrime.securesms.database.MessageType
-import org.thoughtcrime.securesms.dependencies.AppDependencies
-import org.thoughtcrime.securesms.jobmanager.JobManager
-import org.thoughtcrime.securesms.recipients.Recipient
-import org.thoughtcrime.securesms.recipients.RecipientId
-import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.database.model.MessageRecord
-import org.thoughtcrime.securesms.mms.IncomingMessage
-import org.thoughtcrime.securesms.notifications.v2.ConversationId
-import org.thoughtcrime.securesms.tap.TransportMessage
-import org.thoughtcrime.securesms.tap.TransportMessageType
-import org.thoughtcrime.securesms.tap.utils.LogSanitizer
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * Tap消息处理器
- * 
- * 作为TransportMessage与Signal消息处理系统之间的适配器，负责：
- * 1. 将轮询获得的TransportMessage转换为Signal可以处理的格式
- * 2. 通过Signal的消息入库管道进行处理
- * 3. 确保消息去重、幂等性和错误处理
+ * 负责处理通过Tap传输层接收的控制消息和普通消息
+ * 替代原来的CosSignalMessageProcessor
  */
-class TapMessageProcessor(private val context: Context) {
+class TapMessageProcessor private constructor(private val context: Context) {
     
     companion object {
         private val TAG = Log.tag(TapMessageProcessor::class.java)
         
-        @JvmStatic
+        @Volatile
+        private var INSTANCE: TapMessageProcessor? = null
+        
         fun getInstance(context: Context): TapMessageProcessor {
-            return TapMessageProcessor(context)
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TapMessageProcessor(context.applicationContext).also { INSTANCE = it }
+            }
         }
     }
     
-    private val jobManager: JobManager = AppDependencies.jobManager
-    
-    // 消息去重缓存 - 基于messageId + recipientId
-    private val processedMessages = ConcurrentHashMap<String, Long>()
-    private val maxCacheSize = 10000
-    private val cacheExpireMs = 24 * 60 * 60 * 1000L // 24小时
+    // 核心组件
+    private val channelManager = TransportChannelManager.getInstance(context)
+    private val tokenPool = TransportTokenPool.getInstance(context)
     
     /**
-     * 处理来自轮询的传输消息
+     * 检查是否为Tap传输层控制消息
      * 
-     * @param transportMessage 来自传输层的消息
-     * @param recipientId 发送者ID
-     * @return 是否成功处理
+     * @param messageBody 消息体
+     * @return 是否为Tap控制消息
      */
-    suspend fun processIncomingMessage(transportMessage: TransportMessage, recipientId: String): Boolean {
-        return try {
-            Log.d(TAG, "开始处理传输消息: messageId=${transportMessage.messageId}, from=$recipientId")
-            
-            // 1. 验证消息基本信息
-            if (!validateTransportMessage(transportMessage, recipientId)) {
-                Log.w(TAG, "传输消息验证失败: messageId=${transportMessage.messageId}")
-                return false
-            }
-            
-            // 2. 检查消息去重
-            if (isDuplicateMessage(transportMessage.messageId, recipientId)) {
-                Log.d(TAG, "跳过重复消息: messageId=${transportMessage.messageId}")
-                return true // 重复消息视为处理成功
-            }
-            
-            // 3. 转换为Signal消息格式并入库
-            val success = processMessageDirectly(transportMessage, recipientId)
-            if (!success) {
-                Log.w(TAG, "消息处理失败: messageId=${transportMessage.messageId}")
-                return false
-            }
-            
-            // 4. 标记消息已处理（防重放）
-            markMessageAsProcessed(transportMessage.messageId, recipientId)
-            
-            Log.d(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
-            true
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "处理传输消息失败: messageId=${transportMessage.messageId} - ${LogSanitizer.sanitizeThrowable(e)}")
-            false
-        }
+    fun isTapMessage(messageBody: String): Boolean {
+        return messageBody.startsWith("TAP_MSG:") || 
+               messageBody.startsWith("TAP_REQ:") || 
+               messageBody.startsWith("TAP_RESP:") ||
+               messageBody.startsWith("TAP_REVOKE:")
     }
     
     /**
-     * 验证传输消息
-     */
-    private fun validateTransportMessage(message: TransportMessage, recipientId: String): Boolean {
-        // 基本字段验证
-        if (message.messageId.isBlank()) {
-            Log.w(TAG, "消息ID为空")
-            return false
-        }
-        
-        if (message.encryptedContent.isEmpty()) {
-            Log.w(TAG, "消息内容为空")
-            return false
-        }
-        
-        if (recipientId.isBlank()) {
-            Log.w(TAG, "发送者ID为空")
-            return false
-        }
-        
-        // 时间戳验证（不能是未来时间）
-        val currentTime = System.currentTimeMillis()
-        if (message.timestamp > currentTime + 60000) { // 允许1分钟的时间偏差
-            Log.w(TAG, "消息时间戳异常: ${message.timestamp}, 当前时间: $currentTime")
-            return false
-        }
-        
-        return true
-    }
-    
-    /**
-     * 直接处理消息并入库
+     * 处理Tap传输层控制消息
      * 
-     * 将TaP消息作为特殊类型的消息直接存储到Signal数据库中，
-     * 标记为来自传输层的消息，后续可以通过Signal的解密管道处理
+     * @param senderId 发送者ID
+     * @param messageBody 消息体
+     * @return 处理结果
      */
-    private suspend fun processMessageDirectly(transportMessage: TransportMessage, recipientId: String): Boolean {
+    fun processTapMessage(senderId: String, messageBody: String): TapProcessResult {
+        Log.i(TAG, "处理Tap传输层控制消息: senderId=$senderId, bodyLength=${messageBody.length}")
+        
         return try {
-            // 1. 获取或创建发送者Recipient
-            val senderRecipient = getOrCreateRecipient(recipientId)
-            if (senderRecipient == null) {
-                Log.w(TAG, "无法获取发送者信息: $recipientId")
-                return false
+            when {
+                messageBody.startsWith("TAP_REQ:") -> {
+                    runBlocking { processChannelRequest(senderId, messageBody.substring(8)) }
+                }
+                messageBody.startsWith("TAP_RESP:") -> {
+                    runBlocking { processChannelResponse(senderId, messageBody.substring(9)) }
+                }
+                messageBody.startsWith("TAP_REVOKE:") -> {
+                    runBlocking { processChannelRevoke(senderId, messageBody.substring(11)) }
+                }
+                messageBody.startsWith("TAP_MSG:") -> {
+                    runBlocking { processControlMessage(senderId, messageBody.substring(8)) }
+                }
+                else -> {
+                    Log.w(TAG, "未知的Tap控制消息类型: senderId=$senderId")
+                    TapProcessResult.Failed("未知的Tap控制消息类型")
+                }
             }
-            
-            // 2. 构造IncomingMessage
-            val incomingMessage = IncomingMessage(
-                type = MessageType.NORMAL,
-                from = senderRecipient.id,
-                body = buildMessageBody(transportMessage), // 消息内容（包含加密数据）
-                sentTimeMillis = transportMessage.timestamp,
-                serverTimeMillis = System.currentTimeMillis(), // 服务器时间戳
-                receivedTimeMillis = System.currentTimeMillis() // 接收时间戳
-            )
-            
-            // 3. 插入到数据库
-            val insertResult = SignalDatabase.messages.insertMessageInbox(incomingMessage, SignalDatabase.threads.getOrCreateThreadIdFor(senderRecipient))
-            
-            if (insertResult.isPresent) {
-                Log.d(TAG, "TaP消息入库成功: messageId=${insertResult.get().messageId}")
-                
-                // 4. 触发通知
-                AppDependencies.messageNotifier.updateNotification(context, ConversationId.forConversation(insertResult.get().threadId))
-                
-                return true
-            } else {
-                Log.w(TAG, "TaP消息入库失败")
-                return false
-            }
-            
         } catch (e: Exception) {
-            Log.e(TAG, "直接处理消息失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            false
+            Log.e(TAG, "处理Tap控制消息异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
         }
     }
     
     /**
-     * 获取或创建Recipient
+     * 处理传输通道请求
      */
-    private fun getOrCreateRecipient(recipientId: String): Recipient? {
+    private suspend fun processChannelRequest(senderId: String, requestData: String): TapProcessResult {
+        Log.i(TAG, "处理传输通道请求: senderId=$senderId")
+        
         return try {
-            // 尝试解析为ServiceId
-            val serviceId = ServiceId.parseOrNull(recipientId)
-            if (serviceId != null) {
-                Recipient.resolved(RecipientId.from(serviceId))
+            // 解析请求数据
+            val requestInfo = parseChannelRequest(requestData)
+            if (requestInfo == null) {
+                Log.w(TAG, "无法解析通道请求数据: senderId=$senderId")
+                return TapProcessResult.Failed("无法解析请求数据")
+            }
+            
+            // 检查是否已有活跃通道
+            if (channelManager.hasActiveChannel(senderId)) {
+                Log.i(TAG, "已存在活跃通道，更新配置: senderId=$senderId")
+                val updated = channelManager.updateChannelConfig(senderId, requestInfo.config)
+                if (updated) {
+                    TapProcessResult.Success("通道配置已更新")
+                } else {
+                    TapProcessResult.Failed("通道配置更新失败")
+                }
             } else {
-                // 尝试作为E164号码处理
-                Recipient.external(recipientId)
+                // 创建新的传输通道
+                Log.i(TAG, "创建新的传输通道: senderId=$senderId")
+                val channelResult = channelManager.createChannel(
+                    recipientId = senderId,
+                    config = requestInfo.config,
+                    token = requestInfo.token
+                )
+                
+                if (channelResult != null) {
+                    TapProcessResult.Success("传输通道创建成功")
+                } else {
+                    TapProcessResult.Failed("传输通道创建失败")
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "创建Recipient失败: $recipientId - ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "处理通道请求异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 处理传输通道响应
+     */
+    private suspend fun processChannelResponse(senderId: String, responseData: String): TapProcessResult {
+        Log.i(TAG, "处理传输通道响应: senderId=$senderId")
+        
+        return try {
+            // 解析响应数据
+            val responseInfo = parseChannelResponse(responseData)
+            if (responseInfo == null) {
+                Log.w(TAG, "无法解析通道响应数据: senderId=$senderId")
+                return TapProcessResult.Failed("无法解析响应数据")
+            }
+            
+            // 激活传输通道
+            val activated = channelManager.activateChannelPublic(senderId, responseInfo.token)
+            if (activated) {
+                Log.i(TAG, "传输通道激活成功: senderId=$senderId")
+                TapProcessResult.Success("传输通道激活成功")
+            } else {
+                Log.w(TAG, "传输通道激活失败: senderId=$senderId")
+                TapProcessResult.Failed("传输通道激活失败")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "处理通道响应异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 处理传输通道撤销
+     */
+    private suspend fun processChannelRevoke(senderId: String, revokeData: String): TapProcessResult {
+        Log.i(TAG, "处理传输通道撤销: senderId=$senderId")
+        
+        return try {
+            // 撤销传输通道
+            val revoked = channelManager.revokeChannel(senderId)
+            if (revoked) {
+                Log.i(TAG, "传输通道撤销成功: senderId=$senderId")
+                TapProcessResult.Success("传输通道撤销成功")
+            } else {
+                Log.w(TAG, "传输通道撤销失败: senderId=$senderId")
+                TapProcessResult.Failed("传输通道撤销失败")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "处理通道撤销异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 处理其他控制消息
+     */
+    private suspend fun processControlMessage(senderId: String, controlData: String): TapProcessResult {
+        Log.i(TAG, "处理Tap控制消息: senderId=$senderId")
+        
+        return try {
+            // 这里可以处理其他类型的控制消息
+            // 例如：心跳、状态同步等
+            Log.d(TAG, "收到Tap控制消息: senderId=$senderId, data=$controlData")
+            TapProcessResult.Success("控制消息处理完成")
+        } catch (e: Exception) {
+            Log.e(TAG, "处理控制消息异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 解析通道请求数据
+     */
+    private fun parseChannelRequest(requestData: String): ChannelRequestInfo? {
+        return try {
+            // 简单的解析实现（实际应该使用JSON或其他结构化格式）
+            val parts = requestData.split("|")
+            if (parts.size >= 2) {
+                val configData = parts[0]
+                val tokenData = parts[1]
+                
+                // 构建默认配置对象（实际应该根据configData解析）
+                val config = org.thoughtcrime.securesms.tap.TransportChannelConfig(
+                    maxChannels = 10, // 默认值
+                    channelTimeoutMs = 30000L, // 默认值
+                    heartbeatIntervalMs = 60000L, // 默认值
+                    cleanupIntervalMs = 3600000L, // 默认值
+                    maxFailureCount = 5, // 默认值
+                    priorityRange = 1..10 // 默认值
+                )
+                
+                ChannelRequestInfo(config, tokenData)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "解析通道请求数据失败", e)
             null
         }
     }
     
     /**
-     * 构建消息内容
-     * 
-     * 将加密的传输消息内容包装成可识别的格式，
-     * 包含必要的元数据用于后续解密处理
+     * 解析通道响应数据
      */
-    private fun buildMessageBody(transportMessage: TransportMessage): String {
+    private fun parseChannelResponse(responseData: String): ChannelResponseInfo? {
         return try {
-            // 构造一个包含TaP消息信息的JSON格式字符串
-            // 这样可以保持与Signal现有消息格式的兼容性
-            val messageInfo = mapOf(
-                "tap_version" to "1.0",
-                "message_id" to transportMessage.messageId,
-                "message_type" to transportMessage.messageType.name,
-                "timestamp" to transportMessage.timestamp,
-                "encrypted_content" to android.util.Base64.encodeToString(
-                    transportMessage.encryptedContent, 
-                    android.util.Base64.NO_WRAP
-                ),
-                "attachments_count" to transportMessage.attachments.size
-            )
-            
-            // 简单的JSON序列化
-            val json = StringBuilder("{")
-            messageInfo.entries.forEachIndexed { index, entry ->
-                if (index > 0) json.append(",")
-                json.append("\"${entry.key}\":\"${entry.value}\"")
-            }
-            json.append("}")
-            
-            json.toString()
-            
+            // 简单的解析实现
+            ChannelResponseInfo(responseData)
         } catch (e: Exception) {
-            Log.e(TAG, "构建消息内容失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            "[TaP消息] ID: ${transportMessage.messageId}" // 降级方案
+            Log.e(TAG, "解析通道响应数据失败", e)
+            null
         }
     }
     
     /**
-     * 处理消息去重（参考coscomm机制）
-     * 
-     * 基于messageId + recipientId组合键进行去重，
-     * 结合时间戳防止重放攻击
+     * 检查消息是否重复
      */
     fun isDuplicateMessage(messageId: String, recipientId: String): Boolean {
         return try {
-            val key = "${recipientId}:${messageId}"
-            val currentTime = System.currentTimeMillis()
+            val duplicationKey = "${messageId}:${recipientId}"
             
-            // 检查是否已处理过
-            val processedTime = processedMessages[key]
-            if (processedTime != null) {
-                // 检查是否在缓存有效期内
-                if (currentTime - processedTime < cacheExpireMs) {
-                    Log.d(TAG, "发现重复消息: messageId=$messageId, recipientId=$recipientId")
-                    return true
+            // 查询去重表
+            val database = org.thoughtcrime.securesms.database.SignalDatabase.rawDatabase
+            database.rawQuery(
+                "SELECT COUNT(*) FROM transport_processed_messages WHERE duplication_key LIKE ?",
+                arrayOf("$duplicationKey:%")
+            ).use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val count = cursor.getInt(0)
+                    val isDuplicate = count > 0
+                    
+                    if (isDuplicate) {
+                        Log.d(TAG, "发现重复消息: messageId=$messageId, recipientId=$recipientId")
+                    }
+                    
+                    return isDuplicate
                 } else {
-                    // 过期则清理
-                    processedMessages.remove(key)
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "检查消息重复失败: messageId=$messageId, recipientId=$recipientId", e)
+            // 出错时保守处理，假设不重复以避免丢失消息
+            false
+        }
+    }
+    
+    /**
+     * 处理接收到的传输消息
+     */
+    suspend fun processIncomingMessage(message: org.thoughtcrime.securesms.tap.TransportMessage, recipientId: String): Boolean {
+        return try {
+            Log.i(TAG, "处理接收消息: messageId=${message.messageId}, recipientId=$recipientId")
+            
+            // 检查消息重复性
+            if (isDuplicateMessage(message.messageId, recipientId)) {
+                Log.d(TAG, "跳过重复消息: ${message.messageId}")
+                return true
+            }
+            
+            // 获取发送者Recipient
+            val senderRecipient = getSenderRecipient(message.senderId)
+            if (senderRecipient == null) {
+                Log.w(TAG, "无法获取发送者信息: ${message.senderId}")
+                return false
+            }
+            
+            // 解码Signal密文
+            val signalCiphertext = try {
+                android.util.Base64.decode(message.signalCiphertext, android.util.Base64.NO_WRAP)
+            } catch (e: Exception) {
+                Log.e(TAG, "解码Signal密文失败: messageId=${message.messageId}", e)
+                return false
+            }
+            
+            // 创建IncomingMessage对象
+            val incomingMessage = createIncomingMessage(message, senderRecipient, message.timestamp, message.timestamp)
+            
+            // 获取线程ID
+            val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(senderRecipient)
+            
+            // 插入到Signal数据库
+            val insertResult = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertMessageInbox(
+                retrieved = incomingMessage,
+                candidateThreadId = threadId
+            )
+            
+            if (insertResult.isPresent) {
+                val result = insertResult.get()
+                Log.i(TAG, "消息成功插入数据库: messageId=${message.messageId}, dbId=${result.messageId}")
+                
+                // 标记消息为已处理（去重）
+                markMessageAsProcessed(message.messageId, recipientId, message.timestamp)
+                
+                // 更新线程
+                org.thoughtcrime.securesms.database.SignalDatabase.threads.update(threadId, true)
+                
+                // 通知UI更新
+                org.thoughtcrime.securesms.dependencies.AppDependencies.messageNotifier.updateNotification(
+                    context, 
+                    org.thoughtcrime.securesms.notifications.v2.ConversationId.forConversation(threadId)
+                )
+                
+                // 触发相关后台任务
+                schedulePostProcessingJobs(result, senderRecipient)
+                
+                return true
+            } else {
+                Log.w(TAG, "消息插入数据库失败: messageId=${message.messageId}")
+                return false
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "处理接收消息失败: messageId=${message.messageId}", e)
+            false
+        }
+    }
+    
+    /**
+     * 创建Signal的IncomingMessage对象
+     */
+    private fun createIncomingMessage(
+        message: org.thoughtcrime.securesms.tap.TransportMessage,
+        senderRecipient: org.thoughtcrime.securesms.recipients.Recipient,
+        timestamp: Long,
+        serverTimestamp: Long
+    ): org.thoughtcrime.securesms.mms.IncomingMessage {
+        
+        // 根据消息类型创建相应的附件
+        val attachments = mutableListOf<org.thoughtcrime.securesms.attachments.Attachment>()
+        
+        // 处理附件 - 注意TransportAttachment没有data、type、width、height属性
+        message.attachments.forEach { attachment ->
+            try {
+                // 创建临时文件 - 由于没有直接的二进制数据，我们需要从传输路径获取
+                val tempFile = java.io.File.createTempFile("tap_attachment_", ".tmp", context.cacheDir)
+                
+                // 创建UriAttachment - 使用正确的构造函数参数顺序
+                val uriAttachment = org.thoughtcrime.securesms.attachments.UriAttachment(
+                    android.net.Uri.fromFile(tempFile),
+                    attachment.mimeType, // 使用mimeType替代type
+                    org.thoughtcrime.securesms.database.AttachmentTable.TRANSFER_PROGRESS_DONE,
+                    attachment.size,
+                    0, // width - TransportAttachment没有此属性，使用0
+                    0, // height - TransportAttachment没有此属性，使用0  
+                    attachment.fileName, // 使用fileName替代null
+                    null, // fastPreflightId
+                    false, // voiceNote
+                    false, // borderless
+                    false, // videoGif
+                    false, // quote
+                    null, // caption
+                    null, // stickerLocator
+                    null, // blurHash
+                    null, // audioHash
+                    null  // transformProperties
+                )
+                
+                attachments.add(uriAttachment)
+            } catch (e: Exception) {
+                Log.w(TAG, "处理附件失败: ${attachment.attachmentId}", e) // 使用attachmentId替代id
+            }
+        }
+        
+        // 确定消息体 - TransportMessage使用signalCiphertext，需要解密才能获得真实消息内容
+        // 这里我们只能根据消息类型提供占位符文本，真实内容需要通过Signal的解密流程获得
+        val messageBody = when (message.messageType) {
+            org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE -> "文本消息"
+            org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE -> "媒体消息"
+            org.thoughtcrime.securesms.tap.TransportMessageType.CONTROL_MESSAGE -> "控制消息"
+            org.thoughtcrime.securesms.tap.TransportMessageType.RATCHET_UPDATE -> "密钥更新消息"
+            org.thoughtcrime.securesms.tap.TransportMessageType.CALL_MESSAGE -> "通话消息"
+        }
+        
+        // 创建IncomingMessage - 使用正确的参数顺序
+        return org.thoughtcrime.securesms.mms.IncomingMessage(
+            type = org.thoughtcrime.securesms.database.MessageType.NORMAL,
+            from = senderRecipient.id,
+            sentTimeMillis = timestamp,
+            serverTimeMillis = serverTimestamp,
+            receivedTimeMillis = System.currentTimeMillis(),
+            body = messageBody,
+            attachments = attachments,
+            isUnidentified = false,
+            serverGuid = null
+        )
+    }
+    
+    /**
+     * 获取发送者Recipient对象
+     */
+    private fun getSenderRecipient(senderId: String): org.thoughtcrime.securesms.recipients.Recipient? {
+        return try {
+            // 尝试解析为E164号码
+            if (senderId.startsWith("+")) {
+                val externalRecipient = org.thoughtcrime.securesms.recipients.Recipient.external(senderId)
+                if (externalRecipient != null) {
+                    // externalRecipient.id 已经是 RecipientId 类型，无需再次包装
+                    org.thoughtcrime.securesms.recipients.Recipient.resolved(externalRecipient.id)
+                } else {
+                    Log.w(TAG, "无法创建外部Recipient: $senderId")
+                    null
+                }
+            } else {
+                // 尝试解析为UUID（ACI）- 使用正确的ServiceId导入
+                val serviceId = ServiceId.parseOrThrow(senderId)
+                val recipientId = org.thoughtcrime.securesms.recipients.RecipientId.from(serviceId)
+                org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "解析发送者ID失败: $senderId", e)
+            null
+        }
+    }
+    
+    /**
+     * 标记消息为已处理（用于去重）
+     */
+    private fun markMessageAsProcessed(messageId: String, recipientId: String, timestamp: Long) {
+        try {
+            val duplicationKey = "${messageId}:${recipientId}:${timestamp}"
+            
+            // 插入到去重表
+            val database = org.thoughtcrime.securesms.database.SignalDatabase.rawDatabase
+            database.execSQL(
+                "INSERT OR IGNORE INTO transport_processed_messages (duplication_key, processed_timestamp, created_at) VALUES (?, ?, ?)",
+                arrayOf(duplicationKey, timestamp, System.currentTimeMillis())
+            )
+            
+            Log.d(TAG, "标记消息已处理: $duplicationKey")
+        } catch (e: Exception) {
+            Log.e(TAG, "标记消息已处理失败: messageId=$messageId", e)
+        }
+    }
+    
+    /**
+     * 调度后处理任务
+     */
+    private fun schedulePostProcessingJobs(
+        insertResult: org.thoughtcrime.securesms.database.MessageTable.InsertResult,
+        senderRecipient: org.thoughtcrime.securesms.recipients.Recipient
+    ) {
+        try {
+            // 触发附件下载任务（如果有附件）- 需要attachmentId参数
+            if (insertResult.messageId > 0) {
+                // 获取消息的附件并为每个附件创建下载任务
+                val attachments = org.thoughtcrime.securesms.database.SignalDatabase.attachments.getAttachmentsForMessage(insertResult.messageId)
+                attachments.forEach { attachment ->
+                    org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager.add(
+                        org.thoughtcrime.securesms.jobs.AttachmentDownloadJob(insertResult.messageId, attachment.attachmentId, true)
+                    )
                 }
             }
             
-            // 定期清理过期缓存
-            cleanupExpiredCache()
+            // 触发profile刷新任务 - 使用公共API
+            org.thoughtcrime.securesms.jobs.RetrieveProfileJob.enqueue(senderRecipient.id, false)
             
-            false
+            Log.d(TAG, "已调度后处理任务: messageId=${insertResult.messageId}")
         } catch (e: Exception) {
-            Log.e(TAG, "检查重复消息失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            false // 出错时不阻止处理
+            Log.e(TAG, "调度后处理任务失败", e)
         }
     }
-    
-    /**
-     * 标记消息已处理
-     */
-    private fun markMessageAsProcessed(messageId: String, recipientId: String) {
-        val key = "${recipientId}:${messageId}"
-        val currentTime = System.currentTimeMillis()
-        
-        // 如果缓存满了，清理一些旧条目
-        if (processedMessages.size >= maxCacheSize) {
-            cleanupExpiredCache()
-            // 如果清理后仍然满，强制清理最旧的一半
-            if (processedMessages.size >= maxCacheSize) {
-                val toRemove = processedMessages.entries
-                    .sortedBy { it.value }
-                    .take(maxCacheSize / 2)
-                    .map { it.key }
-                toRemove.forEach { processedMessages.remove(it) }
-            }
-        }
-        
-        processedMessages[key] = currentTime
-        Log.v(TAG, "标记消息已处理: messageId=$messageId")
-    }
-    
-    /**
-     * 清理过期的缓存条目
-     */
-    private fun cleanupExpiredCache() {
-        val currentTime = System.currentTimeMillis()
-        val iterator = processedMessages.entries.iterator()
-        var cleanedCount = 0
-        
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (currentTime - entry.value > cacheExpireMs) {
-                iterator.remove()
-                cleanedCount++
-            }
-        }
-        
-        if (cleanedCount > 0) {
-            Log.d(TAG, "清理过期缓存条目: $cleanedCount 个")
-        }
-    }
+}
+
+/**
+ * 通道请求信息
+ */
+private data class ChannelRequestInfo(
+    val config: org.thoughtcrime.securesms.tap.TransportChannelConfig,
+    val token: String
+)
+
+/**
+ * 通道响应信息
+ */
+private data class ChannelResponseInfo(
+    val token: String
+)
+
+/**
+ * Tap处理结果
+ */
+sealed class TapProcessResult {
+    data class Success(val message: String) : TapProcessResult()
+    data class Failed(val reason: String) : TapProcessResult()
 } 

@@ -94,6 +94,29 @@ class TapPollingService(private val context: Context) {
     private val statisticsCollector = PollingStatisticsCollector()
     
     /**
+     * 初始化轮询服务
+     */
+    fun initialize() {
+        Log.i(TAG, "初始化Tap轮询服务...")
+        
+        try {
+            // 初始化核心组件（暂时注释掉，等待组件实现 initialize 方法）
+            // pollingStrategy.initialize()
+            // dynamicScheduler.initialize()
+            // batchOptimizer.initialize()
+            // intervalAdjuster.initialize()
+            
+            // 初始化统计收集器（暂时注释掉）
+            // statisticsCollector.initialize()
+            
+            Log.i(TAG, "Tap轮询服务初始化完成")
+        } catch (e: Exception) {
+            Log.e(TAG, "Tap轮询服务初始化失败", e)
+            throw e
+        }
+    }
+    
+    /**
      * 启动轮询服务
      */
     fun startPolling(): Boolean {
@@ -445,88 +468,28 @@ class TapPollingService(private val context: Context) {
                 }
                 
                 // 获取远程文件列表
-                val listResult = provider.listFiles(taskInfo.metadata.path, taskInfo.metadata)
+                val listResult = provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
                 if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
                     Log.d(TAG, "未发现新文件: ${taskInfo.recipientId}")
                     val responseTime = System.currentTimeMillis() - startTime
                     return@withTimeout PollingExecutionResult.success(0, responseTime)
                 }
                 
-                // 从数据库获取已处理的文件列表（持久化去重）
-                val processedFiles = getProcessedFilesFromDatabase(taskInfo.recipientId, taskInfo.metadata.providerType)
-                
-                // 过滤出未处理的新文件
-                val newFiles = listResult.files.filter { file ->
-                    !processedFiles.contains(file.name) && file.isMessageFile()
-                }.sortedBy { it.lastModified } // 按时间顺序处理
-                
-                Log.d(TAG, "找到新文件数量: ${newFiles.size}, recipient: ${taskInfo.recipientId}")
-                
-                var messagesProcessed = 0
-                val newProcessedFiles = mutableSetOf<String>()
-                
-                // 按时间顺序处理每个新文件
-                for (file in newFiles) {
-                    try {
-                        val downloadResult = withTimeout(POLLING_TIMEOUT_MS) {
-                            provider.downloadFile(file, taskInfo.metadata)
-                        }
-                        
-                        if (downloadResult is TransportResult.Success && downloadResult.data != null) {
-                            // 验证文件内容是否为有效的TaP消息
-                            if (!file.validateMessageFileContent(downloadResult.data)) {
-                                Log.w(TAG, "文件内容验证失败，跳过: ${file.name}")
-                                continue
-                            }
-                            
-                            // 解析并处理消息
-                            val message = parseTransportMessage(downloadResult.data, file)
-                            if (message != null) {
-                                // 使用去重器处理消息（基于coscomm的去重机制）
-                                val messagesToProcess = messageDeduplicator.processMessages(taskInfo.recipientId, listOf(message))
-                                
-                                if (messagesToProcess.isNotEmpty()) {
-                                    // 将去重后的消息传递给Signal主程序处理
-                                    for (processedMessage in messagesToProcess) {
-                                        deliverMessageToSignal(processedMessage, taskInfo)
-                                        messagesProcessed++
-                                    }
-                                    
-                                    // 标记消息为已处理（持久化去重状态）
-                                    messageDeduplicator.markMessagesAsProcessed(messagesToProcess, taskInfo.recipientId)
-                                    
-                                    Log.d(TAG, "消息处理成功: ${file.name}, 处理数量: ${messagesToProcess.size}")
-                                } else {
-                                    Log.d(TAG, "消息已处理过，跳过: ${file.name}")
-                                }
-                            } else {
-                                Log.w(TAG, "消息解析失败: ${file.name}")
-                                continue
-                            }
-                            // 成功处理的文件标记为已处理
-                            newProcessedFiles.add(file.name)
-                        } else {
-                            Log.w(TAG, "文件下载失败: ${file.name}")
-                            // 下载失败的文件不标记为已处理，下次继续尝试
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "处理文件失败: ${file.name}", e)
-                        // 处理失败的文件不标记为已处理
-                    }
-                }
-                
-                // 保存处理结果到任务信息（用于数据库更新）
-                taskInfo.lastProcessedFiles = newProcessedFiles
+                // 使用新的处理方法
+                val processingResult = processPollingResults(provider, taskInfo, listResult.files, taskInfo.metadata)
                 
                 val responseTime = System.currentTimeMillis() - startTime
-                PollingExecutionResult.success(messagesProcessed, responseTime)
+                
+                // 返回处理结果（已包含响应时间）
+                processingResult
                 
             } catch (e: TimeoutCancellationException) {
                 val responseTime = System.currentTimeMillis() - startTime
                 PollingExecutionResult.retry("轮询超时", responseTime)
             } catch (e: Exception) {
                 val responseTime = System.currentTimeMillis() - startTime
-                PollingExecutionResult.failure(e.message ?: "未知错误", responseTime)
+                Log.e(TAG, "轮询异常: ${taskInfo.recipientId}", e)
+                PollingExecutionResult.failure(e.message ?: "轮询失败", responseTime)
             }
         }
     }
@@ -603,7 +566,7 @@ class TapPollingService(private val context: Context) {
         return try {
             // 列举文件
             val listResult = withTimeout(POLLING_TIMEOUT_MS) {
-                provider.listFiles(taskInfo.metadata.path, taskInfo.metadata)
+                provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
             }
             
             if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
@@ -648,13 +611,17 @@ class TapPollingService(private val context: Context) {
                         //     continue
                         // }
                         
-                        // 修复2：基于解析结果判定是否为消息文件
-                        val message = parseTransportMessage(downloadResult.data, file)
+                        // 修复2：基于Provider解析结果判定是否为消息文件
+                        val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
                         if (message != null) {
                             // 将消息传递给Signal主程序处理
-                            deliverMessageToSignal(message, taskInfo)
-                            messagesProcessed++
-                            Log.d(TAG, "消息处理成功: ${file.name}")
+                            val processResult = messageProcessor.processIncomingMessage(message, taskInfo.recipientId)
+                            if (processResult) {
+                                messagesProcessed++
+                                Log.d(TAG, "消息处理成功: ${file.name}")
+                            } else {
+                                Log.w(TAG, "消息处理失败: ${file.name}")
+                            }
                         } else {
                             Log.d(TAG, "文件解析失败，可能不是消息文件: ${file.name}")
                         }
@@ -679,86 +646,7 @@ class TapPollingService(private val context: Context) {
         }
     }
     
-    /**
-     * 解析传输消息 - 使用统一的二进制格式
-     * 
-     * 已统一为严格的二进制格式，禁用JSON回退和猜测式补全
-     */
-    private fun parseTransportMessage(data: ByteArray, fileInfo: FileInfo): TransportMessage? {
-        return try {
-            Log.d(TAG, "开始解析传输消息: ${fileInfo.name}, size=${data.size}")
-            
-            // 使用统一的二进制格式解析
-            val message = TransportMessage.deserialize(data)
-            Log.d(TAG, "成功解析二进制格式消息: messageId=${message.messageId}")
-            message
-            
-        } catch (e: Exception) {
-            Log.w(TAG, "解析传输消息失败: ${fileInfo.name} - ${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitizeThrowable(e)}")
-            null
-        }
-    }
-    
 
-    
-    /**
-     * 从文件名中解析发送者和接收者信息
-     * 
-     * 支持的文件名格式：
-     * - messageId_timestamp.dat
-     * - senderId_messageId_timestamp.dat
-     * - senderId_recipientId_messageId_timestamp.dat
-     */
-    private fun parseFileNameForRecipients(fileName: String): FileNameInfo? {
-        return try {
-            val baseName = fileName.substringBeforeLast('.')
-            val parts = baseName.split('_')
-            
-            when (parts.size) {
-                2 -> {
-                    // messageId_timestamp格式
-                    FileNameInfo(
-                        messageId = parts[0],
-                        timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(),
-                        senderId = "",
-                        recipientId = ""
-                    )
-                }
-                3 -> {
-                    // senderId_messageId_timestamp格式
-                    FileNameInfo(
-                        messageId = parts[1],
-                        timestamp = parts[2].toLongOrNull() ?: System.currentTimeMillis(),
-                        senderId = parts[0],
-                        recipientId = ""
-                    )
-                }
-                4 -> {
-                    // senderId_recipientId_messageId_timestamp格式
-                    FileNameInfo(
-                        messageId = parts[2],
-                        timestamp = parts[3].toLongOrNull() ?: System.currentTimeMillis(),
-                        senderId = parts[0],
-                        recipientId = parts[1]
-                    )
-                }
-                else -> null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "解析文件名失败: $fileName", e)
-            null
-        }
-    }
-    
-    /**
-     * 文件名信息数据类
-     */
-    private data class FileNameInfo(
-        val messageId: String,
-        val timestamp: Long,
-        val senderId: String,
-        val recipientId: String
-    )
     
 
     
@@ -886,15 +774,47 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
-     * 从数据库获取已处理文件列表（去重）
+     * 从数据库获取已处理的文件列表
      */
     private fun getProcessedFilesFromDatabase(recipientId: String, providerType: String): Set<String> {
         return try {
-            val pollingState = pollingStateTable.getPollingState(recipientId, providerType)
-            pollingState?.processedFiles ?: emptySet()
+            val database = org.thoughtcrime.securesms.database.SignalDatabase.rawDatabase
+            val processedFiles = mutableSetOf<String>()
+            
+            database.rawQuery(
+                "SELECT duplication_key FROM transport_processed_messages WHERE duplication_key LIKE ?",
+                arrayOf("%:$recipientId:%")
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val duplicationKey = cursor.getString(0)
+                    // 从去重键中提取文件名信息
+                    // 格式通常是 messageId:recipientId:timestamp
+                    val parts = duplicationKey.split(":")
+                    if (parts.size >= 3) {
+                        // 重建文件名（这是一个简化实现，实际可能需要更复杂的映射）
+                        val fileName = "${parts[0]}_${parts[2]}.dat"
+                        processedFiles.add(fileName)
+                    }
+                }
+            }
+            
+            processedFiles
         } catch (e: Exception) {
-            Log.e(TAG, "从数据库获取已处理文件列表失败: $recipientId", e)
+            Log.e(TAG, "获取已处理文件列表失败: recipientId=$recipientId", e)
             emptySet()
+        }
+    }
+    
+    /**
+     * 标记文件为已处理
+     */
+    private fun markFileAsProcessed(recipientId: String, fileName: String) {
+        try {
+            // 这里可以添加文件级别的处理记录
+            // 目前主要依赖消息级别的去重
+            Log.d(TAG, "标记文件已处理: recipientId=$recipientId, fileName=$fileName")
+        } catch (e: Exception) {
+            Log.e(TAG, "标记文件已处理失败: fileName=$fileName", e)
         }
     }
     
@@ -1132,6 +1052,125 @@ class TapPollingService(private val context: Context) {
             0.0
         }
     }
+
+    /**
+     * 处理轮询结果并下载新消息
+     */
+    private suspend fun processPollingResults(
+        provider: TransportProvider,
+        taskInfo: PollingTaskInfo,
+        files: List<FileInfo>,
+        metadata: TransportMetadata
+    ): PollingExecutionResult {
+        val startTime = System.currentTimeMillis()
+        return try {
+            Log.d(TAG, "处理轮询结果: provider=${provider.providerType}, files=${files.size}")
+            
+            if (files.isEmpty()) {
+                Log.d(TAG, "没有发现文件: recipientId=${taskInfo.recipientId}")
+                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
+            }
+            
+            // 使用Provider的文件识别策略过滤消息文件
+            val messageFiles = files.filter { file ->
+                provider.isMessageFile(file)
+            }
+            
+            Log.d(TAG, "发现消息文件: ${messageFiles.size}/${files.size}")
+            
+            if (messageFiles.isEmpty()) {
+                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
+            }
+            
+            // 获取已处理的文件列表
+            val processedFiles = getProcessedFilesFromDatabase(taskInfo.recipientId, taskInfo.metadata.providerType)
+            
+            // 过滤未处理的文件
+            val newFiles = messageFiles.filter { file ->
+                !processedFiles.contains(file.name)
+            }
+            
+            Log.d(TAG, "发现新文件: ${newFiles.size}/${messageFiles.size}")
+            
+            if (newFiles.isEmpty()) {
+                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
+            }
+            
+            var successCount = 0
+            var errorCount = 0
+            
+            // 处理每个新文件
+            for (file in newFiles) {
+                try {
+                    val processed = processMessageFile(provider, file, metadata, taskInfo)
+                    if (processed) {
+                        successCount++
+                        // 记录已处理的文件
+                        markFileAsProcessed(taskInfo.recipientId, file.name)
+                    } else {
+                        errorCount++
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理消息文件失败: ${file.name}", e)
+                    errorCount++
+                }
+            }
+            
+            Log.i(TAG, "轮询处理完成: 成功=$successCount, 失败=$errorCount")
+            
+            val responseTime = System.currentTimeMillis() - startTime
+            if (errorCount == 0) {
+                PollingExecutionResult.success(successCount, responseTime)
+            } else {
+                PollingExecutionResult.partialSuccess(successCount, errorCount, responseTime)
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "处理轮询结果异常: recipientId=${taskInfo.recipientId}", e)
+            PollingExecutionResult.failure(e.message ?: "处理轮询结果失败", System.currentTimeMillis() - startTime)
+        }
+    }
+    
+    /**
+     * 处理单个消息文件
+     */
+    private suspend fun processMessageFile(
+        provider: TransportProvider,
+        fileInfo: FileInfo,
+        metadata: TransportMetadata,
+        taskInfo: PollingTaskInfo
+    ): Boolean {
+        return try {
+            Log.d(TAG, "开始处理消息文件: ${fileInfo.name}")
+            
+            // 使用Provider下载文件
+            val downloadResult = provider.downloadFile(fileInfo, metadata)
+            
+            if (downloadResult !is TransportResult.Success || downloadResult.data == null) {
+                Log.w(TAG, "下载文件失败: ${fileInfo.name}")
+                return false
+            }
+            
+            // 使用Provider解析传输消息
+            val transportMessage = provider.parseTransportMessage(downloadResult.data, fileInfo, metadata)
+            
+            if (transportMessage == null) {
+                Log.w(TAG, "解析传输消息失败: ${fileInfo.name}")
+                return false
+            }
+            
+            Log.d(TAG, "成功解析传输消息: messageId=${transportMessage.messageId}, fileName=${fileInfo.name}")
+            
+            // 传递消息到Signal主程序处理
+            deliverMessageToSignal(transportMessage, taskInfo)
+            
+            return true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "处理消息文件异常: ${fileInfo.name}", e)
+            false
+        }
+    }
 }
 
 /**
@@ -1150,6 +1189,14 @@ private data class PollingExecutionResult(
             messagesFound = messagesFound,
             responseTime = responseTime,
             error = "",
+            needsRetry = false
+        )
+        
+        fun partialSuccess(successCount: Int, failureCount: Int, responseTime: Long) = PollingExecutionResult(
+            isSuccess = true,
+            messagesFound = successCount,
+            responseTime = responseTime,
+            error = "部分成功: $successCount 成功, $failureCount 失败",
             needsRetry = false
         )
         

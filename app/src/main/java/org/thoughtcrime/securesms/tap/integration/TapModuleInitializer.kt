@@ -30,6 +30,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
         @Volatile
         private var INSTANCE: TapModuleInitializer? = null
         
+        @JvmStatic
         fun getInstance(context: Context): TapModuleInitializer {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TapModuleInitializer(context.applicationContext).also { INSTANCE = it }
