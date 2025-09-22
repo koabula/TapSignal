@@ -486,7 +486,7 @@ public class IndividualSendJob extends PushSendJob {
         @Override
         public TapSendResult sendMessage(long callbackMessageId, Recipient callbackRecipient, OutgoingMessage callbackMessage) {
           Log.w(TAG, "Tap发送失败，v2 mode不回退到Signal Server: messageId=" + callbackMessageId);
-          return new TapSendResult(false, "Tap发送失败，v2 mode不支持回退");
+          return new TapSendResult(false, "Tap发送失败，v2 mode不支持回退", java.util.Collections.emptyMap());
         }
       };
 

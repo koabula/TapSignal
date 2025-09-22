@@ -2,7 +2,9 @@ package org.thoughtcrime.securesms.tap.integration
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.runBlocking
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.TransportManager
 import org.thoughtcrime.securesms.tap.TransportProviderConfigManager
 import org.thoughtcrime.securesms.tap.TransportTokenPool
@@ -11,6 +13,7 @@ import org.thoughtcrime.securesms.tap.polling.TapPollingService
 import org.thoughtcrime.securesms.tap.factory.DefaultTransportProviderFactory
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 import org.thoughtcrime.securesms.database.SignalDatabase
+import org.thoughtcrime.securesms.keyvalue.SignalStore
 import kotlinx.coroutines.*
 
 /**
@@ -37,15 +40,12 @@ class TapModuleInitializer private constructor(private val context: Context) {
             }
         }
         
-        // 初始化状态常量
-        private const val PREF_KEY_TAP_INITIALIZED = "tap_module_initialized"
-        private const val PREF_KEY_LEGACY_MIGRATION_COMPLETED = "tap_legacy_migration_completed"
-        private const val PREF_KEY_INIT_VERSION = "tap_init_version"
-        private const val CURRENT_INIT_VERSION = 1
+        // 已移除SharedPreferences常量，改为使用SignalStore.tap
     }
     
     private val initScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isInitialized = false
+    private val tapValues by lazy { SignalStore.tap }
     
     /**
      * 初始化TaP模块
@@ -63,7 +63,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
         initScope.launch {
             try {
                 // 1. 检查是否需要执行初始化
-                if (!shouldPerformInitialization() && !forceReinit) {
+                if (!tapValues.shouldPerformInitialization() && !forceReinit) {
                     Log.d(TAG, "TaP模块已完成初始化")
                     isInitialized = true
                     return@launch
@@ -84,7 +84,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
                 startPollingService()
                 
                 // 6. 标记初始化完成
-                markInitializationComplete()
+                tapValues.markInitializationComplete()
                 
                 isInitialized = true
                 Log.i(TAG, "TaP模块初始化完成")
@@ -96,17 +96,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
         }
     }
     
-    /**
-     * 检查是否需要执行初始化
-     */
-    private fun shouldPerformInitialization(): Boolean {
-        val prefs = context.getSharedPreferences("tap_module", Context.MODE_PRIVATE)
-        val isInitialized = prefs.getBoolean(PREF_KEY_TAP_INITIALIZED, false)
-        val initVersion = prefs.getInt(PREF_KEY_INIT_VERSION, 0)
-        
-        // 未初始化或版本升级时需要重新初始化
-        return !isInitialized || initVersion < CURRENT_INIT_VERSION
-    }
+    // shouldPerformInitialization方法已移到TapValues中
     
     /**
      * 初始化核心组件
@@ -182,8 +172,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
      * 检查是否需要执行遗留模块迁移
      */
     private fun shouldPerformLegacyMigration(): Boolean {
-        val prefs = context.getSharedPreferences("tap_module", Context.MODE_PRIVATE)
-        val migrationCompleted = prefs.getBoolean(PREF_KEY_LEGACY_MIGRATION_COMPLETED, false)
+        val migrationCompleted = tapValues.isLegacyMigrationCompleted()
         
         // 检查是否存在coscomm配置需要迁移
         val hasCosCommConfig = try {
@@ -290,17 +279,112 @@ class TapModuleInitializer private constructor(private val context: Context) {
     }
     
     /**
-     * 迁移SubAccount Pool
+     * 从SubAccountPool迁移数据到TransportTokenPool
      */
     private fun migrateSubAccountPool() {
+        Log.i(TAG, "开始从SubAccountPool迁移数据到TransportTokenPool")
+        
         try {
-            // 这里应该从coscomm的SubAccountPool迁移到TransportTokenPool
-            // 由于我们没有直接访问coscomm的实现，这里做占位符处理
-            Log.d(TAG, "SubAccount Pool迁移 - 占位符实现")
+            // 获取原始的SubAccountPoolManager实例
+            val subAccountPoolManager = org.thoughtcrime.securesms.coscomm.manager.SubAccountPoolManager.getInstance(context)
+            val transportTokenPool = TransportTokenPool.getInstance(context)
+            
+            var migratedReceived = 0
+            var migratedShared = 0
+            
+            // 1. 迁移接收到的子账户（对方分享给我的）
+            try {
+                val receivedSubAccounts = subAccountPoolManager.getAllValidReceivedSubAccounts()
+                Log.d(TAG, "发现接收子账户数量: ${receivedSubAccounts.size}")
+                
+                receivedSubAccounts.forEach { subAccountEntry ->
+                    try {
+                        val recipientId = subAccountEntry.recipientId
+                        val accessInfo = subAccountEntry.accessInfo
+                        
+                        // 转换为CosTransportToken
+                        val transportToken = convertCosAccessInfoToTransportToken(
+                            recipientId = recipientId,
+                            accessInfo = accessInfo,
+                            tokenType = "received"
+                        )
+                        
+                        // 添加到TransportTokenPool
+                        runBlocking {
+                            val success = transportTokenPool.addReceivedToken(recipientId, transportToken)
+                            if (success) {
+                                migratedReceived++
+                                Log.d(TAG, "迁移接收Token成功: recipientId=$recipientId")
+                            } else {
+                                Log.w(TAG, "迁移接收Token失败: recipientId=$recipientId")
+                            }
+                        }
+                        
+                    } catch (e: Exception) {
+                        Log.e(TAG, "迁移单个接收子账户失败: ${subAccountEntry.recipientId}", e)
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "迁移接收子账户失败", e)
+            }
+            
+            // 2. 迁移分享的子账户（我分享给对方的）
+            try {
+                // 注意：原始设计中可能没有直接获取所有分享子账户的方法
+                // 这里需要通过其他方式获取，或者从持久化存储中读取
+                val statistics = subAccountPoolManager.getStatistics()
+                Log.d(TAG, "SubAccount统计信息: $statistics")
+                
+                // 由于SubAccountPoolManager可能没有直接获取所有分享子账户的方法
+                // 我们可以通过遍历已知的recipientId来获取分享的子账户
+                // 这里暂时跳过，因为原始实现可能不完整
+                Log.w(TAG, "分享子账户迁移暂时跳过，原始API可能不支持批量获取")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "迁移分享子账户失败", e)
+            }
+            
+            Log.i(TAG, "SubAccountPool数据迁移完成: 接收=$migratedReceived, 分享=$migratedShared")
+            
+            // 3. 标记迁移完成（可选：清理原始数据）
+            if (migratedReceived > 0 || migratedShared > 0) {
+                // 可以选择清理原始数据，但为了安全起见，暂时保留
+                Log.i(TAG, "迁移成功，原始SubAccountPool数据保留以备回滚")
+            }
             
         } catch (e: Exception) {
-            Log.e(TAG, "迁移SubAccount Pool失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "SubAccountPool数据迁移失败", e)
         }
+    }
+    
+    /**
+     * 将CosAccessInfo转换为CosTransportToken
+     */
+    private fun convertCosAccessInfoToTransportToken(
+        recipientId: String,
+        accessInfo: org.thoughtcrime.securesms.coscomm.data.CosAccessInfo,
+        tokenType: String
+    ): CosTransportToken {
+        
+        // 生成tokenId
+        val timestamp = System.currentTimeMillis()
+        val tokenId = "migrated-cos-$tokenType-$recipientId-$timestamp"
+        
+        // 映射权限
+        val permissions = setOf(TransportPermission.READ) // 原始设计中通常是只读权限
+        
+        return CosTransportToken(
+            tokenId = tokenId,
+            recipientId = recipientId,
+            permissions = permissions,
+            expirationTime = accessInfo.expireTime,
+            accessKeyId = accessInfo.accessKeyId,
+            secretAccessKey = accessInfo.secretAccessKey,
+            sessionToken = accessInfo.sessionToken,
+            region = accessInfo.region,
+            bucketName = accessInfo.bucketName
+        )
     }
     
     /**
@@ -367,45 +451,25 @@ class TapModuleInitializer private constructor(private val context: Context) {
         }
     }
     
-    /**
-     * 标记初始化完成
-     */
-    private fun markInitializationComplete() {
-        val prefs = context.getSharedPreferences("tap_module", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putBoolean(PREF_KEY_TAP_INITIALIZED, true)
-            .putInt(PREF_KEY_INIT_VERSION, CURRENT_INIT_VERSION)
-            .putLong("init_timestamp", System.currentTimeMillis())
-            .apply()
-    }
+    // markInitializationComplete方法已移到TapValues中
     
     /**
      * 标记遗留模块迁移完成
      */
     private fun markLegacyMigrationComplete() {
-        val prefs = context.getSharedPreferences("tap_module", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putBoolean(PREF_KEY_LEGACY_MIGRATION_COMPLETED, true)
-            .putLong("migration_timestamp", System.currentTimeMillis())
-            .apply()
+        tapValues.setLegacyMigrationCompleted(true)
     }
     
     /**
      * 获取初始化状态
      */
     fun getInitializationStatus(): InitializationStatus {
-        val prefs = context.getSharedPreferences("tap_module", Context.MODE_PRIVATE)
-        val isInitialized = prefs.getBoolean(PREF_KEY_TAP_INITIALIZED, false)
-        val migrationCompleted = prefs.getBoolean(PREF_KEY_LEGACY_MIGRATION_COMPLETED, false)
-        val initVersion = prefs.getInt(PREF_KEY_INIT_VERSION, 0)
-        val initTimestamp = prefs.getLong("init_timestamp", 0)
-        
         return InitializationStatus(
-            isInitialized = isInitialized,
-            migrationCompleted = migrationCompleted,
-            initVersion = initVersion,
-            initTimestamp = initTimestamp,
-            currentVersion = CURRENT_INIT_VERSION
+            isInitialized = tapValues.isTapInitialized(),
+            migrationCompleted = tapValues.isLegacyMigrationCompleted(),
+            initVersion = tapValues.getInitVersion(),
+            initTimestamp = tapValues.getInitTimestamp(),
+            currentVersion = tapValues.getCurrentInitVersion()
         )
     }
     

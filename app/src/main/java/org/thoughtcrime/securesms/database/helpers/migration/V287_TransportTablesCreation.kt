@@ -60,14 +60,19 @@ object V287_TransportTablesCreation : SignalDatabaseMigration {
         "CREATE TABLE IF NOT EXISTS transport_processed_messages (" +
           "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
           "duplication_key TEXT UNIQUE NOT NULL, " +
-          "processed_timestamp INTEGER NOT NULL, " +
-          "created_at INTEGER NOT NULL" +
+          "message_id TEXT NOT NULL, " +
+          "recipient_id TEXT NOT NULL, " +
+          "timestamp INTEGER NOT NULL, " +
+          "processed_at INTEGER NOT NULL, " +
+          "created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)" +
         ")"
       )
       
       // 创建消息去重表索引
       db.execSQL("CREATE INDEX IF NOT EXISTS transport_processed_messages_key_idx ON transport_processed_messages (duplication_key)")
-      db.execSQL("CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx ON transport_processed_messages (processed_timestamp)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx ON transport_processed_messages (processed_at)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS transport_processed_messages_recipient_idx ON transport_processed_messages (recipient_id)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS transport_processed_messages_message_idx ON transport_processed_messages (message_id)")
       Log.d(TAG, "transport_processed_messages表创建完成")
 
       Log.i(TAG, "Transport数据库表创建成功")

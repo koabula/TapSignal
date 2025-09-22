@@ -1005,7 +1005,9 @@ object DataMessageProcessor {
       log(envelope.timestamp!!, "🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=${body.length}")
 
       // 处理Tap传输层控制消息（请求/响应/撤销）
-      val result = tapMessageProcessor.processTapMessage(senderRecipient.id.toString(), body)
+      val result = kotlinx.coroutines.runBlocking { 
+        tapMessageProcessor.processTapMessage(senderRecipient.id.toString(), body)
+      }
       log(envelope.timestamp!!, "🎛️ Tap传输层控制消息处理完成，不插入消息数据库")
 
       // Tap传输层控制消息不插入普通消息数据库，而是显示为特殊UI

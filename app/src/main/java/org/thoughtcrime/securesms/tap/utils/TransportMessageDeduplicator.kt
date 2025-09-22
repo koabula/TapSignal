@@ -2,307 +2,247 @@ package org.thoughtcrime.securesms.tap.utils
 
 import android.content.Context
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.tap.*
-import org.thoughtcrime.securesms.tap.database.TransportPollingStateTable
-import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.database.SignalDatabase
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.readValue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
-import kotlinx.coroutines.*
 
 /**
  * 传输消息去重器
  * 
- * 基于coscomm模块的MessageDeduplicationManager设计，提供持久化的去重机制，
- * 支持幂等性和防重放攻击。使用数据库进行持久化存储，确保重启后去重状态不丢失。
+ * 负责检测和防止重复处理相同的传输层消息
+ * 使用内存缓存 + 数据库持久化的双重策略确保去重效果
  */
 class TransportMessageDeduplicator private constructor(private val context: Context) {
     
     companion object {
         private val TAG = Log.tag(TransportMessageDeduplicator::class.java)
         
-        // 缓存配置
-        private const val MAX_CACHE_SIZE = 1000
-        private const val CACHE_CLEANUP_THRESHOLD = 800
-        private const val MESSAGE_RETENTION_HOURS = 24 // 消息保留时间24小时
-        
-        // 去重键配置
-        private const val DUPLICATION_KEY_SEPARATOR = ":"
+        // 内存缓存相关常量
+        private const val MAX_CACHE_SIZE = 10000
+        private const val CLEANUP_INTERVAL_MS = 60 * 60 * 1000L // 1小时
+        private const val RETENTION_PERIOD_MS = 7 * 24 * 60 * 60 * 1000L // 7天
         
         @Volatile
         private var INSTANCE: TransportMessageDeduplicator? = null
         
-        /**
-         * 获取TransportMessageDeduplicator单例实例
-         */
-        @JvmStatic
         fun getInstance(context: Context): TransportMessageDeduplicator {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: TransportMessageDeduplicator(context.applicationContext).also { 
-                    INSTANCE = it
-                    Log.d(TAG, "创建TransportMessageDeduplicator实例: ${it.hashCode()}")
-                }
-            }
-        }
-        
-        /**
-         * 重置单例实例（仅用于测试）
-         */
-        @JvmStatic
-        internal fun resetInstance() {
-            synchronized(this) {
-                INSTANCE?.let { instance ->
-                    instance.cleanup()
-                }
-                INSTANCE = null
-                Log.d(TAG, "重置TransportMessageDeduplicator实例")
+                INSTANCE ?: TransportMessageDeduplicator(context.applicationContext).also { INSTANCE = it }
             }
         }
     }
     
-    // 数据库访问
-    private val pollingStateTable = SignalDatabase.transportPollingStates
-    
-    // JSON序列化
-    private val objectMapper = ObjectMapper().apply {
-        registerModule(KotlinModule.Builder().build())
-    }
-    
-    // 线程安全
-    private val lock = ReentrantReadWriteLock()
-    
-    // 内存缓存：已处理的消息去重键 - 基于coscomm的设计
-    private val processedMessageKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    
-    // 统计信息
-    private var totalProcessedMessages = 0L
-    private var duplicateMessagesFiltered = 0L
-    private var lastCleanupTime = 0L
-    
-    init {
-        // 启动时加载已处理的消息键
-        loadProcessedMessageKeys()
-        
-        // 启动定期清理任务
-        startPeriodicCleanup()
-    }
+    // 内存缓存：快速去重检查
+    private val messageCache = ConcurrentHashMap<String, MessageRecord>()
+    private val cacheLock = ReentrantReadWriteLock()
+    private var lastCleanupTime = System.currentTimeMillis()
     
     /**
-     * 处理接收到的消息列表，进行去重和排序
+     * 检查消息是否为重复消息
      * 
-     * @param recipientId 发送者ID
-     * @param messages 接收到的消息列表
-     * @return 去重后的新消息列表
+     * @param messageId 消息ID
+     * @param senderId 发送者ID
+     * @param timestamp 消息时间戳
+     * @return true如果是重复消息，false如果是新消息
      */
-    fun processMessages(recipientId: String, messages: List<TransportMessage>): List<TransportMessage> {
-        Log.d(TAG, "处理消息列表: recipientId=${LogSanitizer.sanitize(recipientId)}, count=${messages.size}")
+    fun isDuplicate(messageId: String, senderId: String, timestamp: Long): Boolean {
+        val duplicationKey = generateDuplicationKey(messageId, senderId, timestamp)
         
-        if (messages.isEmpty()) {
-            return emptyList()
-        }
-        
-        return lock.write {
+        return cacheLock.read {
             try {
-                // 1. 基于messageId去重
-                val uniqueMessages = messages.distinctBy { it.messageId }
-                Log.d(TAG, "去重后消息数量: ${uniqueMessages.size}")
-                
-                // 2. 过滤已处理消息 - 使用coscomm的去重键策略
-                val newMessages = uniqueMessages.filter { message ->
-                    val duplicationKey = createDuplicationKey(message, recipientId)
-                    val isNew = !isMessageProcessed(duplicationKey)
-                    if (!isNew) {
-                        Log.d(TAG, "过滤重复消息: messageId=${message.messageId}")
-                        duplicateMessagesFiltered++
-                    }
-                    isNew
+                // 1. 首先检查内存缓存
+                if (messageCache.containsKey(duplicationKey)) {
+                    Log.d(TAG, "内存缓存命中，消息重复: $duplicationKey")
+                    return@read true
                 }
                 
-                Log.d(TAG, "过滤已处理消息后数量: ${newMessages.size}")
+                // 2. 检查数据库
+                val existsInDb = checkDatabaseForDuplicate(duplicationKey, messageId, senderId, timestamp)
+                if (existsInDb) {
+                    // 添加到内存缓存以加速后续检查
+                    addToCache(duplicationKey, messageId, senderId, timestamp)
+                    Log.d(TAG, "数据库检测到重复消息: $duplicationKey")
+                    return@read true
+                }
                 
-                // 3. 按时间戳排序，保持消息顺序
-                val sortedMessages = newMessages.sortedBy { it.timestamp }
-                
-                // 4. 更新统计信息
-                totalProcessedMessages += sortedMessages.size
-                
-                Log.d(TAG, "去重处理完成: 新消息=${sortedMessages.size}, 总处理=${totalProcessedMessages}, 重复过滤=${duplicateMessagesFiltered}")
-                
-                sortedMessages
+                Log.d(TAG, "新消息，无重复: $duplicationKey")
+                false
                 
             } catch (e: Exception) {
-                Log.e(TAG, "处理消息列表失败: recipientId=${LogSanitizer.sanitize(recipientId)}", e)
-                // 发生异常时返回原始消息列表，确保不丢失消息
-                messages
+                Log.e(TAG, "检查消息重复性失败: $duplicationKey", e)
+                // 出错时保守处理，假设不重复以避免丢失消息
+                false
             }
         }
     }
     
     /**
-     * 标记消息列表为已处理
+     * 标记消息为已处理
      * 
-     * @param messages 已处理的消息列表
-     * @param recipientId 发送者ID
+     * @param messageId 消息ID
+     * @param senderId 发送者ID
+     * @param timestamp 消息时间戳
      */
-    fun markMessagesAsProcessed(messages: List<TransportMessage>, recipientId: String) {
-        lock.write {
+    fun markAsProcessed(messageId: String, senderId: String, timestamp: Long) {
+        val duplicationKey = generateDuplicationKey(messageId, senderId, timestamp)
+        
+        cacheLock.write {
             try {
-                val processedKeys = mutableListOf<String>()
-                val currentTime = System.currentTimeMillis()
+                // 1. 添加到内存缓存
+                addToCache(duplicationKey, messageId, senderId, timestamp)
                 
-                for (message in messages) {
-                    val duplicationKey = createDuplicationKey(message, recipientId)
-                    
-                    // 添加到内存缓存
-                    processedMessageKeys.add(duplicationKey)
-                    processedKeys.add(duplicationKey)
-                    
-                    // 持久化到数据库
-                    saveProcessedMessageKey(duplicationKey, message.timestamp)
-                }
+                // 2. 持久化到数据库
+                saveToDatabase(duplicationKey, messageId, senderId, timestamp)
                 
-                Log.d(TAG, "标记消息已处理: recipientId=${LogSanitizer.sanitize(recipientId)}, count=${processedKeys.size}")
+                // 3. 定期清理
+                performPeriodicCleanup()
                 
-                // 检查是否需要清理缓存
-                if (processedMessageKeys.size > MAX_CACHE_SIZE) {
-                    cleanupMemoryCache()
-                }
+                Log.d(TAG, "消息标记为已处理: $duplicationKey")
                 
             } catch (e: Exception) {
-                Log.e(TAG, "标记消息已处理失败: recipientId=${LogSanitizer.sanitize(recipientId)}", e)
+                Log.e(TAG, "标记消息已处理失败: $duplicationKey", e)
             }
         }
     }
     
     /**
-     * 创建消息去重键
-     * 
-     * 基于coscomm的去重键策略：messageId + senderId + timestamp
-     * 这样可以确保即使messageId相同，但来自不同发送者或时间的消息也不会被误判为重复
+     * 生成去重键
      */
-    private fun createDuplicationKey(message: TransportMessage, recipientId: String): String {
-        return "${message.messageId}${DUPLICATION_KEY_SEPARATOR}${message.senderId}${DUPLICATION_KEY_SEPARATOR}${message.timestamp}"
+    private fun generateDuplicationKey(messageId: String, senderId: String, timestamp: Long): String {
+        return "$messageId:$senderId:$timestamp"
     }
     
     /**
-     * 检查消息是否已处理
+     * 添加到内存缓存
      */
-    private fun isMessageProcessed(duplicationKey: String): Boolean {
-        // 首先检查内存缓存
-        if (processedMessageKeys.contains(duplicationKey)) {
-            return true
+    private fun addToCache(duplicationKey: String, messageId: String, senderId: String, timestamp: Long) {
+        // 检查缓存大小，必要时清理
+        if (messageCache.size >= MAX_CACHE_SIZE) {
+            cleanupOldCacheEntries()
         }
         
-        // 检查数据库
+        val record = MessageRecord(
+            messageId = messageId,
+            senderId = senderId,
+            timestamp = timestamp,
+            processedAt = System.currentTimeMillis()
+        )
+        
+        messageCache[duplicationKey] = record
+    }
+    
+    /**
+     * 检查数据库中是否存在重复消息
+     */
+    private fun checkDatabaseForDuplicate(
+        duplicationKey: String,
+        messageId: String,
+        senderId: String,
+        timestamp: Long
+    ): Boolean {
         return try {
-            pollingStateTable.isMessageProcessed(duplicationKey)
+            val database = SignalDatabase.rawDatabase
+            database.rawQuery(
+                """
+                SELECT COUNT(*) FROM transport_processed_messages 
+                WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
+                """,
+                arrayOf(duplicationKey, messageId, senderId, timestamp.toString())
+            ).use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val count = cursor.getInt(0)
+                    count > 0
+                } else {
+                    false
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "检查消息处理状态失败: key=${LogSanitizer.sanitize(duplicationKey)}", e)
+            Log.e(TAG, "检查数据库重复消息失败", e)
             false
         }
     }
     
     /**
-     * 保存已处理消息键到数据库
+     * 保存到数据库
      */
-    private fun saveProcessedMessageKey(duplicationKey: String, timestamp: Long) {
+    private fun saveToDatabase(duplicationKey: String, messageId: String, senderId: String, timestamp: Long) {
         try {
-            pollingStateTable.markMessageAsProcessed(duplicationKey, timestamp)
+            val database = SignalDatabase.rawDatabase
+            val currentTime = System.currentTimeMillis()
+            
+            database.execSQL(
+                """
+                INSERT OR REPLACE INTO transport_processed_messages 
+                (duplication_key, message_id, recipient_id, timestamp, processed_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                arrayOf(duplicationKey, messageId, senderId, timestamp, currentTime, currentTime)
+            )
+            
+            Log.d(TAG, "消息去重记录已保存到数据库: $duplicationKey")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "保存已处理消息键失败: key=${LogSanitizer.sanitize(duplicationKey)}", e)
+            Log.e(TAG, "保存去重记录到数据库失败: $duplicationKey", e)
         }
     }
     
     /**
-     * 从数据库加载已处理的消息键
+     * 清理过期的缓存条目
      */
-    private fun loadProcessedMessageKeys() {
+    private fun cleanupOldCacheEntries() {
         try {
-            val cutoffTime = System.currentTimeMillis() - (MESSAGE_RETENTION_HOURS * 3600 * 1000)
-            val keys = pollingStateTable.getRecentProcessedMessageKeys(cutoffTime)
+            val currentTime = System.currentTimeMillis()
+            val expiredKeys = messageCache.entries.filter { (_, record) ->
+                currentTime - record.processedAt > RETENTION_PERIOD_MS
+            }.map { it.key }
             
-            processedMessageKeys.clear()
-            processedMessageKeys.addAll(keys)
-            
-            Log.d(TAG, "从数据库加载已处理消息键: ${keys.size}")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "加载已处理消息键失败", e)
-        }
-    }
-    
-    /**
-     * 清理内存缓存
-     */
-    private fun cleanupMemoryCache() {
-        try {
-            if (processedMessageKeys.size <= CACHE_CLEANUP_THRESHOLD) {
-                return
+            expiredKeys.forEach { key ->
+                messageCache.remove(key)
             }
             
-            // 清理超过阈值的缓存项
-            val keysToRemove = processedMessageKeys.size - CACHE_CLEANUP_THRESHOLD
-            val iterator = processedMessageKeys.iterator()
-            var removed = 0
+            Log.d(TAG, "清理过期缓存条目: ${expiredKeys.size}个")
             
-            while (iterator.hasNext() && removed < keysToRemove) {
-                iterator.next()
-                iterator.remove()
-                removed++
-            }
-            
-            Log.d(TAG, "清理内存缓存: 移除=${removed}, 剩余=${processedMessageKeys.size}")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "清理内存缓存失败", e)
-        }
-    }
-    
-    /**
-     * 启动定期清理任务
-     */
-    private fun startPeriodicCleanup() {
-        try {
-            // 使用协程定期清理过期数据
-            GlobalScope.launch(Dispatchers.IO) {
-                while (true) {
-                    try {
-                        delay(5 * 60 * 1000L) // 5分钟清理一次
-                        cleanupExpiredMessages()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "定期清理任务异常", e)
-                    }
+            // 如果清理后还是太大，按时间清理最老的条目
+            if (messageCache.size > MAX_CACHE_SIZE * 0.8) {
+                val sortedEntries = messageCache.entries.sortedBy { it.value.processedAt }
+                val toRemove = sortedEntries.take(messageCache.size - (MAX_CACHE_SIZE / 2))
+                
+                toRemove.forEach { (key, _) ->
+                    messageCache.remove(key)
                 }
+                
+                Log.d(TAG, "额外清理最老缓存条目: ${toRemove.size}个")
             }
+            
         } catch (e: Exception) {
-            Log.e(TAG, "启动定期清理任务失败", e)
+            Log.e(TAG, "清理缓存条目失败", e)
         }
     }
     
     /**
-     * 清理过期的消息记录
+     * 定期清理数据库中的过期记录
      */
-    private fun cleanupExpiredMessages() {
-        lock.write {
+    private fun performPeriodicCleanup() {
+        val currentTime = System.currentTimeMillis()
+        
+        if (currentTime - lastCleanupTime > CLEANUP_INTERVAL_MS) {
             try {
-                val cutoffTime = System.currentTimeMillis() - (MESSAGE_RETENTION_HOURS * 3600 * 1000)
-                val cleanedCount = pollingStateTable.cleanupExpiredMessages(cutoffTime)
+                val database = SignalDatabase.rawDatabase
+                val expiredTime = currentTime - RETENTION_PERIOD_MS
                 
-                if (cleanedCount > 0) {
-                    Log.d(TAG, "清理过期消息记录: ${cleanedCount}条")
-                    // 重新加载内存缓存
-                    loadProcessedMessageKeys()
-                }
+                val deletedRows = database.execSQL(
+                    "DELETE FROM transport_processed_messages WHERE processed_at < ?",
+                    arrayOf(expiredTime.toString())
+                )
                 
-                lastCleanupTime = System.currentTimeMillis()
+                lastCleanupTime = currentTime
+                
+                Log.d(TAG, "定期清理数据库过期记录完成")
                 
             } catch (e: Exception) {
-                Log.e(TAG, "清理过期消息记录失败", e)
+                Log.e(TAG, "定期清理数据库失败", e)
             }
         }
     }
@@ -310,55 +250,67 @@ class TransportMessageDeduplicator private constructor(private val context: Cont
     /**
      * 获取去重统计信息
      */
-    fun getDeduplicationStatistics(): DeduplicationStatistics {
-        return lock.read {
-            DeduplicationStatistics(
-                totalProcessedMessages = totalProcessedMessages,
-                duplicateMessagesFiltered = duplicateMessagesFiltered,
-                memoryCacheSize = processedMessageKeys.size,
-                lastCleanupTime = lastCleanupTime
-            )
-        }
-    }
-    
-    /**
-     * 强制处理待处理消息（用于恢复场景）
-     */
-    fun forceProcessPendingMessages(recipientId: String): List<TransportMessage> {
-        Log.d(TAG, "强制处理待处理消息: recipientId=${LogSanitizer.sanitize(recipientId)}")
-        // 对于tap模块，这个方法暂时返回空列表
-        // 在实际实现中，可以从数据库或缓存中获取待处理的消息
-        return emptyList()
-    }
-    
-    /**
-     * 清理资源
-     */
-    fun cleanup() {
-        lock.write {
+    fun getStatistics(): DuplicationStatistics {
+        return cacheLock.read {
             try {
-                processedMessageKeys.clear()
-                Log.d(TAG, "清理TransportMessageDeduplicator资源")
+                val cacheSize = messageCache.size
+                val database = SignalDatabase.rawDatabase
+                
+                val dbCount = database.rawQuery(
+                    "SELECT COUNT(*) FROM transport_processed_messages",
+                    null
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getInt(0) else 0
+                }
+                
+                DuplicationStatistics(
+                    cacheSize = cacheSize,
+                    databaseSize = dbCount,
+                    lastCleanupTime = lastCleanupTime
+                )
+                
             } catch (e: Exception) {
-                Log.e(TAG, "清理资源失败", e)
+                Log.e(TAG, "获取去重统计失败", e)
+                DuplicationStatistics(0, 0, lastCleanupTime)
             }
         }
     }
     
     /**
-     * 去重统计信息数据类
+     * 清空所有去重记录（仅用于测试）
      */
-    data class DeduplicationStatistics(
-        val totalProcessedMessages: Long,
-        val duplicateMessagesFiltered: Long,
-        val memoryCacheSize: Int,
-        val lastCleanupTime: Long
-    ) {
-        val duplicateFilterRate: Double
-            get() = if (totalProcessedMessages > 0) {
-                duplicateMessagesFiltered.toDouble() / totalProcessedMessages.toDouble()
-            } else {
-                0.0
+    fun clearAll() {
+        cacheLock.write {
+            try {
+                messageCache.clear()
+                
+                val database = SignalDatabase.rawDatabase
+                database.execSQL("DELETE FROM transport_processed_messages")
+                
+                Log.i(TAG, "已清空所有去重记录")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "清空去重记录失败", e)
             }
+        }
     }
+    
+    /**
+     * 消息记录数据类
+     */
+    private data class MessageRecord(
+        val messageId: String,
+        val senderId: String,
+        val timestamp: Long,
+        val processedAt: Long
+    )
+    
+    /**
+     * 去重统计信息
+     */
+    data class DuplicationStatistics(
+        val cacheSize: Int,
+        val databaseSize: Int,
+        val lastCleanupTime: Long
+    )
 } 

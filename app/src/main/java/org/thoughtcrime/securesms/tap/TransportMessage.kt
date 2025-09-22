@@ -330,7 +330,7 @@ data class TransportMessage(
                 if (messageTypeOrdinal < 0 || messageTypeOrdinal >= TransportMessageType.values().size) {
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
-                        "二进制消息格式错误：messageType无效 ($messageTypeOrdinal)"
+                        "二进制消息格式错误：messageType值无效 ($messageTypeOrdinal)"
                     )
                 }
                 val messageType = TransportMessageType.values()[messageTypeOrdinal]
@@ -345,7 +345,7 @@ data class TransportMessage(
                 val ciphertextLength = bytesToInt(data, offset)
                 offset += 4
                 
-                if (ciphertextLength <= 0 || ciphertextLength > 10 * 1024 * 1024) { // 最大10MB
+                if (ciphertextLength <= 0 || ciphertextLength > 50 * 1024 * 1024) { // 最大50MB
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
                         "二进制消息格式错误：signalCiphertext长度无效 ($ciphertextLength)"
@@ -370,6 +370,14 @@ data class TransportMessage(
                 val signalCiphertextType = bytesToInt(data, offset)
                 offset += 4
                 
+                // 验证密文类型的合理性
+                if (signalCiphertextType < 0 || signalCiphertextType > 10) {
+                    throw TransportException(
+                        TransportError.INVALID_FORMAT,
+                        "二进制消息格式错误：signalCiphertextType值无效 ($signalCiphertextType)"
+                    )
+                }
+                
                 // 9. 读取contentMetadata
                 if (offset + 4 > data.size) {
                     throw TransportException(
@@ -380,7 +388,7 @@ data class TransportMessage(
                 val metadataLength = bytesToInt(data, offset)
                 offset += 4
                 
-                if (metadataLength <= 0 || metadataLength > 1024 * 1024) { // 最大1MB
+                if (metadataLength <= 0 || metadataLength > 100 * 1024) { // 最大100KB的metadata
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
                         "二进制消息格式错误：contentMetadata长度无效 ($metadataLength)"
@@ -405,7 +413,7 @@ data class TransportMessage(
                     )
                 }
                 
-                // 10. 读取attachments
+                // 10. 读取attachments数量
                 if (offset + 4 > data.size) {
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
@@ -415,35 +423,36 @@ data class TransportMessage(
                 val attachmentCount = bytesToInt(data, offset)
                 offset += 4
                 
-                if (attachmentCount < 0 || attachmentCount > 100) { // 最大100个附件
+                if (attachmentCount < 0 || attachmentCount > 1000) { // 最大1000个附件
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
                         "二进制消息格式错误：attachments数量无效 ($attachmentCount)"
                     )
                 }
                 
+                // 11. 读取每个attachment
                 val attachments = mutableListOf<TransportAttachment>()
-                for (i in 0 until attachmentCount) {
+                repeat(attachmentCount) { index ->
                     if (offset + 4 > data.size) {
                         throw TransportException(
                             TransportError.INVALID_FORMAT,
-                            "二进制消息格式错误：attachment[$i]长度字段不完整"
+                            "二进制消息格式错误：attachment[$index]长度字段不完整"
                         )
                     }
                     
                     val attachmentLength = bytesToInt(data, offset)
                     offset += 4
                     
-                    if (attachmentLength <= 0 || attachmentLength > 1024 * 1024) { // 最大1MB JSON
+                    if (attachmentLength <= 0 || attachmentLength > 10 * 1024) { // 最大10KB的attachment metadata
                         throw TransportException(
                             TransportError.INVALID_FORMAT,
-                            "二进制消息格式错误：attachment[$i]长度无效 ($attachmentLength)"
+                            "二进制消息格式错误：attachment[$index]长度无效 ($attachmentLength)"
                         )
                     }
                     if (offset + attachmentLength > data.size) {
                         throw TransportException(
                             TransportError.INVALID_FORMAT,
-                            "二进制消息格式错误：attachment[$i]内容不完整"
+                            "二进制消息格式错误：attachment[$index]内容不完整"
                         )
                     }
                     
@@ -455,21 +464,23 @@ data class TransportMessage(
                     } catch (e: Exception) {
                         throw TransportException(
                             TransportError.INVALID_FORMAT,
-                            "二进制消息格式错误：attachment[$i] JSON解析失败",
+                            "二进制消息格式错误：attachment[$index] JSON解析失败",
                             e
                         )
                     }
+                    
                     attachments.add(attachment)
                 }
                 
-                // 验证是否消费了所有数据（不允许有多余数据）
+                // 验证是否有剩余数据
                 if (offset != data.size) {
                     throw TransportException(
                         TransportError.INVALID_FORMAT,
-                        "二进制消息格式错误：存在未消费的数据 (${data.size - offset} bytes)"
+                        "二进制消息格式错误：存在多余数据 (expected=$offset, actual=${data.size})"
                     )
                 }
                 
+                // 创建TransportMessage实例
                 TransportMessage(
                     version = version,
                     messageId = messageId,
@@ -616,7 +627,11 @@ data class TransportContentMetadata(
     
     /** 加密算法 */
     @JsonProperty("encryptionAlgorithm")
-    val encryptionAlgorithm: String = "AES-256-GCM"
+    val encryptionAlgorithm: String = "AES-256-GCM",
+    
+    /** 发送设备ID（用于Signal Envelope适配） */
+    @JsonProperty("sourceDeviceId")
+    val sourceDeviceId: Int = 1
 )
 
 /**

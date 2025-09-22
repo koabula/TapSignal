@@ -3,10 +3,8 @@ package org.thoughtcrime.securesms.tap.provider.cos
 import android.content.Context
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
-import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
-import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
-import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
+import org.thoughtcrime.securesms.cos.CosFileInfo
 import java.io.File
 
 /**
@@ -230,14 +228,14 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 )
             }
             
-            // 创建COS配置
+            // 创建COS配置（使用原始COS模块的类）
             val provider = when (config["provider"]?.toString()?.uppercase()) {
-                "AWS" -> CosConfig.Provider.AWS
-                "TENCENT" -> CosConfig.Provider.TENCENT
+                "AWS" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.AWS
+                "TENCENT" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT
                 else -> return ConfigTestResult.Failed("不支持的提供商")
             }
             
-            val cosConfig = CosConfig(
+            val cosConfig = org.thoughtcrime.securesms.cos.CosConfig(
                 provider = provider,
                 secretId = config["secretId"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥ID"),
                 secretKey = config["secretKey"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥"),
@@ -245,9 +243,9 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 bucketName = config["bucketName"]?.toString() ?: return ConfigTestResult.Failed("缺少存储桶名称")
             )
             
-            // 创建测试客户端
+            // 创建测试客户端（使用原始COS模块的工厂）
             val cosClient = try {
-                CosClientFactory.createClient(cosConfig, null)
+                org.thoughtcrime.securesms.cos.CosClientFactory.createClient(cosConfig, null)
             } catch (e: Exception) {
                 return ConfigTestResult.Failed("无法创建COS客户端", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
             }
@@ -264,7 +262,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
     /**
      * 执行实际的连接测试
      */
-    private suspend fun performConnectionTest(cosClient: CosClient, config: CosConfig): ConfigTestResult {
+    private suspend fun performConnectionTest(cosClient: org.thoughtcrime.securesms.cos.CosClient, config: org.thoughtcrime.securesms.cos.CosConfig): ConfigTestResult {
         return try {
             val testFileName = "tap_connection_test_${System.currentTimeMillis()}.txt"
             val testContent = "Transport-as-a-Plugin COS连接测试"
@@ -299,7 +297,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 
                 // 3. 测试目录列举
                 val files = cosClient.listFiles(testPath)
-                val uploadedFile = files.find { it.name.contains(testFileName) }
+                val uploadedFile = files.find { it.key.contains(testFileName) }
                 if (uploadedFile == null) {
                     return ConfigTestResult.Warning(
                         "文件列举测试异常",
@@ -307,7 +305,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                     )
                 }
                 
-                Log.i(TAG, "文件列举成功，找到测试文件: ${LogSanitizer.sanitize(uploadedFile.name, "filename")}")
+                Log.i(TAG, "文件列举成功，找到测试文件: ${LogSanitizer.sanitize(uploadedFile.key, "filename")}")
                 
                 // 4. 测试文件下载
                 val downloadFile = File.createTempFile("tap_download", ".txt")
@@ -340,7 +338,9 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 
                 // 6. 清理远端测试文件
                 val deleteSuccess = try {
-                    cosClient.deleteFile(uploadPath)
+                    // 使用反射调用deleteFile方法（原始CosClient接口未包含此方法但实现类有）
+                    val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
+                    deleteMethod.invoke(cosClient, uploadPath) as Boolean
                 } catch (e: Exception) {
                     Log.w(TAG, "删除测试文件时出现异常（非致命）: ${LogSanitizer.sanitizeThrowable(e)}")
                     false

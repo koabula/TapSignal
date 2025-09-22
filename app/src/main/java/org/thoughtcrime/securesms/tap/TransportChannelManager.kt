@@ -1180,49 +1180,63 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
-     * 创建通道（简化版本，兼容TapMessageProcessor调用）
+     * 创建通道（完整实现，替代简化版本）
      */
     suspend fun createChannel(recipientId: String, config: TransportChannelConfig, token: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                // 这里应该根据config创建合适的TransportMetadata
-                // 为了兼容性，我们创建一个基本的元数据实现
-                val metadata = object : TransportMetadata {
-                    override val recipientId: String = recipientId
-                    override val providerType: String = "cos" // 默认使用COS
-                    
-                    private val address: String = "cos://bucket/messages"
-                    private val transportToken: TransportToken? = null
-                    private val path: String = "/messages/$recipientId"
-                    
-                    override fun getSendMetadata(): SendMetadata {
-                        return SendMetadata(
-                            address = address,
-                            token = transportToken,
-                            path = path,
-                            recipientId = recipientId
-                        )
-                    }
-                    
-                    override fun getReceiveMetadata(): ReceiveMetadata {
-                        return ReceiveMetadata(
-                            address = address,
-                            token = transportToken,
-                            path = path,
-                            myId = "self"
-                        )
-                    }
-                    
-                    override fun toMap(): Map<String, Any> = mapOf()
-                    override fun validate(): Boolean = true
+                Log.d(TAG, "创建通道: recipientId=$recipientId")
+                
+                // 1. 解析Token信息以确定Provider类型
+                val tokenInfo = parseTokenInfo(token)
+                if (tokenInfo == null) {
+                    Log.e(TAG, "无法解析Token信息")
+                    return@withContext null
                 }
                 
-                val channel = establishChannel(recipientId, metadata.providerType, metadata)
-                channel?.channelId
+                // 2. 获取对应的Provider
+                val transportManager = getTransportManager()
+                val provider = transportManager.getProvider(tokenInfo.providerType)
+                if (provider == null) {
+                    Log.e(TAG, "未找到Provider: ${tokenInfo.providerType}")
+                    return@withContext null
+                }
+                
+                // 3. 创建或获取通道
+                val channel = getOrCreateChannel(recipientId, tokenInfo.providerType, provider)
+                if (channel == null) {
+                    Log.e(TAG, "无法创建通道")
+                    return@withContext null
+                }
+                
+                Log.d(TAG, "通道创建成功: channelId=${channel.channelId}")
+                channel.channelId
+                
             } catch (e: Exception) {
                 Log.e(TAG, "创建通道失败: recipientId=$recipientId", e)
                 null
             }
+        }
+    }
+    
+    /**
+     * 解析Token信息
+     */
+    private fun parseTokenInfo(token: String): TokenInfo? {
+        return try {
+            // 尝试解析JSON格式的Token信息
+            val mapper = com.fasterxml.jackson.databind.ObjectMapper()
+            val tokenData = mapper.readValue(token, Map::class.java) as Map<String, Any>
+            
+            val providerType = tokenData["providerType"] as? String ?: "cos"
+            val tokenId = tokenData["tokenId"] as? String ?: ""
+            
+            TokenInfo(providerType, tokenId, tokenData)
+            
+        } catch (e: Exception) {
+            Log.w(TAG, "解析Token信息失败，使用默认配置", e)
+            // 回退到默认配置
+            TokenInfo("cos", "legacy_token", mapOf("data" to token))
         }
     }
     
@@ -1317,4 +1331,13 @@ data class TransportChannelStatistics(
             0.0
         }
     }
-} 
+}
+
+/**
+ * Token信息数据类
+ */
+data class TokenInfo(
+    val providerType: String,
+    val tokenId: String,
+    val tokenData: Map<String, Any>
+) 

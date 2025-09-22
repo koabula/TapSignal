@@ -13,6 +13,7 @@ import kotlinx.coroutines.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.core.type.TypeReference
+import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 
 /**
  * 传输Token池管理器
@@ -80,20 +81,14 @@ class TransportTokenPool private constructor(private val context: Context) {
     private val tokenLock = ReentrantReadWriteLock()
     private val configLock = ReentrantReadWriteLock()
     
-    // 安全持久化存储（使用SharedPreferences作为替代方案）
+    // 安全持久化存储（迁移到SignalStore.tap）
     private val tapValues by lazy { 
-        object {
-            private val prefs = context.getSharedPreferences("tap_token_pool", Context.MODE_PRIVATE)
-            
-            fun getReceivedTokens(): String = prefs.getString("received_tokens", "") ?: ""
-            fun setReceivedTokens(json: String) = prefs.edit().putString("received_tokens", json).apply()
-            
-            fun getSharedTokens(): String = prefs.getString("shared_tokens", "") ?: ""
-            fun setSharedTokens(json: String) = prefs.edit().putString("shared_tokens", json).apply()
-            
-            fun getLastCleanupTime(): Long = prefs.getLong("last_cleanup_time", 0L)
-            fun setLastCleanupTime(time: Long) = prefs.edit().putLong("last_cleanup_time", time).apply()
-        }
+        org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+    }
+    
+    // 旧版本SharedPreferences存储（用于数据迁移）
+    private val legacyPrefs by lazy {
+        context.getSharedPreferences("tap_token_pool", Context.MODE_PRIVATE)
     }
     
     private val objectMapper = ObjectMapper().apply {
@@ -166,7 +161,7 @@ class TransportTokenPool private constructor(private val context: Context) {
                     
                     // 验证Token有效性
                     if (!token.validate()) {
-                        Log.w(TAG, "接收到无效Token: ${token.tokenId}")
+                        Log.w(TAG, "接收到无效Token: ${LogSanitizer.sanitize(token.tokenId)}")
                         return@withContext false
                     }
                     
@@ -197,7 +192,7 @@ class TransportTokenPool private constructor(private val context: Context) {
                     // 持久化存储
                     saveTokensToStorage()
                     
-                    Log.d(TAG, "添加接收Token: ${token.tokenId}, 接收者: $recipientId, 提供者: ${token.providerType}")
+                    Log.d(TAG, "添加接收Token: ${LogSanitizer.sanitize(token.tokenId)}, 接收者: ${LogSanitizer.sanitize(recipientId)}, 提供者: ${token.providerType}")
                     true
                     
                 } catch (e: Exception) {
@@ -636,10 +631,10 @@ class TransportTokenPool private constructor(private val context: Context) {
                         TokenType.SHARED -> addSharedToken(metadata.recipientId, newToken)
                     }
                     
-                    Log.i(TAG, "Token刷新成功: $tokenId -> ${newToken.tokenId}")
+                    Log.i(TAG, "Token刷新成功: ${LogSanitizer.sanitize(tokenId)} -> ${LogSanitizer.sanitize(newToken.tokenId)}")
                     true
                 } else {
-                    Log.w(TAG, "Token刷新失败: $tokenId")
+                    Log.w(TAG, "Token刷新失败: ${LogSanitizer.sanitize(tokenId)}")
                     false
                 }
                 
@@ -873,7 +868,7 @@ class TransportTokenPool private constructor(private val context: Context) {
         try {
             Log.d(TAG, "开始加载持久化的Token数据")
             
-            // 加载接收Token
+            // 尝试从SignalStore.tap加载
             val receivedTokensJson = tapValues.getReceivedTokens()
             if (!receivedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
@@ -897,7 +892,7 @@ class TransportTokenPool private constructor(private val context: Context) {
                 Log.d(TAG, "加载接收Token数据: ${receivedTokens.size}个条目")
             }
             
-            // 加载共享Token
+            // 尝试从SignalStore.tap加载
             val sharedTokensJson = tapValues.getSharedTokens()
             if (!sharedTokensJson.isNullOrEmpty()) {
                 val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
@@ -921,10 +916,35 @@ class TransportTokenPool private constructor(private val context: Context) {
                 Log.d(TAG, "加载共享Token数据: ${sharedTokens.size}个条目")
             }
             
-            // 重建Token元数据
-            rebuildTokenMetadata()
+            // 从SignalStore.tap加载Token元数据
+            val tokenMetadataJson = tapValues.getTokenMetadata()
+            if (!tokenMetadataJson.isNullOrEmpty()) {
+                val type = object : TypeReference<Map<String, Map<String, Any>>>() {}
+                val tokenMetadataData = objectMapper.readValue(tokenMetadataJson, type)
+                
+                tokenMetadata.clear()
+                tokenMetadataData.forEach { (tokenId, metadataMap) ->
+                    try {
+                        val metadata = TokenMetadata.fromMap(metadataMap)
+                        tokenMetadata[tokenId] = metadata
+                    } catch (e: Exception) {
+                        Log.w(TAG, "无法加载Token元数据: $tokenId", e)
+                    }
+                }
+                Log.d(TAG, "加载Token元数据: ${tokenMetadata.size}个条目")
+            }
             
-            Log.i(TAG, "持久化Token数据加载完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}")
+            // 如果SignalStore.tap中没有数据，尝试从旧版本SharedPreferences迁移
+            if (receivedTokens.isEmpty() && sharedTokens.isEmpty()) {
+                migrateLegacyTokens()
+            }
+            
+            // 重建Token元数据（如果元数据丢失）
+            if (tokenMetadata.isEmpty() && (receivedTokens.isNotEmpty() || sharedTokens.isNotEmpty())) {
+                rebuildTokenMetadata()
+            }
+            
+            Log.i(TAG, "持久化Token数据加载完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}, 元数据=${tokenMetadata.size}")
             
             // 执行清理检查
             performCleanupIfNeeded()
@@ -935,6 +955,74 @@ class TransportTokenPool private constructor(private val context: Context) {
             receivedTokens.clear()
             sharedTokens.clear()
             tokenMetadata.clear()
+        }
+    }
+    
+    /**
+     * 从旧版本SharedPreferences迁移数据
+     */
+    private fun migrateLegacyTokens() {
+        try {
+            Log.d(TAG, "开始从旧版本SharedPreferences迁移Token数据")
+            
+            // 迁移接收Token
+            val legacyReceivedTokensJson = legacyPrefs.getString(KEY_RECEIVED_TOKENS, null)
+            if (!legacyReceivedTokensJson.isNullOrEmpty()) {
+                val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
+                val legacyReceivedTokensData = objectMapper.readValue(legacyReceivedTokensJson, type)
+                
+                legacyReceivedTokensData.forEach { (recipientId, providerTokens) ->
+                    val tokenMap = mutableMapOf<String, TransportToken>()
+                    providerTokens.forEach { (providerType, tokenData) ->
+                        val token = createTokenFromData(tokenData)
+                        if (token != null && !token.isExpired) {
+                            tokenMap[providerType] = token
+                        }
+                    }
+                    if (tokenMap.isNotEmpty()) {
+                        receivedTokens[recipientId] = tokenMap
+                    }
+                }
+                Log.d(TAG, "迁移接收Token数据: ${legacyReceivedTokensData.size}个条目")
+            }
+            
+            // 迁移共享Token
+            val legacySharedTokensJson = legacyPrefs.getString(KEY_SHARED_TOKENS, null)
+            if (!legacySharedTokensJson.isNullOrEmpty()) {
+                val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
+                val legacySharedTokensData = objectMapper.readValue(legacySharedTokensJson, type)
+                
+                legacySharedTokensData.forEach { (recipientId, providerTokens) ->
+                    val tokenMap = mutableMapOf<String, TransportToken>()
+                    providerTokens.forEach { (providerType, tokenData) ->
+                        val token = createTokenFromData(tokenData)
+                        if (token != null && !token.isExpired) {
+                            tokenMap[providerType] = token
+                        }
+                    }
+                    if (tokenMap.isNotEmpty()) {
+                        sharedTokens[recipientId] = tokenMap
+                    }
+                }
+                Log.d(TAG, "迁移共享Token数据: ${legacySharedTokensData.size}个条目")
+            }
+            
+            // 如果迁移了数据，保存到新的安全存储并清理旧数据
+            if (receivedTokens.isNotEmpty() || sharedTokens.isNotEmpty()) {
+                saveTokensToStorage()
+                
+                // 清理旧版本数据
+                legacyPrefs.edit()
+                    .remove(KEY_RECEIVED_TOKENS)
+                    .remove(KEY_SHARED_TOKENS)
+                    .remove(KEY_TOKEN_METADATA)
+                    .apply()
+                
+                Log.i(TAG, "Token数据迁移完成，已清理旧版本数据")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "从旧版本迁移Token数据失败", e)
         }
     }
     
@@ -959,7 +1047,12 @@ class TransportTokenPool private constructor(private val context: Context) {
             val sharedTokensJson = objectMapper.writeValueAsString(sharedTokensData)
             tapValues.setSharedTokens(sharedTokensJson)
             
-            Log.d(TAG, "Token数据持久化完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}")
+            // 保存Token元数据
+            val tokenMetadataData = tokenMetadata.mapValues { it.value.toMap() }
+            val tokenMetadataJson = objectMapper.writeValueAsString(tokenMetadataData)
+            tapValues.setTokenMetadata(tokenMetadataJson)
+            
+            Log.d(TAG, "Token数据持久化完成: 接收=${receivedTokens.size}, 共享=${sharedTokens.size}, 元数据=${tokenMetadata.size}")
             
         } catch (e: Exception) {
             Log.e(TAG, "持久化Token到存储失败", e)
@@ -1199,6 +1292,68 @@ class TransportTokenPool private constructor(private val context: Context) {
             }
         }
     }
+
+    /**
+     * 获取对端Token（简化接口，直接返回Token）
+     * 
+     * 这个方法提供与原始SubAccountPool类似的直接访问方式
+     */
+    fun getPeerToken(recipientId: String, providerType: String): TransportToken? {
+        return getValidReceivedToken(recipientId, providerType)
+    }
+    
+    /**
+     * 获取本端Token（简化接口，直接返回Token）
+     * 
+     * 这个方法提供与原始SubAccountPool类似的直接访问方式
+     */
+    fun getMyToken(recipientId: String, providerType: String): TransportToken? {
+        return getValidSharedToken(recipientId, providerType)
+    }
+    
+    /**
+     * 获取所有有效的接收Token列表（用于轮询）
+     */
+    fun getAllValidReceivedTokens(): List<Pair<String, TransportToken>> {
+        tokenLock.read {
+            val validTokens = mutableListOf<Pair<String, TransportToken>>()
+            
+            receivedTokens.forEach { (recipientId, providerTokens) ->
+                providerTokens.forEach { (providerType, token) ->
+                    if (!token.isExpired && token.validate()) {
+                        // 更新访问时间
+                        updateTokenAccessTime(token.tokenId)
+                        validTokens.add(recipientId to token)
+                    }
+                }
+            }
+            
+            Log.d(TAG, "获取所有有效接收Token: ${validTokens.size}个")
+            return validTokens
+        }
+    }
+    
+    /**
+     * 获取所有有效的共享Token列表
+     */
+    fun getAllValidSharedTokens(): List<Pair<String, TransportToken>> {
+        tokenLock.read {
+            val validTokens = mutableListOf<Pair<String, TransportToken>>()
+            
+            sharedTokens.forEach { (recipientId, providerTokens) ->
+                providerTokens.forEach { (providerType, token) ->
+                    if (!token.isExpired && token.validate()) {
+                        // 更新访问时间
+                        updateTokenAccessTime(token.tokenId)
+                        validTokens.add(recipientId to token)
+                    }
+                }
+            }
+            
+            Log.d(TAG, "获取所有有效共享Token: ${validTokens.size}个")
+            return validTokens
+        }
+    }
 }
 
 /**
@@ -1219,7 +1374,31 @@ data class TokenMetadata(
     val tokenType: TokenType,
     val addedAt: Long,
     val lastAccessedAt: Long
-)
+) {
+    fun toMap(): Map<String, Any> {
+        return mapOf(
+            "tokenId" to tokenId,
+            "recipientId" to recipientId,
+            "providerType" to providerType,
+            "tokenType" to tokenType.name,
+            "addedAt" to addedAt,
+            "lastAccessedAt" to lastAccessedAt
+        )
+    }
+
+    companion object {
+        fun fromMap(map: Map<String, Any>): TokenMetadata {
+            return TokenMetadata(
+                tokenId = map["tokenId"] as String,
+                recipientId = map["recipientId"] as String,
+                providerType = map["providerType"] as String,
+                tokenType = TokenType.valueOf(map["tokenType"] as String),
+                addedAt = map["addedAt"] as Long,
+                lastAccessedAt = map["lastAccessedAt"] as Long
+            )
+        }
+    }
+}
 
 /**
  * Token统计信息

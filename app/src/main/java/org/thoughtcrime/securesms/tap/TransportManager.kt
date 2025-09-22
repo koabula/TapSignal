@@ -59,12 +59,7 @@ class TransportManager private constructor(private val context: Context) {
     private val transportConfig = TransportProviderConfigManager.getInstance(context)
     private val channelManager = lazy { TransportChannelManager.getInstance(context) }
     private val tokenPool = lazy { TransportTokenPool.getInstance(context) }
-    
-    // 路由管理功能（整合到TransportManager中）
-    private var routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy.INTELLIGENT
-    private val routingStats = ConcurrentHashMap<String, ProviderRoutingStats>()
-    private val performanceCache = ConcurrentHashMap<String, ProviderPerformanceStats>()
-    private val recipientPreferences = ConcurrentHashMap<String, ProviderPreference>()
+    private val routingManager = TransportRoutingManager.getInstance(context)
     
     // Provider管理
     private val providers = ConcurrentHashMap<String, TransportProvider>()
@@ -73,6 +68,7 @@ class TransportManager private constructor(private val context: Context) {
     
     // 配置和状态
     private var currentConfig: TransportConfig = TransportConfig()
+    private var routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy.INTELLIGENT
     private var isInitialized: Boolean = false
     private val initializationLock = ReentrantReadWriteLock()
     
@@ -243,8 +239,8 @@ class TransportManager private constructor(private val context: Context) {
                 
                 Log.d(TAG, "发送消息到: $recipientId, 消息类型: ${message.messageType}")
                 
-                // 使用内置路由功能选择最佳提供者
-                val bestProvider = selectBestProvider(
+                // 使用路由管理器选择最佳提供者
+                val bestProvider = routingManager.selectBestProvider(
                     recipientId = recipientId,
                     message = message,
                     availableProviders = getEnabledProviders()
@@ -387,7 +383,7 @@ class TransportManager private constructor(private val context: Context) {
             try {
                 val channelStats = channelManager.value.getChannelStatistics()
                 val tokenStats = tokenPool.value.getTokenStatistics()
-                val routingStats = getRoutingStatistics()
+                val routingStats = routingManager.getRoutingStatistics()
                 
                 TransportStatistics(
                     totalProviders = providers.size,
@@ -507,6 +503,100 @@ class TransportManager private constructor(private val context: Context) {
     fun getCurrentConfig(): TransportConfig {
         initializationLock.read {
             return currentConfig.copy()
+        }
+    }
+    
+    /**
+     * 路由消息到合适的传输提供者
+     */
+    suspend fun routeMessage(message: TransportMessage, recipientId: String): TransportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (!isInitialized) {
+                    return@withContext TransportResult.failure(
+                        TransportError.PROVIDER_UNAVAILABLE,
+                        false,
+                        "传输管理器未初始化"
+                    )
+                }
+                
+                Log.d(TAG, "路由消息: messageId=${message.messageId}, recipientId=$recipientId")
+                
+                // 使用路由管理器选择最佳提供者
+                val bestProvider = routingManager.selectBestProvider(
+                    recipientId = recipientId,
+                    message = message,
+                    availableProviders = getEnabledProviders()
+                )
+                
+                if (bestProvider == null) {
+                    return@withContext TransportResult.failure(
+                        TransportError.PROVIDER_UNAVAILABLE,
+                        false,
+                        "没有可用的传输提供者"
+                    )
+                }
+                
+                // 获取或创建传输通道
+                val channel = channelManager.value.getOrCreateChannel(
+                    recipientId = recipientId,
+                    providerType = bestProvider.providerType,
+                    provider = bestProvider
+                )
+                
+                if (channel == null) {
+                    return@withContext TransportResult.failure(
+                        TransportError.CHANNEL_ERROR,
+                        true,
+                        "无法创建传输通道"
+                    )
+                }
+                
+                // 获取传输元数据
+                val metadata = channel.metadata
+                if (metadata == null) {
+                    return@withContext TransportResult.failure(
+                        TransportError.INVALID_METADATA,
+                        true,
+                        "无法获取传输元数据"
+                    )
+                }
+                
+                // 执行消息发送
+                val result = bestProvider.push(message, metadata)
+                
+                // 更新通道统计
+                when (result) {
+                    is TransportResult.Success -> {
+                        channelManager.value.updateChannelSuccess(channel.channelId)
+                        Log.i(TAG, "消息路由成功: messageId=${message.messageId}, provider=${bestProvider.providerType}")
+                    }
+                    
+                    is TransportResult.Failed -> {
+                        channelManager.value.updateChannelFailure(channel.channelId, result.error)
+                        Log.w(TAG, "消息路由失败: messageId=${message.messageId}, error=${result.error}")
+                    }
+                    
+                    is TransportResult.RetryScheduled -> {
+                        Log.w(TAG, "消息路由重试: messageId=${message.messageId}, retryAfter=${result.retryAfter}")
+                    }
+                    
+                    is TransportResult.PartialSuccess -> {
+                        channelManager.value.updateChannelSuccess(channel.channelId)
+                        Log.w(TAG, "消息路由部分成功: messageId=${message.messageId}")
+                    }
+                }
+                
+                result
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "消息路由异常: messageId=${message.messageId}, recipientId=$recipientId", e)
+                TransportResult.failure(
+                    TransportError.NETWORK_ERROR,
+                    true,
+                    "路由异常: ${e.message}"
+                )
+            }
         }
     }
     
@@ -672,266 +762,6 @@ class TransportManager private constructor(private val context: Context) {
                 }
             }
         }
-    }
-    
-    // 路由管理功能（从TransportRoutingManager整合过来）
-    
-    /**
-     * 选择最佳传输提供者
-     */
-    private suspend fun selectBestProvider(
-        recipientId: String,
-        message: TransportMessage,
-        availableProviders: List<TransportProvider>
-    ): TransportProvider? {
-        return try {
-            if (availableProviders.isEmpty()) {
-                Log.w(TAG, "没有可用的传输提供者")
-                return null
-            }
-            
-            Log.d(TAG, "选择最佳Provider，可用数量: ${availableProviders.size}, 策略: ${routingPolicy.displayName}")
-            
-            // 根据路由策略进行选择
-            val selectedProvider = when (routingPolicy) {
-                TransportRoutingPolicy.TRANSPORT_FIRST -> selectTransportFirstProvider(availableProviders)
-                TransportRoutingPolicy.SIGNAL_FIRST -> null // Signal优先时不使用传输服务
-                TransportRoutingPolicy.INTELLIGENT -> selectIntelligentProvider(recipientId, message, availableProviders)
-                TransportRoutingPolicy.TRANSPORT_ONLY -> selectTransportOnlyProvider(availableProviders)
-                TransportRoutingPolicy.SIGNAL_ONLY -> null // 仅Signal时不使用传输服务
-            }
-            
-            if (selectedProvider != null) {
-                Log.d(TAG, "选择Provider: ${selectedProvider.providerType}")
-                recordProviderSelection(selectedProvider.providerType, recipientId)
-            } else {
-                Log.w(TAG, "未找到合适的Provider")
-            }
-            
-            selectedProvider
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "选择最佳Provider失败", e)
-            null
-        }
-    }
-    
-    /**
-     * 传输优先策略Provider选择
-     */
-    private suspend fun selectTransportFirstProvider(providers: List<TransportProvider>): TransportProvider? {
-        // 按可靠性和性能排序，选择最佳的
-        val scoredProviders = providers.map { provider ->
-            provider to calculateProviderScore(provider.providerType, null, null)
-        }.sortedByDescending { it.second }
-        
-        return scoredProviders.firstOrNull()?.first
-    }
-    
-    /**
-     * 传输专用策略Provider选择
-     */
-    private suspend fun selectTransportOnlyProvider(providers: List<TransportProvider>): TransportProvider? {
-        // 类似传输优先，但排除Signal相关的Provider
-        val transportProviders = providers.filter { it.providerType != "signal" }
-        return selectTransportFirstProvider(transportProviders)
-    }
-    
-    /**
-     * 智能Provider选择
-     */
-    private suspend fun selectIntelligentProvider(
-        recipientId: String,
-        message: TransportMessage,
-        providers: List<TransportProvider>
-    ): TransportProvider? {
-        // 为每个Provider计算综合评分
-        val scoredProviders = providers.map { provider ->
-            val score = calculateProviderScore(provider.providerType, recipientId, message)
-            provider to score
-        }.sortedByDescending { it.second }
-        
-        Log.d(TAG, "Provider评分排序: ${scoredProviders.map { "${it.first.providerType}:${String.format("%.2f", it.second)}" }}")
-        
-        return scoredProviders.firstOrNull()?.first
-    }
-    
-    /**
-     * 计算Provider综合评分
-     */
-    private suspend fun calculateProviderScore(
-        providerType: String,
-        recipientId: String?,
-        message: TransportMessage?
-    ): Double {
-        var score = 0.0
-        
-        // 基础评分权重
-        val performanceWeight = 0.3
-        val reliabilityWeight = 0.25
-        val channelWeight = 0.2
-        val preferenceWeight = 0.15
-        val messageTypeWeight = 0.1
-        
-        // 性能评分
-        val performanceScore = calculatePerformanceScore(providerType)
-        score += performanceScore * performanceWeight
-        
-        // 可靠性评分
-        val reliabilityScore = calculateReliabilityScore(providerType)
-        score += reliabilityScore * reliabilityWeight
-        
-        // 通道状态评分
-        val channelScore = calculateChannelScore(providerType, recipientId)
-        score += channelScore * channelWeight
-        
-        // Provider偏好评分
-        val preferenceScore = calculatePreferenceScore(providerType, recipientId)
-        score += preferenceScore * preferenceWeight
-        
-        // 消息类型适配评分
-        val messageTypeScore = calculateMessageTypeScore(providerType, message)
-        score += messageTypeScore * messageTypeWeight
-        
-        return score.coerceIn(0.0, 1.0)
-    }
-    
-    /**
-     * 计算性能评分
-     */
-    private fun calculatePerformanceScore(providerType: String): Double {
-        val perfStats = performanceCache[providerType]
-        if (perfStats == null || perfStats.isExpired()) {
-            return 0.5 // 默认中等评分
-        }
-        
-        // 基于平均响应时间和成功率计算性能评分
-        val responseTimeScore = when {
-            perfStats.averageResponseTime <= 1000 -> 1.0    // 1秒以内优秀
-            perfStats.averageResponseTime <= 3000 -> 0.8    // 3秒以内良好
-            perfStats.averageResponseTime <= 10000 -> 0.6   // 10秒以内一般
-            else -> 0.3                                      // 超过10秒较差
-        }
-        
-        val successRateScore = perfStats.successRate
-        
-        return (responseTimeScore + successRateScore) / 2.0
-    }
-    
-    /**
-     * 计算可靠性评分
-     */
-    private fun calculateReliabilityScore(providerType: String): Double {
-        val stats = routingStats[providerType] ?: return 0.5
-        
-        if (stats.totalAttempts == 0) {
-            return 0.5 // 没有历史数据，给默认评分
-        }
-        
-        val successRate = stats.successfulAttempts.toDouble() / stats.totalAttempts
-        return successRate.coerceIn(0.0, 1.0)
-    }
-    
-    /**
-     * 计算通道状态评分
-     */
-    private suspend fun calculateChannelScore(providerType: String, recipientId: String?): Double {
-        if (recipientId == null) {
-            return 0.5
-        }
-        
-        val channel = channelManager.value.getActiveChannel(recipientId, providerType)
-        
-        return when {
-            channel == null -> 0.3                        // 没有通道
-            channel.isActive() -> 0.9                     // 活跃通道
-            channel.isAvailable() -> 0.7                  // 可用通道
-            channel.isFailed() -> 0.1                     // 失败通道
-            else -> 0.5                                    // 其他状态
-        }
-    }
-    
-    /**
-     * 计算Provider偏好评分
-     */
-    private fun calculatePreferenceScore(providerType: String, recipientId: String?): Double {
-        if (recipientId == null) {
-            return 0.5
-        }
-        
-        val preference = recipientPreferences[recipientId]?.preferences?.get(providerType)
-        return when (preference) {
-            PreferenceLevel.HIGHLY_PREFERRED -> 1.0
-            PreferenceLevel.PREFERRED -> 0.8
-            PreferenceLevel.NEUTRAL -> 0.5
-            PreferenceLevel.NOT_PREFERRED -> 0.2
-            PreferenceLevel.BLOCKED -> 0.0
-            null -> 0.5
-        }
-    }
-    
-    /**
-     * 计算消息类型适配评分
-     */
-    private fun calculateMessageTypeScore(providerType: String, message: TransportMessage?): Double {
-        if (message == null) {
-            return 0.5
-        }
-        
-        // 根据Provider特性和消息类型计算适配度
-        return when (providerType) {
-            "cos" -> when (message.messageType) {
-                TransportMessageType.MEDIA_MESSAGE -> 0.9      // COS适合大文件
-                TransportMessageType.TEXT_MESSAGE -> 0.7       // 文本消息也可以
-                TransportMessageType.CONTROL_MESSAGE -> 0.8    // 控制消息适合
-                TransportMessageType.RATCHET_UPDATE -> 0.6     // 密钥更新一般
-                TransportMessageType.CALL_MESSAGE -> 0.7       // 通话消息也适合
-            }
-            "email" -> when (message.messageType) {
-                TransportMessageType.TEXT_MESSAGE -> 0.8       // 邮件适合文本
-                TransportMessageType.MEDIA_MESSAGE -> 0.6      // 媒体文件有大小限制
-                TransportMessageType.CONTROL_MESSAGE -> 0.7    // 控制消息可以
-                TransportMessageType.RATCHET_UPDATE -> 0.5     // 密钥更新不太适合
-                TransportMessageType.CALL_MESSAGE -> 0.6       // 通话消息可以通过邮件
-            }
-            else -> 0.5
-        }
-    }
-    
-    /**
-     * 记录Provider选择
-     */
-    private fun recordProviderSelection(providerType: String, recipientId: String) {
-        val stats = routingStats.computeIfAbsent(providerType) {
-            ProviderRoutingStats(providerType)
-        }
-        stats.selectionCount++
-    }
-    
-    /**
-     * 获取路由统计信息
-     */
-    fun getRoutingStatistics(): TransportRoutingStatistics {
-        val providerStats = routingStats.values.map { stats ->
-            ProviderRoutingStatistics(
-                providerType = stats.providerType,
-                totalAttempts = stats.totalAttempts,
-                successfulAttempts = stats.successfulAttempts,
-                failedAttempts = stats.failedAttempts,
-                averageResponseTime = stats.averageResponseTime,
-                successRate = if (stats.totalAttempts > 0) {
-                    stats.successfulAttempts.toDouble() / stats.totalAttempts
-                } else 0.0,
-                errorDistribution = stats.errorCounts.toMap()
-            )
-        }.toList()
-        
-        return TransportRoutingStatistics(
-            currentPolicy = routingPolicy,
-            totalRoutingAttempts = routingStats.values.sumOf { it.totalAttempts },
-            totalSuccessfulRouting = routingStats.values.sumOf { it.successfulAttempts },
-            providerStatistics = providerStats
-        )
     }
 }
 

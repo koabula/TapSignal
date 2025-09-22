@@ -132,6 +132,22 @@ enum class TransportError(
         description = "操作超时，请稍后重试"
     ),
     
+    /** 通道错误 */
+    CHANNEL_ERROR(
+        displayName = "通道错误",
+        errorCode = "CHANNEL_ERROR",
+        isRetryable = true,
+        description = "传输通道建立或维护失败"
+    ),
+    
+    /** 元数据无效 */
+    INVALID_METADATA(
+        displayName = "元数据无效",
+        errorCode = "INVALID_METADATA",
+        isRetryable = false,
+        description = "传输元数据格式错误或缺失必要信息"
+    ),
+    
     /** 未知错误 */
     UNKNOWN_ERROR(
         displayName = "未知错误",

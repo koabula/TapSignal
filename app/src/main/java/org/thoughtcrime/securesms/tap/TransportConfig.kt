@@ -16,6 +16,12 @@ data class TransportConfig(
     /** Token配置 */
     val tokenConfig: TransportTokenConfig = TransportTokenConfig(),
     
+    /** 轮询配置 */
+    val pollingConfig: TapPollingConfig = TapPollingConfig(),
+    
+    /** Provider特定配置 */
+    val providerConfigs: Map<String, ProviderSpecificConfig> = emptyMap(),
+    
     /** 超时设置（毫秒） */
     val timeoutMs: Long = 30000L,
     
@@ -151,5 +157,102 @@ sealed class TransportConfigValidationResult {
         fun joinToString(separator: String = ", "): String {
             return errors.values.joinToString(separator)
         }
+    }
+}
+
+/**
+ * Tap轮询配置
+ */
+data class TapPollingConfig(
+    /** 核心线程池大小 */
+    val corePoolSize: Int = 2,
+    
+    /** 最大线程池大小 */
+    val maxPoolSize: Int = 8,
+    
+    /** 线程保活时间（秒） */
+    val keepAliveTimeSeconds: Long = 60L,
+    
+    /** 活跃对话轮询间隔（毫秒） */
+    val activePollingIntervalMs: Long = 5000L,
+    
+    /** 非活跃对话轮询间隔（毫秒） */
+    val inactivePollingIntervalMs: Long = 30000L,
+    
+    /** 后台模式轮询间隔（毫秒） */
+    val backgroundPollingIntervalMs: Long = 60000L,
+    
+    /** 暂停模式轮询间隔（毫秒） */
+    val suspendedPollingIntervalMs: Long = 300000L,
+    
+    /** 轮询超时时间（毫秒） */
+    val pollingTimeoutMs: Long = 30000L,
+    
+    /** 最大重试次数 */
+    val maxRetryAttempts: Int = 3,
+    
+    /** 清理间隔（毫秒） */
+    val cleanupIntervalMs: Long = 300000L
+) {
+    
+    /**
+     * 验证配置有效性
+     */
+    fun validate(): Boolean {
+        return corePoolSize > 0 &&
+               maxPoolSize >= corePoolSize &&
+               keepAliveTimeSeconds > 0 &&
+               activePollingIntervalMs > 0 &&
+               inactivePollingIntervalMs > 0 &&
+               backgroundPollingIntervalMs > 0 &&
+               suspendedPollingIntervalMs > 0 &&
+               pollingTimeoutMs > 0 &&
+               maxRetryAttempts >= 0 &&
+               cleanupIntervalMs > 0
+    }
+}
+
+/**
+ * Provider特定配置基类
+ */
+abstract class ProviderSpecificConfig
+
+/**
+ * COS Provider特定配置
+ */
+data class CosProviderConfig(
+    /** 最大文件大小（字节） */
+    val maxFileSize: Long = 100 * 1024 * 1024L, // 100MB
+    
+    /** 发件箱路径 */
+    val outboxPath: String = "/outbox/",
+    
+    /** 群组路径前缀 */
+    val groupPathPrefix: String = "/group/",
+    
+    /** 群组发件箱后缀 */
+    val groupOutboxSuffix: String = "/outbox/",
+    
+    /** 连接超时时间（毫秒） */
+    val connectionTimeoutMs: Long = 30000L,
+    
+    /** 读取超时时间（毫秒） */
+    val readTimeoutMs: Long = 60000L,
+    
+    /** 写入超时时间（毫秒） */
+    val writeTimeoutMs: Long = 60000L
+) : ProviderSpecificConfig() {
+    
+    /**
+     * 验证配置有效性
+     */
+    fun validate(): Boolean {
+        return maxFileSize > 0 &&
+               outboxPath.isNotBlank() &&
+               groupPathPrefix.isNotBlank() &&
+               groupOutboxSuffix.isNotBlank() &&
+               connectionTimeoutMs > 0 &&
+               readTimeoutMs > 0 &&
+               writeTimeoutMs > 0
     }
 } 

@@ -38,8 +38,17 @@ class TapValues internal constructor(store: KeyValueStore) : SignalStoreValues(s
         private const val KEY_SHARED_TOKENS = "tap.shared_tokens"
         private const val KEY_LAST_CLEANUP_TIME = "tap.last_cleanup_time"
         private const val KEY_LAST_SAVE_TIME = "tap.last_save_time"
+        private const val KEY_TOKEN_METADATA = "tap.token_metadata"
+        
+        // 初始化状态相关键
+        private const val KEY_TAP_INITIALIZED = "tap.initialized"
+        private const val KEY_INIT_VERSION = "tap.init_version"
+        private const val KEY_LEGACY_MIGRATION_COMPLETED = "tap.legacy_migration_completed"
+        private const val KEY_INIT_TIMESTAMP = "tap.init_timestamp"
+        private const val KEY_MIGRATION_TIMESTAMP = "tap.migration_timestamp"
         
         private const val CURRENT_CONFIG_VERSION = 1
+        private const val CURRENT_INIT_VERSION = 1
     }
     
     // Provider配置相关方法
@@ -137,11 +146,79 @@ class TapValues internal constructor(store: KeyValueStore) : SignalStoreValues(s
             .apply()
     }
     
+    fun getTokenMetadata(): String? {
+        return store.getString(KEY_TOKEN_METADATA, null)
+    }
+    
+    fun setTokenMetadata(metadataJson: String) {
+        store.beginWrite()
+            .putString(KEY_TOKEN_METADATA, metadataJson)
+            .putLong(KEY_LAST_SAVE_TIME, System.currentTimeMillis())
+            .apply()
+    }
+    
     fun clearTokens() {
         store.beginWrite()
             .remove(KEY_RECEIVED_TOKENS)
             .remove(KEY_SHARED_TOKENS)
+            .remove(KEY_TOKEN_METADATA)
             .putLong(KEY_LAST_CLEANUP_TIME, 0)
             .apply()
+    }
+    
+    // 初始化状态管理方法
+    fun isTapInitialized(): Boolean {
+        return store.getBoolean(KEY_TAP_INITIALIZED, false)
+    }
+    
+    fun setTapInitialized(initialized: Boolean) {
+        store.beginWrite()
+            .putBoolean(KEY_TAP_INITIALIZED, initialized)
+            .apply()
+    }
+    
+    fun getInitVersion(): Int {
+        return store.getInteger(KEY_INIT_VERSION, 0)
+    }
+    
+    fun setInitVersion(version: Int) {
+        store.beginWrite()
+            .putInteger(KEY_INIT_VERSION, version)
+            .apply()
+    }
+    
+    fun isLegacyMigrationCompleted(): Boolean {
+        return store.getBoolean(KEY_LEGACY_MIGRATION_COMPLETED, false)
+    }
+    
+    fun setLegacyMigrationCompleted(completed: Boolean) {
+        store.beginWrite()
+            .putBoolean(KEY_LEGACY_MIGRATION_COMPLETED, completed)
+            .putLong(KEY_MIGRATION_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+    }
+    
+    fun markInitializationComplete() {
+        store.beginWrite()
+            .putBoolean(KEY_TAP_INITIALIZED, true)
+            .putInteger(KEY_INIT_VERSION, CURRENT_INIT_VERSION)
+            .putLong(KEY_INIT_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+    }
+    
+    fun shouldPerformInitialization(): Boolean {
+        return !isTapInitialized() || getInitVersion() < CURRENT_INIT_VERSION
+    }
+    
+    fun getInitTimestamp(): Long {
+        return store.getLong(KEY_INIT_TIMESTAMP, 0)
+    }
+    
+    fun getMigrationTimestamp(): Long {
+        return store.getLong(KEY_MIGRATION_TIMESTAMP, 0)
+    }
+    
+    fun getCurrentInitVersion(): Int {
+        return CURRENT_INIT_VERSION
     }
 } 

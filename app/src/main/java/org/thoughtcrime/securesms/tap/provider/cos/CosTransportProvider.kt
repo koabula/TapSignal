@@ -29,12 +29,7 @@ class CosTransportProvider(
     companion object {
         private val TAG = Log.tag(CosTransportProvider::class.java)
         
-        // COS特定配置
-        private const val MAX_FILE_SIZE = 100 * 1024 * 1024L // 100MB
-        private const val OUTBOX_PATH = "/outbox/"
-        private const val GROUP_PATH_PREFIX = "/group/"
-        private const val MESSAGE_FORMAT_VERSION = 1
-        private const val GROUP_OUTBOX_SUFFIX = "/outbox/"
+        // 已移除硬编码配置，改为使用可配置的 CosProviderConfig
     }
 
     override val providerType: String = "cos"
@@ -42,7 +37,7 @@ class CosTransportProvider(
     override val supportsGroup: Boolean = true
     override val displayName: String = "云对象存储 (COS)"
     override val description: String = "支持AWS S3和腾讯云COS的云存储服务"
-    override val maxMessageSize: Long = MAX_FILE_SIZE
+    override val maxMessageSize: Long get() = providerConfig.maxFileSize
     
     override val supportedPermissions: Set<TransportPermission> = setOf(
         TransportPermission.READ,
@@ -54,6 +49,11 @@ class CosTransportProvider(
     // COS配置信息
     private val cosConfig: CosConfig by lazy {
         createCosConfigFromMap(config)
+    }
+    
+    // Provider配置（可配置参数）
+    private val providerConfig: CosProviderConfig by lazy {
+        config["providerConfig"] as? CosProviderConfig ?: CosProviderConfig()
     }
 
     /**
@@ -162,19 +162,15 @@ class CosTransportProvider(
                     val tempFile = File.createTempFile("cos_parse_", ".dat", context.cacheDir)
                     try {
                         tempFile.writeBytes(downloadResult.data)
-                        val messageFileInfo = parseMessageFileName(latestFile.name)
-                        if (messageFileInfo != null) {
-                            val message = parseMessageFromBinaryData(downloadResult.data, messageFileInfo)
-                            if (message != null) {
-                                Log.i(TAG, "消息拉取成功: messageId=${message.messageId}")
-                                TransportResult.Success(message)
-                            } else {
-                                Log.w(TAG, "消息解析失败: ${latestFile.name}")
-                                TransportResult.Failed(TransportError.INVALID_FORMAT, false, "消息解析失败")
-                            }
+                        
+                        // 使用Tap通用格式解析消息
+                        val message = TransportMessage.deserialize(downloadResult.data)
+                        if (message != null) {
+                            Log.i(TAG, "消息拉取成功: messageId=${message.messageId}")
+                            TransportResult.Success(message)
                         } else {
-                            Log.w(TAG, "文件名解析失败: ${latestFile.name}")
-                            TransportResult.Failed(TransportError.INVALID_FORMAT, false, "文件名解析失败")
+                            Log.w(TAG, "消息解析失败: ${latestFile.name}")
+                            TransportResult.Failed(TransportError.INVALID_FORMAT, false, "消息解析失败")
                         }
                     } finally {
                         if (tempFile.exists()) {
@@ -373,7 +369,7 @@ class CosTransportProvider(
                 Log.i(TAG, "开始群组推送: groupId=${groupMetadata.groupId}, messageId=${message.messageId}")
                 
                 // 构造群组专用路径
-                val groupPath = "$GROUP_PATH_PREFIX${groupMetadata.groupId}$GROUP_OUTBOX_SUFFIX"
+                val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}${providerConfig.groupOutboxSuffix}"
                 
                 // 使用自己的COS配置创建元数据
                 val myAddress = "${cosConfig.provider.name.lowercase()}://${cosConfig.bucketName}.${cosConfig.region}"
@@ -414,7 +410,7 @@ class CosTransportProvider(
                 // 为每个群组成员构造群组路径并拉取
                 for (memberMetadata in groupMetadata.memberMetadata) {
                     try {
-                        val groupPath = "$GROUP_PATH_PREFIX${groupMetadata.groupId}$GROUP_OUTBOX_SUFFIX"
+                        val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}${providerConfig.groupOutboxSuffix}"
                         
                         // 创建成员的群组元数据 
                         val memberGroupMetadata = if (memberMetadata is CosTransportMetadata) {
@@ -474,54 +470,155 @@ class CosTransportProvider(
     override suspend fun generateToken(request: TransportTokenRequest): TransportToken? {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "生成访问Token: recipientId=${request.recipientId}")
+                Log.i(TAG, "开始生成COS传输Token: recipientId=${request.recipientId}")
                 
-                // 使用COS客户端生成临时凭证
-                val cosClient = CosClientFactory.createClient(cosConfig, context)
-                val directoryPath = OUTBOX_PATH // 默认使用outbox路径
+                // 1. 获取COS配置
+                val cosConfig = getCosConfig()
+                if (cosConfig == null) {
+                    Log.e(TAG, "COS配置不存在，无法生成Token")
+                    return@withContext null
+                }
                 
-                // 生成临时访问凭证
-                val accessToken = cosClient.generateTemporaryAccessToken(
-                    directoryPath = directoryPath, 
-                    durationMinutes = 60 // 1小时有效期
+                // 2. 验证请求参数
+                if (!request.validate()) {
+                    Log.w(TAG, "Token请求参数无效: $request")
+                    return@withContext null
+                }
+                
+                // 3. 生成唯一的子用户标识
+                val timestamp = System.currentTimeMillis()
+                val randomSuffix = (1000..9999).random()
+                val channelDirectoryName = "signal-v2-${timestamp}-${randomSuffix}"
+                val channelDirectoryPath = "/v2-channels/$channelDirectoryName/"
+                val subUserName = "signal-cos-$channelDirectoryName"
+                
+                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/")
+                
+                // 4. 创建COS客户端和子用户管理器
+                val cosClient = org.thoughtcrime.securesms.cos.CosClientFactory.createClient(cosConfig, context)
+                val subUserManager = org.thoughtcrime.securesms.cos.CosSubUserManagerFactory.createManager(cosConfig, context)
+                
+                // 5. 创建通道目录结构
+                try {
+                    Log.d(TAG, "创建COS v2通道目录结构: $channelDirectoryPath")
+                    
+                    // 创建主通道目录
+                    cosClient.createDirectory(channelDirectoryPath)
+                    
+                    // 创建子目录结构
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/")           // 我发送给对方的消息
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/messages/")  // 消息文件
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/attachments/") // 附件文件
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/metadata/")  // 消息索引
+                    cosClient.createDirectory("${channelDirectoryPath}inbox/")            // 对方发送给我的消息（本地使用）
+                    cosClient.createDirectory("${channelDirectoryPath}metadata/")         // 通道元数据和状态信息
+                    
+                    Log.i(TAG, "COS v2通道目录结构创建成功")
+                } catch (e: Exception) {
+                    Log.e(TAG, "创建COS v2通道目录结构失败", e)
+                    throw e
+                }
+                
+                // 6. 创建子用户并分配权限
+                val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
+                val subUserCredential = subUserManager.createSubUser(
+                    userName = subUserName,
+                    directoryPath = "${channelDirectoryPath}outbox", // 允许对方访问我的outbox目录及其子目录
+                    permissions = cosPermission
                 )
                 
-                // 转换为CosTransportToken
-                val transportToken = CosTransportToken(
-                    tokenId = UUID.randomUUID().toString(),
+                Log.i(TAG, "子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}")
+                
+                // 7. 计算过期时间
+                val expirationTime = if (request.validityDurationMs > 0L) {
+                    System.currentTimeMillis() + request.validityDurationMs
+                } else {
+                    // 按照设计要求，使用长期有效的Token
+                    Long.MAX_VALUE
+                }
+                
+                // 8. 创建TransportToken
+                val token = org.thoughtcrime.securesms.tap.CosTransportToken(
+                    tokenId = "cos-${subUserCredential.userName}-${timestamp}",
                     recipientId = request.recipientId,
-                    providerType = "cos",
                     permissions = request.requestedPermissions,
-                    expirationTime = accessToken.expiration,
-                    accessKeyId = accessToken.accessKeyId,
-                    secretAccessKey = accessToken.secretAccessKey,
-                    sessionToken = accessToken.sessionToken,
+                    expirationTime = expirationTime,
+                    accessKeyId = subUserCredential.accessKeyId,
+                    secretAccessKey = subUserCredential.secretAccessKey,
+                    sessionToken = null, // 永久凭证不需要sessionToken
                     region = cosConfig.region,
                     bucketName = cosConfig.bucketName
                 )
                 
-                Log.i(TAG, "Token生成成功: tokenId=${transportToken.tokenId}")
-                transportToken
-
+                Log.i(TAG, "COS传输Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(request.recipientId)}")
+                token
+                
             } catch (e: Exception) {
-                Log.e(TAG, "生成Token时发生异常", e)
+                Log.e(TAG, "生成COS传输Token失败: recipientId=${LogSanitizer.sanitize(request.recipientId)}, 错误: ${LogSanitizer.sanitizeThrowable(e)}")
                 null
             }
+        }
+    }
+    
+    /**
+     * 获取COS配置
+     */
+    private fun getCosConfig(): org.thoughtcrime.securesms.cos.CosConfig? {
+        return try {
+            // 从配置管理器获取COS配置
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val config = configManager.getProviderConfig("cos")
+            
+            if (config == null) {
+                Log.w(TAG, "未找到COS Provider配置")
+                return null
+            }
+            
+            // 转换为CosConfig
+            val provider = when (config["provider"] as? String) {
+                "AWS" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.AWS
+                "TENCENT" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT
+                else -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT // 默认腾讯云
+            }
+            
+            org.thoughtcrime.securesms.cos.CosConfig(
+                provider = provider,
+                region = config["region"] as? String ?: "",
+                bucketName = config["bucketName"] as? String ?: "",
+                secretId = config["secretId"] as? String ?: "",
+                secretKey = config["secretKey"] as? String ?: ""
+            )
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "获取COS配置失败", e)
+            null
+        }
+    }
+    
+    /**
+     * 将TransportPermission映射到CosPermission
+     */
+    private fun mapTransportPermissionToCosPermission(permissions: Set<TransportPermission>): org.thoughtcrime.securesms.cos.CosPermission {
+        return when {
+            permissions.contains(TransportPermission.WRITE) -> org.thoughtcrime.securesms.cos.CosPermission.READ_WRITE
+            permissions.contains(TransportPermission.READ) -> org.thoughtcrime.securesms.cos.CosPermission.READ_ONLY
+            else -> org.thoughtcrime.securesms.cos.CosPermission.READ_ONLY // 默认只读权限
         }
     }
 
     /**
      * 验证Token有效性和权限范围
      * 
-     * 对于长期Token，验证：
+     * 对于长期最高权限Token，验证：
      * 1. 凭证是否有效（能否访问服务）
-     * 2. 权限范围是否正确（只读特定路径前缀）
-     * 3. 可达性测试（能否列举指定前缀）
+     * 2. 基本连通性测试（能否连接到存储服务）
+     * 3. 权限范围测试（验证完整的读写权限）
+     * 4. 路径访问权限（验证能够访问指定的路径前缀）
      */
     override suspend fun validateToken(token: TransportToken): Boolean {
         return try {
             val cosToken = token as? CosTransportToken ?: return false
-            Log.d(TAG, "开始验证Token: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
+            Log.d(TAG, "开始验证长期最高权限Token: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
             
             val cosClient = createCosClient(cosToken)
             if (cosClient == null) {
@@ -536,25 +633,28 @@ class CosTransportProvider(
                 return false
             }
             
-            // 2. 权限范围验证：测试是否只能访问指定路径前缀
+            // 2. 验证完整的读写权限（长期最高权限应具备所有操作能力）
+            val fullPermissionsValid = validateFullPermissions(cosClient, cosToken)
+            if (!fullPermissionsValid) {
+                Log.w(TAG, "完整权限验证失败")
+                return false
+            }
+            
+            // 3. 路径访问权限验证：测试能够访问预期的路径前缀
             val pathPermission = validatePathPermissions(cosClient, cosToken)
             if (!pathPermission) {
                 Log.w(TAG, "路径权限验证失败")
                 return false
             }
             
-            // 3. 权限验证：根据策略调整
-            // 按照当前阶段策略，token应该是长期最高权限的，所以暂时跳过只读校验
-            // TODO: 后续可能需要根据实际部署需求调整权限策略
-            val readOnlyCheck = true // 暂时禁用只读校验，统一与长期最高权限token策略
-            if (!readOnlyCheck) {
-                Log.w(TAG, "权限验证失败")
+            // 4. 验证Token的有效期（长期Token应该没有过期或有很长的有效期）
+            val expirationValid = validateTokenExpiration(cosToken)
+            if (!expirationValid) {
+                Log.w(TAG, "Token过期验证失败")
                 return false
             }
             
-            Log.d(TAG, "权限验证跳过：当前使用长期最高权限token策略")
-            
-            Log.d(TAG, "Token验证成功: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
+            Log.d(TAG, "长期最高权限Token验证成功: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
             true
             
         } catch (e: Exception) {
@@ -823,57 +923,117 @@ class CosTransportProvider(
     }
     
     /**
-     * 验证只读权限（确保无法执行写操作）
+     * 验证完整权限（读、写、删除、列举）
      */
-    private suspend fun validateReadOnlyPermission(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun validateFullPermissions(cosClient: Any, cosToken: CosTransportToken): Boolean {
         return try {
-            // 获取真实的COS客户端
-            val realCosClient = createCosClient(CosTransportMetadata(
-                recipientId = cosToken.recipientId,
-                providerType = "cos",
-                myAddress = "${cosToken.region}://${cosToken.bucketName}",
-                myToken = cosToken,
-                myRegion = cosToken.region,
-                myBucketName = cosToken.bucketName,
-                peerAddress = "${cosToken.region}://${cosToken.bucketName}",
-                peerToken = cosToken,
-                peerRegion = cosToken.region,
-                peerBucketName = cosToken.bucketName,
-                myId = "self"
-            ))
+            Log.d(TAG, "开始验证完整权限")
             
+            // 获取真实的COS客户端
+            val realCosClient = getRealCosClient(cosClient, cosToken)
             if (realCosClient == null) {
-                Log.w(TAG, "无法创建COS客户端进行权限验证")
+                Log.w(TAG, "无法获取真实的COS客户端进行权限验证")
                 return false
             }
             
-            // 1. 测试写操作：尝试上传文件（应该被拒绝）
-            val testKey = "/outbox/${cosToken.recipientId}/__readonly_test_${System.currentTimeMillis()}.tmp"
-            val testData = "readonly_test_${System.currentTimeMillis()}".toByteArray()
+            // 创建测试路径（使用专门的测试目录）
+            val testPrefix = "/test_permissions/${cosToken.recipientId}/"
+            val testKey = "${testPrefix}token_validation_${System.currentTimeMillis()}.test"
+            val testData = "Token validation test - ${System.currentTimeMillis()}".toByteArray()
             
-            // 创建测试文件
-            val testFile = File.createTempFile("readonly_test", ".tmp", context.cacheDir)
+            // 创建临时测试文件
+            val testFile = File.createTempFile("token_validation", ".test", context.cacheDir)
             try {
                 testFile.writeBytes(testData)
                 
-                // 尝试上传（应该失败）
-                val uploadSuccess = realCosClient.uploadFile(testFile, testKey)
+                // 1. 测试写权限：上传文件
+                val uploadSuccess = when (cosConfig.provider) {
+                    CosConfig.Provider.TENCENT -> testTencentUpload(realCosClient, testFile, testKey)
+                    CosConfig.Provider.AWS -> testAwsUpload(realCosClient, testFile, testKey)
+                    else -> false
+                }
                 
-                if (uploadSuccess) {
-                    Log.w(TAG, "Token具有写权限，不符合只读要求")
-                    
-                    // 如果意外上传成功，尝试清理测试文件
-                    try {
-                        realCosClient.deleteFile(testKey)
-                        Log.d(TAG, "已清理意外上传的测试文件")
-                    } catch (cleanupError: Exception) {
-                        Log.w(TAG, "清理测试文件失败: ${LogSanitizer.sanitizeThrowable(cleanupError)}")
+                if (!uploadSuccess) {
+                    Log.w(TAG, "写权限测试失败：无法上传测试文件")
+                    return false
+                }
+                Log.d(TAG, "写权限验证通过")
+                
+                // 2. 测试读权限：下载文件并验证内容
+                val downloadFile = File.createTempFile("token_download", ".test", context.cacheDir)
+                try {
+                    val downloadSuccess = when (cosConfig.provider) {
+                        CosConfig.Provider.TENCENT -> testTencentDownload(realCosClient, testKey, downloadFile)
+                        CosConfig.Provider.AWS -> testAwsDownload(realCosClient, testKey, downloadFile)
+                        else -> false
                     }
                     
-                    return false
-                } else {
-                    Log.d(TAG, "写权限验证通过：上传操作被正确拒绝")
+                    if (!downloadSuccess) {
+                        Log.w(TAG, "读权限测试失败：无法下载测试文件")
+                        return false
+                    }
+                    
+                    // 验证下载内容
+                    val downloadedData = downloadFile.readBytes()
+                    if (!downloadedData.contentEquals(testData)) {
+                        Log.w(TAG, "读权限测试失败：下载内容不匹配")
+                        return false
+                    }
+                    Log.d(TAG, "读权限验证通过")
+                    
+                } finally {
+                    if (downloadFile.exists()) {
+                        downloadFile.delete()
+                    }
                 }
+                
+                // 3. 测试列举权限：列出文件
+                val listResult = when (cosConfig.provider) {
+                    CosConfig.Provider.TENCENT -> testTencentListFiles(realCosClient, testPrefix)
+                    CosConfig.Provider.AWS -> testAwsListFiles(realCosClient, testPrefix)
+                    else -> emptyList()
+                }
+                
+                if (listResult.isEmpty()) {
+                    Log.w(TAG, "列举权限测试失败：无法列出文件")
+                    return false
+                }
+                
+                val foundTestFile = listResult.any { it.contains(testKey.substringAfterLast("/")) }
+                if (!foundTestFile) {
+                    Log.w(TAG, "列举权限测试失败：未能找到测试文件")
+                    return false
+                }
+                Log.d(TAG, "列举权限验证通过")
+                
+                // 4. 测试删除权限：删除测试文件
+                val deleteSuccess = when (cosConfig.provider) {
+                    CosConfig.Provider.TENCENT -> testTencentDelete(realCosClient, testKey)
+                    CosConfig.Provider.AWS -> testAwsDelete(realCosClient, testKey)
+                    else -> false
+                }
+                
+                if (!deleteSuccess) {
+                    Log.w(TAG, "删除权限测试失败：无法删除测试文件")
+                    return false
+                }
+                Log.d(TAG, "删除权限验证通过")
+                
+                // 验证文件确实被删除
+                val listAfterDelete = when (cosConfig.provider) {
+                    CosConfig.Provider.TENCENT -> testTencentListFiles(realCosClient, testPrefix)
+                    CosConfig.Provider.AWS -> testAwsListFiles(realCosClient, testPrefix)
+                    else -> emptyList()
+                }
+                
+                val fileStillExists = listAfterDelete.any { it.contains(testKey.substringAfterLast("/")) }
+                if (fileStillExists) {
+                    Log.w(TAG, "删除权限测试失败：文件删除后仍然存在")
+                    return false
+                }
+                
+                Log.i(TAG, "完整权限验证成功：读、写、列举、删除权限均可用")
+                return true
                 
             } finally {
                 if (testFile.exists()) {
@@ -881,86 +1041,234 @@ class CosTransportProvider(
                 }
             }
             
-            // 2. 测试删除操作：尝试删除文件（应该被拒绝）
-            val existingTestKey = "/outbox/${cosToken.recipientId}/test_file_for_delete.tmp"
-            try {
-                val deleteSuccess = realCosClient.deleteFile(existingTestKey)
-                if (deleteSuccess) {
-                    Log.w(TAG, "Token具有删除权限，不符合只读要求")
-                    return false
-                } else {
-                    Log.d(TAG, "删除权限验证通过：删除操作被正确拒绝")
-                }
-            } catch (e: Exception) {
-                // 删除操作被拒绝是预期行为
-                Log.d(TAG, "删除权限验证通过：删除操作抛出异常（被拒绝）")
-            }
-            
-            Log.d(TAG, "只读权限验证通过：所有写操作都被正确拒绝")
-            true
-            
         } catch (e: Exception) {
-            // 如果是权限相关异常，说明只读权限正确
-            val errorMessage = e.message?.lowercase() ?: ""
-            if (errorMessage.contains("permission") || 
-                errorMessage.contains("forbidden") || 
-                errorMessage.contains("403") ||
-                errorMessage.contains("unauthorized")) {
-                Log.d(TAG, "只读权限验证通过：写操作被正确拒绝")
-                true
-            } else {
-                Log.e(TAG, "只读权限验证异常: ${LogSanitizer.sanitizeThrowable(e)}")
-                false
-            }
+            Log.e(TAG, "完整权限验证异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
         }
     }
     
     /**
-     * 撤销Token - 安全改进：不在客户端执行云厂商账号管理
+     * 测试腾讯云COS上传
      */
+    private suspend fun testTencentUpload(cosClient: Any, file: File, key: String): Boolean {
+        return try {
+            // 使用反射调用上传方法（避免直接类型依赖）
+            val uploadMethod = cosClient.javaClass.getMethod("uploadFile", File::class.java, String::class.java)
+            val result = uploadMethod.invoke(cosClient, file, key) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "腾讯云COS上传测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 测试AWS S3上传
+     */
+    private suspend fun testAwsUpload(cosClient: Any, file: File, key: String): Boolean {
+        return try {
+            // 使用反射调用上传方法
+            val uploadMethod = cosClient.javaClass.getMethod("uploadFile", File::class.java, String::class.java)
+            val result = uploadMethod.invoke(cosClient, file, key) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "AWS S3上传测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 测试腾讯云COS下载
+     */
+    private suspend fun testTencentDownload(cosClient: Any, key: String, file: File): Boolean {
+        return try {
+            val downloadMethod = cosClient.javaClass.getMethod("downloadFile", String::class.java, File::class.java)
+            val result = downloadMethod.invoke(cosClient, key, file) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "腾讯云COS下载测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 测试AWS S3下载
+     */
+    private suspend fun testAwsDownload(cosClient: Any, key: String, file: File): Boolean {
+        return try {
+            val downloadMethod = cosClient.javaClass.getMethod("downloadFile", String::class.java, File::class.java)
+            val result = downloadMethod.invoke(cosClient, key, file) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "AWS S3下载测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 测试腾讯云COS列举文件
+     */
+    private suspend fun testTencentListFiles(cosClient: Any, prefix: String): List<String> {
+        return try {
+            val listMethod = cosClient.javaClass.getMethod("listFiles", String::class.java)
+            val result = listMethod.invoke(cosClient, prefix) as List<String>
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "腾讯云COS列举测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            emptyList()
+        }
+    }
+    
+    /**
+     * 测试AWS S3列举文件
+     */
+    private suspend fun testAwsListFiles(cosClient: Any, prefix: String): List<String> {
+        return try {
+            val listMethod = cosClient.javaClass.getMethod("listFiles", String::class.java)
+            val result = listMethod.invoke(cosClient, prefix) as List<String>
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "AWS S3列举测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            emptyList()
+        }
+    }
+    
+    /**
+     * 测试腾讯云COS删除文件
+     */
+    private suspend fun testTencentDelete(cosClient: Any, key: String): Boolean {
+        return try {
+            val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
+            val result = deleteMethod.invoke(cosClient, key) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "腾讯云COS删除测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 测试AWS S3删除文件
+     */
+    private suspend fun testAwsDelete(cosClient: Any, key: String): Boolean {
+        return try {
+            val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
+            val result = deleteMethod.invoke(cosClient, key) as Boolean
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "AWS S3删除测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
+    /**
+     * 验证Token有效期
+     */
+    private fun validateTokenExpiration(cosToken: CosTransportToken): Boolean {
+        return try {
+            val currentTime = System.currentTimeMillis()
+            val expirationTime = cosToken.expirationTime
+            
+            if (expirationTime != null && expirationTime > 0) {
+                // 检查是否过期
+                if (currentTime >= expirationTime) {
+                    Log.w(TAG, "Token已过期: currentTime=$currentTime, expirationTime=$expirationTime")
+                    return false
+                }
+                
+                // 检查剩余有效期（长期Token应该有足够长的有效期）
+                val remainingTime = expirationTime - currentTime
+                val minimumValidTime = 7 * 24 * 60 * 60 * 1000L // 7天
+                
+                if (remainingTime < minimumValidTime) {
+                    Log.w(TAG, "Token剩余有效期过短: remainingDays=${remainingTime / (24 * 60 * 60 * 1000L)}")
+                    return false
+                }
+                
+                Log.d(TAG, "Token有效期验证通过: 剩余${remainingTime / (24 * 60 * 60 * 1000L)}天")
+            } else {
+                // 无限期Token
+                Log.d(TAG, "Token无过期时间限制")
+            }
+            
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Token有效期验证异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            false
+        }
+    }
+    
     override suspend fun revokeToken(token: TransportToken): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "撤销Token: tokenId=${token.tokenId}")
+                Log.i(TAG, "开始撤销COS传输Token: tokenId=${LogSanitizer.sanitize(token.tokenId)}")
                 
-                val cosToken = token as? CosTransportToken
-                    ?: return@withContext false
-                
-                // 安全措施：不在客户端直接调用云厂商API删除用户/密钥
-                // 而是标记Token为已撤销状态，由后端或自然过期处理
-                val revokeResult = markTokenAsRevoked(cosToken)
-                
-                if (revokeResult) {
-                    Log.i(TAG, "Token撤销成功: tokenId=${token.tokenId}")
-                } else {
-                    Log.w(TAG, "Token撤销失败: tokenId=${token.tokenId}")
+                if (token !is CosTransportToken) {
+                    Log.w(TAG, "Token类型不匹配，无法撤销: ${token::class.simpleName}")
+                    return@withContext false
                 }
                 
-                revokeResult
-
+                // 1. 获取COS配置
+                val cosConfig = getCosConfig()
+                if (cosConfig == null) {
+                    Log.e(TAG, "COS配置不存在，无法撤销Token")
+                    return@withContext false
+                }
+                
+                // 2. 从tokenId中提取子用户名
+                val subUserName = extractSubUserNameFromTokenId(token.tokenId)
+                if (subUserName == null) {
+                    Log.w(TAG, "无法从tokenId中提取子用户名: ${LogSanitizer.sanitize(token.tokenId)}")
+                    return@withContext false
+                }
+                
+                // 3. 创建子用户管理器
+                val subUserManager = org.thoughtcrime.securesms.cos.CosSubUserManagerFactory.createManager(cosConfig, context)
+                
+                // 4. 删除子用户（这会自动撤销所有相关权限和访问密钥）
+                val success = subUserManager.deleteSubUser(subUserName)
+                
+                if (success) {
+                    Log.i(TAG, "COS传输Token撤销成功: tokenId=${token.tokenId}, subUser=$subUserName")
+                } else {
+                    Log.w(TAG, "COS传输Token撤销失败: tokenId=${token.tokenId}, subUser=$subUserName")
+                }
+                
+                success
+                
             } catch (e: Exception) {
-                Log.e(TAG, "撤销Token时发生异常", e)
+                Log.e(TAG, "撤销COS传输Token时发生异常: tokenId=${token.tokenId}", e)
                 false
             }
         }
     }
     
     /**
-     * 标记Token为已撤销状态
+     * 从tokenId中提取子用户名
      */
-    private suspend fun markTokenAsRevoked(cosToken: CosTransportToken): Boolean {
+    private fun extractSubUserNameFromTokenId(tokenId: String): String? {
         return try {
-            // 从Token池中移除该Token
-            val tokenPool = TransportTokenPool.getInstance(context)
-            tokenPool.removeToken(cosToken.recipientId, cosToken.providerType)
-            
-            // 记录撤销操作到日志
-            Log.i(TAG, "Token已标记为撤销: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
-            
-            true
+            // tokenId格式: cos-signal-cos-signal-v2-{timestamp}-{randomSuffix}-{timestamp}
+            // 需要提取: signal-cos-signal-v2-{timestamp}-{randomSuffix}
+            if (tokenId.startsWith("cos-")) {
+                val parts = tokenId.split("-")
+                if (parts.size >= 6) {
+                    // 重构子用户名: signal-cos-signal-v2-{timestamp}-{randomSuffix}
+                    val userName = parts.drop(1).dropLast(1).joinToString("-")
+                    Log.d(TAG, "提取子用户名: $userName from tokenId: $tokenId")
+                    userName
+                } else {
+                    Log.w(TAG, "tokenId格式不正确: $tokenId")
+                    null
+                }
+            } else {
+                Log.w(TAG, "tokenId不是COS格式: $tokenId")
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "标记Token撤销状态失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            false
+            Log.e(TAG, "提取子用户名失败: tokenId=$tokenId", e)
+            null
         }
     }
 
@@ -1104,9 +1412,9 @@ class CosTransportProvider(
      * 创建临时文件保存消息数据
      */
     private fun createTempFile(data: ByteArray): File {
-        val tempFile = File.createTempFile("cos_upload_", ".json", context.cacheDir)
+        val tempFile = File.createTempFile("cos_upload_", ".dat", context.cacheDir)
         
-        // 直接写入JSON格式的数据（兼容coscomm）
+        // 写入Tap通用格式的消息数据（与远端文件扩展名保持一致）
         tempFile.outputStream().use { output ->
             output.write(data)
         }
@@ -1115,17 +1423,14 @@ class CosTransportProvider(
     }
 
     /**
-     * 从文件解析消息 - 支持JSON格式（优先）和二进制格式（兼容）
+     * 从文件解析消息 - 使用Tap通用格式
      */
     override suspend fun parseTransportMessage(fileData: ByteArray, fileInfo: FileInfo, metadata: TransportMetadata): TransportMessage? {
         return try {
             Log.d(TAG, "解析COS传输消息: ${fileInfo.name}, size=${fileData.size}")
             
-            // 从文件名解析基本信息
-            val messageFileInfo = parseMessageFileName(fileInfo.name) ?: return null
-            
-            // COS使用二进制格式存储消息
-            val message = parseMessageFromBinaryData(fileData, messageFileInfo)
+            // 使用Tap通用格式反序列化
+            val message = TransportMessage.deserialize(fileData)
             
             if (message != null) {
                 Log.d(TAG, "COS消息解析成功: messageId=${message.messageId}")
@@ -1193,97 +1498,7 @@ class CosTransportProvider(
     
 
     
-    /**
-     * 从二进制数据解析消息（COS特定格式）
-     */
-    private fun parseMessageFromBinaryData(data: ByteArray, fileInfo: MessageFileInfo): TransportMessage? {
-        return try {
-            // 使用与writeMessageToBinaryData对应的解析逻辑
-            val inputStream = java.io.ByteArrayInputStream(data)
-            val dataInputStream = java.io.DataInputStream(inputStream)
-            
-            // 读取版本号
-            val version = dataInputStream.readInt()
-            if (version != MESSAGE_FORMAT_VERSION) {
-                Log.w(TAG, "不支持的消息格式版本: $version")
-                return null
-            }
-            
-            // 读取消息类型
-            val messageTypeOrdinal = dataInputStream.readInt()
-            val messageType = TransportMessageType.values().getOrNull(messageTypeOrdinal) 
-                ?: TransportMessageType.TEXT_MESSAGE
-            
-            // 读取Signal密文长度和内容
-            val ciphertextLength = dataInputStream.readInt()
-            val signalCiphertext = ByteArray(ciphertextLength)
-            dataInputStream.readFully(signalCiphertext)
-            val signalCiphertextB64 = android.util.Base64.encodeToString(signalCiphertext, android.util.Base64.NO_WRAP)
-            
-            // 读取内容元数据
-            val originalSize = dataInputStream.readLong()
-            val compressionTypeOrdinal = dataInputStream.readInt()
-            val compressionType = TransportCompressionType.values().getOrNull(compressionTypeOrdinal)
-                ?: TransportCompressionType.NONE
-            
-            val contentMetadata = TransportContentMetadata(
-                originalSize = originalSize,
-                compressionType = compressionType
-            )
-            
-            // 读取附件数量
-            val attachmentCount = dataInputStream.readInt()
-            val attachments = mutableListOf<TransportAttachment>()
-            
-            // 读取每个附件
-            for (i in 0 until attachmentCount) {
-                val attachmentId = dataInputStream.readUTF()
-                val attachmentType = dataInputStream.readUTF()
-                val attachmentSize = dataInputStream.readLong()
-                val attachmentWidth = dataInputStream.readInt()
-                val attachmentHeight = dataInputStream.readInt()
-                
-                val attachmentDataLength = dataInputStream.readInt()
-                val attachmentData = ByteArray(attachmentDataLength)
-                dataInputStream.readFully(attachmentData)
-                
-                // 创建临时文件存储附件数据 
-                val tempFile = File.createTempFile("tap_attachment_", ".tmp", File("/tmp"))
-                try {
-                    tempFile.writeBytes(attachmentData)
-                    
-                    attachments.add(
-                        TransportAttachment(
-                            attachmentId = attachmentId,
-                            fileName = "attachment_${attachmentId}",
-                            mimeType = attachmentType,
-                            size = attachmentSize,
-                            fileHash = null,
-                            transportPath = tempFile.absolutePath
-                        )
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "创建附件临时文件失败: $attachmentId", e)
-                }
-            }
-            
-            // 创建TransportMessage
-            TransportMessage(
-                messageId = fileInfo.messageId,
-                timestamp = fileInfo.timestamp,
-                senderId = fileInfo.senderId,
-                recipientId = fileInfo.recipientId,
-                messageType = messageType,
-                signalCiphertext = signalCiphertextB64,
-                contentMetadata = contentMetadata,
-                attachments = attachments
-            )
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "二进制数据解析失败", e)
-            null
-        }
-    }
+
     
     /**
      * COS特定的发送路径策略
@@ -1385,5 +1600,42 @@ class CosTransportProvider(
             peerBucketName = cosToken.bucketName,
             myId = "self"
         )
+    }
+
+    /**
+     * 获取真实的COS客户端（类型安全）
+     */
+    private fun getRealCosClient(cosClient: Any, cosToken: CosTransportToken): Any? {
+        return try {
+            // 确保客户端类型正确
+            when (cosConfig.provider) {
+                CosConfig.Provider.TENCENT -> {
+                    // 对于腾讯云COS，确保客户端配置正确
+                    if (cosClient.javaClass.simpleName.contains("TencentCos", ignoreCase = true)) {
+                        cosClient
+                    } else {
+                        Log.w(TAG, "COS客户端类型不匹配腾讯云配置")
+                        null
+                    }
+                }
+                CosConfig.Provider.AWS -> {
+                    // 对于AWS S3，确保客户端配置正确
+                    if (cosClient.javaClass.simpleName.contains("S3", ignoreCase = true) ||
+                        cosClient.javaClass.simpleName.contains("Aws", ignoreCase = true)) {
+                        cosClient
+                    } else {
+                        Log.w(TAG, "COS客户端类型不匹配AWS配置")
+                        null
+                    }
+                }
+                else -> {
+                    Log.w(TAG, "不支持的COS Provider: ${cosConfig.provider}")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取真实COS客户端失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            null
+        }
     }
 } 

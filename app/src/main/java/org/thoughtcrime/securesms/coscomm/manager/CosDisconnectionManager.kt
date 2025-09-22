@@ -59,7 +59,7 @@ class CosDisconnectionManager private constructor(private val context: Context) 
                     org.thoughtcrime.securesms.database.MessageTable.DATE_RECEIVED to System.currentTimeMillis(),
                     org.thoughtcrime.securesms.database.MessageTable.DATE_SENT to System.currentTimeMillis(),
                     org.thoughtcrime.securesms.database.MessageTable.READ to 1,
-                    org.thoughtcrime.securesms.database.MessageTable.TYPE to org.thoughtcrime.securesms.database.MessageTypes.COS_V2_MODE_ENABLED_TYPE,
+                    org.thoughtcrime.securesms.database.MessageTable.TYPE to org.thoughtcrime.securesms.database.MessageTypes.TAP_V2_MODE_ENABLED_TYPE,
                     org.thoughtcrime.securesms.database.MessageTable.THREAD_ID to threadId,
                     org.thoughtcrime.securesms.database.MessageTable.BODY to "v2 mode enabled"
                 )
@@ -330,7 +330,7 @@ class CosDisconnectionManager private constructor(private val context: Context) 
                 org.thoughtcrime.securesms.database.MessageTable.DATE_RECEIVED to System.currentTimeMillis(),
                 org.thoughtcrime.securesms.database.MessageTable.DATE_SENT to System.currentTimeMillis(),
                 org.thoughtcrime.securesms.database.MessageTable.READ to 1,
-                org.thoughtcrime.securesms.database.MessageTable.TYPE to org.thoughtcrime.securesms.database.MessageTypes.COS_V2_MODE_DISABLED_TYPE,
+                org.thoughtcrime.securesms.database.MessageTable.TYPE to org.thoughtcrime.securesms.database.MessageTypes.TAP_V2_MODE_DISABLED_TYPE,
                 org.thoughtcrime.securesms.database.MessageTable.THREAD_ID to threadId,
                 org.thoughtcrime.securesms.database.MessageTable.BODY to "v2 mode disabled"
             )
