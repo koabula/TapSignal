@@ -329,6 +329,48 @@ class PollingStatisticsCollector {
     // 系统启动时间
     private val systemStartTime = System.currentTimeMillis()
     
+    // 初始化状态
+    private var isInitialized = false
+    
+    /**
+     * 初始化轮询统计收集器
+     */
+    fun initialize(): Boolean {
+        if (isInitialized) {
+            return true
+        }
+        
+        try {
+            // 重置所有计数器
+            totalPolls.set(0)
+            successfulPolls.set(0)
+            failedPolls.set(0)
+            messagesFound.set(0)
+            totalResponseTime.set(0)
+            responseTimeRecords.set(0)
+            
+            // 清理分类统计
+            providerStats.clear()
+            activityLevelStats.clear()
+            
+            // 验证系统启动时间
+            if (systemStartTime <= 0) {
+                throw IllegalStateException("系统启动时间无效")
+            }
+            
+            isInitialized = true
+            return true
+            
+        } catch (e: Exception) {
+            return false
+        }
+    }
+    
+    /**
+     * 检查是否已初始化
+     */
+    fun isInitialized(): Boolean = isInitialized
+    
     /**
      * 记录轮询结果
      */

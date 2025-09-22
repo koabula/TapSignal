@@ -51,6 +51,46 @@ class TapIntelligentPollingStrategy(private val context: Context) {
         private const val NETWORK_QUALITY_BAD = 2.0           // 网络很差 - 增加100%间隔
     }
     
+    // 初始化状态
+    private var isInitialized = false
+    
+    /**
+     * 初始化智能轮询策略
+     */
+    fun initialize(): Boolean {
+        if (isInitialized) {
+            Log.w(TAG, "智能轮询策略已经初始化")
+            return true
+        }
+        
+        try {
+            Log.i(TAG, "初始化智能轮询策略...")
+            
+            // 验证配置常量的有效性
+            if (ACTIVE_THRESHOLD_MINUTES <= 0 || INACTIVE_THRESHOLD_HOURS <= 0) {
+                throw IllegalStateException("轮询策略配置常量无效")
+            }
+            
+            // 验证错误处理配置
+            if (MAX_CONSECUTIVE_ERRORS <= 0 || ERROR_BACKOFF_BASE <= 0) {
+                throw IllegalStateException("错误处理配置常量无效")
+            }
+            
+            isInitialized = true
+            Log.i(TAG, "智能轮询策略初始化完成")
+            return true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "智能轮询策略初始化失败", e)
+            return false
+        }
+    }
+    
+    /**
+     * 检查是否已初始化
+     */
+    fun isInitialized(): Boolean = isInitialized
+    
     /**
      * 计算智能轮询间隔（核心算法）
      * 
@@ -69,6 +109,11 @@ class TapIntelligentPollingStrategy(private val context: Context) {
         errorCount: Int = 0,
         networkQuality: NetworkQuality = NetworkQuality.UNKNOWN
     ): Long {
+        if (!isInitialized) {
+            Log.w(TAG, "智能轮询策略未初始化，使用默认间隔")
+            return 30000L // 30秒默认间隔
+        }
+        
         Log.d(TAG, "计算轮询间隔: recipient=$recipientId, provider=${metadata.providerType}, errors=$errorCount")
         
         try {

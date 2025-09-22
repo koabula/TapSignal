@@ -35,7 +35,7 @@ import org.thoughtcrime.securesms.transport.RetryLaterException
 import org.thoughtcrime.securesms.util.AttachmentUtil
 import org.thoughtcrime.securesms.util.RemoteConfig
 import org.thoughtcrime.securesms.util.Util
-import org.thoughtcrime.securesms.coscomm.processor.CosAttachmentDownloadInterceptor
+import org.thoughtcrime.securesms.tap.integration.TapAttachmentDownloadInterceptor
 import org.whispersystems.signalservice.api.crypto.AttachmentCipherInputStream.IntegrityCheck
 import org.whispersystems.signalservice.api.messages.AttachmentTransferProgress
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment
@@ -215,16 +215,16 @@ class AttachmentDownloadJob private constructor(
     Log.i(TAG, "Downloading push part $attachmentId")
     SignalDatabase.attachments.setTransferState(messageId, attachmentId, AttachmentTable.TRANSFER_PROGRESS_STARTED)
 
-    // 🔧 方案B：检查是否为COS附件，如果是则使用COS下载机制
-    val cosInterceptor = CosAttachmentDownloadInterceptor.getInstance(context)
-    if (cosInterceptor.isCosAttachment(attachment)) {
-      Log.i(TAG, "检测到COS附件，使用COS下载机制: attachmentId=$attachmentId")
-      val success = cosInterceptor.interceptAndDownload(messageId, attachment)
+    // 🔧 方案B：检查是否为Tap附件，如果是则使用Tap下载机制
+    val tapInterceptor = TapAttachmentDownloadInterceptor.getInstance(context)
+    if (tapInterceptor.isTapAttachment(attachment)) {
+      Log.i(TAG, "检测到Tap附件，使用Tap下载机制: attachmentId=$attachmentId")
+      val success = tapInterceptor.interceptAndDownload(messageId, attachment)
       if (success) {
-        Log.i(TAG, "COS附件下载完成: attachmentId=$attachmentId")
-        return  // COS下载成功，直接返回，跳过Signal原生下载
+        Log.i(TAG, "Tap附件下载完成: attachmentId=$attachmentId")
+        return  // Tap下载成功，直接返回，跳过Signal原生下载
       } else {
-        Log.e(TAG, "COS附件下载失败，标记为失败: attachmentId=$attachmentId")
+        Log.e(TAG, "Tap附件下载失败，标记为失败: attachmentId=$attachmentId")
         markFailed(messageId, attachmentId)
         return
       }

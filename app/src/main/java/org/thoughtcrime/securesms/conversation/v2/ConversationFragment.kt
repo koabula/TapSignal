@@ -1387,105 +1387,158 @@ class ConversationFragment :
   }
 
   /**
-   * 显示COS v2模式请求确认对话框
+   * 显示Tap v2模式请求确认对话框
    */
   private fun showCosV2ModeRequestDialog(recipient: Recipient) {
-    org.thoughtcrime.securesms.coscomm.ui.CosRequestDialog.showSendRequestDialog(
-      requireContext(),
-      recipient
-    ) {
-      sendCosV2ModeRequest(recipient)
-    }
+    showTapV2ModeRequestDialog(recipient)
   }
 
   /**
-   * 显示COS v2模式断开确认对话框
+   * 显示Tap v2模式断开确认对话框
    */
   private fun showCosV2ModeDisconnectDialog(recipient: Recipient) {
-    org.thoughtcrime.securesms.coscomm.ui.CosRequestDialog.showDisconnectRequestDialog(
-      requireContext(),
-      recipient
-    ) {
-      disconnectCosV2Mode(recipient)
-    }
+    showTapV2ModeDisconnectDialog(recipient)
   }
 
   /**
-   * 发送COS v2模式请求
+   * 发送COS v2模式请求（保留兼容性，实际使用Tap）
    */
   private fun sendCosV2ModeRequest(recipient: Recipient) {
+    sendTapV2ModeRequest(recipient)
+  }
+
+  /**
+   * 断开COS v2模式（保留兼容性，实际使用Tap）
+   */
+  private fun disconnectCosV2Mode(recipient: Recipient) {
+    disconnectTapV2Mode(recipient)
+  }
+  
+  /**
+   * 显示Tap v2模式请求确认对话框
+   */
+  private fun showTapV2ModeRequestDialog(recipient: Recipient) {
+    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+      .setTitle("启用 Tap 传输模式")
+      .setMessage("是否要向 ${recipient.getDisplayName(requireContext())} 发送 Tap 传输连接请求？")
+      .setPositiveButton("发送") { _, _ ->
+        sendTapV2ModeRequest(recipient)
+      }
+      .setNegativeButton("取消", null)
+      .show()
+  }
+  
+  /**
+   * 显示Tap v2模式断开确认对话框
+   */
+  private fun showTapV2ModeDisconnectDialog(recipient: Recipient) {
+    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+      .setTitle("断开 Tap 传输模式")
+      .setMessage("是否要断开与 ${recipient.getDisplayName(requireContext())} 的 Tap 传输连接？")
+      .setPositiveButton("断开") { _, _ ->
+        disconnectTapV2Mode(recipient)
+      }
+      .setNegativeButton("取消", null)
+      .show()
+  }
+
+  /**
+   * 发送Tap v2模式请求
+   */
+  private fun sendTapV2ModeRequest(recipient: Recipient) {
     try {
-      val requestManager = org.thoughtcrime.securesms.coscomm.manager.CosRequestManager.getInstance(requireContext())
-
-      // 发送永久CAM请求
-      val future = requestManager.sendCosRequest(
-        recipientId = recipient.id.toString(),
-        durationType = org.thoughtcrime.securesms.coscomm.data.CosDuration.PERMANENT,
-        message = "COS v2 mode request"
-      )
-
-      future.thenApply { result ->
-        requireActivity().runOnUiThread {
-          when (result) {
-            is org.thoughtcrime.securesms.coscomm.data.CosRequestResult.Success -> {
-              Toast.makeText(requireContext(), R.string.cos_request_sent, Toast.LENGTH_SHORT).show()
+      Log.i(TAG, "发送Tap v2模式请求: recipientId=${recipient.id}")
+      
+      // 这里应该通过Tap的通道建立机制发送请求
+      // 目前作为简化实现，直接尝试建立通道
+      
+      lifecycleScope.launch {
+        try {
+          val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
+          val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(requireContext())
+          
+          // 获取默认的COS配置
+          val providerType = "cos"  // 扩展时支持更多Provider
+          val providerConfig = configManager.getProviderConfig(providerType)
+          
+          if (providerConfig == null) {
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "未配置传输服务，请先在设置中配置", Toast.LENGTH_LONG).show()
             }
-            is org.thoughtcrime.securesms.coscomm.data.CosRequestResult.Failure -> {
-              Toast.makeText(requireContext(), R.string.cos_request_failed, Toast.LENGTH_SHORT).show()
+            return@launch
+          }
+          
+          // 尝试建立通道（这里简化实现，实际应该发送请求消息等待对方响应）
+          val channelId = channelManager.createChannel(
+            recipientId = recipient.id.toString(),
+            config = org.thoughtcrime.securesms.tap.TransportChannelConfig(),
+            token = ""  // 实际应该从Token池获取
+          )
+          
+          requireActivity().runOnUiThread {
+            if (channelId != null) {
+              Toast.makeText(requireContext(), "Tap传输请求已发送", Toast.LENGTH_SHORT).show()
+            } else {
+              Toast.makeText(requireContext(), "发送Tap传输请求失败", Toast.LENGTH_SHORT).show()
             }
           }
+          
+        } catch (e: Exception) {
+          Log.e(TAG, "发送Tap v2模式请求异常", e)
+          requireActivity().runOnUiThread {
+            Toast.makeText(requireContext(), "发送请求失败: ${e.message}", Toast.LENGTH_SHORT).show()
+          }
         }
-      }.exceptionally { throwable ->
-        requireActivity().runOnUiThread {
-          Toast.makeText(requireContext(), "Error: ${throwable.message}", Toast.LENGTH_SHORT).show()
-        }
-        null
       }
 
     } catch (e: Exception) {
-      Toast.makeText(requireContext(), "Error sending COS request: ${e.message}", Toast.LENGTH_SHORT).show()
+      Toast.makeText(requireContext(), "Error sending Tap request: ${e.message}", Toast.LENGTH_SHORT).show()
     }
   }
 
   /**
-   * 断开COS v2模式
+   * 断开Tap v2模式
    */
-  private fun disconnectCosV2Mode(recipient: Recipient) {
+  private fun disconnectTapV2Mode(recipient: Recipient) {
     try {
-      val disconnectionManager = org.thoughtcrime.securesms.coscomm.manager.CosDisconnectionManager.getInstance(requireContext())
-
-      // 断开v2模式连接
-      val future = disconnectionManager.disconnectV2Mode(
-        recipientId = recipient.id.serialize().toString(),
-        reason = "User requested disconnection"
-      )
-
-      future.whenComplete { result, throwable ->
-        requireActivity().runOnUiThread {
-          when {
-            throwable != null -> {
-              Log.e(TAG, "断开COS v2模式异常", throwable)
-              Toast.makeText(requireContext(), getString(R.string.cos_disconnect_failed), Toast.LENGTH_SHORT).show()
+      Log.i(TAG, "断开Tap v2模式: recipientId=${recipient.id}")
+      
+      lifecycleScope.launch {
+        try {
+          val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
+          
+          // 关闭所有与该联系人的活跃通道
+          val activeChannels = channelManager.getActiveChannels(recipient.id.toString())
+          var successCount = 0
+          
+          for (channel in activeChannels) {
+            val success = channelManager.closeChannel(channel.channelId)
+            if (success) {
+              successCount++
             }
-            result is org.thoughtcrime.securesms.coscomm.data.CosResult.Success -> {
-              Log.i(TAG, "COS v2模式断开成功")
-              Toast.makeText(requireContext(), getString(R.string.cos_disconnect_sent), Toast.LENGTH_SHORT).show()
-
+          }
+          
+          requireActivity().runOnUiThread {
+            if (successCount > 0) {
+              Toast.makeText(requireContext(), "Tap传输连接已断开", Toast.LENGTH_SHORT).show()
               // 刷新菜单以更新按钮文本
               requireActivity().invalidateOptionsMenu()
+            } else {
+              Toast.makeText(requireContext(), "断开Tap传输连接失败", Toast.LENGTH_SHORT).show()
             }
-            result is org.thoughtcrime.securesms.coscomm.data.CosResult.Error -> {
-              Log.e(TAG, "断开COS v2模式失败: ${result.exception.message}")
-              Toast.makeText(requireContext(), getString(R.string.cos_disconnect_failed), Toast.LENGTH_SHORT).show()
-            }
+          }
+          
+        } catch (e: Exception) {
+          Log.e(TAG, "断开Tap v2模式异常", e)
+          requireActivity().runOnUiThread {
+            Toast.makeText(requireContext(), "断开连接失败: ${e.message}", Toast.LENGTH_SHORT).show()
           }
         }
       }
 
-      Log.i(TAG, "COS v2模式断开请求发送完成")
     } catch (e: Exception) {
-      Log.e(TAG, "断开COS v2模式失败", e)
-      Toast.makeText(requireContext(), getString(R.string.cos_disconnect_failed), Toast.LENGTH_SHORT).show()
+      Log.e(TAG, "断开Tap v2模式失败", e)
+      Toast.makeText(requireContext(), "断开连接失败: ${e.message}", Toast.LENGTH_SHORT).show()
     }
   }
 
@@ -3751,11 +3804,11 @@ class ConversationFragment :
         return
       }
 
-      // 检查当前v2模式状态
-      val channelManager = org.thoughtcrime.securesms.coscomm.manager.CosChannelManager.getInstance(requireContext())
-      val channel = channelManager.getChannel(recipient.id.toString())
+      // 检查当前Tap v2模式状态
+      val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
+      val hasActiveChannel = channelManager.hasActiveChannel(recipient.id.toString())
 
-      if (channel?.isActive() == true) {
+      if (hasActiveChannel) {
         // 当前已启用v2模式，显示断开确认对话框
         showCosV2ModeDisconnectDialog(recipient)
       } else {

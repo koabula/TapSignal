@@ -55,6 +55,54 @@ class BatchPollingOptimizer(private val context: Context) {
     private val totalTasksProcessed = AtomicLong(0)
     private val totalTimeSaved = AtomicLong(0) // 通过批处理节省的时间（毫秒）
     
+    // 初始化状态
+    private var isInitialized = false
+    
+    /**
+     * 初始化批处理轮询优化器
+     */
+    fun initialize(): Boolean {
+        if (isInitialized) {
+            Log.w(TAG, "批处理轮询优化器已经初始化")
+            return true
+        }
+        
+        try {
+            Log.i(TAG, "初始化批处理轮询优化器...")
+            
+            // 验证配置常量的有效性
+            if (DEFAULT_BATCH_SIZE <= 0 || MAX_BATCH_SIZE <= DEFAULT_BATCH_SIZE) {
+                throw IllegalStateException("批处理配置常量无效")
+            }
+            
+            if (DEFAULT_BATCH_WINDOW_MS <= 0 || MAX_BATCH_WINDOW_MS <= DEFAULT_BATCH_WINDOW_MS) {
+                throw IllegalStateException("批处理时间窗口配置无效")
+            }
+            
+            // 清理可能存在的旧数据
+            batchGroups.clear()
+            batchStatistics.clear()
+            
+            // 重置统计计数器
+            totalBatchesProcessed.set(0)
+            totalTasksProcessed.set(0)
+            totalTimeSaved.set(0)
+            
+            isInitialized = true
+            Log.i(TAG, "批处理轮询优化器初始化完成 - 批处理大小: $currentBatchSize, 时间窗口: ${currentBatchWindow}ms")
+            return true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "批处理轮询优化器初始化失败", e)
+            return false
+        }
+    }
+    
+    /**
+     * 检查是否已初始化
+     */
+    fun isInitialized(): Boolean = isInitialized
+    
     /**
      * 将相似的轮询任务批量处理
      * 

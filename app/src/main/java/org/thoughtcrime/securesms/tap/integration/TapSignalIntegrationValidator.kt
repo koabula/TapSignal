@@ -422,6 +422,108 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
             }
         }
     }
+    
+    /**
+     * 检测是否为Tap v2模式的消息
+     * v2模式的特征：通过Tap传输且使用长期Token（永久凭证）
+     */
+    fun isTapV2ModeMessage(
+        envelope: org.whispersystems.signalservice.internal.push.Envelope,
+        senderRecipient: org.thoughtcrime.securesms.recipients.Recipient
+    ): Boolean {
+        return try {
+            // 首先检查是否为Tap传输层传输的消息
+            if (!isTapDeliveredMessage(envelope)) {
+                return false
+            }
+            
+            val channelManager = TransportChannelManager.getInstance(context)
+            val tokenPool = TransportTokenPool.getInstance(context)
+            
+            // 检查是否有活跃的通道
+            val hasActiveChannel = channelManager.hasActiveChannel(senderRecipient.id.toString())
+            if (!hasActiveChannel) {
+                return false
+            }
+            
+            // 检查是否使用长期Token（永久凭证）
+            // 获取所有可用的Provider类型
+            val availableProviders = listOf("cos")  // 扩展时添加更多Provider
+            
+            var hasLongTermCredentials = false
+            for (providerType in availableProviders) {
+                val receivedToken = tokenPool.getValidReceivedToken(senderRecipient.id.toString(), providerType)
+                val sharedToken = tokenPool.getValidSharedToken(senderRecipient.id.toString(), providerType)
+                
+                // 检查Token是否为长期Token（没有过期时间或过期时间很远）
+                val isReceivedLongTerm = receivedToken?.let { isLongTermToken(it) } ?: false
+                val isSharedLongTerm = sharedToken?.let { isLongTermToken(it) } ?: false
+                
+                if (isReceivedLongTerm || isSharedLongTerm) {
+                    hasLongTermCredentials = true
+                    break
+                }
+            }
+            
+            val isV2Mode = hasActiveChannel && hasLongTermCredentials
+            
+            Log.d(TAG, "Tap v2模式检测 (接收端): senderId=${senderRecipient.id}, " +
+                    "hasActiveChannel=$hasActiveChannel, " +
+                    "hasLongTermCredentials=$hasLongTermCredentials, " +
+                    "isV2Mode=$isV2Mode")
+            
+            isV2Mode
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "检测Tap v2模式时发生异常: senderId=${senderRecipient.id}", e)
+            false
+        }
+    }
+    
+    /**
+     * 检查消息是否为通过Tap传输层传输的消息
+     */
+    private fun isTapDeliveredMessage(envelope: org.whispersystems.signalservice.internal.push.Envelope): Boolean {
+        // 通过Tap传输层传输的消息会有特殊的serverGuid格式
+        // Tap传输层消息的serverGuid通常是Tap消息ID，而不是Signal服务器的UUID格式
+        val serverGuid = envelope.serverGuid
+        if (serverGuid != null) {
+            // Tap传输层消息ID格式通常是时间戳+随机数，不是标准UUID格式
+            // 如果不是标准UUID格式，可能是Tap传输层消息
+            return !isStandardUuid(serverGuid.toString())
+        }
+        return false
+    }
+    
+    /**
+     * 检查字符串是否为标准UUID格式
+     */
+    private fun isStandardUuid(str: String): Boolean {
+        return try {
+            // 标准UUID格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+            val uuidPattern = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+            uuidPattern.matches(str)
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 检查Token是否为长期Token（永久凭证）
+     */
+    private fun isLongTermToken(token: TransportToken): Boolean {
+        return when (token) {
+            is org.thoughtcrime.securesms.tap.CosTransportToken -> {
+                // COS Token如果没有sessionToken则为永久凭证
+                token.sessionToken.isNullOrEmpty()
+            }
+            else -> {
+                // 其他类型的Token，检查是否有过期时间且过期时间很远（假设为永久）
+                // 这里可以根据具体Provider类型进行扩展
+                false
+            }
+        }
+    }
 }
 
 /**

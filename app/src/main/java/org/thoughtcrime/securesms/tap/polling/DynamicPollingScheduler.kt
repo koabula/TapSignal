@@ -68,6 +68,38 @@ class DynamicPollingScheduler(private val context: Context) {
     private var lastNetworkQuality: NetworkQuality = NetworkQuality.UNKNOWN
     
     /**
+     * 初始化动态轮询调度器
+     */
+    fun initialize(): Boolean {
+        try {
+            Log.i(TAG, "初始化动态轮询调度器...")
+            
+            // 验证网络质量检测器是否可用
+            val networkQuality = networkQualityDetector.getCurrentNetworkQuality()
+            lastNetworkQuality = networkQuality
+            
+            // 启动调度器
+            val startResult = start()
+            if (startResult) {
+                Log.i(TAG, "动态轮询调度器初始化完成")
+            } else {
+                Log.e(TAG, "动态轮询调度器启动失败")
+            }
+            
+            return startResult
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "动态轮询调度器初始化失败", e)
+            return false
+        }
+    }
+    
+    /**
+     * 检查是否已初始化
+     */
+    fun isInitialized(): Boolean = isRunning
+    
+    /**
      * 启动动态调度器
      */
     fun start(): Boolean {

@@ -264,11 +264,11 @@ internal object ConversationOptionsMenu {
 
         try {
           val context = callback.getContext()
-          val channelManager = org.thoughtcrime.securesms.coscomm.manager.CosChannelManager.getInstance(context)
-          val channel = channelManager.getChannel(recipient.id.toString())
+          val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+          val hasActiveChannel = channelManager.hasActiveChannel(recipient.id.toString())
 
           cosMenuItem.isVisible = true
-          if (channel?.isActive() == true) {
+          if (hasActiveChannel) {
             cosMenuItem.setTitle(R.string.conversation__menu_disable_v2_mode)
           } else {
             cosMenuItem.setTitle(R.string.conversation__menu_use_v2_mode)

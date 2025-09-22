@@ -53,6 +53,108 @@ class AdaptiveIntervalAdjuster(private val context: Context) {
     // 时间模式分析
     private val timePatterns = ConcurrentHashMap<String, TimePattern>()
     
+    // 初始化状态
+    private var isInitialized = false
+    
+    /**
+     * 初始化自适应间隔调整器
+     */
+    fun initialize(): Boolean {
+        if (isInitialized) {
+            Log.w(TAG, "自适应间隔调整器已经初始化")
+            return true
+        }
+        
+        try {
+            Log.i(TAG, "初始化自适应间隔调整器...")
+            
+            // 验证配置常量的有效性
+            if (MAX_HISTORY_RECORDS <= MIN_HISTORY_FOR_PREDICTION) {
+                throw IllegalStateException("历史记录配置无效")
+            }
+            
+            if (LEARNING_RATE <= 0 || LEARNING_RATE >= 1) {
+                throw IllegalStateException("学习率配置无效，应在(0, 1)范围内")
+            }
+            
+            if (MIN_ADJUSTMENT_RATIO <= 0 || MAX_ADJUSTMENT_RATIO <= MIN_ADJUSTMENT_RATIO) {
+                throw IllegalStateException("调整比例配置无效")
+            }
+            
+            // 清理可能存在的旧数据
+            pollingHistory.clear()
+            intervalHistory.clear()
+            modelWeights.clear()
+            adaptationStats.clear()
+            timePatterns.clear()
+            
+            // 初始化默认模型权重
+            initializeDefaultModelWeights()
+            
+            // 加载持久化的历史数据（如果存在）
+            loadPersistedHistoryData()
+            
+            isInitialized = true
+            Log.i(TAG, "自适应间隔调整器初始化完成 - 学习率: $LEARNING_RATE, 最大历史记录: $MAX_HISTORY_RECORDS")
+            return true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "自适应间隔调整器初始化失败", e)
+            return false
+        }
+    }
+    
+    /**
+     * 检查是否已初始化
+     */
+    fun isInitialized(): Boolean = isInitialized
+    
+    /**
+     * 初始化默认模型权重
+     */
+    private fun initializeDefaultModelWeights() {
+        // 为常见Provider类型初始化默认权重
+        val defaultProviders = listOf("cos", "email", "ipfs", "git", "nas")
+        
+        for (providerType in defaultProviders) {
+            // 初始化模型权重，使用正确的构造函数
+            val weights = ModelWeights(
+                bias = 0.5, // 默认偏置
+                version = 1
+            )
+            
+            // 初始化特征权重映射
+            // 0: 时间特征权重, 1: 星期特征权重, 2: 历史成功率权重, 3: 网络质量权重
+            weights.weights[0] = 0.3  // timeOfDayWeight
+            weights.weights[1] = 0.2  // dayOfWeekWeight  
+            weights.weights[2] = 0.4  // historicalSuccessWeight
+            weights.weights[3] = 0.1  // networkQualityWeight
+            
+            // 初始化动量
+            weights.momentum[0] = 0.0
+            weights.momentum[1] = 0.0
+            weights.momentum[2] = 0.0
+            weights.momentum[3] = 0.0
+            
+            modelWeights[providerType] = weights
+        }
+        
+        Log.d(TAG, "初始化了${defaultProviders.size}个Provider的默认模型权重")
+    }
+    
+    /**
+     * 加载持久化的历史数据
+     */
+    private fun loadPersistedHistoryData() {
+        try {
+            // 这里可以从数据库或文件系统加载历史数据
+            // 暂时跳过持久化加载，因为我们使用内存存储
+            Log.d(TAG, "跳过历史数据加载（使用内存存储）")
+        } catch (e: Exception) {
+            Log.w(TAG, "加载历史数据失败，使用空状态启动", e)
+        }
+    }
+    
     /**
      * 基于历史数据预测最优间隔
      * 

@@ -103,16 +103,30 @@ class TapPollingService(private val context: Context) {
                 throw IllegalArgumentException("轮询配置无效")
             }
             this.pollingConfig = config
-            // 初始化核心组件（暂时注释掉，等待组件实现 initialize 方法）
-            // pollingStrategy.initialize()
-            // dynamicScheduler.initialize()
-            // batchOptimizer.initialize()
-            // intervalAdjuster.initialize()
             
-            // 初始化统计收集器（暂时注释掉）
-            // statisticsCollector.initialize()
+            // 初始化核心组件
+            if (!pollingStrategy.initialize()) {
+                throw IllegalStateException("智能轮询策略初始化失败")
+            }
             
-            Log.i(TAG, "Tap轮询服务初始化完成")
+            if (!dynamicScheduler.initialize()) {
+                throw IllegalStateException("动态轮询调度器初始化失败")
+            }
+            
+            if (!batchOptimizer.initialize()) {
+                throw IllegalStateException("批处理优化器初始化失败")
+            }
+            
+            if (!intervalAdjuster.initialize()) {
+                throw IllegalStateException("自适应间隔调整器初始化失败")
+            }
+            
+            // 初始化统计收集器
+            if (!statisticsCollector.initialize()) {
+                throw IllegalStateException("统计收集器初始化失败")
+            }
+            
+            Log.i(TAG, "Tap轮询服务初始化完成 - 所有组件初始化成功")
         } catch (e: Exception) {
             Log.e(TAG, "Tap轮询服务初始化失败", e)
             throw e

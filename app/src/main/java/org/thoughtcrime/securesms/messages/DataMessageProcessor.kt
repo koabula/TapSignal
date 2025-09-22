@@ -195,8 +195,9 @@ object DataMessageProcessor {
       SignalDatabase.recipients.markHidden(senderRecipient.id, clearProfileKey = false, showMessageRequest = true)
     }
 
-    // 🔧 修复：检查是否为COS v2模式，如果是则禁用需要服务器的Job
-    val isV2Mode = isCosV2ModeMessage(context, envelope, senderRecipient)
+    // 🔧 修复：检查是否为Tap v2模式，如果是则禁用需要服务器的Job
+    val tapValidator = org.thoughtcrime.securesms.tap.integration.TapSignalIntegrationValidator.getInstance(context)
+    val isV2Mode = tapValidator.isTapV2ModeMessage(envelope, senderRecipient)
 
     if (metadata.sealedSender && messageId != null) {
       if (!isV2Mode) {
@@ -1300,51 +1301,5 @@ object DataMessageProcessor {
     }
   }
 
-  /**
-   * 检测是否为COS v2模式的消息
-   * v2模式的特征：COS传输的消息且使用永久凭证
-   */
-  private fun isCosV2ModeMessage(context: Context, envelope: Envelope, senderRecipient: Recipient): Boolean {
-    return try {
-      // 首先检查是否为Tap传输层传输的消息
-      if (!isTapDeliveredMessage(envelope)) {
-        return false
-      }
 
-      // 检查是否启用永久凭证
-      val isPermanentCredentialEnabled = org.thoughtcrime.securesms.cos.CosConfigStorage.isPermanentCredentialEnabled(context)
-      if (!isPermanentCredentialEnabled) {
-        return false
-      }
-
-      // 检查是否有活跃的COS通道
-      val cosChannelManager = org.thoughtcrime.securesms.coscomm.manager.CosChannelManager.getInstance(context)
-      val channel = cosChannelManager.getChannel(senderRecipient.id.toString())
-      if (channel?.status != org.thoughtcrime.securesms.coscomm.data.ChannelStatus.ACTIVE) {
-        return false
-      }
-
-      // 检查通道是否使用永久凭证（通过检查sessionToken是否为空）
-      val myAccessInfo = channel.myAccessInfo
-      val theirAccessInfo = channel.theirAccessInfo
-
-      val isMyCredentialPermanent = myAccessInfo?.sessionToken.isNullOrEmpty()
-      val isTheirCredentialPermanent = theirAccessInfo?.sessionToken.isNullOrEmpty()
-
-      // 只有双方都使用永久凭证才算v2模式
-      val isV2Mode = isMyCredentialPermanent && isTheirCredentialPermanent
-
-      Log.d(MessageContentProcessor.TAG, "COS v2模式检测 (接收端): senderId=${senderRecipient.id}, " +
-                "permanentEnabled=$isPermanentCredentialEnabled, " +
-                "channelActive=${channel?.status}, " +
-                "myPermanent=$isMyCredentialPermanent, " +
-                "theirPermanent=$isTheirCredentialPermanent, " +
-                "isV2Mode=$isV2Mode")
-
-      isV2Mode
-    } catch (e: Exception) {
-      Log.e(MessageContentProcessor.TAG, "检测COS v2模式时发生异常: senderId=${senderRecipient.id}", e)
-      false
-    }
-  }
 }
