@@ -62,6 +62,7 @@ class TapPollingService(private val context: Context) {
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
     private val messageProcessor = TapMessageProcessor.getInstance(context)
     private val errorHandler = TransportErrorHandler.getInstance(context)
+    private val networkQualityDetector = org.thoughtcrime.securesms.tap.utils.NetworkQualityDetector.getInstance(context)
     
     // 数据库访问
     private val pollingStateTable = SignalDatabase.transportPollingStates
@@ -149,6 +150,9 @@ class TapPollingService(private val context: Context) {
                 
                 // 启动动态调度器
                 dynamicScheduler.start()
+                
+                // 启动网络质量监控
+                networkQualityDetector.startNetworkMonitoring()
                 
                 // 启动清理任务
                 startCleanupTask()
@@ -944,6 +948,9 @@ class TapPollingService(private val context: Context) {
             // 停止动态调度器
             dynamicScheduler.stop()
             
+            // 停止网络质量监控
+            networkQualityDetector.stopNetworkMonitoring()
+            
             // 取消清理任务
             cleanupTask?.cancel(false)
             cleanupTask = null
@@ -1045,8 +1052,7 @@ class TapPollingService(private val context: Context) {
      * 获取当前网络质量
      */
     private fun getCurrentNetworkQuality(): NetworkQuality {
-        // 简化实现
-        return NetworkQuality.GOOD
+        return networkQualityDetector.getCurrentNetworkQuality()
     }
     
     /**

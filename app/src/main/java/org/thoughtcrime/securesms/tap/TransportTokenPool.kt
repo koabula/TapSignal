@@ -58,11 +58,7 @@ class TransportTokenPool private constructor(private val context: Context) {
             }
         }
         
-        // SharedPreferences相关常量
-        private const val PREF_NAME = "transport_token_pool"
-        private const val KEY_RECEIVED_TOKENS = "received_tokens"
-        private const val KEY_SHARED_TOKENS = "shared_tokens"
-        private const val KEY_TOKEN_METADATA = "token_metadata"
+
         
         // 缓存相关常量
         private const val DEFAULT_CACHE_SIZE = 1000
@@ -86,10 +82,7 @@ class TransportTokenPool private constructor(private val context: Context) {
         org.thoughtcrime.securesms.keyvalue.SignalStore.tap
     }
     
-    // 旧版本SharedPreferences存储（用于数据迁移）
-    private val legacyPrefs by lazy {
-        context.getSharedPreferences("tap_token_pool", Context.MODE_PRIVATE)
-    }
+
     
     private val objectMapper = ObjectMapper().apply {
         // 忽略未知属性，确保向后兼容性
@@ -934,10 +927,7 @@ class TransportTokenPool private constructor(private val context: Context) {
                 Log.d(TAG, "加载Token元数据: ${tokenMetadata.size}个条目")
             }
             
-            // 如果SignalStore.tap中没有数据，尝试从旧版本SharedPreferences迁移
-            if (receivedTokens.isEmpty() && sharedTokens.isEmpty()) {
-                migrateLegacyTokens()
-            }
+
             
             // 重建Token元数据（如果元数据丢失）
             if (tokenMetadata.isEmpty() && (receivedTokens.isNotEmpty() || sharedTokens.isNotEmpty())) {
@@ -958,73 +948,7 @@ class TransportTokenPool private constructor(private val context: Context) {
         }
     }
     
-    /**
-     * 从旧版本SharedPreferences迁移数据
-     */
-    private fun migrateLegacyTokens() {
-        try {
-            Log.d(TAG, "开始从旧版本SharedPreferences迁移Token数据")
-            
-            // 迁移接收Token
-            val legacyReceivedTokensJson = legacyPrefs.getString(KEY_RECEIVED_TOKENS, null)
-            if (!legacyReceivedTokensJson.isNullOrEmpty()) {
-                val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
-                val legacyReceivedTokensData = objectMapper.readValue(legacyReceivedTokensJson, type)
-                
-                legacyReceivedTokensData.forEach { (recipientId, providerTokens) ->
-                    val tokenMap = mutableMapOf<String, TransportToken>()
-                    providerTokens.forEach { (providerType, tokenData) ->
-                        val token = createTokenFromData(tokenData)
-                        if (token != null && !token.isExpired) {
-                            tokenMap[providerType] = token
-                        }
-                    }
-                    if (tokenMap.isNotEmpty()) {
-                        receivedTokens[recipientId] = tokenMap
-                    }
-                }
-                Log.d(TAG, "迁移接收Token数据: ${legacyReceivedTokensData.size}个条目")
-            }
-            
-            // 迁移共享Token
-            val legacySharedTokensJson = legacyPrefs.getString(KEY_SHARED_TOKENS, null)
-            if (!legacySharedTokensJson.isNullOrEmpty()) {
-                val type = object : TypeReference<Map<String, Map<String, Map<String, Any>>>>() {}
-                val legacySharedTokensData = objectMapper.readValue(legacySharedTokensJson, type)
-                
-                legacySharedTokensData.forEach { (recipientId, providerTokens) ->
-                    val tokenMap = mutableMapOf<String, TransportToken>()
-                    providerTokens.forEach { (providerType, tokenData) ->
-                        val token = createTokenFromData(tokenData)
-                        if (token != null && !token.isExpired) {
-                            tokenMap[providerType] = token
-                        }
-                    }
-                    if (tokenMap.isNotEmpty()) {
-                        sharedTokens[recipientId] = tokenMap
-                    }
-                }
-                Log.d(TAG, "迁移共享Token数据: ${legacySharedTokensData.size}个条目")
-            }
-            
-            // 如果迁移了数据，保存到新的安全存储并清理旧数据
-            if (receivedTokens.isNotEmpty() || sharedTokens.isNotEmpty()) {
-                saveTokensToStorage()
-                
-                // 清理旧版本数据
-                legacyPrefs.edit()
-                    .remove(KEY_RECEIVED_TOKENS)
-                    .remove(KEY_SHARED_TOKENS)
-                    .remove(KEY_TOKEN_METADATA)
-                    .apply()
-                
-                Log.i(TAG, "Token数据迁移完成，已清理旧版本数据")
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "从旧版本迁移Token数据失败", e)
-        }
-    }
+
     
     /**
      * 持久化Token到存储

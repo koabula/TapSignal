@@ -116,6 +116,8 @@ class BatchPollingOptimizer(private val context: Context) {
                 NetworkQuality.GOOD -> DEFAULT_BATCH_SIZE
                 NetworkQuality.FAIR -> DEFAULT_BATCH_SIZE
                 NetworkQuality.POOR -> (DEFAULT_BATCH_SIZE * POOR_NETWORK_BATCH_MULTIPLIER).toInt()
+                NetworkQuality.VERY_POOR -> (DEFAULT_BATCH_SIZE * POOR_NETWORK_BATCH_MULTIPLIER * 0.5).toInt()
+                NetworkQuality.NO_CONNECTION -> MIN_BATCH_SIZE
                 NetworkQuality.UNKNOWN -> DEFAULT_BATCH_SIZE
             }.coerceIn(MIN_BATCH_SIZE, MAX_BATCH_SIZE)
             

@@ -47,6 +47,7 @@ class DynamicPollingScheduler(private val context: Context) {
     
     // 核心组件
     private val pollingStrategy = TapIntelligentPollingStrategy(context)
+    private val networkQualityDetector = org.thoughtcrime.securesms.tap.utils.NetworkQualityDetector.getInstance(context)
     
     // 线程池和调度器
     private var schedulerExecutor: ScheduledExecutorService? = null
@@ -418,8 +419,12 @@ class DynamicPollingScheduler(private val context: Context) {
      * 获取当前网络质量
      */
     private fun getCurrentNetworkQuality(): NetworkQuality {
-        // 简化实现：返回缓存的网络质量
-        // 实际实现应该检测网络连接类型、延迟、带宽等
+        val detectedQuality = networkQualityDetector.getCurrentNetworkQuality()
+        if (detectedQuality != NetworkQuality.UNKNOWN) {
+            lastNetworkQuality = detectedQuality
+            return detectedQuality
+        }
+        // 如果检测失败，返回缓存的网络质量
         return lastNetworkQuality
     }
     

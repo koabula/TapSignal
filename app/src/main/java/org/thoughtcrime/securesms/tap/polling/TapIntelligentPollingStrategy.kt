@@ -306,6 +306,8 @@ class TapIntelligentPollingStrategy(private val context: Context) {
             NetworkQuality.GOOD -> NETWORK_QUALITY_GOOD
             NetworkQuality.FAIR -> NETWORK_QUALITY_POOR
             NetworkQuality.POOR -> NETWORK_QUALITY_BAD
+            NetworkQuality.VERY_POOR -> 3.0 // 网络极差 - 增加200%间隔
+            NetworkQuality.NO_CONNECTION -> 5.0 // 无网络连接 - 增加400%间隔
             NetworkQuality.UNKNOWN -> NETWORK_QUALITY_GOOD // 默认假设网络良好
         }
     }
@@ -434,11 +436,13 @@ class TapIntelligentPollingStrategy(private val context: Context) {
  * 网络质量枚举
  */
 enum class NetworkQuality {
-    EXCELLENT,  // 网络极佳
-    GOOD,       // 网络良好
-    FAIR,       // 网络一般
-    POOR,       // 网络较差
-    UNKNOWN     // 未知
+    EXCELLENT,     // 网络极佳
+    GOOD,          // 网络良好
+    FAIR,          // 网络一般
+    POOR,          // 网络较差
+    VERY_POOR,     // 网络极差
+    NO_CONNECTION, // 无网络连接
+    UNKNOWN        // 未知
 }
 
 /**
