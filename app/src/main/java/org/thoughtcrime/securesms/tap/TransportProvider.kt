@@ -110,10 +110,7 @@ interface TransportProvider {
      * @param metadata 传输元数据
      * @return 文件列表结果
      */
-    suspend fun listFiles(path: String, metadata: TransportMetadata): TransportResult {
-        // 抽象方法：所有Provider必须实现此方法
-        throw UnsupportedOperationException("Provider ${this::class.simpleName} 必须实现 listFiles() 方法")
-    }
+    suspend fun listFiles(path: String, metadata: TransportMetadata): TransportResult
     
     /**
      * 下载指定文件
@@ -122,10 +119,7 @@ interface TransportProvider {
      * @param metadata 传输元数据
      * @return 下载结果和文件数据
      */
-    suspend fun downloadFile(fileInfo: FileInfo, metadata: TransportMetadata): TransportResult {
-        // 抽象方法：所有Provider必须实现此方法
-        throw UnsupportedOperationException("Provider ${this::class.simpleName} 必须实现 downloadFile() 方法")
-    }
+    suspend fun downloadFile(fileInfo: FileInfo, metadata: TransportMetadata): TransportResult
     
     /**
      * 上传文件数据
@@ -135,10 +129,7 @@ interface TransportProvider {
      * @param metadata 传输元数据
      * @return 上传结果
      */
-    suspend fun uploadFile(data: ByteArray, path: String, metadata: TransportMetadata): TransportResult {
-        // 抽象方法：所有Provider必须实现此方法
-        throw UnsupportedOperationException("Provider ${this::class.simpleName} 必须实现 uploadFile() 方法")
-    }
+    suspend fun uploadFile(data: ByteArray, path: String, metadata: TransportMetadata): TransportResult
     
     /**
      * 权限管理 - 生成访问Token

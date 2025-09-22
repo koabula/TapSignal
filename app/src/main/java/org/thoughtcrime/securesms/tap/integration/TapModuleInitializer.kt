@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.TransportManager
+import org.thoughtcrime.securesms.tap.TransportProviderManager
 import org.thoughtcrime.securesms.tap.TransportProviderConfigManager
 import org.thoughtcrime.securesms.tap.TransportTokenPool
 import org.thoughtcrime.securesms.tap.TransportChannelManager
@@ -135,10 +136,11 @@ class TapModuleInitializer private constructor(private val context: Context) {
         
         try {
             val transportManager = TransportManager.getInstance(context)
+            val providerManager = TransportProviderManager.getInstance(context)
             val factory = DefaultTransportProviderFactory(context)
             
             // 注册工厂
-            transportManager.registerProviderFactory(factory)
+            providerManager.registerProviderFactory("default", factory)
             
             // 注册所有可用的Provider
             val availableProviders = factory.supportedProviderTypes
@@ -149,7 +151,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
                     if (defaultConfig.isNotEmpty()) {
                         val provider = factory.createProvider(providerType, defaultConfig)
                         if (provider != null) {
-                            transportManager.registerProvider(provider)
+                            providerManager.registerProvider(provider)
                             Log.d(TAG, "Provider注册成功: $providerType")
                         } else {
                             Log.w(TAG, "Provider创建失败: $providerType")

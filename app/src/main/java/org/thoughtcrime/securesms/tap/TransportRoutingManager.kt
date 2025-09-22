@@ -294,6 +294,120 @@ class TransportRoutingManager private constructor(private val context: Context) 
         }
     }
     
+    /**
+     * 选择最佳传输通道
+     */
+    suspend fun selectBestChannel(
+        availableChannels: List<TransportChannel>,
+        message: TransportMessage
+    ): TransportChannel? {
+        return withContext(Dispatchers.IO) {
+            routingLock.read {
+                try {
+                    if (!isInitialized) {
+                        Log.w(TAG, "路由管理器未初始化")
+                        return@withContext null
+                    }
+                    
+                    if (availableChannels.isEmpty()) {
+                        Log.w(TAG, "没有可用的传输通道")
+                        return@withContext null
+                    }
+                    
+                    // 过滤活跃的通道
+                    val activeChannels = availableChannels.filter { it.isActive() }
+                    if (activeChannels.isEmpty()) {
+                        Log.w(TAG, "没有活跃的传输通道")
+                        return@withContext null
+                    }
+                    
+                    Log.d(TAG, "选择最佳通道，可用数量: ${activeChannels.size}")
+                    
+                    // 根据优先级、成功率和最后活跃时间选择最佳通道
+                    val selectedChannel = activeChannels.maxByOrNull { channel ->
+                        val priorityScore = channel.priority * 0.4
+                        val successRateScore = channel.getSuccessRate() * 0.4
+                        val freshnessScore = (1.0 / (1.0 + channel.getTimeSinceLastActive() / 60000.0)) * 0.2
+                        priorityScore + successRateScore + freshnessScore
+                    }
+                    
+                    if (selectedChannel != null) {
+                        Log.d(TAG, "选择通道: ${selectedChannel.channelId}, Provider: ${selectedChannel.providerType}")
+                    }
+                    
+                    selectedChannel
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "选择最佳通道失败", e)
+                    null
+                }
+            }
+        }
+    }
+
+    /**
+     * 记录发送结果
+     */
+    fun recordSendResult(providerType: String, result: TransportResult) {
+        try {
+            statsLock.write {
+                val stats = routingStats.computeIfAbsent(providerType) { 
+                    ProviderRoutingStats(providerType) 
+                }
+                
+                if (result is TransportResult.Success) {
+                    stats.recordSuccess()
+                } else if (result is TransportResult.Failed) {
+                    stats.recordFailure(result.error)
+                }
+                
+                routingStats[providerType] = stats
+            }
+            
+            Log.d(TAG, "记录发送结果: provider=$providerType, success=${result is TransportResult.Success}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "记录发送结果失败", e)
+        }
+    }
+    
+    /**
+     * 评估可用的Provider
+     * @param availableChannels 可用通道列表
+     * @return Provider类型和评分的配对列表
+     */
+    suspend fun evaluateProviders(availableChannels: List<TransportChannel>): List<Pair<String, Double>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val providerScores = mutableMapOf<String, Double>()
+                
+                availableChannels.forEach { channel ->
+                    val providerType = channel.providerType
+                    val stats = routingStats[providerType]
+                    
+                    val baseScore = if (channel.isActive()) 1.0 else 0.5
+                    val successRateScore = channel.getSuccessRate() * 0.4
+                    val priorityScore = (channel.priority / 10.0) * 0.3
+                    val performanceScore = stats?.let { it.getSuccessRate() } ?: 0.5
+                    val freshnessScore = (1.0 / (1.0 + channel.getTimeSinceLastActive() / 60000.0)) * 0.2
+                    
+                    val totalScore = baseScore + successRateScore + priorityScore + performanceScore * 0.1 + freshnessScore
+                    
+                    providerScores[providerType] = maxOf(
+                        providerScores.getOrDefault(providerType, 0.0),
+                        totalScore
+                    )
+                }
+                
+                providerScores.toList()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "评估Provider失败", e)
+                emptyList()
+            }
+        }
+    }
+    
     // 私有辅助方法
     
     /**
@@ -616,7 +730,34 @@ data class ProviderRoutingStats(
     var averageResponseTime: Long = 0L,
     var lastAttemptTime: Long = 0L,
     val errorCounts: MutableMap<TransportError, Int> = mutableMapOf()
-)
+) {
+    
+    /**
+     * 记录成功
+     */
+    fun recordSuccess() {
+        totalAttempts++
+        successfulAttempts++
+        lastAttemptTime = System.currentTimeMillis()
+    }
+    
+    /**
+     * 记录失败
+     */
+    fun recordFailure(error: TransportError) {
+        totalAttempts++
+        failedAttempts++
+        errorCounts[error] = errorCounts.getOrDefault(error, 0) + 1
+        lastAttemptTime = System.currentTimeMillis()
+    }
+    
+    /**
+     * 获取成功率
+     */
+    fun getSuccessRate(): Double {
+        return if (totalAttempts > 0) successfulAttempts.toDouble() / totalAttempts else 0.0
+    }
+}
 
 /**
  * Provider性能统计

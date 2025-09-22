@@ -1288,6 +1288,62 @@ class TransportChannelManager private constructor(private val context: Context) 
             }
         }
     }
+
+    /**
+     * 记录成功发送
+     */
+    fun recordSuccessfulSend(channelId: String) {
+        channelLock.write {
+            val channel = channels[channelId]
+            if (channel != null) {
+                val updatedChannel = channel.copy(
+                    successCount = channel.successCount + 1,
+                    lastActiveAt = System.currentTimeMillis(),
+                    status = TransportChannelStatus.ACTIVE,
+                    lastError = null
+                )
+                channels[channelId] = updatedChannel
+                
+                // 异步更新数据库
+                managerScope.launch {
+                    try {
+                        transportChannelTable.insertOrUpdateChannel(updatedChannel)
+                        Log.d(TAG, "记录通道成功发送: $channelId")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "更新通道成功发送统计失败: $channelId - ${LogSanitizer.sanitizeThrowable(e)}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 记录失败发送
+     */
+    fun recordFailedSend(channelId: String, error: TransportError) {
+        channelLock.write {
+            val channel = channels[channelId]
+            if (channel != null) {
+                val updatedChannel = channel.copy(
+                    failureCount = channel.failureCount + 1,
+                    lastActiveAt = System.currentTimeMillis(),
+                    status = if (channel.failureCount >= 5) TransportChannelStatus.FAILED else channel.status,
+                    lastError = error
+                )
+                channels[channelId] = updatedChannel
+                
+                // 异步更新数据库
+                managerScope.launch {
+                    try {
+                        transportChannelTable.insertOrUpdateChannel(updatedChannel)
+                        Log.d(TAG, "记录通道失败发送: $channelId, error: $error")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "更新通道失败发送统计失败: $channelId - ${LogSanitizer.sanitizeThrowable(e)}")
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

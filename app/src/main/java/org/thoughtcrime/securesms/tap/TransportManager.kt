@@ -61,10 +61,9 @@ class TransportManager private constructor(private val context: Context) {
     private val tokenPool = lazy { TransportTokenPool.getInstance(context) }
     private val routingManager = TransportRoutingManager.getInstance(context)
     
-    // Provider管理
-    private val providers = ConcurrentHashMap<String, TransportProvider>()
-    private val providerFactories = ConcurrentHashMap<String, TransportProviderFactory>()
-    private val providerLock = ReentrantReadWriteLock()
+    // 新的子管理器
+    private val providerManager = TransportProviderManager.getInstance(context)
+    private val messageRouter = TransportMessageRouter.getInstance(context)
     
     // 配置和状态
     private var currentConfig: TransportConfig = TransportConfig()
@@ -103,15 +102,13 @@ class TransportManager private constructor(private val context: Context) {
                     // 初始化子组件
                     channelManager.value.initialize(config.channelConfig)
                     tokenPool.value.initialize(config.tokenConfig)
-                    
-                    // 初始化路由配置
                     routingPolicy = config.routingPolicy
                     
-                    // 注册默认Provider工厂
-                    registerProviderFactory(DefaultTransportProviderFactory(context))
-                    
-                    // 加载已配置的Providers
-                    loadConfiguredProviders()
+                    // 初始化Provider管理器（内部注册默认工厂并加载配置）
+                    if (!providerManager.initialize()) {
+                        Log.e(TAG, "Provider管理器初始化失败")
+                        return@withContext false
+                    }
                     
                     isInitialized = true
                     Log.i(TAG, "传输管理器初始化完成")
@@ -126,101 +123,26 @@ class TransportManager private constructor(private val context: Context) {
     }
     
     /**
-     * 注册传输提供者
-     */
-    fun registerProvider(provider: TransportProvider): Boolean {
-        providerLock.write {
-            return try {
-                if (providers.containsKey(provider.providerType)) {
-                    Log.w(TAG, "传输提供者已存在: ${provider.providerType}")
-                    false
-                } else {
-                    providers[provider.providerType] = provider
-                    Log.i(TAG, "注册传输提供者: ${provider.providerType}")
-                    true
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "注册传输提供者失败: ${provider.providerType}", e)
-                false
-            }
-        }
-    }
-    
-    /**
-     * 注册传输提供者工厂
-     */
-    fun registerProviderFactory(factory: TransportProviderFactory): Boolean {
-        providerLock.write {
-            return try {
-                factory.supportedProviderTypes.forEach { providerType ->
-                    providerFactories[providerType] = factory
-                    Log.i(TAG, "注册传输提供者工厂: $providerType")
-                }
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "注册传输提供者工厂失败", e)
-                false
-            }
-        }
-    }
-    
-    /**
-     * 注销传输提供者
-     */
-    fun unregisterProvider(providerType: String): Boolean {
-        providerLock.write {
-            return try {
-                val provider = providers.remove(providerType)
-                if (provider != null) {
-                    // 清理相关资源
-                    managerScope.launch {
-                        try {
-                            provider.cleanup()
-                            channelManager.value.closeProviderChannels(providerType)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "清理Provider资源时出错: $providerType", e)
-                        }
-                    }
-                    Log.i(TAG, "注销传输提供者: $providerType")
-                    true
-                } else {
-                    Log.w(TAG, "传输提供者不存在: $providerType")
-                    false
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "注销传输提供者失败: $providerType", e)
-                false
-            }
-        }
-    }
-    
-    /**
      * 获取传输提供者
      */
     fun getProvider(providerType: String): TransportProvider? {
-        providerLock.read {
-            return providers[providerType] ?: createProviderIfConfigured(providerType)
-        }
+        return providerManager.getProvider(providerType)
     }
     
     /**
      * 获取所有可用提供者
      */
     fun getAvailableProviders(): List<TransportProvider> {
-        providerLock.read {
-            return providers.values.toList()
-        }
+        return providerManager.getActiveProviders()
     }
     
     /**
      * 获取所有已启用的提供者
      */
     fun getEnabledProviders(): List<TransportProvider> {
-        providerLock.read {
-            return providers.values.filter { provider ->
-                currentConfig.isProviderEnabled(provider.providerType)
-            }
-        }
+        // 以ProviderManager的活跃Provider为准，同时检查当前配置启用状态
+        val active = providerManager.getActiveProviders()
+        return active.filter { provider -> currentConfig.isProviderEnabled(provider.providerType) }
     }
     
     /**
@@ -239,89 +161,12 @@ class TransportManager private constructor(private val context: Context) {
                 
                 Log.d(TAG, "发送消息到: $recipientId, 消息类型: ${message.messageType}")
                 
-                // 使用路由管理器选择最佳提供者
-                val bestProvider = routingManager.selectBestProvider(
-                    recipientId = recipientId,
-                    message = message,
-                    availableProviders = getEnabledProviders()
-                )
-                
-                if (bestProvider == null) {
-                    return@withContext TransportResult.failure(
-                        TransportError.PROVIDER_UNAVAILABLE,
-                        true,
-                        "没有可用的传输提供者"
-                    )
-                }
-                
-                Log.d(TAG, "选择传输提供者: ${bestProvider.providerType}")
-                
-                // 获取或建立通道
-                val channel = channelManager.value.getOrCreateChannel(
-                    recipientId = recipientId,
-                    providerType = bestProvider.providerType,
-                    provider = bestProvider
-                )
-                
-                if (channel == null || !channel.isAvailable()) {
-                    return@withContext TransportResult.failure(
-                        TransportError.NETWORK_ERROR,
-                        true,
-                        "无法建立传输通道"
-                    )
-                }
-                
-                // 执行消息发送
-                val result = bestProvider.push(message, channel.metadata)
-                
-                // 更新通道状态
-                when (result) {
-                    is TransportResult.Success -> {
-                        channelManager.value.updateChannelSuccess(channel.channelId)
-                        Log.d(TAG, "消息发送成功: ${message.messageId}")
-                    }
-                    is TransportResult.Failed -> {
-                        channelManager.value.updateChannelFailure(channel.channelId, result.error)
-                        Log.w(TAG, "消息发送失败: ${message.messageId}, 错误: ${result.error}")
-                    }
-                    is TransportResult.RetryScheduled -> {
-                        Log.d(TAG, "消息需要重试: ${message.messageId}, 延迟: ${result.retryAfter}ms")
-                    }
-                    is TransportResult.PartialSuccess -> {
-                        channelManager.value.updateChannelSuccess(channel.channelId)
-                        Log.w(TAG, "消息部分成功: ${message.messageId}")
-                    }
-                }
-                
-                result
+                // 通过路由器发送
+                messageRouter.sendMessage(message, recipientId)
                 
             } catch (e: Exception) {
                 Log.e(TAG, "发送消息异常", e)
-                val isRetryable = when (e) {
-                    is SecurityException,
-                    is IllegalArgumentException,
-                    is IllegalStateException -> false // 配置或权限问题不可重试
-                    is java.net.UnknownHostException,
-                    is java.net.SocketTimeoutException,
-                    is java.net.ConnectException,
-                    is java.io.IOException -> true // 网络问题可重试
-                    is InterruptedException,
-                    is CancellationException -> false // 取消操作不重试
-                    else -> {
-                        // 未知异常，根据消息内容判断
-                        val message = e.message?.lowercase() ?: ""
-                        when {
-                            message.contains("permission") || 
-                            message.contains("unauthorized") ||
-                            message.contains("forbidden") -> false
-                            message.contains("timeout") ||
-                            message.contains("connection") ||
-                            message.contains("network") -> true
-                            else -> false // 保守策略：未知错误不重试
-                        }
-                    }
-                }
-                TransportResult.fromException(e, isRetryable)
+                TransportResult.fromException(e, true)
             }
         }
     }
@@ -384,9 +229,10 @@ class TransportManager private constructor(private val context: Context) {
                 val channelStats = channelManager.value.getChannelStatistics()
                 val tokenStats = tokenPool.value.getTokenStatistics()
                 val routingStats = routingManager.getRoutingStatistics()
+                val providerStats = providerManager.getProviderStatistics()
                 
                 TransportStatistics(
-                    totalProviders = providers.size,
+                    totalProviders = providerStats.totalProviders,
                     enabledProviders = getEnabledProviders().size,
                     activeChannels = channelStats.activeChannels,
                     totalChannels = channelStats.totalChannels,
@@ -456,25 +302,13 @@ class TransportManager private constructor(private val context: Context) {
             try {
                 Log.i(TAG, "开始清理传输管理器资源")
                 
-                // 清理所有Providers
-                providerLock.write {
-                    providers.values.forEach { provider ->
-                        try {
-                            runBlocking { provider.cleanup() }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "清理Provider失败: ${provider.providerType}", e)
-                        }
-                    }
-                    providers.clear()
-                    providerFactories.clear()
-                }
+                // 取消协程作用域
+                managerScope.cancel()
                 
                 // 清理子组件
                 channelManager.value.cleanup()
                 tokenPool.value.cleanup()
-                
-                // 取消协程作用域
-                managerScope.cancel()
+                providerManager.cleanup()
                 
                 initializationLock.write {
                     isInitialized = false
@@ -614,9 +448,9 @@ class TransportManager private constructor(private val context: Context) {
             
             providerConfigs.forEach { (providerType, config) ->
                 if (enabledProviders.contains(providerType)) {
-                    val provider = createProviderFromConfig(providerType, config)
+                    val provider = providerManager.createProviderFromConfig(providerType, config)
                     if (provider != null) {
-                        registerProvider(provider)
+                        providerManager.registerProvider(provider)
                         Log.i(TAG, "加载Provider: $providerType")
                     } else {
                         Log.w(TAG, "无法创建Provider: $providerType")
@@ -629,15 +463,7 @@ class TransportManager private constructor(private val context: Context) {
         }
     }
     
-    /**
-     * 从配置创建Provider实例
-     */
-    private fun createProviderFromConfig(providerType: String, config: Map<String, Any>): TransportProvider? {
-        providerLock.read {
-            val factory = providerFactories[providerType]
-            return factory?.createProvider(providerType, config)
-        }
-    }
+    // 该方法已移动到TransportProviderManager中
     
     /**
      * 如果已配置则创建Provider
@@ -646,7 +472,7 @@ class TransportManager private constructor(private val context: Context) {
         return try {
             val config = transportConfig.getProviderConfig(providerType)
             if (config != null && transportConfig.isProviderEnabled(providerType)) {
-                createProviderFromConfig(providerType, config)
+                providerManager.createProviderFromConfig(providerType, config)
             } else {
                 null
             }
@@ -740,26 +566,23 @@ class TransportManager private constructor(private val context: Context) {
      * 处理Provider状态变化
      */
     private suspend fun handleProviderStatusChange(oldConfig: TransportConfig, newConfig: TransportConfig) {
-        // 找出新禁用的Providers
+        // 新禁用的Providers：停用其通道
         val newlyDisabled = oldConfig.enabledProviders - newConfig.enabledProviders
         newlyDisabled.forEach { providerType ->
             Log.i(TAG, "禁用Provider: $providerType")
             channelManager.value.deactivateProviderChannels(providerType)
+            providerManager.removeProvider(providerType)
         }
         
-        // 找出新启用的Providers
+        // 新启用的Providers：创建并注册
         val newlyEnabled = newConfig.enabledProviders - oldConfig.enabledProviders
         newlyEnabled.forEach { providerType ->
             Log.i(TAG, "启用Provider: $providerType")
-            // 如果Provider未注册，尝试从配置创建
-            if (!providers.containsKey(providerType)) {
-                val config = transportConfig.getProviderConfig(providerType)
-                if (config != null) {
-                    val provider = createProviderFromConfig(providerType, config)
-                    if (provider != null) {
-                        registerProvider(provider)
-                    }
-                }
+            val config = transportConfig.getProviderConfig(providerType)
+            if (config != null) {
+                providerManager.createProvider(providerType, config)
+            } else {
+                Log.w(TAG, "Provider配置不存在: $providerType")
             }
         }
     }

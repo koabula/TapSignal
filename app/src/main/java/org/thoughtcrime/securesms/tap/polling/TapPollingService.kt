@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlinx.coroutines.*
+import org.thoughtcrime.securesms.tap.TransportErrorHandler
+import org.thoughtcrime.securesms.tap.ErrorContext
 
 /**
  * Tap轮询服务
@@ -59,6 +61,7 @@ class TapPollingService(private val context: Context) {
     private val tokenPool = TransportTokenPool.getInstance(context)
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
     private val messageProcessor = TapMessageProcessor.getInstance(context)
+    private val errorHandler = TransportErrorHandler.getInstance(context)
     
     // 数据库访问
     private val pollingStateTable = SignalDatabase.transportPollingStates
@@ -574,7 +577,14 @@ class TapPollingService(private val context: Context) {
         return try {
             // 列举文件
             val listResult = withTimeout(pollingConfig.pollingTimeoutMs) {
-                provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
+                errorHandler.executeWithRetry({
+                    provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
+                }, ErrorContext(
+                    providerType = taskInfo.metadata.providerType,
+                    operationType = "listFiles",
+                    targetId = taskInfo.recipientId,
+                    channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}"
+                ))
             }
             
             if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
@@ -582,16 +592,12 @@ class TapPollingService(private val context: Context) {
                 return FilePollingResult.success(emptySet(), 0)
             }
             
-            // 修复2：轮询侧文件识别收敛 - 移除启发式二次过滤，交由Provider过滤+解析结果判定
             val allFiles = FileInfo.sortByTime(listResult.files, ascending = true)
             val processedFiles = pollingState?.processedFiles ?: emptySet()
             
-            // 修复2：仅基于处理状态和时间过滤，不再进行文件名/类型的启发式过滤
-            // Provider的listFiles已经按isMessageFile()过滤，这里只需过滤处理状态
             val newFiles = allFiles.filter { file ->
                 !processedFiles.contains(file.name) && 
                 file.lastModified > (pollingState?.lastProcessedTime ?: 0)
-                // 移除file.isMessageFile()二次过滤，交由Provider侧和解析结果判定
             }
             
             if (newFiles.isEmpty()) {
@@ -604,25 +610,23 @@ class TapPollingService(private val context: Context) {
             var messagesProcessed = 0
             val newProcessedFiles = mutableSetOf<String>()
             
-            // 按时间顺序处理每个新文件
             for (file in newFiles) {
                 try {
                     val downloadResult = withTimeout(pollingConfig.pollingTimeoutMs) {
-                        provider.downloadFile(file, taskInfo.metadata)
+                        errorHandler.executeWithRetry({
+                            provider.downloadFile(file, taskInfo.metadata)
+                        }, ErrorContext(
+                            providerType = taskInfo.metadata.providerType,
+                            operationType = "downloadFile",
+                            targetId = taskInfo.recipientId,
+                            channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
+                            metadata = mapOf("fileName" to file.name)
+                        ))
                     }
                     
                     if (downloadResult is TransportResult.Success && downloadResult.data != null) {
-                        // 修复2：移除文件内容的强校验，交由解析结果判定
-                        // 注释掉validateMessageFileContent，避免提前丢弃文件
-                        // if (!file.validateMessageFileContent(downloadResult.data)) {
-                        //     Log.w(TAG, "文件内容验证失败，跳过: ${file.name}")
-                        //     continue
-                        // }
-                        
-                        // 修复2：基于Provider解析结果判定是否为消息文件
                         val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
                         if (message != null) {
-                            // 将消息传递给Signal主程序处理
                             val processResult = messageProcessor.processTapTransportMessage(message)
                             if (processResult is TapProcessResult.Success) {
                                 messagesProcessed++
@@ -633,24 +637,22 @@ class TapPollingService(private val context: Context) {
                         } else {
                             Log.d(TAG, "文件解析失败，可能不是消息文件: ${file.name}")
                         }
-                        // 修复2：无论解析成功与否都标记为已处理，避免重复下载
+                        // 无论成功与否都标记已处理，避免重复
                         newProcessedFiles.add(file.name)
                     } else {
                         Log.w(TAG, "文件下载失败: ${file.name}")
-                        // 下载失败的文件不标记为已处理，下次继续尝试
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "处理文件失败: ${file.name}", e)
-                    // 处理失败的文件不标记为已处理
+                    Log.e(TAG, "处理文件时发生异常: ${file.name}", e)
+                    // 出错的文件不标记为已处理，下次继续尝试
                 }
             }
             
             FilePollingResult.success(newProcessedFiles, messagesProcessed)
             
-        } catch (e: TimeoutCancellationException) {
-            FilePollingResult.failure("轮询超时", needsRetry = true)
         } catch (e: Exception) {
-            FilePollingResult.failure(e.message ?: "未知错误", needsRetry = true)
+            Log.e(TAG, "文件轮询异常: ${taskInfo.recipientId}", e)
+            FilePollingResult.failure(e.message ?: "UNKNOWN_ERROR", needsRetry = true)
         }
     }
     

@@ -148,6 +148,14 @@ enum class TransportError(
         description = "传输元数据格式错误或缺失必要信息"
     ),
     
+    /** 路由错误 */
+    ROUTING_ERROR(
+        displayName = "路由错误",
+        errorCode = "ROUTING_ERROR",
+        isRetryable = true,
+        description = "消息路由失败，无法找到合适的传输通道"
+    ),
+    
     /** 未知错误 */
     UNKNOWN_ERROR(
         displayName = "未知错误",
