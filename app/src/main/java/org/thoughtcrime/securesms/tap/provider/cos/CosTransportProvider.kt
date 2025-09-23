@@ -7,6 +7,8 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosFileInfo
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosAccessToken
+import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosSubUserManagerFactory
+import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosPermission
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 import java.io.File
@@ -472,12 +474,8 @@ class CosTransportProvider(
             try {
                 Log.i(TAG, "开始生成COS传输Token: recipientId=${request.recipientId}")
                 
-                // 1. 获取COS配置
-                val cosConfig = getCosConfig()
-                if (cosConfig == null) {
-                    Log.e(TAG, "COS配置不存在，无法生成Token")
-                    return@withContext null
-                }
+                // 1. 使用已有的COS配置
+                val tapCosConfig = cosConfig
                 
                 // 2. 验证请求参数
                 if (!request.validate()) {
@@ -495,8 +493,9 @@ class CosTransportProvider(
                 Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/")
                 
                 // 4. 创建COS客户端和子用户管理器
-                val cosClient = org.thoughtcrime.securesms.cos.CosClientFactory.createClient(cosConfig, context)
-                val subUserManager = org.thoughtcrime.securesms.cos.CosSubUserManagerFactory.createManager(cosConfig, context)
+                val cosClient = CosClientFactory.createClient(tapCosConfig, context)
+                
+                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
                 
                 // 5. 创建通道目录结构
                 try {
@@ -560,49 +559,15 @@ class CosTransportProvider(
         }
     }
     
-    /**
-     * 获取COS配置
-     */
-    private fun getCosConfig(): org.thoughtcrime.securesms.cos.CosConfig? {
-        return try {
-            // 从配置管理器获取COS配置
-            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            val config = configManager.getProviderConfig("cos")
-            
-            if (config == null) {
-                Log.w(TAG, "未找到COS Provider配置")
-                return null
-            }
-            
-            // 转换为CosConfig
-            val provider = when (config["provider"] as? String) {
-                "AWS" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.AWS
-                "TENCENT" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT
-                else -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT // 默认腾讯云
-            }
-            
-            org.thoughtcrime.securesms.cos.CosConfig(
-                provider = provider,
-                region = config["region"] as? String ?: "",
-                bucketName = config["bucketName"] as? String ?: "",
-                secretId = config["secretId"] as? String ?: "",
-                secretKey = config["secretKey"] as? String ?: ""
-            )
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "获取COS配置失败", e)
-            null
-        }
-    }
     
     /**
      * 将TransportPermission映射到CosPermission
      */
-    private fun mapTransportPermissionToCosPermission(permissions: Set<TransportPermission>): org.thoughtcrime.securesms.cos.CosPermission {
+    private fun mapTransportPermissionToCosPermission(permissions: Set<TransportPermission>): CosPermission {
         return when {
-            permissions.contains(TransportPermission.WRITE) -> org.thoughtcrime.securesms.cos.CosPermission.READ_WRITE
-            permissions.contains(TransportPermission.READ) -> org.thoughtcrime.securesms.cos.CosPermission.READ_ONLY
-            else -> org.thoughtcrime.securesms.cos.CosPermission.READ_ONLY // 默认只读权限
+            permissions.contains(TransportPermission.WRITE) -> CosPermission.READ_WRITE
+            permissions.contains(TransportPermission.READ) -> CosPermission.READ_ONLY
+            else -> CosPermission.READ_ONLY // 默认只读权限
         }
     }
 
@@ -1209,12 +1174,7 @@ class CosTransportProvider(
                     return@withContext false
                 }
                 
-                // 1. 获取COS配置
-                val cosConfig = getCosConfig()
-                if (cosConfig == null) {
-                    Log.e(TAG, "COS配置不存在，无法撤销Token")
-                    return@withContext false
-                }
+                // 1. 使用已有的COS配置
                 
                 // 2. 从tokenId中提取子用户名
                 val subUserName = extractSubUserNameFromTokenId(token.tokenId)
@@ -1224,7 +1184,7 @@ class CosTransportProvider(
                 }
                 
                 // 3. 创建子用户管理器
-                val subUserManager = org.thoughtcrime.securesms.cos.CosSubUserManagerFactory.createManager(cosConfig, context)
+                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
                 
                 // 4. 删除子用户（这会自动撤销所有相关权限和访问密钥）
                 val success = subUserManager.deleteSubUser(subUserName)

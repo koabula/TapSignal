@@ -598,8 +598,16 @@ class TransportChannelManager private constructor(private val context: Context) 
         
         // 3. 构建本端地址和参数
         val myAddress = provider.formatAddress(myProviderConfig)
-        val myRegion = myProviderConfig["region"]?.toString() ?: "ap-beijing"
-        val myBucketName = myProviderConfig["bucketName"]?.toString() ?: "default-bucket"
+        val myRegion = myProviderConfig["region"]?.toString() 
+            ?: run {
+                Log.e(TAG, "COS配置缺少region参数")
+                return null
+            }
+        val myBucketName = myProviderConfig["bucketName"]?.toString() 
+            ?: run {
+                Log.e(TAG, "COS配置缺少bucketName参数")
+                return null
+            }
         
         // 4. 从对端Token信息中获取对端参数
         val peerAddress = peerTokenInfo.address
@@ -608,10 +616,43 @@ class TransportChannelManager private constructor(private val context: Context) 
         
         // 5. 生成本端Token（如果不存在）
         val myToken = myTokenInfo?.token ?: run {
-            Log.d(TAG, "本端Token不存在，生成新Token")
-            // 这里可以触发Token生成逻辑
-            // 暂时使用null，实际应该生成并保存到TokenPool
-            null
+            Log.d(TAG, "本端Token不存在，生成新的长期最高权限Token")
+            try {
+                // 创建Token请求：长期有效 + 最高权限
+                val tokenRequest = TransportTokenRequest(
+                    recipientId = recipientId,
+                    providerType = "cos",
+                    requestedPermissions = setOf(
+                        TransportPermission.READ,
+                        TransportPermission.WRITE,
+                        TransportPermission.DELETE,
+                        TransportPermission.LIST
+                    ),
+                    validityDurationMs = 0L, // 0表示使用默认（长期有效）
+                    providerConfig = myProviderConfig,
+                    purpose = "channel_metadata_generation"
+                )
+                
+                // 使用Provider生成Token
+                val generatedToken = provider.generateToken(tokenRequest)
+                if (generatedToken != null) {
+                    // 保存到Token池（作为共享Token，供对方访问我们的存储）
+                    val saveSuccess = tokenPool.addSharedToken(recipientId, generatedToken)
+                    if (saveSuccess) {
+                        Log.i(TAG, "本端Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
+                        generatedToken
+                    } else {
+                        Log.w(TAG, "本端Token保存失败")
+                        null
+                    }
+                } else {
+                    Log.w(TAG, "Provider生成Token失败")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "生成本端Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
+                null
+            }
         }
         
         Log.d(TAG, "COS元数据创建: " +

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tap配置相关字符串 -->
+    <string name="TapConfigFragment__tap_config">Tap Config</string>
+    <string name="TapConfigFragment__loading">Loading</string>
+    <string name="TapConfigFragment__choose_transport_provider">Choose Transport Provider</string>
+    <string name="TapConfigFragment__no_providers_available">No providers available</string>
+    <string name="TapConfigFragment__no_providers_summary">No registered transport service providers found</string>
+    
+    <!-- Provider相关字符串 -->
+    <string name="TapConfigFragment__switch_provider">Switch Provider</string>
+    <string name="TapConfigFragment__switch_provider_summary">Choose a different transport service provider</string>
+    <string name="TapConfigFragment__switch_provider_dialog_title">Switch Transport Service</string>
+    <string name="TapConfigFragment__switch_provider_dialog_message">Switching transport service will clear the current configuration. Are you sure you want to continue?</string>
+    
+    <!-- 配置测试相关字符串 -->
+    <string name="TapConfigFragment__test_config">Test Configuration</string>
+    <string name="TapConfigFragment__test_config_disabled">Test Configuration (Please fill required fields)</string>
+    <string name="TapConfigFragment__test_config_summary">Click to test configuration connectivity</string>
+    <string name="TapConfigFragment__testing">Testing...</string>
+    <string name="TapConfigFragment__testing_summary">Verifying configuration, please wait</string>
+    <string name="TapConfigFragment__test_success">Test Successful ✓</string>
+    <string name="TapConfigFragment__test_failed">Test Failed ✗</string>
+    <string name="TapConfigFragment__test_default_success">Configuration is valid, connection is normal</string>
+    <string name="TapConfigFragment__test_default_failed">Configuration test failed</string>
+    
+    <!-- 配置保存相关字符串 -->
+    <string name="TapConfigFragment__save_config">Save Configuration</string>
+    <string name="TapConfigFragment__save_config_disabled">Save Configuration (Please fill required fields)</string>
+    <string name="TapConfigFragment__save_config_summary">Save current configuration and enable transport service</string>
+    <string name="TapConfigFragment__save_success">Configuration saved successfully</string>
+    <string name="TapConfigFragment__save_failed">Configuration save failed</string>
+    
+    <!-- 配置删除相关字符串 -->
+    <string name="TapConfigFragment__delete_config">Delete Configuration</string>
+    <string name="TapConfigFragment__delete_config_summary">Delete current provider configuration</string>
+    <string name="TapConfigFragment__delete_config_dialog_title">Delete Configuration</string>
+    <string name="TapConfigFragment__delete_config_dialog_message">After deleting the configuration, you will not be able to use this transport service. Are you sure you want to continue?</string>
+    <string name="TapConfigFragment__delete_success">Configuration deleted successfully</string>
+    <string name="TapConfigFragment__delete_failed">Configuration delete failed</string>
+    
+    <!-- 通用字符串 -->
+    <string name="TapConfigFragment__ok">OK</string>
+    <string name="TapConfigFragment__cancel">Cancel</string>
+    <string name="TapConfigFragment__delete">Delete</string>
+    <string name="TapConfigFragment__confirm">Confirm</string>
+    
+    <!-- 配置字段提示 -->
+    <string name="TapConfigFragment__provider_selection_help">Please select the transport service provider you want to use. Different providers support different features and service types.</string>
+    
+    <!-- 错误消息 -->
+    <string name="TapConfigFragment__load_error">Failed to load configuration</string>
+    <string name="TapConfigFragment__test_error">Test failed with an error: %s</string>
+    <string name="TapConfigFragment__validation_error">Configuration validation failed</string>
+    
+    <!-- Tap V2模式指示器相关字符串 -->
+    <string name="TapV2ModeIndicator__active">v2</string>
+    <string name="TapV2ModeIndicator__inactive">v2?</string>
+    <string name="TapV2ModeIndicator__failed">v2!</string>
+</resources> 

@@ -77,7 +77,7 @@
         app:layout_constraintVertical_chainStyle="packed"
         tools:text="Long Chat name for testing purposes" />
 
-    <org.thoughtcrime.securesms.coscomm.ui.CosV2ModeIndicator
+    <org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator
         android:id="@+id/conversation_list_item_cos_v2_indicator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

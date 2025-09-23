@@ -85,6 +85,13 @@ class AvatarProvider : BaseContentProvider() {
       AppDependencies.init(application, ApplicationDependencyProvider(application))
     }
 
+    // 挂接 TaP 模块初始化（传输管理与轮询服务）
+    try {
+      org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(application).initialize(false)
+    } catch (e: Exception) {
+      Log.w(TAG, "TapModuleInitializer initialization failed", e)
+    }
+
     return application
   }
 

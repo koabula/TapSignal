@@ -4,7 +4,9 @@ import android.content.Context
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
-import org.thoughtcrime.securesms.cos.CosFileInfo
+import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosFileInfo
+import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
+import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
 import java.io.File
 
 /**
@@ -228,14 +230,14 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 )
             }
             
-            // 创建COS配置（使用原始COS模块的类）
+            // 创建COS配置（使用tap模块的CosConfig）
             val provider = when (config["provider"]?.toString()?.uppercase()) {
-                "AWS" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.AWS
-                "TENCENT" -> org.thoughtcrime.securesms.cos.CosConfig.Provider.TENCENT
+                "AWS" -> CosConfig.Provider.AWS
+                "TENCENT" -> CosConfig.Provider.TENCENT
                 else -> return ConfigTestResult.Failed("不支持的提供商")
             }
             
-            val cosConfig = org.thoughtcrime.securesms.cos.CosConfig(
+            val cosConfig = CosConfig(
                 provider = provider,
                 secretId = config["secretId"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥ID"),
                 secretKey = config["secretKey"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥"),
@@ -243,9 +245,9 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 bucketName = config["bucketName"]?.toString() ?: return ConfigTestResult.Failed("缺少存储桶名称")
             )
             
-            // 创建测试客户端（使用原始COS模块的工厂）
+            // 创建测试客户端（使用tap模块的CosClientFactory）
             val cosClient = try {
-                org.thoughtcrime.securesms.cos.CosClientFactory.createClient(cosConfig, null)
+                CosClientFactory.createClient(cosConfig, null)
             } catch (e: Exception) {
                 return ConfigTestResult.Failed("无法创建COS客户端", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
             }
@@ -262,7 +264,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
     /**
      * 执行实际的连接测试
      */
-    private suspend fun performConnectionTest(cosClient: org.thoughtcrime.securesms.cos.CosClient, config: org.thoughtcrime.securesms.cos.CosConfig): ConfigTestResult {
+    private suspend fun performConnectionTest(cosClient: org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient, config: CosConfig): ConfigTestResult {
         return try {
             val testFileName = "tap_connection_test_${System.currentTimeMillis()}.txt"
             val testContent = "Transport-as-a-Plugin COS连接测试"
@@ -297,7 +299,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 
                 // 3. 测试目录列举
                 val files = cosClient.listFiles(testPath)
-                val uploadedFile = files.find { it.key.contains(testFileName) }
+                val uploadedFile = files.find { it.name.contains(testFileName) }
                 if (uploadedFile == null) {
                     return ConfigTestResult.Warning(
                         "文件列举测试异常",
@@ -305,7 +307,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                     )
                 }
                 
-                Log.i(TAG, "文件列举成功，找到测试文件: ${LogSanitizer.sanitize(uploadedFile.key, "filename")}")
+                Log.i(TAG, "文件列举成功，找到测试文件: ${LogSanitizer.sanitize(uploadedFile.name, "filename")}")
                 
                 // 4. 测试文件下载
                 val downloadFile = File.createTempFile("tap_download", ".txt")

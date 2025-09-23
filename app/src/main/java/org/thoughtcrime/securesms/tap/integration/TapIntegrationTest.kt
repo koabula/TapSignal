@@ -321,12 +321,7 @@ class TapIntegrationTest private constructor(private val context: Context) {
         return try {
             Log.i(TAG, "开始测试数据迁移功能")
             
-            // 获取原始SubAccountPoolManager的统计信息
-            val subAccountManager = org.thoughtcrime.securesms.coscomm.manager.SubAccountPoolManager.getInstance(context)
-            val originalStats = subAccountManager.getStatistics()
-            
-            Log.i(TAG, "原始SubAccount统计: $originalStats")
-            
+            // 已移除对旧coscomm SubAccountPoolManager的依赖
             // 获取TransportTokenPool的统计信息
             val tokenPool = TransportTokenPool.getInstance(context)
             val tokenStats = tokenPool.getTokenStatistics()

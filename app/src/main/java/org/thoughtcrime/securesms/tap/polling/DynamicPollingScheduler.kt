@@ -1,6 +1,7 @@
 package org.thoughtcrime.securesms.tap.polling
 
 import android.content.Context
+import android.os.BatteryManager
 import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -521,20 +522,51 @@ class DynamicPollingScheduler(private val context: Context) {
     }
     
     /**
-     * 估算CPU使用率（简化实现）
+     * 估算CPU使用率
      */
     private fun estimateCpuUsage(): Double {
-        // 实际实现应该使用更精确的方法
-        // 这里提供一个简化的估算
-        return 0.3 // 假设30%使用率
+        return try {
+            val statFile = java.io.File("/proc/stat")
+            if (statFile.exists()) {
+                val reader = statFile.bufferedReader()
+                val line = reader.readLine()
+                reader.close()
+                
+                if (line != null && line.startsWith("cpu ")) {
+                    val fields = line.split(" ").filter { it.isNotEmpty() }
+                    if (fields.size >= 5) {
+                        val user = fields[1].toLongOrNull() ?: 0L
+                        val nice = fields[2].toLongOrNull() ?: 0L
+                        val system = fields[3].toLongOrNull() ?: 0L
+                        val idle = fields[4].toLongOrNull() ?: 0L
+                        
+                        val total = user + nice + system + idle
+                        val used = total - idle
+                        
+                        if (total > 0) {
+                            return used.toDouble() / total.toDouble()
+                        }
+                    }
+                }
+            }
+            0.3 // 默认值
+        } catch (e: Exception) {
+            Log.w(TAG, "获取CPU使用率失败", e)
+            0.3 // 默认值
+        }
     }
     
     /**
-     * 获取电池电量（简化实现）
+     * 获取电池电量
      */
     private fun getBatteryLevel(): Int {
-        // 实际实现需要BatteryManager
-        return 50 // 假设50%电量
+        return try {
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 50
+        } catch (e: Exception) {
+            Log.w(TAG, "获取电池电量失败", e)
+            50 // 默认值
+        }
     }
     
     /**

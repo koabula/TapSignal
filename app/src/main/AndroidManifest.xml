@@ -948,12 +948,7 @@
         </intent-filter>
     </activity>
 
-    <!-- COS Request Activity -->
-    <activity android:name="org.thoughtcrime.securesms.coscomm.ui.CosRequestActivity"
-        android:exported="false"
-        android:theme="@style/TextSecure.DialogActivity"
-        android:launchMode="singleTop"
-        android:excludeFromRecents="true" />
+
 
     <activity android:name="org.thoughtcrime.securesms.webrtc.VoiceCallShare"
         android:exported="true"

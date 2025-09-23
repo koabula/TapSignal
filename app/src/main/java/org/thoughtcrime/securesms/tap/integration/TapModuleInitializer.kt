@@ -1,7 +1,6 @@
 package org.thoughtcrime.securesms.tap.integration
 
 import android.content.Context
-import android.content.SharedPreferences
 import kotlinx.coroutines.runBlocking
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
@@ -24,7 +23,6 @@ import kotlinx.coroutines.*
  * 1. 初始化核心管理器
  * 2. 注册Provider
  * 3. 启动轮询服务
- * 4. 从coscomm模块迁移配置和数据（如需要）
  */
 class TapModuleInitializer private constructor(private val context: Context) {
     
@@ -76,15 +74,10 @@ class TapModuleInitializer private constructor(private val context: Context) {
                 // 3. 注册传输Provider
                 registerTransportProviders()
                 
-                // 4. 执行数据迁移（如需要）
-                if (shouldPerformLegacyMigration()) {
-                    migrateFromLegacyModules()
-                }
-                
-                // 5. 启动轮询服务
+                // 4. 启动轮询服务（移除数据迁移步骤）
                 startPollingService()
                 
-                // 6. 标记初始化完成
+                // 5. 标记初始化完成
                 tapValues.markInitializationComplete()
                 
                 isInitialized = true
@@ -171,238 +164,6 @@ class TapModuleInitializer private constructor(private val context: Context) {
     }
     
     /**
-     * 检查是否需要执行遗留模块迁移
-     */
-    private fun shouldPerformLegacyMigration(): Boolean {
-        val migrationCompleted = tapValues.isLegacyMigrationCompleted()
-        
-        // 检查是否存在coscomm配置需要迁移
-        val hasCosCommConfig = try {
-            // 检查是否存在旧的coscomm配置文件
-            context.getSharedPreferences("cos_settings", Context.MODE_PRIVATE)
-                .contains("cos_enabled")
-        } catch (e: Exception) {
-            false
-        }
-        
-        return !migrationCompleted && hasCosCommConfig
-    }
-    
-    /**
-     * 从coscomm模块迁移配置和数据
-     */
-    private suspend fun migrateFromLegacyModules() {
-        Log.i(TAG, "开始从coscomm模块迁移数据...")
-        
-        try {
-            // 1. 迁移COS配置
-            migrateCosConfiguration()
-            
-            // 2. 迁移SubAccount Pool到Transport Token Pool
-            migrateSubAccountPool()
-            
-            // 3. 迁移轮询状态
-            migratePollingStates()
-            
-            // 4. 标记迁移完成
-            markLegacyMigrationComplete()
-            
-            Log.i(TAG, "coscomm模块数据迁移完成")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "数据迁移失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            // 迁移失败不应该阻止初始化
-        }
-    }
-    
-    /**
-     * 迁移COS配置
-     */
-    private fun migrateCosConfiguration() {
-        try {
-            // 检查是否有COS配置需要迁移
-            val cosPrefs = context.getSharedPreferences("cos_settings", Context.MODE_PRIVATE)
-            val cosEnabled = cosPrefs.getBoolean("cos_enabled", false)
-            
-            if (!cosEnabled) {
-                Log.d(TAG, "无COS配置需要迁移")
-                return
-            }
-            
-            // 获取COS配置
-            val cosConfig = mapOf(
-                "provider" to cosPrefs.getString("cos_provider", "TENCENT"),
-                "secretId" to cosPrefs.getString("cos_secret_id", ""),
-                "secretKey" to cosPrefs.getString("cos_secret_key", ""),
-                "region" to cosPrefs.getString("cos_region", ""),
-                "bucketName" to cosPrefs.getString("cos_bucket_name", "")
-            ).filter { it.value != null && it.value.toString().isNotEmpty() }
-            
-            if (cosConfig.isNotEmpty()) {
-                // 转换为TaP Provider配置
-                val configManager = TransportProviderConfigManager.getInstance(context)
-                val tapConfig = convertCosConfigToTapConfig(cosConfig)
-                
-                if (tapConfig != null) {
-                    configManager.saveProviderConfig("cos", tapConfig)
-                    Log.d(TAG, "COS配置迁移成功")
-                } else {
-                    Log.w(TAG, "COS配置转换失败")
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "迁移COS配置失败: ${LogSanitizer.sanitizeThrowable(e)}")
-        }
-    }
-    
-    /**
-     * 转换COS配置为TaP配置
-     */
-    private fun convertCosConfigToTapConfig(cosConfig: Map<String, Any?>): Map<String, Any>? {
-        return try {
-            // 这里需要根据实际的COS配置结构进行转换
-            // 示例转换逻辑
-            mapOf(
-                "provider_type" to "cos",
-                "enabled" to true,
-                "provider" to (cosConfig["provider"] ?: "TENCENT"),
-                "secretId" to (cosConfig["secretId"] ?: ""),
-                "secretKey" to (cosConfig["secretKey"] ?: ""),
-                "region" to (cosConfig["region"] ?: ""),
-                "bucketName" to (cosConfig["bucketName"] ?: ""),
-                "migrated_from_legacy" to true,
-                "migration_timestamp" to System.currentTimeMillis()
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "转换COS配置失败: ${LogSanitizer.sanitizeThrowable(e)}")
-            null
-        }
-    }
-    
-    /**
-     * 从SubAccountPool迁移数据到TransportTokenPool
-     */
-    private fun migrateSubAccountPool() {
-        Log.i(TAG, "开始从SubAccountPool迁移数据到TransportTokenPool")
-        
-        try {
-            // 获取原始的SubAccountPoolManager实例
-            val subAccountPoolManager = org.thoughtcrime.securesms.coscomm.manager.SubAccountPoolManager.getInstance(context)
-            val transportTokenPool = TransportTokenPool.getInstance(context)
-            
-            var migratedReceived = 0
-            var migratedShared = 0
-            
-            // 1. 迁移接收到的子账户（对方分享给我的）
-            try {
-                val receivedSubAccounts = subAccountPoolManager.getAllValidReceivedSubAccounts()
-                Log.d(TAG, "发现接收子账户数量: ${receivedSubAccounts.size}")
-                
-                receivedSubAccounts.forEach { subAccountEntry ->
-                    try {
-                        val recipientId = subAccountEntry.recipientId
-                        val accessInfo = subAccountEntry.accessInfo
-                        
-                        // 转换为CosTransportToken
-                        val transportToken = convertCosAccessInfoToTransportToken(
-                            recipientId = recipientId,
-                            accessInfo = accessInfo,
-                            tokenType = "received"
-                        )
-                        
-                        // 添加到TransportTokenPool
-                        runBlocking {
-                            val success = transportTokenPool.addReceivedToken(recipientId, transportToken)
-                            if (success) {
-                                migratedReceived++
-                                Log.d(TAG, "迁移接收Token成功: recipientId=$recipientId")
-                            } else {
-                                Log.w(TAG, "迁移接收Token失败: recipientId=$recipientId")
-                            }
-                        }
-                        
-                    } catch (e: Exception) {
-                        Log.e(TAG, "迁移单个接收子账户失败: ${subAccountEntry.recipientId}", e)
-                    }
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "迁移接收子账户失败", e)
-            }
-            
-            // 2. 迁移分享的子账户（我分享给对方的）
-            try {
-                // 注意：原始设计中可能没有直接获取所有分享子账户的方法
-                // 这里需要通过其他方式获取，或者从持久化存储中读取
-                val statistics = subAccountPoolManager.getStatistics()
-                Log.d(TAG, "SubAccount统计信息: $statistics")
-                
-                // 由于SubAccountPoolManager可能没有直接获取所有分享子账户的方法
-                // 我们可以通过遍历已知的recipientId来获取分享的子账户
-                // 这里暂时跳过，因为原始实现可能不完整
-                Log.w(TAG, "分享子账户迁移暂时跳过，原始API可能不支持批量获取")
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "迁移分享子账户失败", e)
-            }
-            
-            Log.i(TAG, "SubAccountPool数据迁移完成: 接收=$migratedReceived, 分享=$migratedShared")
-            
-            // 3. 标记迁移完成（可选：清理原始数据）
-            if (migratedReceived > 0 || migratedShared > 0) {
-                // 可以选择清理原始数据，但为了安全起见，暂时保留
-                Log.i(TAG, "迁移成功，原始SubAccountPool数据保留以备回滚")
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "SubAccountPool数据迁移失败", e)
-        }
-    }
-    
-    /**
-     * 将CosAccessInfo转换为CosTransportToken
-     */
-    private fun convertCosAccessInfoToTransportToken(
-        recipientId: String,
-        accessInfo: org.thoughtcrime.securesms.coscomm.data.CosAccessInfo,
-        tokenType: String
-    ): CosTransportToken {
-        
-        // 生成tokenId
-        val timestamp = System.currentTimeMillis()
-        val tokenId = "migrated-cos-$tokenType-$recipientId-$timestamp"
-        
-        // 映射权限
-        val permissions = setOf(TransportPermission.READ) // 原始设计中通常是只读权限
-        
-        return CosTransportToken(
-            tokenId = tokenId,
-            recipientId = recipientId,
-            permissions = permissions,
-            expirationTime = accessInfo.expireTime,
-            accessKeyId = accessInfo.accessKeyId,
-            secretAccessKey = accessInfo.secretAccessKey,
-            sessionToken = accessInfo.sessionToken,
-            region = accessInfo.region,
-            bucketName = accessInfo.bucketName
-        )
-    }
-    
-    /**
-     * 迁移轮询状态
-     */
-    private fun migratePollingStates() {
-        try {
-            // 迁移coscomm的轮询状态到TaP轮询状态
-            Log.d(TAG, "轮询状态迁移 - 占位符实现")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "迁移轮询状态失败: ${LogSanitizer.sanitizeThrowable(e)}")
-        }
-    }
-    
-    /**
      * 启动轮询服务
      */
     private suspend fun startPollingService() {
@@ -454,13 +215,6 @@ class TapModuleInitializer private constructor(private val context: Context) {
     }
     
     // markInitializationComplete方法已移到TapValues中
-    
-    /**
-     * 标记遗留模块迁移完成
-     */
-    private fun markLegacyMigrationComplete() {
-        tapValues.setLegacyMigrationCompleted(true)
-    }
     
     /**
      * 获取初始化状态

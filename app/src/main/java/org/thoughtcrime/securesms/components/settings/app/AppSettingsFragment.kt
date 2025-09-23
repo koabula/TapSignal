@@ -282,10 +282,10 @@ private fun AppSettingsContent(
 
         item {
           Rows.TextRow(
-            text = stringResource(R.string.CosSettingsFragment__cloud_object_storage),
+            text = stringResource(R.string.TapConfigFragment__tap_config),
             icon = painterResource(R.drawable.symbol_data_bold_24),
             onClick = {
-              callbacks.navigate(R.id.action_appSettingsFragment_to_cosSettingsFragment)
+              callbacks.navigate(R.id.action_appSettingsFragment_to_tapConfigFragment)
             }
           )
         }
