@@ -579,7 +579,7 @@ class TransportChannelManager private constructor(private val context: Context) 
         provider: TransportProvider,
         configManager: TransportProviderConfigManager,
         tokenPool: TransportTokenPool
-    ): CosTransportMetadata? {
+    ): org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata? {
         // 1. 获取本端COS配置
         val myProviderConfig = configManager.getProviderConfig("cos")
             ?: run {
@@ -655,23 +655,36 @@ class TransportChannelManager private constructor(private val context: Context) 
             }
         }
         
+        // 5. 生成哈希化ID
+        val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+        val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+        val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientId)
+        
+        // 6. 构建路径
+        val mySendPath = provider.getSendPath(peerHashedId)
+        val peerReceivePath = provider.getReceivePath(myHashedId)
+        
         Log.d(TAG, "COS元数据创建: " +
               "myAddress=${LogSanitizer.sanitize(myAddress, "address")}, " +
               "peerAddress=${LogSanitizer.sanitize(peerAddress, "address")}, " +
-              "myRegion=$myRegion, peerRegion=$peerRegion")
+              "myHashedId=$myHashedId, peerHashedId=$peerHashedId, " +
+              "mySendPath=$mySendPath, peerReceivePath=$peerReceivePath")
         
-        return CosTransportMetadata(
+        return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
             recipientId = recipientId,
             providerType = "cos",
             myAddress = myAddress,
             myToken = myToken,
             myRegion = myRegion,
             myBucketName = myBucketName,
+            mySendPath = mySendPath,
             peerAddress = peerAddress,
             peerToken = peerTokenInfo.token,
             peerRegion = peerRegion,
             peerBucketName = peerBucketName,
-            myId = "self"
+            peerReceivePath = peerReceivePath,
+            myHashedId = myHashedId,
+            peerHashedId = peerHashedId
         )
     }
     

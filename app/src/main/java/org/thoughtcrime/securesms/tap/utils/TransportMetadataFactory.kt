@@ -2,7 +2,7 @@ package org.thoughtcrime.securesms.tap.utils
 
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.TransportMetadata
-import org.thoughtcrime.securesms.tap.CosTransportMetadata
+import org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
 import org.thoughtcrime.securesms.tap.EmailTransportMetadata
 
 /**

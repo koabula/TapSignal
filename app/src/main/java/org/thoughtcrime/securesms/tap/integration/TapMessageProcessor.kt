@@ -423,7 +423,17 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 }
             }
             
-            ChannelRequestInfo(config, token)
+            // 构建扩展信息
+            val extendedInfo = ChannelRequestExtendedInfo(
+                address = requestInfo.address,
+                sendPath = requestInfo.sendPath,
+                receivePath = requestInfo.receivePath,
+                hashedId = requestInfo.hashedId,
+                capabilities = requestInfo.capabilities ?: emptyList(),
+                version = requestInfo.version ?: "1.0"
+            )
+            
+            ChannelRequestInfo(config, token, extendedInfo)
         } catch (e: Exception) {
             Log.e(TAG, "解析JSON通道请求数据失败，尝试旧格式解析", e)
             
@@ -438,7 +448,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     cleanupIntervalMs = 3600000L,
                     maxFailureCount = 3
                 )
-                ChannelRequestInfo(config, null)
+                ChannelRequestInfo(config, null, null)
             } catch (legacyException: Exception) {
                 Log.e(TAG, "旧格式通道请求解析也失败", legacyException)
                 null
@@ -462,11 +472,22 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 }
             }
             
+            // 构建扩展信息
+            val extendedInfo = ChannelResponseExtendedInfo(
+                address = responseInfo.address,
+                sendPath = responseInfo.sendPath,
+                receivePath = responseInfo.receivePath,
+                hashedId = responseInfo.hashedId,
+                capabilities = responseInfo.capabilities ?: emptyList(),
+                version = responseInfo.version ?: "1.0"
+            )
+            
             ChannelResponseInfo(
                 status = responseInfo.status,
                 providerType = responseInfo.providerType,
                 token = token,
-                reason = responseInfo.reason
+                reason = responseInfo.reason,
+                extendedInfo = extendedInfo
             )
         } catch (e: Exception) {
             Log.e(TAG, "解析JSON通道响应数据失败，尝试旧格式解析", e)
@@ -478,7 +499,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     status = if (responseData.contains("accepted")) "accepted" else "rejected",
                     providerType = "cos",
                     token = null,
-                    reason = null
+                    reason = null,
+                    extendedInfo = null
                 )
             } catch (legacyException: Exception) {
                 Log.e(TAG, "旧格式通道响应解析也失败", legacyException)
@@ -626,7 +648,20 @@ sealed class TapEnvelopeProcessResult {
  */
 private data class ChannelRequestInfo(
     val config: TransportChannelConfig,
-    val token: TransportToken?
+    val token: TransportToken?,
+    val extendedInfo: ChannelRequestExtendedInfo? = null
+)
+
+/**
+ * 通道请求扩展信息
+ */
+private data class ChannelRequestExtendedInfo(
+    val address: String?,
+    val sendPath: String?,
+    val receivePath: String?,
+    val hashedId: String?,
+    val capabilities: List<String>,
+    val version: String
 )
 
 /**
@@ -636,7 +671,20 @@ private data class ChannelResponseInfo(
     val status: String,
     val providerType: String,
     val token: TransportToken?,
-    val reason: String?
+    val reason: String?,
+    val extendedInfo: ChannelResponseExtendedInfo? = null
+)
+
+/**
+ * 通道响应扩展信息
+ */
+private data class ChannelResponseExtendedInfo(
+    val address: String?,
+    val sendPath: String?,
+    val receivePath: String?,
+    val hashedId: String?,
+    val capabilities: List<String>,
+    val version: String
 )
 
 /**
@@ -662,14 +710,26 @@ private data class TapChannelRequestMessage(
     @JsonProperty("priority") val priority: Int?,
     @JsonProperty("maxRetries") val maxRetries: Int?,
     @JsonProperty("timeout") val timeout: Long?,
-    @JsonProperty("token") val token: Map<String, Any>?
+    @JsonProperty("token") val token: Map<String, Any>?,
+    @JsonProperty("address") val address: String?,
+    @JsonProperty("sendPath") val sendPath: String?,
+    @JsonProperty("receivePath") val receivePath: String?,
+    @JsonProperty("hashedId") val hashedId: String?,
+    @JsonProperty("capabilities") val capabilities: List<String>?,
+    @JsonProperty("version") val version: String?
 )
 
 private data class TapChannelResponseMessage(
     @JsonProperty("status") val status: String,
     @JsonProperty("providerType") val providerType: String,
     @JsonProperty("token") val token: Map<String, Any>?,
-    @JsonProperty("reason") val reason: String?
+    @JsonProperty("reason") val reason: String?,
+    @JsonProperty("address") val address: String?,
+    @JsonProperty("sendPath") val sendPath: String?,
+    @JsonProperty("receivePath") val receivePath: String?,
+    @JsonProperty("hashedId") val hashedId: String?,
+    @JsonProperty("capabilities") val capabilities: List<String>?,
+    @JsonProperty("version") val version: String?
 )
 
 private data class TapChannelRevokeMessage(

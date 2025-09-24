@@ -391,7 +391,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             messageId = org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId(),
             timestamp = outgoingMessage.sentTimeMillis,
             senderId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString(),
-            recipientId = recipient.id.toString(),
+            recipientId = recipient.requireAci().toString(),
             messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
             signalCiphertext = Base64.encodeWithPadding(encryptedData.ciphertext),
             signalCiphertextType = encryptedData.ciphertextType,
@@ -411,7 +411,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             Log.d(TAG, "通过TAP传输层发送: messageId=${transportMessage.messageId}")
             
             // 获取传输路由
-            val routingResult = transportManager.routeMessage(transportMessage, recipient.id.toString())
+            val routingResult = transportManager.routeMessage(transportMessage, recipient.requireAci().toString())
             
             when (routingResult) {
                 is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
