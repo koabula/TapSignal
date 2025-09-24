@@ -117,9 +117,6 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 return TapProcessResult.Failed("消息验证失败")
             }
             
-            // 记录接收统计
-            recordMessageReceived(transportMessage)
-            
             // 将加密消息交给TapEnvelopeAdapter处理Signal相关逻辑
             val envelopeAdapter = TapEnvelopeAdapter.getInstance(context)
             val adapterResult = envelopeAdapter.processEncryptedMessage(transportMessage)
@@ -127,20 +124,14 @@ class TapMessageProcessor private constructor(private val context: Context) {
             when (adapterResult) {
                 is TapEnvelopeProcessResult.Success -> {
                     Log.i(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
-                    // 记录处理成功统计
-                    statisticsManager.recordMessageProcessingSuccess(transportMessage.messageId)
                     TapProcessResult.Success("消息处理成功")
                 }
                 is TapEnvelopeProcessResult.Failed -> {
                     Log.w(TAG, "传输消息处理失败: messageId=${transportMessage.messageId}, error=${adapterResult.error}")
-                    // 记录处理失败统计
-                    statisticsManager.recordMessageProcessingError(transportMessage.messageId, adapterResult.error)
                     TapProcessResult.Failed(adapterResult.error)
                 }
                 is TapEnvelopeProcessResult.Duplicate -> {
                     Log.d(TAG, "传输消息重复: messageId=${transportMessage.messageId}")
-                    // 重复消息也算作成功处理（已忽略）
-                    statisticsManager.recordMessageProcessingSuccess(transportMessage.messageId)
                     TapProcessResult.Success("消息重复，已忽略")
                 }
             }
@@ -204,29 +195,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
             false
         }
     }
-    
-    // 统计管理器
-    private val statisticsManager by lazy { 
-        org.thoughtcrime.securesms.tap.statistics.TapMessageStatistics.getInstance(context) 
-    }
-    
-    /**
-     * 记录消息接收统计
-     */
-    private fun recordMessageReceived(message: TransportMessage) {
-        try {
-            // 使用真实的统计管理器记录消息接收信息
-            statisticsManager.recordMessageReceived(message)
-            
-            Log.d(TAG, "记录消息接收统计: senderId=${message.senderId}, " +
-                    "type=${message.messageType}, " +
-                    "size=${message.signalCiphertext.length}, " +
-                    "attachments=${message.attachments.size}")
-            
-        } catch (e: Exception) {
-            Log.w(TAG, "记录消息统计失败", e)
-        }
-    }
+
 
     /**
      * 处理传输通道请求

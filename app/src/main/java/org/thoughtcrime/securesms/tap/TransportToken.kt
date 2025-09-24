@@ -73,7 +73,9 @@ data class CosTransportToken(
     /** COS区域 */
     val region: String,
     /** COS存储桶名称 */
-    val bucketName: String
+    val bucketName: String,
+    /** 云服务提供商类型 (AWS/TENCENT) */
+    val cloudProvider: String
 ) : TransportToken {
     
     override fun toMap(): Map<String, Any> {
@@ -86,7 +88,8 @@ data class CosTransportToken(
             "accessKeyId" to accessKeyId,
             "secretAccessKey" to secretAccessKey,
             "region" to region,
-            "bucketName" to bucketName
+            "bucketName" to bucketName,
+            "cloudProvider" to cloudProvider
         )
         
         sessionToken?.let { map["sessionToken"] = it }
@@ -99,11 +102,12 @@ data class CosTransportToken(
                recipientId.isNotBlank() &&
                providerType == "cos" &&
                permissions.isNotEmpty() &&
-               expirationTime > System.currentTimeMillis() &&
                accessKeyId.isNotBlank() &&
                secretAccessKey.isNotBlank() &&
                region.isNotBlank() &&
-               bucketName.isNotBlank()
+               bucketName.isNotBlank() &&
+               cloudProvider.isNotBlank() &&
+               (cloudProvider == "AWS" || cloudProvider == "TENCENT")
     }
     
     companion object {
@@ -123,6 +127,7 @@ data class CosTransportToken(
                 val sessionToken = data["sessionToken"] as? String
                 val region = data["region"] as? String ?: return null
                 val bucketName = data["bucketName"] as? String ?: return null
+                val cloudProvider = data["cloudProvider"] as? String ?: return null
                 
                 CosTransportToken(
                     tokenId = tokenId,
@@ -134,7 +139,8 @@ data class CosTransportToken(
                     secretAccessKey = secretAccessKey,
                     sessionToken = sessionToken,
                     region = region,
-                    bucketName = bucketName
+                    bucketName = bucketName,
+                    cloudProvider = cloudProvider
                 )
             } catch (e: Exception) {
                 null
@@ -232,7 +238,8 @@ object TransportTokenFactory {
         secretAccessKey: String,
         sessionToken: String? = null,
         region: String,
-        bucketName: String
+        bucketName: String,
+        cloudProvider: String
     ): CosTransportToken {
         return CosTransportToken(
             tokenId = tokenId,
@@ -243,7 +250,8 @@ object TransportTokenFactory {
             secretAccessKey = secretAccessKey,
             sessionToken = sessionToken,
             region = region,
-            bucketName = bucketName
+            bucketName = bucketName,
+            cloudProvider = cloudProvider
         )
     }
     

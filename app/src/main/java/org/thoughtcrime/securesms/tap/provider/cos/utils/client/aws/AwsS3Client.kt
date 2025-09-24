@@ -52,7 +52,8 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
 
         okHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
-                Log.w(TAG, "Upload failed: ${resp.code}")
+                val errorBody = resp.body?.string() ?: "无响应内容"
+                Log.w(TAG, "AWS S3上传失败: code=${resp.code}, message=${resp.message}, path=$remotePath, error=$errorBody")
             }
             return resp.isSuccessful
         }
@@ -84,7 +85,8 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
 
         okHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
-                Log.w(TAG, "Download failed: ${resp.code}")
+                val errorBody = resp.body?.string() ?: "无响应内容"
+                Log.w(TAG, "AWS S3下载失败: code=${resp.code}, message=${resp.message}, path=$remotePath, error=$errorBody")
                 return false
             }
             localFile.outputStream().use { out ->

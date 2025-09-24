@@ -133,7 +133,7 @@ class CosTransportProvider(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "推送消息时发生异常", e)
+                Log.e(TAG, "推送消息时发生异常: messageId=${LogSanitizer.sanitize(message.messageId, "messageId")}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -185,7 +185,7 @@ class CosTransportProvider(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "拉取消息时发生异常", e)
+                Log.e(TAG, "拉取消息时发生异常: recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -237,7 +237,7 @@ class CosTransportProvider(
                 TransportResult.success(fileInfos)
 
             } catch (e: Exception) {
-                Log.e(TAG, "列举文件时发生异常", e)
+                Log.e(TAG, "列举文件时发生异常: path=${LogSanitizer.sanitize(path, "path")}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -293,7 +293,7 @@ class CosTransportProvider(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "下载文件时发生异常", e)
+                Log.e(TAG, "下载文件时发生异常: fileName=${LogSanitizer.sanitize(fileInfo.name, "fileName")}, size=${fileInfo.size}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -357,7 +357,7 @@ class CosTransportProvider(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "上传文件时发生异常", e)
+                Log.e(TAG, "上传文件时发生异常: path=${LogSanitizer.sanitize(path, "path")}, size=${data.size}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -533,7 +533,8 @@ class CosTransportProvider(
                     secretAccessKey = subUserCredential.secretAccessKey,
                     sessionToken = null, // 永久凭证不需要sessionToken
                     region = cosConfig.region,
-                    bucketName = cosConfig.bucketName
+                    bucketName = cosConfig.bucketName,
+                    cloudProvider = cosConfig.provider.name
                 )
                 
                 Log.i(TAG, "COS传输Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(request.recipientId)}")
@@ -618,7 +619,7 @@ class CosTransportProvider(
     /**
      * 测试Bucket连通性
      */
-    private suspend fun testBucketConnectivity(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun testBucketConnectivity(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
         return try {
             when (cosConfig.provider) {
                 CosConfig.Provider.TENCENT -> testTencentBucketConnectivity(cosClient, cosToken)
@@ -637,7 +638,7 @@ class CosTransportProvider(
     /**
      * 腾讯云Bucket连通性测试
      */
-    private suspend fun testTencentBucketConnectivity(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun testTencentBucketConnectivity(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
         return try {
             val bucketName = extractBucketName(cosToken.bucketName)
             
@@ -696,7 +697,7 @@ class CosTransportProvider(
     /**
      * AWS S3 Bucket连通性测试
      */
-    private suspend fun testAwsBucketConnectivity(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun testAwsBucketConnectivity(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
         return try {
             val bucketName = extractBucketName(cosToken.bucketName)
             val region = cosToken.region
@@ -771,7 +772,7 @@ class CosTransportProvider(
     /**
      * 验证路径权限（确保只能访问指定前缀）
      */
-    private suspend fun validatePathPermissions(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun validatePathPermissions(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
         return try {
             // 获取真实的COS客户端
             val realCosClient = createCosClient(createMetadataFromToken(cosToken))
@@ -865,7 +866,7 @@ class CosTransportProvider(
     /**
      * 验证完整权限（读、写、删除、列举）
      */
-    private suspend fun validateFullPermissions(cosClient: Any, cosToken: CosTransportToken): Boolean {
+    private suspend fun validateFullPermissions(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
         return try {
             Log.d(TAG, "开始验证完整权限")
             
@@ -990,12 +991,10 @@ class CosTransportProvider(
     /**
      * 测试腾讯云COS上传
      */
-    private suspend fun testTencentUpload(cosClient: Any, file: File, key: String): Boolean {
+    private suspend fun testTencentUpload(cosClient: CosClient, file: File, key: String): Boolean {
         return try {
-            // 使用反射调用上传方法（避免直接类型依赖）
-            val uploadMethod = cosClient.javaClass.getMethod("uploadFile", File::class.java, String::class.java)
-            val result = uploadMethod.invoke(cosClient, file, key) as Boolean
-            result
+            // 使用类型安全的接口调用
+            cosClient.uploadFile(file, key)
         } catch (e: Exception) {
             Log.e(TAG, "腾讯云COS上传测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1005,12 +1004,10 @@ class CosTransportProvider(
     /**
      * 测试AWS S3上传
      */
-    private suspend fun testAwsUpload(cosClient: Any, file: File, key: String): Boolean {
+    private suspend fun testAwsUpload(cosClient: CosClient, file: File, key: String): Boolean {
         return try {
-            // 使用反射调用上传方法
-            val uploadMethod = cosClient.javaClass.getMethod("uploadFile", File::class.java, String::class.java)
-            val result = uploadMethod.invoke(cosClient, file, key) as Boolean
-            result
+            // 使用类型安全的接口调用
+            cosClient.uploadFile(file, key)
         } catch (e: Exception) {
             Log.e(TAG, "AWS S3上传测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1020,11 +1017,9 @@ class CosTransportProvider(
     /**
      * 测试腾讯云COS下载
      */
-    private suspend fun testTencentDownload(cosClient: Any, key: String, file: File): Boolean {
+    private suspend fun testTencentDownload(cosClient: CosClient, key: String, file: File): Boolean {
         return try {
-            val downloadMethod = cosClient.javaClass.getMethod("downloadFile", String::class.java, File::class.java)
-            val result = downloadMethod.invoke(cosClient, key, file) as Boolean
-            result
+            cosClient.downloadFile(key, file)
         } catch (e: Exception) {
             Log.e(TAG, "腾讯云COS下载测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1034,11 +1029,9 @@ class CosTransportProvider(
     /**
      * 测试AWS S3下载
      */
-    private suspend fun testAwsDownload(cosClient: Any, key: String, file: File): Boolean {
+    private suspend fun testAwsDownload(cosClient: CosClient, key: String, file: File): Boolean {
         return try {
-            val downloadMethod = cosClient.javaClass.getMethod("downloadFile", String::class.java, File::class.java)
-            val result = downloadMethod.invoke(cosClient, key, file) as Boolean
-            result
+            cosClient.downloadFile(key, file)
         } catch (e: Exception) {
             Log.e(TAG, "AWS S3下载测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1048,11 +1041,10 @@ class CosTransportProvider(
     /**
      * 测试腾讯云COS列举文件
      */
-    private suspend fun testTencentListFiles(cosClient: Any, prefix: String): List<String> {
+    private suspend fun testTencentListFiles(cosClient: CosClient, prefix: String): List<String> {
         return try {
-            val listMethod = cosClient.javaClass.getMethod("listFiles", String::class.java)
-            val result = listMethod.invoke(cosClient, prefix) as List<String>
-            result
+            val cosFileInfos = cosClient.listFiles(prefix)
+            cosFileInfos.map { it.name }
         } catch (e: Exception) {
             Log.e(TAG, "腾讯云COS列举测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             emptyList()
@@ -1062,11 +1054,10 @@ class CosTransportProvider(
     /**
      * 测试AWS S3列举文件
      */
-    private suspend fun testAwsListFiles(cosClient: Any, prefix: String): List<String> {
+    private suspend fun testAwsListFiles(cosClient: CosClient, prefix: String): List<String> {
         return try {
-            val listMethod = cosClient.javaClass.getMethod("listFiles", String::class.java)
-            val result = listMethod.invoke(cosClient, prefix) as List<String>
-            result
+            val cosFileInfos = cosClient.listFiles(prefix)
+            cosFileInfos.map { it.name }
         } catch (e: Exception) {
             Log.e(TAG, "AWS S3列举测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             emptyList()
@@ -1076,11 +1067,9 @@ class CosTransportProvider(
     /**
      * 测试腾讯云COS删除文件
      */
-    private suspend fun testTencentDelete(cosClient: Any, key: String): Boolean {
+    private suspend fun testTencentDelete(cosClient: CosClient, key: String): Boolean {
         return try {
-            val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
-            val result = deleteMethod.invoke(cosClient, key) as Boolean
-            result
+            cosClient.deleteFile(key)
         } catch (e: Exception) {
             Log.e(TAG, "腾讯云COS删除测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1090,11 +1079,9 @@ class CosTransportProvider(
     /**
      * 测试AWS S3删除文件
      */
-    private suspend fun testAwsDelete(cosClient: Any, key: String): Boolean {
+    private suspend fun testAwsDelete(cosClient: CosClient, key: String): Boolean {
         return try {
-            val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
-            val result = deleteMethod.invoke(cosClient, key) as Boolean
-            result
+            cosClient.deleteFile(key)
         } catch (e: Exception) {
             Log.e(TAG, "AWS S3删除测试失败: ${LogSanitizer.sanitizeThrowable(e)}")
             false
@@ -1227,6 +1214,13 @@ class CosTransportProvider(
     }
 
     /**
+     * 从配置中获取Provider类型
+     */
+    private fun getProviderFromConfig(): String {
+        return config["provider"]?.toString()?.uppercase() ?: cosConfig.provider.name
+    }
+
+    /**
      * 创建COS客户端
      */
     private fun createCosClient(metadata: org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata): CosClient? {
@@ -1235,10 +1229,7 @@ class CosTransportProvider(
                 // 使用Token创建客户端
                 val cosToken = metadata.myToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
-                    provider = when (cosToken.region.startsWith("ap-")) {
-                        true -> "TENCENT"
-                        false -> "AWS"
-                    },
+                    provider = getProviderFromConfig(),
                     region = cosToken.region,
                     bucketName = cosToken.bucketName,
                     accessKeyId = cosToken.accessKeyId,
@@ -1250,7 +1241,7 @@ class CosTransportProvider(
                 CosClientFactory.createClient(cosConfig, context)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "创建COS客户端失败", e)
+            Log.e(TAG, "创建COS客户端失败: provider=${getProviderFromConfig()}, region=${cosConfig.region}, error=${LogSanitizer.sanitizeThrowable(e)}")
             null
         }
     }
@@ -1264,10 +1255,7 @@ class CosTransportProvider(
                 // 使用本端Token创建客户端
                 val cosToken = metadata.myToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
-                    provider = when (cosToken.region.startsWith("ap-")) {
-                        true -> "TENCENT"
-                        false -> "AWS"
-                    },
+                    provider = getProviderFromConfig(),
                     region = metadata.myRegion,
                     bucketName = metadata.myBucketName,
                     accessKeyId = cosToken.accessKeyId,
@@ -1293,10 +1281,7 @@ class CosTransportProvider(
                 // 使用对端Token创建客户端（只读权限）
                 val cosToken = metadata.peerToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
-                    provider = when (cosToken.region.startsWith("ap-")) {
-                        true -> "TENCENT"
-                        false -> "AWS"
-                    },
+                    provider = cosToken.cloudProvider,
                     region = metadata.peerRegion,
                     bucketName = metadata.peerBucketName,
                     accessKeyId = cosToken.accessKeyId,
@@ -1318,15 +1303,8 @@ class CosTransportProvider(
      */
     private fun createCosClient(cosToken: CosTransportToken): CosClient? {
         return try {
-            // 根据Token信息确定Provider类型
-            val providerType = when {
-                cosToken.region.startsWith("ap-") || cosToken.region.startsWith("na-") -> "TENCENT"
-                cosToken.region.startsWith("us-") || cosToken.region.startsWith("eu-") -> "AWS"
-                else -> {
-                    Log.w(TAG, "无法从region确定Provider类型: ${cosToken.region}，默认使用配置中的Provider")
-                    cosConfig.provider.name
-                }
-            }
+            // 直接使用Token中的Provider信息，更可靠的provider类型识别
+            val providerType = cosToken.cloudProvider
             
             // 使用CosClientFactory创建真实客户端
             CosClientFactory.createClientWithToken(
@@ -1469,15 +1447,18 @@ class CosTransportProvider(
      * COS特定的地址格式化
      */
     override fun formatAddress(config: Map<String, Any>): String {
-        val region = config["region"]?.toString() ?: "ap-beijing"
-        val bucketName = config["bucketName"]?.toString() ?: "default-bucket"
-        val provider = config["provider"]?.toString()?.uppercase() ?: "TENCENT"
+        val region = config["region"]?.toString()?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Region配置不能为空")
+        val bucketName = config["bucketName"]?.toString()?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("BucketName配置不能为空")
+        val provider = config["provider"]?.toString()?.uppercase()?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Provider配置不能为空")
         
         return when (provider) {
             "AWS" -> "https://$bucketName.s3.$region.amazonaws.com"
             "TENCENT" -> "https://$bucketName.cos.$region.myqcloud.com"
             "ALIYUN" -> "https://$bucketName.oss-$region.aliyuncs.com"
-            else -> "https://$bucketName.cos.$region.myqcloud.com" // 默认腾讯云
+            else -> throw IllegalArgumentException("不支持的Provider类型: $provider，仅支持: AWS, TENCENT, ALIYUN")
         }
     }
     
@@ -1552,34 +1533,10 @@ class CosTransportProvider(
     /**
      * 获取真实的COS客户端（类型安全）
      */
-    private fun getRealCosClient(cosClient: Any, cosToken: CosTransportToken): Any? {
+    private fun getRealCosClient(cosClient: CosClient, cosToken: CosTransportToken): CosClient? {
         return try {
-            // 确保客户端类型正确
-            when (cosConfig.provider) {
-                CosConfig.Provider.TENCENT -> {
-                    // 对于腾讯云COS，确保客户端配置正确
-                    if (cosClient.javaClass.simpleName.contains("TencentCos", ignoreCase = true)) {
-                        cosClient
-                    } else {
-                        Log.w(TAG, "COS客户端类型不匹配腾讯云配置")
-                        null
-                    }
-                }
-                CosConfig.Provider.AWS -> {
-                    // 对于AWS S3，确保客户端配置正确
-                    if (cosClient.javaClass.simpleName.contains("S3", ignoreCase = true) ||
-                        cosClient.javaClass.simpleName.contains("Aws", ignoreCase = true)) {
-                        cosClient
-                    } else {
-                        Log.w(TAG, "COS客户端类型不匹配AWS配置")
-                        null
-                    }
-                }
-                else -> {
-                    Log.w(TAG, "不支持的COS Provider: ${cosConfig.provider}")
-                    null
-                }
-            }
+            // 直接返回CosClient实例，已经是类型安全的
+            cosClient
         } catch (e: Exception) {
             Log.e(TAG, "获取真实COS客户端失败: ${LogSanitizer.sanitizeThrowable(e)}")
             null
