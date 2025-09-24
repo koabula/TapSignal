@@ -83,7 +83,12 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         }
     }
     
-    override fun createAccessKey(userName: String): CosAccessKey {
+    override fun createAccessKeyInternal(userIdentifier: Any): CosAccessKey {
+        val userName = userIdentifier as? String ?: throw CosSubUserException("AWS IAM需要String类型的用户名作为标识符")
+        return createAccessKey(userName)
+    }
+    
+    private fun createAccessKey(userName: String): CosAccessKey {
         val date = Date()
         val amzDate = iso8601(date)
         val dateStamp = dateStamp(date)

@@ -133,7 +133,7 @@ class CosTransportProvider(
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "推送消息时发生异常: messageId=${LogSanitizer.sanitize(message.messageId, "messageId")}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
+                Log.  e(TAG, "推送消息时发生异常: messageId=${LogSanitizer.sanitize(message.messageId, "messageId")}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
                 TransportResult.fromException(e, true)
             }
         }
@@ -382,8 +382,8 @@ class CosTransportProvider(
                     "bucketName" to cosConfig.bucketName,
                     "provider" to cosConfig.provider.name
                 ))
-                val groupSendPath = getSendPath("group")
-                val groupReceivePath = getReceivePath(myHashedId)
+                val groupSendPath = getSendPath("group", TransportMessageType.TEXT_MESSAGE)
+                val groupReceivePath = getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
                 
                 val cosMetadata = org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
                     recipientId = myAci.toString(), // 上传到自己的COS
@@ -425,17 +425,70 @@ class CosTransportProvider(
                 // 为每个群组成员构造群组路径并拉取
                 for (memberMetadata in groupMetadata.memberMetadata) {
                     try {
+                        Log.d(TAG, "处理群组成员: ${memberMetadata.recipientId}")
+                        
+                        // 将通用TransportMetadata转换为CosTransportMetadata
+                        val cosMetadata = convertToCosTransportMetadata(memberMetadata, groupMetadata.groupId)
+                        if (cosMetadata == null) {
+                            Log.w(TAG, "无法转换群组成员的传输元数据: ${memberMetadata.recipientId}")
+                            results.add(TransportResult.failure(
+                                TransportError.INVALID_FORMAT,
+                                false,
+                                "无法转换群组成员的传输元数据"
+                            ))
+                            continue
+                        }
+                        
+                        // 构造群组消息路径：/group/{groupId}/outbox/
                         val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}${providerConfig.groupOutboxSuffix}"
                         
-                        // TODO: 群组元数据处理需要重构以支持新的CosTransportMetadata结构
-                        // 暂时跳过群组功能，专注于单对单消息修复
-                        Log.w(TAG, "群组拉取功能需要重构以支持新的元数据结构，暂时跳过成员: ${memberMetadata.recipientId}")
-                        results.add(TransportResult.failure(
-                            TransportError.INVALID_FORMAT,
-                            false,
-                            "群组功能需要重构以支持新的元数据结构"
-                        ))
-                        continue
+                        Log.d(TAG, "从群组成员拉取消息: ${memberMetadata.recipientId}, 路径: $groupPath")
+                        
+                        // 列举群组目录中的文件
+                        val listResult = listFiles(groupPath, cosMetadata)
+                        
+                        if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
+                            Log.d(TAG, "找到群组消息文件数量: ${listResult.files.size}, 来自成员: ${memberMetadata.recipientId}")
+                            
+                            // 下载并解析每个消息文件
+                            for (fileInfo in listResult.files) {
+                                try {
+                                    val downloadResult = downloadFile(fileInfo, cosMetadata)
+                                    if (downloadResult is TransportResult.Success && downloadResult.data != null) {
+                                        // 解析消息
+                                        val message = parseTransportMessage(downloadResult.data, fileInfo, cosMetadata)
+                                        if (message != null) {
+                                            Log.d(TAG, "成功解析群组消息: ${message.messageId}, 来自: ${memberMetadata.recipientId}")
+                                            results.add(TransportResult.Success(message, mapOf(
+                                                "groupId" to groupMetadata.groupId,
+                                                "memberId" to memberMetadata.recipientId,
+                                                "filePath" to fileInfo.path
+                                            )))
+                                        } else {
+                                            Log.w(TAG, "群组消息解析失败: ${fileInfo.name}")
+                                            results.add(TransportResult.failure(
+                                                TransportError.INVALID_FORMAT,
+                                                false,
+                                                "群组消息解析失败"
+                                            ))
+                                        }
+                                    } else {
+                                        Log.w(TAG, "下载群组消息文件失败: ${fileInfo.name}")
+                                        results.add(TransportResult.failure(
+                                            TransportError.NETWORK_ERROR,
+                                            true,
+                                            "下载群组消息文件失败"
+                                        ))
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "处理群组消息文件失败: ${fileInfo.name}", e)
+                                    results.add(TransportResult.fromException(e, true))
+                                }
+                            }
+                        } else {
+                            Log.d(TAG, "群组成员无新消息: ${memberMetadata.recipientId}")
+                            // 无消息不算错误，只是记录日志
+                        }
                         
                     } catch (e: Exception) {
                         Log.e(TAG, "拉取群组成员消息失败: ${memberMetadata.recipientId}", e)
@@ -1465,6 +1518,97 @@ class CosTransportProvider(
 
 
     /**
+     * 将通用TransportMetadata转换为CosTransportMetadata（群组功能支持）
+     */
+    private fun convertToCosTransportMetadata(metadata: TransportMetadata, groupId: String? = null): org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata? {
+        return try {
+            when (metadata) {
+                is org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata -> {
+                    // 已经是CosTransportMetadata，直接返回
+                    metadata
+                }
+                else -> {
+                    // 尝试从通用TransportMetadata构造CosTransportMetadata
+                    Log.d(TAG, "尝试从通用TransportMetadata构造CosTransportMetadata: ${metadata.recipientId}")
+                    
+                    // 从metadata.toMap()获取数据
+                    val metadataMap = metadata.toMap()
+                    
+                    // 尝试使用fromMap方法重构
+                    val cosMetadata = org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata.fromMap(metadataMap)
+                    
+                    if (cosMetadata != null) {
+                        Log.d(TAG, "成功从Map重构CosTransportMetadata: ${metadata.recipientId}")
+                        cosMetadata
+                    } else {
+                        // 如果fromMap失败，尝试手动构造最小可用的CosTransportMetadata
+                        Log.w(TAG, "从Map重构失败，尝试手动构造CosTransportMetadata: ${metadata.recipientId}")
+                        createMinimalCosMetadata(metadata, groupId)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "转换TransportMetadata为CosTransportMetadata失败: ${metadata.recipientId}", e)
+            null
+        }
+    }
+    
+    /**
+     * 创建最小可用的CosTransportMetadata（当转换失败时的备用方案）
+     */
+    private fun createMinimalCosMetadata(metadata: TransportMetadata, groupId: String?): org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata? {
+        return try {
+            Log.d(TAG, "创建最小CosTransportMetadata: ${metadata.recipientId}")
+            
+            // 获取当前用户的ACI
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+            val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+            val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(metadata.recipientId)
+            
+            // 构造COS地址
+            val myAddress = formatAddress(mapOf(
+                "region" to cosConfig.region,
+                "bucketName" to cosConfig.bucketName,
+                "provider" to cosConfig.provider.name
+            ))
+            
+                         // 对于群组消息，使用群组特定的路径
+             val basePath = if (groupId != null) {
+                 "${providerConfig.groupPathPrefix}${groupId}${providerConfig.groupOutboxSuffix}"
+             } else {
+                 getSendPath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
+             }
+             
+             val receivePath = if (groupId != null) {
+                 "${providerConfig.groupPathPrefix}${groupId}${providerConfig.groupOutboxSuffix}"
+             } else {
+                 getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
+             }
+            
+            // 创建CosTransportMetadata实例
+            org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+                recipientId = metadata.recipientId,
+                providerType = "cos",
+                myAddress = myAddress,
+                myToken = null, // 使用配置中的凭证
+                myRegion = cosConfig.region,
+                myBucketName = cosConfig.bucketName,
+                mySendPath = basePath,
+                peerAddress = myAddress, // 群组消息使用相同的COS服务
+                peerToken = null, // 群组消息使用相同的凭证
+                peerRegion = cosConfig.region,
+                peerBucketName = cosConfig.bucketName,
+                peerReceivePath = receivePath,
+                myHashedId = myHashedId,
+                peerHashedId = peerHashedId
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "创建最小CosTransportMetadata失败: ${metadata.recipientId}", e)
+            null
+        }
+    }
+
+    /**
      * 从地址中提取Bucket名称
      * 
      * 支持格式：
@@ -1509,8 +1653,8 @@ class CosTransportProvider(
         val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(cosToken.recipientId)
         
         // 构建路径
-        val mySendPath = getSendPath(peerHashedId)
-        val peerReceivePath = getReceivePath(myHashedId)
+        val mySendPath = getSendPath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
+        val peerReceivePath = getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
         
         return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
             recipientId = cosToken.recipientId,

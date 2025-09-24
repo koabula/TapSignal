@@ -49,7 +49,6 @@ class TencentSubUserManager(
             Log.i(TAG, "  用户名: $userName")
             Log.i(TAG, "  用户UIN: $userUin")
             Log.i(TAG, "  AccessKeyId: ${accessKey.accessKeyId}")
-            Log.i(TAG, "  SecretAccessKey: ${accessKey.secretAccessKey.take(8)}...")
             Log.i(TAG, "  允许目录: $directoryPath")
             Log.i(TAG, "  权限类型: $permissions")
             Log.i(TAG, "=== 子用户创建总结结束 ===")
@@ -100,10 +99,9 @@ class TencentSubUserManager(
         }
     }
     
-    override fun createAccessKey(userName: String): CosAccessKey {
-        // 注意：这个方法的参数在接口中是userName，但实际需要UIN
-        // 我们需要重载一个接受UIN的版本
-        throw CosSubUserException("请使用createAccessKey(userUin: Long)方法")
+    override fun createAccessKeyInternal(userIdentifier: Any): CosAccessKey {
+        val userUin = userIdentifier as? Long ?: throw CosSubUserException("腾讯云需要Long类型的UIN作为用户标识符")
+        return createAccessKey(userUin)
     }
 
     /**
@@ -208,13 +206,146 @@ class TencentSubUserManager(
     }
     
     override fun listSubUsers(): List<CosSubUserInfo> {
-        // 可以调用ListUsers API实现真实功能
-        return emptyList()
+        return try {
+            Log.d(TAG, "开始查询腾讯云CAM子用户列表")
+
+            val timestamp = System.currentTimeMillis() / 1000
+            val action = "ListUsers"
+
+            val requestBody = JSONObject().apply {
+                // 可以添加Marker和MaxItems参数来分页，这里暂时获取默认数量
+            }.toString()
+
+            val authorization = TencentSigner.buildTC3AuthorizationHeader(
+                secretId = config.secretId,
+                secretKey = config.secretKey,
+                service = service,
+                region = config.region,
+                action = action,
+                timestamp = timestamp,
+                payload = requestBody,
+                host = host
+            )
+
+            val request = Request.Builder()
+                .url("https://$host/")
+                .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                .header("Host", host)
+                .header("Authorization", authorization)
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", version)
+                .header("X-TC-Region", config.region)
+                .header("X-TC-Timestamp", timestamp.toString())
+                .header("Content-Type", "application/json; charset=utf-8")
+                .build()
+
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    Log.w(TAG, "查询子用户列表失败: ${resp.code}")
+                    return emptyList()
+                }
+
+                val responseBody = resp.body?.string() ?: return emptyList()
+                val json = JSONObject(responseBody)
+                val response = json.getJSONObject("Response")
+
+                if (response.has("Data")) {
+                    val users = response.getJSONArray("Data")
+                    val userInfoList = mutableListOf<CosSubUserInfo>()
+
+                    for (i in 0 until users.length()) {
+                        val user = users.getJSONObject(i)
+                        val userName = user.optString("Name", "")
+                        val uin = user.optLong("Uin", 0L)
+                        val createTimeStr = user.optString("CreateTime", "")
+                        val lastLoginTimeStr = user.optString("LastLoginTime", "")
+
+                        if (userName.isNotEmpty() && uin > 0) {
+                            val createTime = parseTimestamp(createTimeStr)
+                            val lastActivity = parseTimestamp(lastLoginTimeStr)
+                            
+                            // 获取用户的访问密钥列表
+                            val accessKeys = listUserAccessKeys(userName)
+
+                            userInfoList.add(CosSubUserInfo(
+                                userName = userName,
+                                userId = uin.toString(),
+                                createDate = createTime,
+                                lastActivity = lastActivity,
+                                accessKeys = accessKeys
+                            ))
+                        }
+                    }
+
+                    Log.i(TAG, "查询到${userInfoList.size}个腾讯云CAM子用户")
+                    return userInfoList
+                }
+
+                Log.i(TAG, "未查询到任何腾讯云CAM子用户")
+                return emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "查询腾讯云CAM子用户列表异常", e)
+            emptyList()
+        }
     }
 
     override fun cleanupExpiredUsers(maxAgeHours: Int): Int {
-        // 可以结合ListUsers和DeleteUser API实现真实功能
-        return 0
+        return try {
+            Log.d(TAG, "开始清理过期的腾讯云CAM子用户，最大存活时间: ${maxAgeHours}小时")
+
+            val currentTime = System.currentTimeMillis()
+            val maxAgeMillis = maxAgeHours * 60 * 60 * 1000L
+            val expiredUsers = mutableListOf<String>()
+
+            // 获取所有子用户
+            val allUsers = listSubUsers()
+            
+            allUsers.forEach { userInfo ->
+                val userAge = currentTime - userInfo.createDate
+                val isExpired = userAge > maxAgeMillis
+                
+                // 检查是否有最后活动时间记录
+                val lastActivityAge = userInfo.lastActivity?.let { currentTime - it }
+                val hasRecentActivity = lastActivityAge?.let { it < maxAgeMillis } ?: false
+                
+                Log.d(TAG, "用户: ${userInfo.userName}, " +
+                        "创建时间: ${userAge / (60 * 60 * 1000)}小时前, " +
+                        "最后活动: ${lastActivityAge?.let { "${it / (60 * 60 * 1000)}小时前" } ?: "无记录"}, " +
+                        "是否过期: $isExpired, " +
+                        "有最近活动: $hasRecentActivity")
+
+                // 如果用户过期且没有最近活动，则标记为待删除
+                if (isExpired && !hasRecentActivity) {
+                    expiredUsers.add(userInfo.userName)
+                }
+            }
+
+            Log.i(TAG, "发现${expiredUsers.size}个过期的腾讯云CAM子用户")
+
+            // 删除过期的用户
+            var deletedCount = 0
+            expiredUsers.forEach { userName ->
+                try {
+                    Log.d(TAG, "删除过期用户: $userName")
+                    if (deleteSubUser(userName)) {
+                        deletedCount++
+                        Log.i(TAG, "过期用户删除成功: $userName")
+                    } else {
+                        Log.w(TAG, "过期用户删除失败: $userName")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "删除过期用户时发生异常: $userName", e)
+                }
+            }
+
+            Log.i(TAG, "腾讯云CAM子用户清理完成，已删除${deletedCount}个过期用户")
+            deletedCount
+
+        } catch (e: Exception) {
+            Log.e(TAG, "清理过期腾讯云CAM子用户异常", e)
+            0
+        }
     }
 
     // 私有辅助方法
@@ -1014,6 +1145,20 @@ class TencentSubUserManager(
             }
         } catch (e: Exception) {
             Log.e(TAG, "删除策略异常: $policyName", e)
+        }
+    }
+
+    /**
+     * 解析时间戳字符串为毫秒
+     */
+    private fun parseTimestamp(timestampStr: String): Long {
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+            sdf.timeZone = TimeZone.getTimeZone("UTC")
+            return sdf.parse(timestampStr)?.time ?: 0L
+        } catch (e: Exception) {
+            Log.w(TAG, "解析时间戳失败: $timestampStr", e)
+            return 0L
         }
     }
 } 

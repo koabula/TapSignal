@@ -30,11 +30,12 @@ interface CosSubUserManager {
     fun deleteSubUser(userName: String): Boolean
     
     /**
-     * 为子用户创建访问密钥
-     * @param userName 子用户名称
+     * 为子用户创建访问密钥（内部方法，不同云提供商实现方式不同）
+     * AWS使用userName，腾讯云使用UIN，因此标记为内部方法
+     * @param userIdentifier 用户标识符（AWS使用userName，腾讯云使用UIN）
      * @return 访问密钥信息
      */
-    fun createAccessKey(userName: String): CosAccessKey
+    fun createAccessKeyInternal(userIdentifier: Any): CosAccessKey
     
     /**
      * 删除子用户的访问密钥

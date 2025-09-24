@@ -160,10 +160,11 @@ interface TransportProvider {
         }
         
         return if (supportsAuth) {
-            // 支持权限管理的Provider可以重写此方法进行更严格的验证
-            true
+            // 支持权限管理的Provider必须重写此方法进行具体的Token验证
+            // 默认实现保守地返回false，强制Provider提供安全的验证逻辑
+            false
         } else {
-            // 不支持权限管理的Provider也需要基本验证
+            // 不支持权限管理的Provider，基本验证通过即可
             true
         }
     }
@@ -187,7 +188,7 @@ interface TransportProvider {
     suspend fun testConnection(metadata: TransportMetadata): TransportResult {
         return try {
             // 默认实现：尝试进行一次简单的操作
-            pull(metadata)
+            listFiles("/", metadata)
         } catch (e: Exception) {
             TransportResult.fromException(e, true)
         }
