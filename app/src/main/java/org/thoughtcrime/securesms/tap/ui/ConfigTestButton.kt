@@ -5,6 +5,7 @@
 
 package org.thoughtcrime.securesms.tap.ui
 
+import android.content.Context
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.components.settings.DSLConfiguration
 import org.thoughtcrime.securesms.components.settings.DSLSettingsText
@@ -31,6 +32,7 @@ object ConfigTestButtonCreator {
      * 创建配置测试按钮
      */
     fun createTestButton(
+        context: Context,
         state: ConfigTestState,
         testResult: ConfigTestResult?,
         enabled: Boolean = true,
@@ -40,26 +42,29 @@ object ConfigTestButtonCreator {
         val (titleRes, summaryText) = when (state) {
             ConfigTestState.READY -> {
                 Pair(
-                    if (enabled) "测试配置" else "测试配置（请填写必需字段）",
-                    "点击测试配置连接性"
+                    if (enabled) context.getString(R.string.ConfigTestButton__test_config) 
+                    else context.getString(R.string.ConfigTestButton__test_config_disabled),
+                    context.getString(R.string.ConfigTestButton__test_config_click_hint)
                 )
             }
             ConfigTestState.TESTING -> {
                 Pair(
-                    "测试中...",
-                    "正在验证配置，请稍候"
+                    context.getString(R.string.ConfigTestButton__testing),
+                    context.getString(R.string.ConfigTestButton__testing_progress)
                 )
             }
             ConfigTestState.SUCCESS -> {
                 Pair(
-                    "测试成功",
-                    (testResult as? ConfigTestResult.Success)?.message ?: "配置有效，连接正常"
+                    context.getString(R.string.ConfigTestButton__test_success),
+                    (testResult as? ConfigTestResult.Success)?.message 
+                        ?: context.getString(R.string.ConfigTestButton__test_success_default)
                 )
             }
             ConfigTestState.FAILED -> {
                 Pair(
-                    "测试失败",
-                    (testResult as? ConfigTestResult.Failed)?.error ?: "配置测试失败"
+                    context.getString(R.string.ConfigTestButton__test_failed),
+                    (testResult as? ConfigTestResult.Failed)?.error 
+                        ?: context.getString(R.string.ConfigTestButton__test_failed_default)
                 )
             }
         }
@@ -71,10 +76,10 @@ object ConfigTestButtonCreator {
             summary = DSLSettingsText.from(
                 summaryText, 
                 when (state) {
-                    ConfigTestState.SUCCESS -> DSLSettingsText.ColorModifier(0xFF4CAF50.toInt()) // 绿色
-                    ConfigTestState.FAILED -> DSLSettingsText.ColorModifier(0xFFf44336.toInt()) // 红色
-                    ConfigTestState.TESTING -> DSLSettingsText.ColorModifier(0xFF2196F3.toInt()) // 蓝色
-                    else -> DSLSettingsText.ColorModifier(0xFF666666.toInt()) // 默认灰色
+                    ConfigTestState.SUCCESS -> DSLSettingsText.ColorModifier(context.getColor(R.color.signal_colorPrimary))
+                    ConfigTestState.FAILED -> DSLSettingsText.ColorModifier(context.getColor(R.color.signal_colorError))
+                    ConfigTestState.TESTING -> DSLSettingsText.ColorModifier(context.getColor(R.color.signal_accent_primary))
+                    else -> DSLSettingsText.ColorModifier(context.getColor(R.color.signal_colorSecondary))
                 }
             ),
             isEnabled = enabled && state != ConfigTestState.TESTING,
@@ -87,8 +92,8 @@ object ConfigTestButtonCreator {
             textPref(
                 title = DSLSettingsText.from(""),
                 summary = DSLSettingsText.from(
-                    "详细信息：$details",
-                    DSLSettingsText.ColorModifier(0xFF666666.toInt())
+                    "${context.getString(R.string.ConfigTestButton__details_prefix)}$details",
+                    DSLSettingsText.ColorModifier(context.getColor(R.color.signal_colorSecondary))
                 )
             )
         }
@@ -98,6 +103,7 @@ object ConfigTestButtonCreator {
      * 创建保存按钮
      */
     fun createSaveButton(
+        context: Context,
         enabled: Boolean = true,
         onClick: () -> Unit
     ): DSLConfiguration.() -> Unit = {
@@ -105,8 +111,11 @@ object ConfigTestButtonCreator {
         dividerPref()
         
         clickPref(
-            title = DSLSettingsText.from(if (enabled) "保存配置" else "保存配置（请填写必需字段）"),
-            summary = DSLSettingsText.from("保存当前配置并启用传输服务"),
+            title = DSLSettingsText.from(
+                if (enabled) context.getString(R.string.ConfigTestButton__save_config) 
+                else context.getString(R.string.ConfigTestButton__save_config_disabled)
+            ),
+            summary = DSLSettingsText.from(context.getString(R.string.ConfigTestButton__save_config_hint)),
             isEnabled = enabled,
             onClick = if (enabled) onClick else { -> }
         )
@@ -116,6 +125,7 @@ object ConfigTestButtonCreator {
      * 创建删除配置按钮
      */
     fun createDeleteButton(
+        context: Context,
         onClick: () -> Unit
     ): DSLConfiguration.() -> Unit = {
         
@@ -123,10 +133,10 @@ object ConfigTestButtonCreator {
         
         clickPref(
             title = DSLSettingsText.from(
-                "删除配置",
-                DSLSettingsText.ColorModifier(0xFFf44336.toInt()) // 红色警告文字
+                context.getString(R.string.ConfigTestButton__delete_config),
+                DSLSettingsText.ColorModifier(context.getColor(R.color.signal_colorError))
             ),
-            summary = DSLSettingsText.from("删除当前Provider配置"),
+            summary = DSLSettingsText.from(context.getString(R.string.ConfigTestButton__delete_config_hint)),
             onClick = onClick
         )
     }

@@ -11,7 +11,9 @@ import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.database.DatabaseTable;
 import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.tap.TransportPermission;
+import org.thoughtcrime.securesms.util.JsonUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -91,6 +93,39 @@ public class TransportTokenTable extends DatabaseTable {
                 }
             }
             return RECEIVED;
+        }
+    }
+
+    /**
+     * 权限集合的JSON包装类
+     */
+    public static class PermissionsData {
+        public Set<String> permissions = new HashSet<>();
+
+        public PermissionsData() {}
+
+        public PermissionsData(Set<TransportPermission> transportPermissions) {
+            this.permissions = new HashSet<>();
+            if (transportPermissions != null) {
+                for (TransportPermission permission : transportPermissions) {
+                    this.permissions.add(permission.name());
+                }
+            }
+        }
+
+        public Set<TransportPermission> toTransportPermissions() {
+            Set<TransportPermission> result = new HashSet<>();
+            if (permissions != null) {
+                for (String permissionName : permissions) {
+                    try {
+                        TransportPermission permission = TransportPermission.valueOf(permissionName);
+                        result.add(permission);
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "跳过未知权限: " + permissionName);
+                    }
+                }
+            }
+            return result;
         }
     }
 
@@ -459,63 +494,50 @@ public class TransportTokenTable extends DatabaseTable {
     }
 
     /**
-     * 序列化权限集合为JSON字符串
+     * 使用Jackson序列化权限集合
      */
     @NonNull
     private String serializePermissions(@NonNull Set<TransportPermission> permissions) {
-        if (permissions.isEmpty()) {
-            return "[]";
+        try {
+            PermissionsData data = new PermissionsData(permissions);
+            return JsonUtils.toJson(data);
+        } catch (IOException e) {
+            Log.e(TAG, "序列化权限集合失败", e);
+            return "{\"permissions\":[]}";
         }
-        
-        StringBuilder sb = new StringBuilder("[");
-        boolean first = true;
-        for (TransportPermission permission : permissions) {
-            if (!first) {
-                sb.append(",");
-            }
-            sb.append("\"").append(permission.name()).append("\"");
-            first = false;
-        }
-        sb.append("]");
-        return sb.toString();
     }
 
     /**
-     * 从JSON字符串反序列化权限集合
+     * 使用Jackson反序列化权限集合
      */
     @NonNull
     private Set<TransportPermission> deserializePermissions(@NonNull String json) {
-        Set<TransportPermission> permissions = new HashSet<>();
-        
         try {
-            if (json == null || json.trim().isEmpty() || "[]".equals(json.trim())) {
+            if (json == null || json.trim().isEmpty()) {
+                return new HashSet<>();
+            }
+            
+            // 兼容旧格式的简单数组
+            if (json.trim().startsWith("[")) {
+                List<String> permissionNames = JsonUtils.fromJsonArray(json, String.class);
+                Set<TransportPermission> permissions = new HashSet<>();
+                for (String name : permissionNames) {
+                    try {
+                        permissions.add(TransportPermission.valueOf(name));
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "跳过未知权限: " + name);
+                    }
+                }
                 return permissions;
             }
             
-            // 简单的JSON数组解析
-            String content = json.trim();
-            if (content.startsWith("[") && content.endsWith("]")) {
-                content = content.substring(1, content.length() - 1);
-                if (!content.trim().isEmpty()) {
-                    String[] parts = content.split(",");
-                    for (String part : parts) {
-                        String permissionName = part.trim();
-                        if (permissionName.startsWith("\"") && permissionName.endsWith("\"")) {
-                            permissionName = permissionName.substring(1, permissionName.length() - 1);
-                            try {
-                                TransportPermission permission = TransportPermission.valueOf(permissionName);
-                                permissions.add(permission);
-                            } catch (IllegalArgumentException e) {
-                                Log.w(TAG, "未知权限: " + permissionName);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "反序列化权限集合失败: " + json, e);
+            // 新格式的对象结构
+            PermissionsData data = JsonUtils.fromJson(json, PermissionsData.class);
+            return data.toTransportPermissions();
+            
+        } catch (IOException e) {
+            Log.w(TAG, "反序列化权限集合失败，使用空集合: " + json, e);
+            return new HashSet<>();
         }
-        
-        return permissions;
     }
 } 

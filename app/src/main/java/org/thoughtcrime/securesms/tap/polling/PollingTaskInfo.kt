@@ -4,14 +4,17 @@ import org.thoughtcrime.securesms.tap.TransportMetadata
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 轮询任务信息
  * 
  * 封装每个轮询任务的完整信息，包括任务状态、统计数据和配置参数。
  * 支持任务的动态调整和错误处理。
+ * 所有可变状态都使用原子变量保证线程安全。
  */
-data class PollingTaskInfo(
+class PollingTaskInfo(
     /**
      * 接收者ID - 唯一标识轮询目标
      */
@@ -23,54 +26,9 @@ data class PollingTaskInfo(
     val metadata: TransportMetadata,
     
     /**
-     * 定时任务 - 可为null表示任务未启动或已停止
-     */
-    var task: ScheduledFuture<*>? = null,
-    
-    /**
-     * 当前轮询间隔（毫秒）
-     */
-    var currentInterval: Long = metadata.providerType.let { getDefaultInterval(it) },
-    
-    /**
-     * 最后轮询时间戳
-     */
-    val lastPollTime: AtomicLong = AtomicLong(0L),
-    
-    /**
-     * 连续错误次数
-     */
-    val consecutiveErrors: AtomicInteger = AtomicInteger(0),
-    
-    /**
-     * 当前活跃度级别
-     */
-    var activityLevel: TransportActivityLevel = TransportActivityLevel.INACTIVE,
-    
-    /**
-     * 轮询状态
-     */
-    var status: PollingTaskStatus = PollingTaskStatus.CREATED,
-    
-    /**
      * 任务创建时间
      */
-    val createdAt: Long = System.currentTimeMillis(),
-    
-    /**
-     * 上次成功轮询时间
-     */
-    val lastSuccessTime: AtomicLong = AtomicLong(0L),
-    
-    /**
-     * 轮询统计信息
-     */
-    val statistics: PollingTaskStatistics = PollingTaskStatistics(),
-    
-    /**
-     * 最近一次轮询处理的文件列表（用于更新数据库状态）
-     */
-    var lastProcessedFiles: Set<String> = emptySet()
+    val createdAt: Long = System.currentTimeMillis()
 ) {
     
     companion object {
@@ -78,14 +36,7 @@ data class PollingTaskInfo(
          * 根据Provider类型获取默认轮询间隔
          */
         private fun getDefaultInterval(providerType: String): Long {
-            return when (providerType) {
-                "cos" -> 5000L      // COS: 5秒
-                "email" -> 60000L   // Email: 1分钟
-                "ipfs" -> 30000L    // IPFS: 30秒
-                "git" -> 120000L    // Git: 2分钟
-                "nas" -> 30000L     // NAS: 30秒
-                else -> 30000L      // 默认: 30秒
-            }
+            return TapPollingConstants.ProviderIntervals.getBaseInterval(providerType)
         }
         
         /**
@@ -94,17 +45,129 @@ data class PollingTaskInfo(
         fun create(recipientId: String, metadata: TransportMetadata): PollingTaskInfo {
             return PollingTaskInfo(
                 recipientId = recipientId,
-                metadata = metadata,
-                currentInterval = getDefaultInterval(metadata.providerType)
-            )
+                metadata = metadata
+            ).apply {
+                setCurrentInterval(getDefaultInterval(metadata.providerType))
+                setActivityLevel(TransportActivityLevel.INACTIVE)
+                setStatus(PollingTaskStatus.CREATED)
+            }
         }
     }
+    
+    // === 线程安全的状态变量 ===
+    
+    /**
+     * 定时任务引用 - 使用原子引用保证线程安全
+     */
+    private val taskRef = AtomicReference<ScheduledFuture<*>?>(null)
+    var task: ScheduledFuture<*>?
+        get() = taskRef.get()
+        set(value) = taskRef.set(value)
+    
+    /**
+     * 当前轮询间隔（毫秒）
+     */
+    private val currentIntervalMs = AtomicLong(getDefaultInterval(metadata.providerType))
+    
+    /**
+     * 最后轮询时间戳
+     */
+    private val lastPollTimeMs = AtomicLong(0L)
+    
+    /**
+     * 连续错误次数
+     */
+    val consecutiveErrors = AtomicInteger(0)
+    
+    /**
+     * 当前活跃度级别
+     */
+    private val currentActivityLevel = AtomicReference(TransportActivityLevel.INACTIVE)
+    
+    /**
+     * 轮询状态
+     */
+    private val currentStatus = AtomicReference(PollingTaskStatus.CREATED)
+    
+    /**
+     * 上次成功轮询时间
+     */
+    private val lastSuccessTimeMs = AtomicLong(0L)
+    
+    /**
+     * 最近一次轮询处理的文件列表（用于更新数据库状态）
+     */
+    private val processedFilesRef = AtomicReference<Set<String>>(emptySet())
+    var lastProcessedFiles: Set<String>
+        get() = processedFilesRef.get()
+        set(value) = processedFilesRef.set(value)
+    
+    /**
+     * 执行门闩 - 防止同一任务重叠执行
+     */
+    private val isExecuting = AtomicBoolean(false)
+    
+    /**
+     * 轮询统计信息 - 线程安全
+     */
+    val statistics: PollingTaskStatistics = PollingTaskStatistics()
+    
+    // === 线程安全的访问方法 ===
+    
+    /**
+     * 获取当前轮询间隔
+     */
+    fun getCurrentInterval(): Long = currentIntervalMs.get()
+    
+    /**
+     * 设置当前轮询间隔
+     */
+    fun setCurrentInterval(interval: Long) {
+        currentIntervalMs.set(interval)
+    }
+    
+    /**
+     * 获取最后轮询时间
+     */
+    fun getLastPollTime(): Long = lastPollTimeMs.get()
+    
+    /**
+     * 获取活跃度级别
+     */
+    fun getActivityLevel(): TransportActivityLevel = currentActivityLevel.get()
+    
+    /**
+     * 设置活跃度级别
+     */
+    fun setActivityLevel(level: TransportActivityLevel) {
+        currentActivityLevel.set(level)
+    }
+    
+    /**
+     * 获取轮询状态
+     */
+    val status: PollingTaskStatus
+        get() = currentStatus.get()
+    
+    /**
+     * 设置轮询状态
+     */
+    fun setStatus(status: PollingTaskStatus) {
+        currentStatus.set(status)
+    }
+    
+    /**
+     * 获取上次成功时间
+     */
+    fun getLastSuccessTime(): Long = lastSuccessTimeMs.get()
+    
+    // === 业务方法 ===
     
     /**
      * 更新轮询时间
      */
     fun updatePollTime() {
-        lastPollTime.set(System.currentTimeMillis())
+        lastPollTimeMs.set(System.currentTimeMillis())
         statistics.incrementTotalPolls()
     }
     
@@ -112,7 +175,7 @@ data class PollingTaskInfo(
      * 记录成功轮询
      */
     fun recordSuccess() {
-        lastSuccessTime.set(System.currentTimeMillis())
+        lastSuccessTimeMs.set(System.currentTimeMillis())
         consecutiveErrors.set(0)
         statistics.incrementSuccessfulPolls()
     }
@@ -149,7 +212,10 @@ data class PollingTaskInfo(
     /**
      * 获取错误退避时间
      */
-    fun getErrorBackoffTime(baseBackoffMs: Long = 2000L, maxBackoffMs: Long = 180000L): Long {
+    fun getErrorBackoffTime(
+        baseBackoffMs: Long = TapPollingConstants.ErrorBackoff.BASE_BACKOFF_MS, 
+        maxBackoffMs: Long = TapPollingConstants.ErrorBackoff.MAX_BACKOFF_MS
+    ): Long {
         val errorCount = consecutiveErrors.get()
         if (errorCount <= 0) return 0L
         
@@ -162,8 +228,9 @@ data class PollingTaskInfo(
      * 更新活跃度级别
      */
     fun updateActivityLevel(newLevel: TransportActivityLevel): Boolean {
-        if (activityLevel != newLevel) {
-            activityLevel = newLevel
+        val oldLevel = currentActivityLevel.get()
+        if (oldLevel != newLevel) {
+            currentActivityLevel.set(newLevel)
             return true
         }
         return false
@@ -193,7 +260,7 @@ data class PollingTaskInfo(
     fun cleanup() {
         task?.cancel(false)
         task = null
-        status = PollingTaskStatus.STOPPED
+        setStatus(PollingTaskStatus.STOPPED)
     }
     
     /**
@@ -201,8 +268,30 @@ data class PollingTaskInfo(
      */
     fun getSummary(): String {
         return "PollingTask[recipient=$recipientId, provider=${metadata.providerType}, " +
-                "status=$status, interval=${currentInterval}ms, errors=${consecutiveErrors.get()}, " +
-                "activity=$activityLevel, successRate=${String.format("%.2f", getSuccessRate() * 100)}%]"
+                "status=${currentStatus.get()}, interval=${currentIntervalMs.get()}ms, errors=${consecutiveErrors.get()}, " +
+                "activity=${currentActivityLevel.get()}, successRate=${String.format("%.2f", getSuccessRate() * 100)}%]"
+    }
+    
+    /**
+     * 尝试开始执行轮询任务
+     * @return true 如果成功获取执行权，false 如果任务已在执行中
+     */
+    fun tryStartExecution(): Boolean {
+        return isExecuting.compareAndSet(false, true)
+    }
+    
+    /**
+     * 结束轮询任务执行
+     */
+    fun finishExecution() {
+        isExecuting.set(false)
+    }
+    
+    /**
+     * 检查任务是否正在执行中
+     */
+    fun isCurrentlyExecuting(): Boolean {
+        return isExecuting.get()
     }
 }
 
@@ -242,39 +331,39 @@ enum class PollingTaskStatus {
 }
 
 /**
- * 轮询任务统计信息
+ * 轮询任务统计信息 - 线程安全版本
  */
-data class PollingTaskStatistics(
+class PollingTaskStatistics {
+    
     /**
      * 总轮询次数
      */
-    val totalPolls: AtomicLong = AtomicLong(0L),
+    val totalPolls = AtomicLong(0L)
     
     /**
      * 成功轮询次数
      */
-    val successfulPolls: AtomicLong = AtomicLong(0L),
+    val successfulPolls = AtomicLong(0L)
     
     /**
      * 失败轮询次数
      */
-    val failedPolls: AtomicLong = AtomicLong(0L),
+    val failedPolls = AtomicLong(0L)
     
     /**
      * 找到的消息总数
      */
-    val messagesFound: AtomicLong = AtomicLong(0L),
+    val messagesFound = AtomicLong(0L)
     
     /**
      * 响应时间总和（用于计算平均值）
      */
-    val totalResponseTimeMs: AtomicLong = AtomicLong(0L),
+    private val totalResponseTimeMs = AtomicLong(0L)
     
     /**
      * 有响应时间记录的轮询次数
      */
-    val responseTimeRecords: AtomicLong = AtomicLong(0L)
-) {
+    private val responseTimeRecords = AtomicLong(0L)
     
     /**
      * 增加总轮询次数
@@ -308,8 +397,10 @@ data class PollingTaskStatistics(
      * 记录响应时间
      */
     fun recordResponseTime(responseTimeMs: Long) {
-        totalResponseTimeMs.addAndGet(responseTimeMs)
-        responseTimeRecords.incrementAndGet()
+        if (responseTimeMs > 0) {
+            totalResponseTimeMs.addAndGet(responseTimeMs)
+            responseTimeRecords.incrementAndGet()
+        }
     }
     
     /**

@@ -135,25 +135,20 @@ class TapModuleInitializer private constructor(private val context: Context) {
             // 注册工厂
             providerManager.registerProviderFactory("default", factory)
             
-            // 注册所有可用的Provider
+            // 注册所有可用的Provider类型（不创建实际实例，因为需要用户配置）
             val availableProviders = factory.supportedProviderTypes
             for (providerType in availableProviders) {
                 try {
-                    // 获取默认配置
-                    val defaultConfig = factory.getDefaultConfig(providerType)
-                    if (defaultConfig.isNotEmpty()) {
-                        val provider = factory.createProvider(providerType, defaultConfig)
-                        if (provider != null) {
-                            providerManager.registerProvider(provider)
-                            Log.d(TAG, "Provider注册成功: $providerType")
-                        } else {
-                            Log.w(TAG, "Provider创建失败: $providerType")
-                        }
+                    // 获取Provider配置描述器以验证Provider可用性
+                    val configDescriptor = factory.getProviderConfigDescriptor(providerType)
+                    if (configDescriptor != null) {
+                        Log.d(TAG, "Provider类型可用: $providerType - ${configDescriptor.displayName}")
+                        // 注意：实际的Provider实例将在用户配置后通过TransportProviderManager创建
                     } else {
-                        Log.d(TAG, "Provider无默认配置，跳过: $providerType")
+                        Log.w(TAG, "Provider类型无配置描述器: $providerType")
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Provider注册失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
+                    Log.e(TAG, "验证Provider类型失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
                 }
             }
             
@@ -194,20 +189,26 @@ class TapModuleInitializer private constructor(private val context: Context) {
      */
     private fun getActiveRecipientsFromTokenPool(tokenPool: TransportTokenPool): Set<String> {
         return try {
-            // 通过反射访问私有字段来获取接收者列表
-            val receivedTokensField = tokenPool.javaClass.getDeclaredField("receivedTokens")
-            receivedTokensField.isAccessible = true
-            val receivedTokens = receivedTokensField.get(tokenPool) as? java.util.concurrent.ConcurrentHashMap<String, *>
+            Log.d(TAG, "获取活跃接收者列表")
             
-            val sharedTokensField = tokenPool.javaClass.getDeclaredField("sharedTokens")
-            sharedTokensField.isAccessible = true
-            val sharedTokens = sharedTokensField.get(tokenPool) as? java.util.concurrent.ConcurrentHashMap<String, *>
+            // 使用公开的方法获取有效的Token
+            val activeRecipients = mutableSetOf<String>()
             
-            val recipients = mutableSetOf<String>()
-            receivedTokens?.keys?.let { recipients.addAll(it) }
-            sharedTokens?.keys?.let { recipients.addAll(it) }
+            // 获取所有有效的接收Token
+            val validReceivedTokens = tokenPool.getAllValidReceivedTokens()
+            validReceivedTokens.forEach { (recipientId, _) ->
+                activeRecipients.add(recipientId)
+            }
             
-            recipients
+            // 获取所有有效的共享Token
+            val validSharedTokens = tokenPool.getAllValidSharedTokens()
+            validSharedTokens.forEach { (recipientId, _) ->
+                activeRecipients.add(recipientId)
+            }
+            
+            Log.d(TAG, "找到活跃接收者数量: ${activeRecipients.size}")
+            activeRecipients
+            
         } catch (e: Exception) {
             Log.w(TAG, "获取活跃接收者失败: ${LogSanitizer.sanitizeThrowable(e)}")
             emptySet()

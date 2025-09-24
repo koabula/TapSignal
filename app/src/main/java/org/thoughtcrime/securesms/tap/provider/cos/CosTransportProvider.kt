@@ -10,6 +10,7 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosAccessToken
 import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosSubUserManagerFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosPermission
 import org.thoughtcrime.securesms.tap.*
+import org.thoughtcrime.securesms.tap.GroupTransportManager.GroupTransportMetadata
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 import java.io.File
 import java.util.UUID

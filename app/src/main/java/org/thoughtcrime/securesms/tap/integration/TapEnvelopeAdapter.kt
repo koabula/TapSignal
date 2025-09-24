@@ -105,9 +105,34 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                     TapEnvelopeProcessResult.Failed("消息内容处理失败")
                 }
                 
+            } catch (e: SecurityException) {
+                Log.e(TAG, "安全异常，可能是恶意消息: messageId=${transportMessage.messageId}", e)
+                TapEnvelopeProcessResult.Failed("安全验证失败")
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "消息格式异常，可能是协议不兼容: messageId=${transportMessage.messageId}", e)
+                TapEnvelopeProcessResult.Failed("消息格式错误: ${e.message}")
+            } catch (e: org.signal.libsignal.protocol.InvalidMessageException) {
+                Log.w(TAG, "Signal协议异常: messageId=${transportMessage.messageId}", e)
+                TapEnvelopeProcessResult.Failed("Signal协议错误")
+            } catch (e: org.signal.libsignal.protocol.NoSessionException) {
+                Log.i(TAG, "会话不存在，可能需要重新建立: messageId=${transportMessage.messageId}", e)
+                TapEnvelopeProcessResult.Failed("会话不存在，请重新建立联系")
             } catch (e: Exception) {
                 Log.e(TAG, "处理传输消息异常: messageId=${transportMessage.messageId}", e)
-                TapEnvelopeProcessResult.Failed("处理异常: ${e.message}")
+                
+                // 根据异常类型决定是否可以重试
+                val retryable = when {
+                    e.message?.contains("network", ignoreCase = true) == true -> true
+                    e.message?.contains("timeout", ignoreCase = true) == true -> true
+                    e.message?.contains("connection", ignoreCase = true) == true -> true
+                    else -> false
+                }
+                
+                if (retryable) {
+                    TapEnvelopeProcessResult.Failed("处理异常(可重试): ${e.message}")
+                } else {
+                    TapEnvelopeProcessResult.Failed("处理异常: ${e.message}")
+                }
             }
         }
     }
@@ -139,7 +164,7 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 .timestamp(transportMessage.timestamp)
                 .content(Base64.decode(transportMessage.signalCiphertext).toByteString())
                 .sourceServiceId(sourceServiceId.toString())
-                .sourceDevice(1) // 默认设备ID
+                .sourceDevice(getSourceDeviceId(transportMessage))
             
             // 如果有目标ServiceId，设置它
             val localServiceId = SignalStore.account.requireAci()
@@ -155,6 +180,44 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "转换Envelope失败: messageId=${transportMessage.messageId}", e)
             null
+        }
+    }
+    
+    /**
+     * 获取源设备ID
+     * 从TransportMessage的元数据中获取真实的设备ID，如果没有则使用默认值
+     */
+    private fun getSourceDeviceId(transportMessage: TransportMessage): Int {
+        return try {
+            // 首先尝试从消息元数据中获取设备ID
+            val deviceId = transportMessage.contentMetadata?.sourceDeviceId
+            if (deviceId != null && deviceId > 0) {
+                Log.d(TAG, "从消息元数据获取设备ID: $deviceId")
+                deviceId
+            } else {
+                // 如果元数据中没有设备ID，尝试从发送者的联系人信息中获取
+                val senderId = transportMessage.senderId
+                val recipient = try {
+                    val serviceId = parseServiceIdFromSender(senderId)
+                    if (serviceId != null) {
+                        val recipientIdOpt = SignalDatabase.recipients.getByServiceId(serviceId)
+                        if (recipientIdOpt.isPresent) {
+                            Recipient.resolved(recipientIdOpt.get())
+                        } else null
+                    } else null
+                } catch (e: Exception) {
+                    Log.w(TAG, "获取发送者联系人信息失败: $senderId", e)
+                    null
+                }
+                
+                // 使用默认设备ID（主设备）
+                val defaultDeviceId = 1
+                Log.d(TAG, "使用默认设备ID: $defaultDeviceId, senderId=$senderId")
+                defaultDeviceId
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "获取设备ID失败，使用默认值: messageId=${transportMessage.messageId}", e)
+            1 // 默认主设备ID
         }
     }
     
@@ -309,9 +372,17 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             val currentTime = System.currentTimeMillis()
             val timeDiff = Math.abs(currentTime - timestamp)
             
-            // 允许24小时的时间偏差
-            if (timeDiff > 24 * 60 * 60 * 1000L) {
-                Log.w(TAG, "Envelope时间戳异常: envelopeTime=$timestamp, currentTime=$currentTime")
+            // 允许1小时的时间偏差，防止重放攻击
+            val MAX_TIME_DRIFT_MS = 60 * 60 * 1000L // 1小时
+            if (timeDiff > MAX_TIME_DRIFT_MS) {
+                Log.w(TAG, "Envelope时间戳偏差过大: envelopeTime=$timestamp, currentTime=$currentTime, diff=${timeDiff}ms")
+                return false
+            }
+            
+            // 检查时间戳是否为未来时间（允许5分钟时钟偏差）
+            val MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000L // 5分钟
+            if (timestamp > currentTime + MAX_FUTURE_DRIFT_MS) {
+                Log.w(TAG, "Envelope时间戳为未来时间: envelopeTime=$timestamp, currentTime=$currentTime")
                 return false
             }
             

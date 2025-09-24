@@ -57,4 +57,25 @@
     <string name="TapV2ModeIndicator__active">v2</string>
     <string name="TapV2ModeIndicator__inactive">v2?</string>
     <string name="TapV2ModeIndicator__failed">v2!</string>
+    
+    <!-- ConfigTestButton相关字符串 -->
+    <string name="ConfigTestButton__test_config">测试配置</string>
+    <string name="ConfigTestButton__test_config_disabled">测试配置（请填写必需字段）</string>
+    <string name="ConfigTestButton__test_config_click_hint">点击测试配置连接性</string>
+    <string name="ConfigTestButton__testing">测试中...</string>
+    <string name="ConfigTestButton__testing_progress">正在验证配置，请稍候</string>
+    <string name="ConfigTestButton__test_success">测试成功</string>
+    <string name="ConfigTestButton__test_success_default">配置有效，连接正常</string>
+    <string name="ConfigTestButton__test_failed">测试失败</string>
+    <string name="ConfigTestButton__test_failed_default">配置测试失败</string>
+    <string name="ConfigTestButton__save_config">保存配置</string>
+    <string name="ConfigTestButton__save_config_disabled">保存配置（请填写必需字段）</string>
+    <string name="ConfigTestButton__save_config_hint">保存当前配置并启用传输服务</string>
+    <string name="ConfigTestButton__delete_config">删除配置</string>
+    <string name="ConfigTestButton__delete_config_hint">删除当前Provider配置</string>
+    <string name="ConfigTestButton__details_prefix">详细信息：</string>
+    
+    <!-- 文件选择器相关字符串 -->
+    <string name="FilePathConfig__browse_button">浏览</string>
+    <string name="FilePathConfig__select_file_hint">点击浏览按钮选择文件</string>
 </resources> 

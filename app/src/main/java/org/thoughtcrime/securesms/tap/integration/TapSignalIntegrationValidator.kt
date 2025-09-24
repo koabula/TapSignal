@@ -8,7 +8,6 @@ import org.signal.core.util.Base64
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
-import org.thoughtcrime.securesms.tap.polling.NetworkQuality
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
@@ -16,6 +15,7 @@ import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.whispersystems.signalservice.internal.push.Envelope
 import org.whispersystems.signalservice.api.push.ServiceId
 import java.util.*
+import kotlinx.coroutines.runBlocking
 
 /**
  * TAP-Signal集成验证工具
@@ -34,6 +34,18 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
         fun getInstance(context: Context): TapSignalIntegrationValidator {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TapSignalIntegrationValidator(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+        
+        /**
+         * 仅用于内部测试的验证方法
+         * 生产环境不应调用此方法
+         */
+        @JvmStatic
+        internal fun validateFullIntegrationInternal(context: Context): ValidationResult {
+            val validator = getInstance(context)
+            return runBlocking {
+                validator.validateFullIntegration()
             }
         }
     }
@@ -379,10 +391,12 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
                 }
                 
                 // 2. 检查可用Token
-                val availableProviders = listOf("cos")  // 扩展时添加更多Provider
+                val transportManager = TransportManager.getInstance(context)
+                val availableProviders = transportManager.getAvailableProviders()
                 val tokenInfos = mutableListOf<TokenValidationInfo>()
                 
-                availableProviders.forEach { providerType ->
+                availableProviders.forEach { provider ->
+                    val providerType = provider.providerType
                     val receivedToken = tokenPool.getValidReceivedToken(recipientId.toString(), providerType)
                     val sharedToken = tokenPool.getValidSharedToken(recipientId.toString(), providerType)
                     
@@ -448,10 +462,12 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
             
             // 检查是否使用长期Token（永久凭证）
             // 获取所有可用的Provider类型
-            val availableProviders = listOf("cos")  // 扩展时添加更多Provider
+            val transportManager = TransportManager.getInstance(context)
+            val availableProviders = transportManager.getAvailableProviders()
             
             var hasLongTermCredentials = false
-            for (providerType in availableProviders) {
+            for (provider in availableProviders) {
+                val providerType = provider.providerType
                 val receivedToken = tokenPool.getValidReceivedToken(senderRecipient.id.toString(), providerType)
                 val sharedToken = tokenPool.getValidSharedToken(senderRecipient.id.toString(), providerType)
                 

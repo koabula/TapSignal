@@ -15,8 +15,12 @@ import org.thoughtcrime.securesms.tap.TransportChannelStatus;
 import org.thoughtcrime.securesms.tap.TransportError;
 import org.thoughtcrime.securesms.tap.TransportMetadata;
 import org.thoughtcrime.securesms.tap.utils.TransportMetadataFactory;
+import org.thoughtcrime.securesms.util.JsonUtils;
 
+import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
+import java.util.HashMap;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +48,7 @@ public class TransportChannelTable extends DatabaseTable {
     private static final String SUCCESS_COUNT     = "success_count";
     private static final String FAILURE_COUNT     = "failure_count";
     private static final String LAST_ERROR        = "last_error";
+    private static final String CONFIG_JSON       = "config_json";
     private static final String VERSION           = "version";
 
     public static final String CREATE_TABLE = 
@@ -60,6 +65,7 @@ public class TransportChannelTable extends DatabaseTable {
             SUCCESS_COUNT     + " INTEGER NOT NULL DEFAULT 0, " +
             FAILURE_COUNT     + " INTEGER NOT NULL DEFAULT 0, " +
             LAST_ERROR        + " TEXT DEFAULT NULL, " +
+            CONFIG_JSON       + " TEXT NOT NULL DEFAULT '{}', " +
             VERSION           + " INTEGER NOT NULL DEFAULT 1" +
         ")";
 
@@ -76,32 +82,67 @@ public class TransportChannelTable extends DatabaseTable {
 
     /**
      * 插入或更新传输通道
+     * 使用乐观锁确保并发安全
      */
     @WorkerThread
     public void insertOrUpdateChannel(@NonNull TransportChannel channel) {
-        try {
-            ContentValues values = new ContentValues();
-            values.put(CHANNEL_ID, channel.getChannelId());
-            values.put(RECIPIENT_ID, channel.getRecipientId());
-            values.put(PROVIDER_TYPE, channel.getProviderType());
-            values.put(METADATA_JSON, channel.getMetadata().toJson());
-            values.put(STATUS, channel.getStatus().ordinal());
-            values.put(PRIORITY, channel.getPriority());
-            values.put(CREATED_AT, channel.getCreatedAt());
-            values.put(LAST_ACTIVE_AT, channel.getLastActiveAt());
-            values.put(SUCCESS_COUNT, channel.getSuccessCount());
-            values.put(FAILURE_COUNT, channel.getFailureCount());
-            values.put(LAST_ERROR, channel.getLastError() != null ? channel.getLastError().name() : null);
-            values.put(VERSION, channel.getVersion() + 1); // 乐观锁版本递增
-
-            // 使用标准的upsert逻辑
-            int updatedRows = getWritableDatabase().update(TABLE_NAME, values, CHANNEL_ID + " = ?", new String[]{channel.getChannelId()});
-            if (updatedRows == 0) {
-                getWritableDatabase().insert(TABLE_NAME, null, values);
+        synchronized (this) { // 添加对象级同步，防止同一个表的并发修改
+            try {
+                // 获取当前版本号（用于乐观锁检查）
+                long currentVersion = getCurrentChannelVersion(channel.getChannelId());
+                
+                ContentValues values = new ContentValues();
+                values.put(CHANNEL_ID, channel.getChannelId());
+                values.put(RECIPIENT_ID, channel.getRecipientId());
+                values.put(PROVIDER_TYPE, channel.getProviderType());
+                values.put(METADATA_JSON, channel.getMetadata().toJson());
+                values.put(STATUS, channel.getStatus().ordinal());
+                values.put(PRIORITY, channel.getPriority());
+                values.put(CREATED_AT, channel.getCreatedAt());
+                values.put(LAST_ACTIVE_AT, channel.getLastActiveAt());
+                values.put(SUCCESS_COUNT, channel.getSuccessCount());
+                values.put(FAILURE_COUNT, channel.getFailureCount());
+                values.put(LAST_ERROR, channel.getLastError() != null ? channel.getLastError().name() : null);
+                values.put(CONFIG_JSON, serializeChannelConfig(channel.getConfig()));
+                
+                if (currentVersion >= 0) {
+                    // 记录存在，使用乐观锁更新
+                    long newVersion = currentVersion + 1;
+                    values.put(VERSION, newVersion);
+                    
+                    int updatedRows = getWritableDatabase().update(
+                        TABLE_NAME, 
+                        values, 
+                        CHANNEL_ID + " = ? AND " + VERSION + " = ?", 
+                        new String[]{channel.getChannelId(), String.valueOf(currentVersion)}
+                    );
+                    
+                    if (updatedRows == 0) {
+                        // 乐观锁冲突，记录已被其他线程修改
+                        Log.w(TAG, "乐观锁冲突，通道可能已被其他线程修改: " + channel.getChannelId());
+                        throw new OptimisticLockException("通道版本冲突: " + channel.getChannelId());
+                    }
+                    
+                    Log.d(TAG, "通道更新成功: " + channel.getChannelId() + ", 版本: " + currentVersion + " -> " + newVersion);
+                } else {
+                    // 记录不存在，插入新记录
+                    values.put(VERSION, 1); // 新记录版本从1开始
+                    
+                    long insertId = getWritableDatabase().insert(TABLE_NAME, null, values);
+                    if (insertId < 0) {
+                        throw new IllegalStateException("插入通道失败: " + channel.getChannelId());
+                    }
+                    
+                    Log.d(TAG, "通道插入成功: " + channel.getChannelId() + ", ID: " + insertId);
+                }
+                
+            } catch (OptimisticLockException e) {
+                // 重新抛出乐观锁异常，让调用者决定如何处理
+                throw e;
+            } catch (Exception e) {
+                Log.e(TAG, "保存通道失败: " + channel.getChannelId(), e);
+                throw new RuntimeException("保存通道失败", e);
             }
-            Log.d(TAG, "通道保存成功: " + channel.getChannelId());
-        } catch (Exception e) {
-            Log.e(TAG, "保存通道失败: " + channel.getChannelId(), e);
         }
     }
 
@@ -296,6 +337,33 @@ public class TransportChannelTable extends DatabaseTable {
     }
 
     /**
+     * 获取通道当前版本号
+     * 
+     * @param channelId 通道ID
+     * @return 版本号，如果通道不存在返回-1
+     */
+    private long getCurrentChannelVersion(@NonNull String channelId) {
+        try (Cursor cursor = getReadableDatabase().query(
+            TABLE_NAME,
+            new String[]{VERSION},
+            CHANNEL_ID + " = ?",
+            new String[]{channelId},
+            null,
+            null,
+            null
+        )) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getLong(0);
+            } else {
+                return -1; // 记录不存在
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "获取通道版本失败: " + channelId, e);
+            return -1;
+        }
+    }
+    
+    /**
      * 从Cursor读取TransportChannel
      */
     @Nullable
@@ -312,6 +380,7 @@ public class TransportChannelTable extends DatabaseTable {
             int successCount = cursor.getInt(cursor.getColumnIndexOrThrow(SUCCESS_COUNT));
             int failureCount = cursor.getInt(cursor.getColumnIndexOrThrow(FAILURE_COUNT));
             String lastError = cursor.getString(cursor.getColumnIndexOrThrow(LAST_ERROR));
+            String configJson = cursor.getString(cursor.getColumnIndexOrThrow(CONFIG_JSON));
             long version = cursor.getLong(cursor.getColumnIndexOrThrow(VERSION));
 
             TransportChannelStatus status = TransportChannelStatus.values()[statusOrdinal];
@@ -333,6 +402,9 @@ public class TransportChannelTable extends DatabaseTable {
                 }
             }
             
+            // 反序列化config
+            Map<String, Object> config = deserializeChannelConfig(configJson);
+            
             Log.d(TAG, "从数据库读取通道: " + channelId);
             
             return new TransportChannel(
@@ -346,7 +418,7 @@ public class TransportChannelTable extends DatabaseTable {
                 failureCount,
                 successCount,
                 error,
-                Collections.emptyMap(), // config - 暂时为空
+                config,
                 priority,
                 version
             );
@@ -401,6 +473,56 @@ public class TransportChannelTable extends DatabaseTable {
             this.totalChannels = totalChannels;
             this.activeChannels = activeChannels;
             this.failedChannels = failedChannels;
+        }
+    }
+
+    /**
+     * 使用Jackson序列化通道配置
+     */
+    @NonNull
+    private String serializeChannelConfig(@NonNull Map<String, Object> config) {
+        try {
+            if (config == null || config.isEmpty()) {
+                return "{}";
+            }
+            return JsonUtils.toJson(config);
+        } catch (IOException e) {
+            Log.e(TAG, "序列化通道配置失败", e);
+            return "{}";
+        }
+    }
+
+    /**
+     * 使用Jackson反序列化通道配置
+     */
+    @NonNull
+    private Map<String, Object> deserializeChannelConfig(@NonNull String json) {
+        try {
+            if (json == null || json.trim().isEmpty() || "{}".equals(json.trim())) {
+                return new HashMap<>();
+            }
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> config = JsonUtils.fromJson(json, Map.class);
+            return config != null ? config : new HashMap<>();
+            
+        } catch (IOException e) {
+            Log.w(TAG, "反序列化通道配置失败，使用空配置: " + json, e);
+            return new HashMap<>();
+        }
+    }
+    
+    /**
+     * 乐观锁异常
+     * 当多个线程同时修改同一记录时抛出
+     */
+    public static class OptimisticLockException extends RuntimeException {
+        public OptimisticLockException(String message) {
+            super(message);
+        }
+        
+        public OptimisticLockException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 } 

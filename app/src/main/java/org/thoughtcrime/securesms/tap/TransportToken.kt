@@ -143,84 +143,7 @@ data class CosTransportToken(
     }
 }
 
-/**
- * Email传输Token实现
- * 
- * 用于Email服务的访问凭证。
- */
-data class EmailTransportToken(
-    override val tokenId: String,
-    override val recipientId: String,
-    override val providerType: String = "email",
-    override val permissions: Set<TransportPermission>,
-    override val expirationTime: Long,
-    /** 邮箱用户名 */
-    val username: String,
-    /** 邮箱密码或应用专用密码 */
-    val password: String,
-    /** SMTP服务器地址 */
-    val smtpServer: String,
-    /** IMAP服务器地址 */
-    val imapServer: String
-) : TransportToken {
-    
-    override fun toMap(): Map<String, Any> {
-        return mapOf(
-            "tokenId" to tokenId,
-            "recipientId" to recipientId,
-            "providerType" to providerType,
-            "permissions" to TransportPermission.toStringList(permissions),
-            "expirationTime" to expirationTime,
-            "username" to username,
-            "password" to password,
-            "smtpServer" to smtpServer,
-            "imapServer" to imapServer
-        )
-    }
-    
-    override fun validate(): Boolean {
-        return tokenId.isNotBlank() &&
-               recipientId.isNotBlank() &&
-               providerType == "email" &&
-               permissions.isNotEmpty() &&
-               expirationTime > System.currentTimeMillis() &&
-               username.isNotBlank() &&
-               password.isNotBlank() &&
-               smtpServer.isNotBlank() &&
-               imapServer.isNotBlank()
-    }
-    
-    companion object {
-        fun fromMap(data: Map<String, Any>): EmailTransportToken? {
-            return try {
-                val tokenId = data["tokenId"] as? String ?: return null
-                val recipientId = data["recipientId"] as? String ?: return null
-                val providerType = data["providerType"] as? String ?: "email"
-                val permissionsList = data["permissions"] as? List<String> ?: return null
-                val permissions = TransportPermission.fromStringList(permissionsList)
-                val expirationTime = (data["expirationTime"] as? Number)?.toLong() ?: return null
-                val username = data["username"] as? String ?: return null
-                val password = data["password"] as? String ?: return null
-                val smtpServer = data["smtpServer"] as? String ?: return null
-                val imapServer = data["imapServer"] as? String ?: return null
-                
-                EmailTransportToken(
-                    tokenId = tokenId,
-                    recipientId = recipientId,
-                    providerType = providerType,
-                    permissions = permissions,
-                    expirationTime = expirationTime,
-                    username = username,
-                    password = password,
-                    smtpServer = smtpServer,
-                    imapServer = imapServer
-                )
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-}
+
 
 /**
  * 传输Token请求数据结构
@@ -293,7 +216,6 @@ object TransportTokenFactory {
         
         return when (providerType) {
             "cos" -> CosTransportToken.fromMap(data)
-            "email" -> EmailTransportToken.fromMap(data)
             else -> null
         }
     }
@@ -325,28 +247,5 @@ object TransportTokenFactory {
         )
     }
     
-    /**
-     * 创建Email Token
-     */
-    fun createEmailToken(
-        tokenId: String,
-        recipientId: String,
-        permissions: Set<TransportPermission>,
-        expirationTime: Long,
-        username: String,
-        password: String,
-        smtpServer: String,
-        imapServer: String
-    ): EmailTransportToken {
-        return EmailTransportToken(
-            tokenId = tokenId,
-            recipientId = recipientId,
-            permissions = permissions,
-            expirationTime = expirationTime,
-            username = username,
-            password = password,
-            smtpServer = smtpServer,
-            imapServer = imapServer
-        )
-    }
+
 } 

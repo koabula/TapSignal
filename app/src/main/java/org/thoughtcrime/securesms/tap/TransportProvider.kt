@@ -1,5 +1,7 @@
 package org.thoughtcrime.securesms.tap
 
+import org.thoughtcrime.securesms.tap.GroupTransportManager.GroupTransportMetadata
+
 /**
  * 传输提供者核心接口
  * 
@@ -412,6 +414,7 @@ data class TransportProviderStatus(
  * 传输提供者工厂接口
  * 
  * 用于创建和管理传输提供者实例。
+ * 支持基于ProviderRegistrar的插件化架构。
  */
 interface TransportProviderFactory {
     
@@ -443,6 +446,30 @@ interface TransportProviderFactory {
      * @return 默认配置
      */
     fun getDefaultConfig(providerType: String): Map<String, Any>
+    
+    /**
+     * 注册Provider注册器
+     * 
+     * @param registrar Provider注册器实例
+     * @return 注册是否成功
+     */
+    fun registerProviderRegistrar(registrar: ProviderRegistrar): Boolean
+    
+    /**
+     * 注销Provider注册器
+     * 
+     * @param providerType Provider类型
+     * @return 注销是否成功  
+     */
+    fun unregisterProviderRegistrar(providerType: String): Boolean
+    
+    /**
+     * 获取Provider配置描述器
+     * 
+     * @param providerType Provider类型
+     * @return 配置描述器，如果不支持该类型则返回null
+     */
+    fun getProviderConfigDescriptor(providerType: String): ProviderConfigDescriptor?
     
     /**
      * 检查是否支持指定的提供者类型

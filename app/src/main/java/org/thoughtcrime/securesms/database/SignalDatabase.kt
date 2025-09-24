@@ -152,6 +152,12 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     executeStatements(db, ChatFolderTables.CREATE_TABLE)
     db.execSQL(BackupMediaSnapshotTable.CREATE_TABLE)
 
+    // Tap模块数据库表
+    db.execSQL(org.thoughtcrime.securesms.tap.database.TransportChannelTable.CREATE_TABLE)
+    db.execSQL(org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_TABLE)
+    db.execSQL(org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_PROCESSED_MESSAGES_TABLE)
+    db.execSQL(org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_TABLE)
+
     executeStatements(db, RecipientTable.CREATE_INDEXS)
     executeStatements(db, MessageTable.CREATE_INDEXS)
     executeStatements(db, AttachmentTable.CREATE_INDEXS)
@@ -175,6 +181,11 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     executeStatements(db, ChatFolderTables.CREATE_INDEXES)
     executeStatements(db, NameCollisionTables.CREATE_INDEXES)
     executeStatements(db, BackupMediaSnapshotTable.CREATE_INDEXES)
+
+    // Tap模块索引
+    executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportChannelTable.CREATE_INDEXES)
+    executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_INDEXES)
+    executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_INDEXES)
 
     executeStatements(db, MessageSendLogTables.CREATE_TRIGGERS)
 

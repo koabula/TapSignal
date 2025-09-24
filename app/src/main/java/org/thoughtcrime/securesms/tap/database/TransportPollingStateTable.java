@@ -10,7 +10,9 @@ import androidx.annotation.WorkerThread;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.database.DatabaseTable;
 import org.thoughtcrime.securesms.database.SignalDatabase;
+import org.thoughtcrime.securesms.util.JsonUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +45,13 @@ public class TransportPollingStateTable extends DatabaseTable {
     private static final String VERSION               = "version";
     private static final String UPDATED_AT            = "updated_at";
 
+    // 消息去重表常量
+    public static final String PROCESSED_MESSAGES_TABLE = "transport_processed_messages";
+    private static final String PM_ID                    = "_id";
+    private static final String PM_DUPLICATION_KEY      = "duplication_key";
+    private static final String PM_PROCESSED_TIMESTAMP  = "processed_timestamp";
+    private static final String PM_CREATED_AT           = "created_at";
+
     public static final String CREATE_TABLE = 
         "CREATE TABLE " + TABLE_NAME + "(" +
             ID                    + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -62,12 +71,35 @@ public class TransportPollingStateTable extends DatabaseTable {
             "UNIQUE(" + RECIPIENT_ID + ", " + PROVIDER_TYPE + ") ON CONFLICT REPLACE" +
         ")";
 
+    public static final String CREATE_PROCESSED_MESSAGES_TABLE = 
+        "CREATE TABLE " + PROCESSED_MESSAGES_TABLE + "(" +
+            PM_ID                    + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            PM_DUPLICATION_KEY       + " TEXT UNIQUE NOT NULL, " +
+            PM_PROCESSED_TIMESTAMP   + " INTEGER NOT NULL, " +
+            PM_CREATED_AT           + " INTEGER NOT NULL" +
+        ")";
+
     public static final String[] CREATE_INDEXES = {
         "CREATE INDEX IF NOT EXISTS transport_polling_state_recipient_idx ON " + TABLE_NAME + " (" + RECIPIENT_ID + ")",
         "CREATE INDEX IF NOT EXISTS transport_polling_state_provider_idx ON " + TABLE_NAME + " (" + PROVIDER_TYPE + ")",
         "CREATE INDEX IF NOT EXISTS transport_polling_state_last_processed_idx ON " + TABLE_NAME + " (" + LAST_PROCESSED_TIME + ")",
-        "CREATE INDEX IF NOT EXISTS transport_polling_state_errors_idx ON " + TABLE_NAME + " (" + CONSECUTIVE_ERRORS + ", " + LAST_ERROR_TIME + ")"
+        "CREATE INDEX IF NOT EXISTS transport_polling_state_errors_idx ON " + TABLE_NAME + " (" + CONSECUTIVE_ERRORS + ", " + LAST_ERROR_TIME + ")",
+        "CREATE INDEX IF NOT EXISTS transport_processed_messages_key_idx ON " + PROCESSED_MESSAGES_TABLE + " (" + PM_DUPLICATION_KEY + ")",
+        "CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx ON " + PROCESSED_MESSAGES_TABLE + " (" + PM_PROCESSED_TIMESTAMP + ")"
     };
+
+    /**
+     * 处理文件集合的JSON包装类
+     */
+    public static class ProcessedFilesData {
+        public Set<String> files = new HashSet<>();
+
+        public ProcessedFilesData() {}
+
+        public ProcessedFilesData(Set<String> files) {
+            this.files = files != null ? files : new HashSet<>();
+        }
+    }
 
     public TransportPollingStateTable(@NonNull Context context, @NonNull SignalDatabase databaseHelper) {
         super(context, databaseHelper);
@@ -158,7 +190,7 @@ public class TransportPollingStateTable extends DatabaseTable {
             values.put(RECIPIENT_ID, state.recipientId);
             values.put(PROVIDER_TYPE, state.providerType);
             values.put(LAST_PROCESSED_TIME, state.lastProcessedTime);
-            values.put(PROCESSED_FILES_JSON, serializeFileSet(state.processedFiles));
+            values.put(PROCESSED_FILES_JSON, serializeProcessedFiles(state.processedFiles));
             values.put(LAST_POLLING_CURSOR, state.lastPollingCursor);
             values.put(CONSECUTIVE_ERRORS, state.consecutiveErrors);
             values.put(LAST_ERROR_TIME, state.lastErrorTime);
@@ -370,7 +402,7 @@ public class TransportPollingStateTable extends DatabaseTable {
             long version = cursor.getLong(cursor.getColumnIndexOrThrow(VERSION));
             long updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(UPDATED_AT));
 
-            Set<String> processedFiles = deserializeFileSet(processedFilesJson);
+            Set<String> processedFiles = deserializeProcessedFiles(processedFilesJson);
 
             return new PollingState(
                 recipientId, providerType, lastProcessedTime, processedFiles, lastPollingCursor,
@@ -384,60 +416,43 @@ public class TransportPollingStateTable extends DatabaseTable {
     }
 
     /**
-     * 序列化文件集合为JSON字符串
+     * 使用Jackson序列化处理文件集合
      */
     @NonNull
-    private String serializeFileSet(@NonNull Set<String> files) {
-        if (files.isEmpty()) {
-            return "[]";
+    private String serializeProcessedFiles(@NonNull Set<String> files) {
+        try {
+            ProcessedFilesData data = new ProcessedFilesData(files);
+            return JsonUtils.toJson(data);
+        } catch (IOException e) {
+            Log.e(TAG, "序列化处理文件集合失败", e);
+            return "{\"files\":[]}";
         }
-        
-        StringBuilder sb = new StringBuilder("[");
-        boolean first = true;
-        for (String file : files) {
-            if (!first) {
-                sb.append(",");
-            }
-            sb.append("\"").append(file.replace("\"", "\\\"")).append("\"");
-            first = false;
-        }
-        sb.append("]");
-        return sb.toString();
     }
 
     /**
-     * 从JSON字符串反序列化文件集合
+     * 使用Jackson反序列化处理文件集合
      */
     @NonNull
-    private Set<String> deserializeFileSet(@NonNull String json) {
-        Set<String> files = new HashSet<>();
-        
+    private Set<String> deserializeProcessedFiles(@NonNull String json) {
         try {
-            if (json == null || json.trim().isEmpty() || "[]".equals(json.trim())) {
-                return files;
+            if (json == null || json.trim().isEmpty()) {
+                return new HashSet<>();
             }
             
-            // 简单的JSON数组解析（避免引入JSON库依赖）
-            String content = json.trim();
-            if (content.startsWith("[") && content.endsWith("]")) {
-                content = content.substring(1, content.length() - 1);
-                if (!content.trim().isEmpty()) {
-                    String[] parts = content.split(",");
-                    for (String part : parts) {
-                        String file = part.trim();
-                        if (file.startsWith("\"") && file.endsWith("\"")) {
-                            file = file.substring(1, file.length() - 1);
-                            file = file.replace("\\\"", "\"");
-                            files.add(file);
-                        }
-                    }
-                }
+            // 兼容旧格式的简单数组
+            if (json.trim().startsWith("[")) {
+                List<String> fileList = JsonUtils.fromJsonArray(json, String.class);
+                return new HashSet<>(fileList);
             }
-        } catch (Exception e) {
-            Log.w(TAG, "反序列化文件集合失败: " + json, e);
+            
+            // 新格式的对象结构
+            ProcessedFilesData data = JsonUtils.fromJson(json, ProcessedFilesData.class);
+            return data.files != null ? data.files : new HashSet<>();
+            
+        } catch (IOException e) {
+            Log.w(TAG, "反序列化处理文件集合失败，使用空集合: " + json, e);
+            return new HashSet<>();
         }
-        
-        return files;
     }
 
     // ==================== 消息去重支持方法 ====================
@@ -448,26 +463,24 @@ public class TransportPollingStateTable extends DatabaseTable {
     @WorkerThread
     public void markMessageAsProcessed(@NonNull String duplicationKey, long timestamp) {
         try {
-            // 使用简单的表结构存储去重信息
-            getWritableDatabase().execSQL(
-                "INSERT OR REPLACE INTO transport_processed_messages (duplication_key, processed_timestamp, created_at) " +
-                "VALUES (?, ?, ?)",
-                new Object[]{duplicationKey, timestamp, System.currentTimeMillis()}
+            ContentValues values = new ContentValues();
+            values.put(PM_DUPLICATION_KEY, duplicationKey);
+            values.put(PM_PROCESSED_TIMESTAMP, timestamp);
+            values.put(PM_CREATED_AT, System.currentTimeMillis());
+
+            // 使用标准的upsert逻辑
+            int updatedRows = getWritableDatabase().update(
+                PROCESSED_MESSAGES_TABLE, 
+                values, 
+                PM_DUPLICATION_KEY + " = ?", 
+                new String[]{duplicationKey}
             );
+            if (updatedRows == 0) {
+                getWritableDatabase().insert(PROCESSED_MESSAGES_TABLE, null, values);
+            }
             
         } catch (Exception e) {
             Log.e(TAG, "标记消息已处理失败: " + duplicationKey, e);
-            // 如果表不存在，尝试创建
-            createMessageDeduplicationTable();
-            try {
-                getWritableDatabase().execSQL(
-                    "INSERT OR REPLACE INTO transport_processed_messages (duplication_key, processed_timestamp, created_at) " +
-                    "VALUES (?, ?, ?)",
-                    new Object[]{duplicationKey, timestamp, System.currentTimeMillis()}
-                );
-            } catch (Exception e2) {
-                Log.e(TAG, "重试标记消息已处理仍然失败: " + duplicationKey, e2);
-            }
         }
     }
     
@@ -476,9 +489,14 @@ public class TransportPollingStateTable extends DatabaseTable {
      */
     @WorkerThread
     public boolean isMessageProcessed(@NonNull String duplicationKey) {
-        try (Cursor cursor = getReadableDatabase().rawQuery(
-            "SELECT COUNT(*) FROM transport_processed_messages WHERE duplication_key = ?",
-            new String[]{duplicationKey}
+        try (Cursor cursor = getReadableDatabase().query(
+            PROCESSED_MESSAGES_TABLE,
+            new String[]{"COUNT(*)"},
+            PM_DUPLICATION_KEY + " = ?",
+            new String[]{duplicationKey},
+            null,
+            null,
+            null
         )) {
             if (cursor != null && cursor.moveToFirst()) {
                 return cursor.getInt(0) > 0;
@@ -497,9 +515,15 @@ public class TransportPollingStateTable extends DatabaseTable {
     public List<String> getRecentProcessedMessageKeys(long cutoffTime) {
         List<String> keys = new ArrayList<>();
         
-        try (Cursor cursor = getReadableDatabase().rawQuery(
-            "SELECT duplication_key FROM transport_processed_messages WHERE processed_timestamp >= ? ORDER BY processed_timestamp DESC LIMIT 1000",
-            new String[]{String.valueOf(cutoffTime)}
+        try (Cursor cursor = getReadableDatabase().query(
+            PROCESSED_MESSAGES_TABLE,
+            new String[]{PM_DUPLICATION_KEY},
+            PM_PROCESSED_TIMESTAMP + " >= ?",
+            new String[]{String.valueOf(cutoffTime)},
+            null,
+            null,
+            PM_PROCESSED_TIMESTAMP + " DESC",
+            "1000"
         )) {
             while (cursor != null && cursor.moveToNext()) {
                 keys.add(cursor.getString(0));
@@ -518,8 +542,8 @@ public class TransportPollingStateTable extends DatabaseTable {
     public int cleanupExpiredMessages(long cutoffTime) {
         try {
             int deletedCount = getWritableDatabase().delete(
-                "transport_processed_messages",
-                "processed_timestamp < ?",
+                PROCESSED_MESSAGES_TABLE,
+                PM_PROCESSED_TIMESTAMP + " < ?",
                 new String[]{String.valueOf(cutoffTime)}
             );
             
@@ -533,34 +557,5 @@ public class TransportPollingStateTable extends DatabaseTable {
             return 0;
         }
     }
-    
-    /**
-     * 创建消息去重表
-     */
-    @WorkerThread
-    public void createMessageDeduplicationTable() {
-        try {
-            getWritableDatabase().execSQL(
-                "CREATE TABLE IF NOT EXISTS transport_processed_messages (" +
-                    "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "duplication_key TEXT UNIQUE NOT NULL, " +
-                    "processed_timestamp INTEGER NOT NULL, " +
-                    "created_at INTEGER NOT NULL" +
-                ")"
-            );
-            
-            getWritableDatabase().execSQL(
-                "CREATE INDEX IF NOT EXISTS transport_processed_messages_key_idx ON transport_processed_messages (duplication_key)"
-            );
-            
-            getWritableDatabase().execSQL(
-                "CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx ON transport_processed_messages (processed_timestamp)"
-            );
-            
-            Log.d(TAG, "创建消息去重表成功");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "创建消息去重表失败", e);
-        }
-    }
+
 } 

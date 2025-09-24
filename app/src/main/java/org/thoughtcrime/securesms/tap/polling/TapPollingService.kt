@@ -1,16 +1,12 @@
 package org.thoughtcrime.securesms.tap.polling
 
 import android.content.Context
-import android.os.BatteryManager
 import android.util.Log
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator
 import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
 import org.thoughtcrime.securesms.tap.integration.TapProcessResult
 import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.tap.polling.ProviderPollingStats
-import org.thoughtcrime.securesms.tap.polling.ActivityLevelStats
-import org.thoughtcrime.securesms.tap.polling.RecentPollingStats
 import java.util.concurrent.*
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.concurrent.atomic.AtomicBoolean
@@ -20,28 +16,25 @@ import kotlinx.coroutines.*
 import org.thoughtcrime.securesms.tap.TransportErrorHandler
 import org.thoughtcrime.securesms.tap.ErrorContext
 
+
+
+
+
 /**
- * Tap轮询服务
+ * Tap轮询服务 - 简化版本
  * 
- * 主轮询服务，提供每联系人独立调度的智能轮询功能。
- * 集成所有轮询优化组件，实现高效、智能的消息轮询机制。
- * 
- * 核心特性：
+ * 提供每联系人独立调度的基础轮询功能，专注于：
  * 1. 每联系人独立轮询调度
- * 2. 智能轮询策略自动优化
- * 3. 动态资源调度和负载均衡
- * 4. 批处理优化提高效率
- * 5. 自适应学习持续改进
- * 6. 完整的错误处理和恢复
- * 7. 丰富的监控和统计信息
+ * 2. 基础错误处理和退避
+ * 3. 活跃度级别调整
+ * 4. 资源安全管理
  */
 class TapPollingService(private val context: Context) {
     
     companion object {
         private const val TAG = "TapPollingService"
         
-        // 已移除硬编码配置，改为使用可配置的 TapPollingConfig
-        
+        @Volatile
         private var INSTANCE: TapPollingService? = null
         
         /**
@@ -55,83 +48,36 @@ class TapPollingService(private val context: Context) {
         }
     }
     
-    // 核心组件
+    // 核心依赖组件
     private val transportManager = TransportManager.getInstance(context)
     private val channelManager = TransportChannelManager.getInstance(context)
-    private val tokenPool = TransportTokenPool.getInstance(context)
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
     private val messageProcessor = TapMessageProcessor.getInstance(context)
     private val errorHandler = TransportErrorHandler.getInstance(context)
-    private val networkQualityDetector = org.thoughtcrime.securesms.tap.utils.NetworkQualityDetector.getInstance(context)
     
     // 数据库访问
     private val pollingStateTable = SignalDatabase.transportPollingStates
-    
-    // 轮询优化组件
-    private val pollingStrategy = TapIntelligentPollingStrategy(context)
-    private val dynamicScheduler = DynamicPollingScheduler(context)
-    private val batchOptimizer = BatchPollingOptimizer(context)
-    private val intervalAdjuster = AdaptiveIntervalAdjuster(context)
     
     // 轮询任务管理
     private val pollingTasks = ConcurrentHashMap<String, PollingTaskInfo>()
     private val pollingLock = ReentrantReadWriteLock()
     
-    // 线程池和调度器
+    // 线程池管理
+    @Volatile
     private var pollingExecutor: ScheduledThreadPoolExecutor? = null
+    @Volatile
     private var cleanupTask: ScheduledFuture<*>? = null
     
     // 服务状态
     private val isRunning = AtomicBoolean(false)
+    @Volatile
     private var serviceScope: CoroutineScope? = null
     
-    // 统计收集器
-    private val statisticsCollector = PollingStatisticsCollector()
+    // 文件处理失败跟踪
+    private val fileProcessingFailures = ConcurrentHashMap<String, FileProcessingFailure>()
     
-    // 轮询配置（可配置参数）
-    private var pollingConfig: TapPollingConfig = TapPollingConfig()
-    
-    /**
-     * 初始化轮询服务
-     */
-    fun initialize(config: TapPollingConfig = TapPollingConfig()) {
-        Log.i(TAG, "初始化Tap轮询服务...")
-        
-        try {
-            // 验证并保存配置
-            if (!config.validate()) {
-                throw IllegalArgumentException("轮询配置无效")
-            }
-            this.pollingConfig = config
-            
-            // 初始化核心组件
-            if (!pollingStrategy.initialize()) {
-                throw IllegalStateException("智能轮询策略初始化失败")
-            }
-            
-            if (!dynamicScheduler.initialize()) {
-                throw IllegalStateException("动态轮询调度器初始化失败")
-            }
-            
-            if (!batchOptimizer.initialize()) {
-                throw IllegalStateException("批处理优化器初始化失败")
-            }
-            
-            if (!intervalAdjuster.initialize()) {
-                throw IllegalStateException("自适应间隔调整器初始化失败")
-            }
-            
-            // 初始化统计收集器
-            if (!statisticsCollector.initialize()) {
-                throw IllegalStateException("统计收集器初始化失败")
-            }
-            
-            Log.i(TAG, "Tap轮询服务初始化完成 - 所有组件初始化成功")
-        } catch (e: Exception) {
-            Log.e(TAG, "Tap轮询服务初始化失败", e)
-            throw e
-        }
-    }
+    // 设备性能检测
+    private val deviceCapabilityProvider = DeviceCapabilityProvider(context)
     
     /**
      * 启动轮询服务
@@ -146,27 +92,45 @@ class TapPollingService(private val context: Context) {
                 
                 Log.i(TAG, "启动Tap轮询服务...")
                 
-                // 创建线程池
+                // 根据设备性能计算最优线程池配置
+                val threadPoolConfig = deviceCapabilityProvider.calculateOptimalThreadPoolSize()
+                val deviceSummary = deviceCapabilityProvider.getDeviceSummary()
+                
+                Log.i(TAG, "设备性能: $deviceSummary")
+                Log.i(TAG, "线程池配置: ${threadPoolConfig.getSummary()}")
+                
+                // 创建自适应线程池
                 pollingExecutor = ScheduledThreadPoolExecutor(
-                    pollingConfig.corePoolSize,
-                    { r -> Thread(r, "TapPolling-${System.currentTimeMillis()}") },
-                    ThreadPoolExecutor.CallerRunsPolicy()
+                    threadPoolConfig.corePoolSize,
+                    { r -> 
+                        Thread(r, "TapPolling-${Thread.currentThread().id}").apply {
+                            isDaemon = true
+                            priority = if (threadPoolConfig.isConservative()) {
+                                Thread.MIN_PRIORITY + 1 // 低性能设备使用较低优先级
+                            } else {
+                                Thread.NORM_PRIORITY
+                            }
+                        }
+                    }
                 ).apply {
-                    maximumPoolSize = pollingConfig.maxPoolSize
-                    setKeepAliveTime(pollingConfig.keepAliveTimeSeconds, TimeUnit.SECONDS)
+                    maximumPoolSize = threadPoolConfig.maxPoolSize
+                    setKeepAliveTime(threadPoolConfig.keepAliveSeconds, TimeUnit.SECONDS)
                     allowCoreThreadTimeOut(true)
+                    
+                    // 根据设备性能选择拒绝策略
+                    setRejectedExecutionHandler(
+                        if (threadPoolConfig.isConservative()) {
+                            ThreadPoolExecutor.DiscardOldestPolicy() // 低性能设备丢弃最旧任务
+                        } else {
+                            ThreadPoolExecutor.CallerRunsPolicy()    // 高性能设备由调用线程执行
+                        }
+                    )
                 }
                 
                 // 创建协程作用域
                 serviceScope = CoroutineScope(
                     Dispatchers.IO + SupervisorJob() + CoroutineName("TapPollingService")
                 )
-                
-                // 启动动态调度器
-                dynamicScheduler.start()
-                
-                // 启动网络质量监控
-                networkQualityDetector.startNetworkMonitoring()
                 
                 // 启动清理任务
                 startCleanupTask()
@@ -176,7 +140,11 @@ class TapPollingService(private val context: Context) {
                 true
                 
             } catch (e: Exception) {
-                Log.e(TAG, "启动轮询服务失败", e)
+                when (e) {
+                    is SecurityException -> Log.e(TAG, "安全权限不足，无法启动轮询服务", e)
+                    is OutOfMemoryError -> Log.e(TAG, "内存不足，无法启动轮询服务", e)
+                    else -> Log.e(TAG, "启动轮询服务失败: ${e.javaClass.simpleName}", e)
+                }
                 cleanup()
                 false
             }
@@ -198,7 +166,7 @@ class TapPollingService(private val context: Context) {
                 
                 isRunning.set(false)
                 
-                // 优雅停止：等待正在执行的任务完成
+                // 优雅停止
                 gracefulShutdown()
                 
                 // 清理资源
@@ -207,7 +175,7 @@ class TapPollingService(private val context: Context) {
                 Log.i(TAG, "Tap轮询服务已停止")
                 
             } catch (e: Exception) {
-                Log.e(TAG, "停止轮询服务时发生错误", e)
+                Log.e(TAG, "停止轮询服务时发生错误: ${e.javaClass.simpleName}", e)
             }
         }
     }
@@ -222,18 +190,18 @@ class TapPollingService(private val context: Context) {
             Log.d(TAG, "取消 ${tasks.size} 个轮询任务")
             
             tasks.forEach { taskInfo ->
-                taskInfo.task?.cancel(false) // 不中断正在运行的任务
+                taskInfo.task?.cancel(false)
             }
             
             // 等待线程池安全关闭
             pollingExecutor?.let { executor ->
                 executor.shutdown()
                 try {
-                    // 等待30秒让任务自然结束
                     if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
                         Log.w(TAG, "轮询任务未在30秒内完成，强制停止")
-                        executor.shutdownNow()
-                        // 再等待10秒
+                        val unfinishedTasks = executor.shutdownNow()
+                        Log.w(TAG, "强制停止了 ${unfinishedTasks.size} 个未完成任务")
+                        
                         if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
                             Log.e(TAG, "无法停止轮询线程池")
                         }
@@ -248,12 +216,12 @@ class TapPollingService(private val context: Context) {
             pollingTasks.clear()
             
         } catch (e: Exception) {
-            Log.e(TAG, "优雅停止轮询任务时出错", e)
+            Log.e(TAG, "优雅停止轮询任务时出错: ${e.javaClass.simpleName}", e)
         }
     }
     
     /**
-     * 添加轮询目标（支持每联系人独立调度）
+     * 添加轮询目标
      */
     fun addPollingTarget(recipientId: String, metadata: TransportMetadata): Boolean {
         if (!isRunning.get()) {
@@ -265,7 +233,6 @@ class TapPollingService(private val context: Context) {
             Log.d(TAG, "添加轮询目标: recipient=$recipientId, provider=${metadata.providerType}")
             
             pollingLock.write {
-                // 检查是否已存在
                 if (pollingTasks.containsKey(recipientId)) {
                     Log.w(TAG, "轮询目标已存在: $recipientId")
                     return@write false
@@ -276,15 +243,13 @@ class TapPollingService(private val context: Context) {
                 
                 // 计算初始轮询间隔
                 val channel = channelManager.getActiveChannel(recipientId, metadata.providerType)
-                val initialInterval = pollingStrategy.calculatePollingInterval(
-                    recipientId, metadata, channel
-                )
-                taskInfo.currentInterval = initialInterval
+                val initialInterval = calculatePollingInterval(metadata, channel)
+                taskInfo.setCurrentInterval(initialInterval)
                 
                 // 调度轮询任务
                 val scheduledTask = schedulePollingTask(taskInfo)
                 taskInfo.task = scheduledTask
-                taskInfo.status = PollingTaskStatus.RUNNING
+                taskInfo.setStatus(PollingTaskStatus.RUNNING)
                 
                 // 添加到任务列表
                 pollingTasks[recipientId] = taskInfo
@@ -293,7 +258,11 @@ class TapPollingService(private val context: Context) {
                 true
             }
         } catch (e: Exception) {
-            Log.e(TAG, "添加轮询目标失败: recipient=$recipientId", e)
+            when (e) {
+                is IllegalArgumentException -> Log.e(TAG, "添加轮询目标失败，参数无效: recipient=$recipientId", e)
+                is IllegalStateException -> Log.e(TAG, "添加轮询目标失败，状态异常: recipient=$recipientId", e)
+                else -> Log.e(TAG, "添加轮询目标失败: recipient=$recipientId, ${e.javaClass.simpleName}", e)
+            }
             false
         }
     }
@@ -310,7 +279,6 @@ class TapPollingService(private val context: Context) {
                     return@write false
                 }
                 
-                // 检查Provider类型是否匹配
                 if (taskInfo.metadata.providerType != providerType) {
                     Log.w(TAG, "Provider类型不匹配: expected=$providerType, actual=${taskInfo.metadata.providerType}")
                     return@write false
@@ -318,7 +286,6 @@ class TapPollingService(private val context: Context) {
                 
                 Log.d(TAG, "移除轮询目标: recipient=$recipientId, provider=$providerType")
                 
-                // 取消任务
                 taskInfo.cleanup()
                 pollingTasks.remove(recipientId)
                 
@@ -326,71 +293,29 @@ class TapPollingService(private val context: Context) {
                 true
                 
             } catch (e: Exception) {
-                Log.e(TAG, "移除轮询目标失败: recipient=$recipientId", e)
+                Log.e(TAG, "移除轮询目标失败: recipient=$recipientId, ${e.javaClass.simpleName}", e)
                 false
             }
         }
     }
     
     /**
-     * 动态调整轮询间隔（基于活跃度变化）
-     */
-    fun adjustPollingInterval(recipientId: String, newInterval: Long): Boolean {
-        return pollingLock.write {
-            try {
-                val taskInfo = pollingTasks[recipientId]
-                if (taskInfo == null) {
-                    Log.w(TAG, "轮询任务不存在: $recipientId")
-                    return@write false
-                }
-                
-                if (taskInfo.currentInterval == newInterval) {
-                    Log.d(TAG, "轮询间隔无变化，跳过调整: $recipientId")
-                    return@write true
-                }
-                
-                Log.d(TAG, "调整轮询间隔: recipient=$recipientId, ${taskInfo.currentInterval}ms -> ${newInterval}ms")
-                
-                // 取消当前任务
-                taskInfo.task?.cancel(false)
-                
-                // 更新间隔
-                taskInfo.currentInterval = newInterval
-                
-                // 重新调度任务
-                val newTask = schedulePollingTask(taskInfo)
-                taskInfo.task = newTask
-                
-                // 通知动态调度器
-                dynamicScheduler.adjustPollingSchedule(recipientId, PollingAdjustTrigger.USER_ACTIVE)
-                
-                true
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "调整轮询间隔失败: recipient=$recipientId", e)
-                false
-            }
-        }
-    }
-    
-    /**
-     * 获取轮询状态和统计信息
+     * 获取轮询状态
      */
     fun getPollingStatus(): TapPollingStatus {
         return pollingLock.read {
-            val currentTime = System.currentTimeMillis()
             val activeTasks = pollingTasks.values.filter { 
                 it.status == PollingTaskStatus.RUNNING || it.status == PollingTaskStatus.POLLING 
             }
             val totalTasks = pollingTasks.size
             
             val averageInterval = if (activeTasks.isNotEmpty()) {
-                activeTasks.map { it.currentInterval }.average().toLong()
+                activeTasks.map { it.getCurrentInterval() }.average().toLong()
             } else {
                 0L
             }
             
-            val lastPollingTime = pollingTasks.values.maxOfOrNull { it.lastPollTime.get() } ?: 0L
+            val lastPollingTime = pollingTasks.values.maxOfOrNull { it.getLastPollTime() } ?: 0L
             
             TapPollingStatus(
                 isRunning = isRunning.get(),
@@ -398,9 +323,13 @@ class TapPollingService(private val context: Context) {
                 totalPollingTargets = totalTasks,
                 averagePollingInterval = averageInterval,
                 lastPollingTime = lastPollingTime,
-                pollingStatistics = statisticsCollector.getCurrentStatistics(),
-                resourceUsage = getCurrentResourceUsage(),
-                systemStartTime = currentTime
+                pollingStatistics = createSimpleStatistics(),
+                resourceUsage = PollingResourceUsage(
+                    memoryUsageKB = Runtime.getRuntime().let { (it.totalMemory() - it.freeMemory()) / 1024 },
+                    activeThreads = pollingExecutor?.activeCount ?: 0,
+                    queueLength = pollingExecutor?.queue?.size ?: 0
+                ),
+                systemStartTime = System.currentTimeMillis()
             )
         }
     }
@@ -410,7 +339,7 @@ class TapPollingService(private val context: Context) {
      */
     fun getCurrentStatistics(): TapPollingStatistics {
         return pollingLock.read {
-            statisticsCollector.getCurrentStatistics()
+            createSimpleStatistics()
         }
     }
     
@@ -420,10 +349,13 @@ class TapPollingService(private val context: Context) {
      * 调度轮询任务
      */
     private fun schedulePollingTask(taskInfo: PollingTaskInfo): ScheduledFuture<*>? {
+        // 添加初始延迟抖动，防止冷启动风暴
+        val jitterMs = (Math.random() * TapPollingConstants.PollingService.INITIAL_DELAY_JITTER_MAX_MS).toLong()
+        
         return pollingExecutor?.scheduleWithFixedDelay(
             { executePollingTask(taskInfo) },
-            0L,
-            taskInfo.currentInterval,
+            jitterMs,
+            taskInfo.getCurrentInterval(),
             TimeUnit.MILLISECONDS
         )
     }
@@ -436,9 +368,15 @@ class TapPollingService(private val context: Context) {
             return
         }
         
+        // 尝试获取执行权，如果已在执行中则跳过
+        if (!taskInfo.tryStartExecution()) {
+            Log.d(TAG, "轮询任务已在执行中，跳过: ${taskInfo.recipientId}")
+            return
+        }
+        
         serviceScope?.launch {
             try {
-                taskInfo.status = PollingTaskStatus.POLLING
+                taskInfo.setStatus(PollingTaskStatus.POLLING)
                 taskInfo.updatePollTime()
                 
                 Log.v(TAG, "执行轮询: ${taskInfo.getSummary()}")
@@ -449,9 +387,9 @@ class TapPollingService(private val context: Context) {
                     taskInfo.metadata.providerType
                 )
                 
-                if (pollingStrategy.shouldSkipPolling(taskInfo.recipientId, taskInfo.metadata, channel)) {
+                if (shouldSkipPolling(taskInfo.recipientId, taskInfo.metadata, channel)) {
                     Log.d(TAG, "跳过轮询: ${taskInfo.recipientId}")
-                    taskInfo.status = PollingTaskStatus.PAUSED
+                    taskInfo.setStatus(PollingTaskStatus.PAUSED)
                     return@launch
                 }
                 
@@ -461,64 +399,17 @@ class TapPollingService(private val context: Context) {
                 // 处理轮询结果
                 handlePollingResult(taskInfo, result)
                 
-                // 记录统计信息
-                statisticsCollector.recordPoll(
-                    taskInfo.metadata.providerType,
-                    taskInfo.activityLevel,
-                    result.isSuccess,
-                    result.responseTime,
-                    result.messagesFound
-                )
+                // 记录任务级别的响应时间
+                taskInfo.statistics.recordResponseTime(result.responseTime)
                 
-                taskInfo.status = PollingTaskStatus.RUNNING
+                taskInfo.setStatus(PollingTaskStatus.RUNNING)
                 
             } catch (e: Exception) {
                 Log.e(TAG, "轮询任务执行失败: ${taskInfo.recipientId}", e)
                 handlePollingError(taskInfo, e)
-            }
-        }
-    }
-    
-    /**
-     * 轮询单个目标的消息
-     */
-    private suspend fun pollSingleTarget(taskInfo: PollingTaskInfo): PollingExecutionResult {
-        val startTime = System.currentTimeMillis()
-        
-        return withTimeout(pollingConfig.pollingTimeoutMs) {
-            try {
-                Log.d(TAG, "开始轮询目标: recipient=${taskInfo.recipientId}, provider=${taskInfo.metadata.providerType}")
-                
-                val provider = transportManager.getProvider(taskInfo.metadata.providerType)
-                if (provider == null) {
-                    Log.w(TAG, "Provider不可用: ${taskInfo.metadata.providerType}")
-                    val responseTime = System.currentTimeMillis() - startTime
-                    return@withTimeout PollingExecutionResult.failure("Provider不可用", responseTime)
-                }
-                
-                // 获取远程文件列表
-                val listResult = provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
-                if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
-                    Log.d(TAG, "未发现新文件: ${taskInfo.recipientId}")
-                    val responseTime = System.currentTimeMillis() - startTime
-                    return@withTimeout PollingExecutionResult.success(0, responseTime)
-                }
-                
-                // 使用新的处理方法
-                val processingResult = processPollingResults(provider, taskInfo, listResult.files, taskInfo.metadata)
-                
-                val responseTime = System.currentTimeMillis() - startTime
-                
-                // 返回处理结果（已包含响应时间）
-                processingResult
-                
-            } catch (e: TimeoutCancellationException) {
-                val responseTime = System.currentTimeMillis() - startTime
-                PollingExecutionResult.retry("轮询超时", responseTime)
-            } catch (e: Exception) {
-                val responseTime = System.currentTimeMillis() - startTime
-                Log.e(TAG, "轮询异常: ${taskInfo.recipientId}", e)
-                PollingExecutionResult.failure(e.message ?: "轮询失败", responseTime)
+            } finally {
+                // 确保在任何情况下都释放执行门闩
+                taskInfo.finishExecution()
             }
         }
     }
@@ -534,7 +425,8 @@ class TapPollingService(private val context: Context) {
             val provider = transportManager.getProvider(taskInfo.metadata.providerType)
             if (provider == null) {
                 Log.e(TAG, "Provider不可用: ${taskInfo.metadata.providerType}")
-                return PollingExecutionResult.failure("Provider不可用", startTime)
+                val responseTime = System.currentTimeMillis() - startTime
+                return PollingExecutionResult.failure("Provider不可用", responseTime)
             }
             
             // 获取轮询状态
@@ -594,7 +486,7 @@ class TapPollingService(private val context: Context) {
     ): FilePollingResult {
         return try {
             // 列举文件
-            val listResult = withTimeout(pollingConfig.pollingTimeoutMs) {
+            val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
                 errorHandler.executeWithRetry({
                     provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
                 }, ErrorContext(
@@ -615,7 +507,8 @@ class TapPollingService(private val context: Context) {
             
             val newFiles = allFiles.filter { file ->
                 !processedFiles.contains(file.name) && 
-                file.lastModified > (pollingState?.lastProcessedTime ?: 0)
+                file.lastModified > (pollingState?.lastProcessedTime ?: 0) &&
+                shouldRetryFileProcessing(file.name, taskInfo.recipientId)
             }
             
             if (newFiles.isEmpty()) {
@@ -630,7 +523,7 @@ class TapPollingService(private val context: Context) {
             
             for (file in newFiles) {
                 try {
-                    val downloadResult = withTimeout(pollingConfig.pollingTimeoutMs) {
+                    val downloadResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
                         errorHandler.executeWithRetry({
                             provider.downloadFile(file, taskInfo.metadata)
                         }, ErrorContext(
@@ -648,60 +541,51 @@ class TapPollingService(private val context: Context) {
                             val processResult = messageProcessor.processTapTransportMessage(message)
                             if (processResult is TapProcessResult.Success) {
                                 messagesProcessed++
+                                // 仅在成功处理消息后标记文件已处理
+                                newProcessedFiles.add(file.name)
+                                // 清除失败记录（如果存在）
+                                clearFileProcessingFailure(file.name, taskInfo.recipientId)
                                 Log.d(TAG, "消息处理成功: ${file.name}")
                             } else {
-                                Log.w(TAG, "消息处理失败: ${file.name}, error=${(processResult as? TapProcessResult.Failed)?.error}")
+                                // 消息处理失败，记录失败并判断是否可重试
+                                val error = (processResult as? TapProcessResult.Failed)?.error ?: "Unknown processing error"
+                                val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, error)
+                                if (!shouldRetry) {
+                                    // 超过重试次数，标记为已处理避免无限重试
+                                    newProcessedFiles.add(file.name)
+                                    Log.w(TAG, "消息处理失败超过重试次数，跳过: ${file.name}")
+                                } else {
+                                    Log.w(TAG, "消息处理失败，将重试: ${file.name}, error=$error")
+                                }
                             }
                         } else {
+                            // 文件解析失败，可能不是消息文件，标记已处理避免重复尝试
+                            newProcessedFiles.add(file.name)
                             Log.d(TAG, "文件解析失败，可能不是消息文件: ${file.name}")
                         }
-                        // 无论成功与否都标记已处理，避免重复
-                        newProcessedFiles.add(file.name)
                     } else {
+                        // 下载失败，不标记已处理，下次继续尝试
                         Log.w(TAG, "文件下载失败: ${file.name}")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "处理文件时发生异常: ${file.name}", e)
-                    // 出错的文件不标记为已处理，下次继续尝试
+                    // 异常情况下记录失败，判断是否可重试
+                    val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, e.message ?: "Exception during processing")
+                    if (!shouldRetry) {
+                        // 超过重试次数，标记为已处理
+                        newProcessedFiles.add(file.name)
+                    }
                 }
             }
+            
+            // 更新任务信息中的已处理文件列表
+            taskInfo.lastProcessedFiles = newProcessedFiles
             
             FilePollingResult.success(newProcessedFiles, messagesProcessed)
             
         } catch (e: Exception) {
             Log.e(TAG, "文件轮询异常: ${taskInfo.recipientId}", e)
             FilePollingResult.failure(e.message ?: "UNKNOWN_ERROR", needsRetry = true)
-        }
-    }
-    
-
-    
-
-    
-    /**
-     * 将消息传递给Signal主程序处理
-     */
-    private suspend fun deliverMessageToSignal(message: TransportMessage, taskInfo: PollingTaskInfo) {
-        try {
-            Log.i(TAG, "开始传递消息到Signal: messageId=${message.messageId}, recipient=${taskInfo.recipientId}")
-            
-            // 1. 检查消息去重
-            if (messageProcessor.isDuplicateMessage(message.messageId, taskInfo.recipientId)) {
-                Log.d(TAG, "跳过重复消息: messageId=${message.messageId}")
-                return
-            }
-            
-            // 2. 通过TapMessageProcessor处理消息
-            val processResult = messageProcessor.processTapTransportMessage(message)
-            
-            if (processResult is TapProcessResult.Success) {
-                Log.i(TAG, "消息成功传递到Signal: messageId=${message.messageId}")
-            } else {
-                Log.w(TAG, "消息传递失败: messageId=${message.messageId}, error=${(processResult as? TapProcessResult.Failed)?.error}")
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "传递消息到Signal失败: messageId=${message.messageId} - ${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitizeThrowable(e)}")
         }
     }
     
@@ -714,32 +598,6 @@ class TapPollingService(private val context: Context) {
                 // 轮询成功
                 taskInfo.recordSuccess()
                 taskInfo.recordMessagesFound(result.messagesFound)
-                
-                // 更新数据库轮询状态
-                updatePollingStateInDatabase(taskInfo, result)
-                
-                // 如果找到消息，通知动态调度器
-                if (result.messagesFound > 0) {
-                    dynamicScheduler.adjustPollingSchedule(
-                        taskInfo.recipientId, 
-                        PollingAdjustTrigger.MESSAGE_RECEIVED
-                    )
-                } else {
-                    // 连续空轮询
-                    dynamicScheduler.adjustPollingSchedule(
-                        taskInfo.recipientId,
-                        PollingAdjustTrigger.CONSECUTIVE_EMPTY
-                    )
-                }
-                
-                // 自适应学习
-                intervalAdjuster.learnFromExperience(
-                    taskInfo.recipientId,
-                    createPollingFeatures(taskInfo),
-                    taskInfo.currentInterval,
-                    createPollingPerformance(taskInfo)
-                )
-                
             }
             
             result.needsRetry -> {
@@ -752,16 +610,8 @@ class TapPollingService(private val context: Context) {
                 // 轮询失败
                 taskInfo.recordError()
                 
-                // 更新数据库错误状态
-                updatePollingErrorInDatabase(taskInfo, result)
-                
-                dynamicScheduler.adjustPollingSchedule(
-                    taskInfo.recipientId,
-                    PollingAdjustTrigger.ERROR_OCCURRED
-                )
-                
                 // 检查是否需要暂停轮询
-                if (taskInfo.consecutiveErrors.get() >= pollingConfig.maxRetryAttempts) {
+                if (taskInfo.consecutiveErrors.get() >= TapPollingConstants.ErrorBackoff.MAX_CONSECUTIVE_ERRORS) {
                     Log.w(TAG, "轮询连续失败次数过多，暂停轮询: ${taskInfo.recipientId}")
                     removePollingTarget(taskInfo.recipientId, taskInfo.metadata.providerType)
                 }
@@ -770,79 +620,16 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
-     * 更新数据库轮询状态（成功情况）
-     */
-    private fun updatePollingStateInDatabase(taskInfo: PollingTaskInfo, result: PollingExecutionResult) {
-        try {
-            // 使用taskInfo中保存的处理文件信息
-            pollingStateTable.recordSuccessfulPoll(
-                taskInfo.recipientId,
-                taskInfo.metadata.providerType,
-                taskInfo.lastProcessedFiles,
-                result.messagesFound
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "更新轮询状态到数据库失败: ${taskInfo.recipientId}", e)
-        }
-    }
-    
-    /**
-     * 更新数据库错误状态
-     */
-    private fun updatePollingErrorInDatabase(taskInfo: PollingTaskInfo, result: PollingExecutionResult) {
-        try {
-            pollingStateTable.recordFailedPoll(
-                taskInfo.recipientId,
-                taskInfo.metadata.providerType,
-                result.error ?: "未知错误"
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "更新轮询错误状态到数据库失败: ${taskInfo.recipientId}", e)
-        }
-    }
-    
-    /**
      * 从数据库获取已处理的文件列表
      */
     private fun getProcessedFilesFromDatabase(recipientId: String, providerType: String): Set<String> {
         return try {
-            val database = org.thoughtcrime.securesms.database.SignalDatabase.rawDatabase
-            val processedFiles = mutableSetOf<String>()
-            
-            database.rawQuery(
-                "SELECT duplication_key FROM transport_processed_messages WHERE duplication_key LIKE ?",
-                arrayOf("%:$recipientId:%")
-            ).use { cursor ->
-                while (cursor.moveToNext()) {
-                    val duplicationKey = cursor.getString(0)
-                    // 从去重键中提取文件名信息
-                    // 格式通常是 messageId:recipientId:timestamp
-                    val parts = duplicationKey.split(":")
-                    if (parts.size >= 3) {
-                        // 重建文件名（这是一个简化实现，实际可能需要更复杂的映射）
-                        val fileName = "${parts[0]}_${parts[2]}.dat"
-                        processedFiles.add(fileName)
-                    }
-                }
-            }
-            
-            processedFiles
+            // 使用专门的轮询状态表获取已处理文件列表
+            val pollingState = pollingStateTable.getPollingState(recipientId, providerType)
+            pollingState?.processedFiles ?: emptySet()
         } catch (e: Exception) {
             Log.e(TAG, "获取已处理文件列表失败: recipientId=$recipientId", e)
             emptySet()
-        }
-    }
-    
-    /**
-     * 标记文件为已处理
-     */
-    private fun markFileAsProcessed(recipientId: String, fileName: String) {
-        try {
-            // 这里可以添加文件级别的处理记录
-            // 目前主要依赖消息级别的去重
-            Log.d(TAG, "标记文件已处理: recipientId=$recipientId, fileName=$fileName")
-        } catch (e: Exception) {
-            Log.e(TAG, "标记文件已处理失败: fileName=$fileName", e)
         }
     }
     
@@ -851,54 +638,13 @@ class TapPollingService(private val context: Context) {
      */
     private fun handlePollingError(taskInfo: PollingTaskInfo, error: Throwable) {
         taskInfo.recordError()
-        taskInfo.status = PollingTaskStatus.ERROR_SUSPENDED
+        taskInfo.setStatus(PollingTaskStatus.ERROR_SUSPENDED)
         
         Log.e(TAG, "轮询任务出现严重错误，暂停任务: ${taskInfo.recipientId}", error)
         
         // 取消当前任务
         taskInfo.task?.cancel(false)
         taskInfo.task = null
-        
-        // 通知动态调度器
-        dynamicScheduler.adjustPollingSchedule(
-            taskInfo.recipientId,
-            PollingAdjustTrigger.ERROR_OCCURRED
-        )
-    }
-    
-    /**
-     * 批量轮询指定Provider的所有目标
-     */
-    private suspend fun batchPollProvider(providerType: String) {
-        val providerTasks = pollingTasks.values.filter { 
-            it.metadata.providerType == providerType && it.status == PollingTaskStatus.RUNNING 
-        }
-        
-        if (providerTasks.isEmpty()) return
-        
-        Log.d(TAG, "批量轮询: provider=$providerType, tasks=${providerTasks.size}")
-        
-        try {
-            // 使用批处理优化器
-            val batchGroups = batchOptimizer.batchSimilarPollingTasks(providerTasks)
-            
-            // 并发执行批处理组
-            batchGroups.forEach { batchGroup ->
-                serviceScope?.launch {
-                    batchOptimizer.executeBatchPolling(batchGroup) { task ->
-                        val result = performSinglePoll(task)
-                        if (result.isSuccess) {
-                            PollingResult.success(result.messagesFound)
-                        } else {
-                            PollingResult.failure(Exception(result.error))
-                        }
-                    }
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "批量轮询失败: provider=$providerType", e)
-        }
     }
     
     /**
@@ -907,8 +653,8 @@ class TapPollingService(private val context: Context) {
     private fun startCleanupTask() {
         cleanupTask = pollingExecutor?.scheduleWithFixedDelay(
             { performCleanup() },
-            pollingConfig.cleanupIntervalMs,
-            pollingConfig.cleanupIntervalMs,
+            TapPollingConstants.PollingService.CLEANUP_INTERVAL_MS,
+            TapPollingConstants.PollingService.CLEANUP_INTERVAL_MS,
             TimeUnit.MILLISECONDS
         )
     }
@@ -927,14 +673,14 @@ class TapPollingService(private val context: Context) {
                     when {
                         // 清理长时间错误暂停的任务
                         taskInfo.status == PollingTaskStatus.ERROR_SUSPENDED && 
-                                currentTime - taskInfo.lastSuccessTime.get() > 24 * 60 * 60 * 1000L -> {
+                                currentTime - taskInfo.getLastSuccessTime() > TapPollingConstants.PollingService.ERROR_TASK_CLEANUP_MS -> {
                             Log.i(TAG, "清理长期错误任务: $recipientId")
                             toRemove.add(recipientId)
                         }
                         
                         // 清理休眠状态的任务
-                        taskInfo.activityLevel == TransportActivityLevel.DORMANT &&
-                                currentTime - taskInfo.lastPollTime.get() > 7 * 24 * 60 * 60 * 1000L -> {
+                        taskInfo.getActivityLevel() == TransportActivityLevel.DORMANT &&
+                                currentTime - taskInfo.getLastPollTime() > TapPollingConstants.PollingService.DORMANT_TASK_CLEANUP_MS -> {
                             Log.i(TAG, "清理休眠任务: $recipientId")
                             toRemove.add(recipientId)
                         }
@@ -947,6 +693,9 @@ class TapPollingService(private val context: Context) {
                     pollingTasks.remove(recipientId)
                 }
                 
+                // 清理文件处理失败记录 - 修复内存泄漏
+                cleanupFileProcessingFailures(currentTime)
+                
                 Log.d(TAG, "清理任务完成: 移除${toRemove.size}个任务")
             }
         } catch (e: Exception) {
@@ -955,16 +704,50 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
+     * 清理文件处理失败记录，防止内存泄漏
+     */
+    private fun cleanupFileProcessingFailures(currentTime: Long) {
+        try {
+            val keysToRemove = mutableListOf<String>()
+            val maxFailureRecords = TapPollingConstants.PollingService.MAX_FILE_FAILURE_RECORDS
+            val failureExpiryTime = TapPollingConstants.ErrorBackoff.FILE_FAILURE_EXPIRY_MS
+            
+            // 按时间清理过期记录
+            fileProcessingFailures.forEach { (key, failure) ->
+                if (currentTime - failure.lastFailureTime > failureExpiryTime) {
+                    keysToRemove.add(key)
+                }
+            }
+            
+            // 如果记录数量超过限制，清理最老的记录
+            if (fileProcessingFailures.size > maxFailureRecords) {
+                val sortedFailures = fileProcessingFailures.toList()
+                    .sortedBy { it.second.lastFailureTime }
+                
+                val excessCount = fileProcessingFailures.size - maxFailureRecords
+                for (i in 0 until excessCount) {
+                    keysToRemove.add(sortedFailures[i].first)
+                }
+            }
+            
+            // 执行清理
+            keysToRemove.forEach { key ->
+                fileProcessingFailures.remove(key)
+            }
+            
+            if (keysToRemove.isNotEmpty()) {
+                Log.d(TAG, "清理文件处理失败记录: ${keysToRemove.size}条")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "清理文件处理失败记录时出错", e)
+        }
+    }
+    
+    /**
      * 清理所有资源
      */
     private fun cleanup() {
         try {
-            // 停止动态调度器
-            dynamicScheduler.stop()
-            
-            // 停止网络质量监控
-            networkQualityDetector.stopNetworkMonitoring()
-            
             // 取消清理任务
             cleanupTask?.cancel(false)
             cleanupTask = null
@@ -995,356 +778,384 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
-     * 获取当前资源使用情况
+     * 记录文件处理失败
+     * @param fileName 文件名
+     * @param recipientId 接收者ID
+     * @param error 错误信息
+     * @return true 如果应该重试，false 如果已达到重试上限
      */
-    private fun getCurrentResourceUsage(): PollingResourceUsage {
-        return try {
-            val runtime = Runtime.getRuntime()
-            val totalMemory = runtime.totalMemory()
-            val freeMemory = runtime.freeMemory()
-            val usedMemory = totalMemory - freeMemory
-            
-            PollingResourceUsage(
-                cpuUsagePercent = getCurrentCpuUsage(),
-                memoryUsageKB = usedMemory / 1024,
-                networkUsageKB = getCurrentNetworkUsage(),
-                batteryDrainRate = getCurrentBatteryDrainRate(),
-                activeThreads = pollingExecutor?.activeCount ?: 0,
-                queueLength = pollingExecutor?.queue?.size ?: 0
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "获取资源使用信息失败", e)
-            PollingResourceUsage(0.0, 0L, 0L, 0.0, 0, 0)
-        }
-    }
-    
-    /**
-     * 创建轮询特征
-     */
-    private fun createPollingFeatures(taskInfo: PollingTaskInfo): PollingFeatures {
+    private fun recordFileProcessingFailure(fileName: String, recipientId: String, error: String): Boolean {
+        val failureKey = "${recipientId}:${fileName}"
         val currentTime = System.currentTimeMillis()
-        val hourOfDay = ((currentTime % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000)).toInt()
-        val dayOfWeek = ((currentTime / (24 * 60 * 60 * 1000)) % 7).toInt()
         
-        return PollingFeatures(
-            recipientId = taskInfo.recipientId,
-            hourOfDay = hourOfDay,
-            dayOfWeek = dayOfWeek,
-            userActivityScore = calculateUserActivityScore(taskInfo),
-            networkQuality = getCurrentNetworkQuality(),
-            batteryLevel = getCurrentBatteryLevel(),
-            recentMessageFrequency = calculateRecentMessageFrequency(taskInfo)
+        val existingFailure = fileProcessingFailures[failureKey]
+        val newFailureCount = (existingFailure?.failureCount ?: 0) + 1
+        
+        // 检查是否在退避期内
+        if (existingFailure != null && 
+            currentTime - existingFailure.lastFailureTime < TapPollingConstants.ErrorBackoff.FILE_RETRY_BACKOFF_MS) {
+            // 仍在退避期内，不重试
+            return false
+        }
+        
+        val failure = FileProcessingFailure(
+            fileName = fileName,
+            recipientId = recipientId,
+            failureCount = newFailureCount,
+            lastFailureTime = currentTime,
+            lastError = error
         )
+        
+        fileProcessingFailures[failureKey] = failure
+        
+        // 如果失败次数超过上限，不再重试
+        if (newFailureCount >= TapPollingConstants.ErrorBackoff.MAX_FILE_RETRY_ATTEMPTS) {
+            Log.w(TAG, "文件处理失败次数达到上限: $fileName, count=$newFailureCount")
+            return false
+        }
+        
+        return true
     }
     
     /**
-     * 创建轮询性能
+     * 清除文件处理失败记录
      */
-    private fun createPollingPerformance(taskInfo: PollingTaskInfo): PollingPerformance {
-        return PollingPerformance(
-            successRate = taskInfo.getSuccessRate(),
-            averageResponseTime = taskInfo.getAverageResponseTime(),
-            messagesFound = taskInfo.statistics.messagesFound.get().toInt(),
-            errorCount = taskInfo.consecutiveErrors.get()
-        )
+    private fun clearFileProcessingFailure(fileName: String, recipientId: String) {
+        val failureKey = "${recipientId}:${fileName}"
+        fileProcessingFailures.remove(failureKey)
     }
     
     /**
-     * 计算用户活跃度分数
+     * 检查文件是否应该重试处理
      */
-    private fun calculateUserActivityScore(taskInfo: PollingTaskInfo): Double {
-        return when (taskInfo.activityLevel) {
-            TransportActivityLevel.ACTIVE -> 1.0
-            TransportActivityLevel.INACTIVE -> 0.7
-            TransportActivityLevel.BACKGROUND -> 0.5
-            TransportActivityLevel.SUSPENDED -> 0.3
-            TransportActivityLevel.DORMANT -> 0.1
+    private fun shouldRetryFileProcessing(fileName: String, recipientId: String): Boolean {
+        val failureKey = "${recipientId}:${fileName}"
+        val failure = fileProcessingFailures[failureKey] ?: return true
+        
+        val currentTime = System.currentTimeMillis()
+        
+        // 检查是否超过重试次数
+        if (failure.failureCount >= TapPollingConstants.ErrorBackoff.MAX_FILE_RETRY_ATTEMPTS) {
+            return false
+        }
+        
+        // 检查是否过了退避时间
+        return currentTime - failure.lastFailureTime >= TapPollingConstants.ErrorBackoff.FILE_RETRY_BACKOFF_MS
+    }
+    
+    // === PollingIntervalCallback 实现 ===
+    
+    /**
+     * 调整单个目标的轮询间隔
+     */
+    fun adjustPollingInterval(recipientId: String, changeType: IntervalChangeType): Boolean {
+        return pollingLock.write {
+            try {
+                val taskInfo = pollingTasks[recipientId]
+                if (taskInfo == null) {
+                    Log.w(TAG, "调整轮询间隔失败，任务不存在: $recipientId")
+                    return@write false
+                }
+                
+                val currentInterval = taskInfo.getCurrentInterval()
+                val newInterval = calculateNewInterval(currentInterval, changeType, taskInfo.metadata.providerType)
+                
+                if (newInterval != currentInterval) {
+                    Log.d(TAG, "动态调整轮询间隔: recipient=$recipientId, changeType=$changeType, ${currentInterval}ms -> ${newInterval}ms")
+                    
+                    // 取消当前任务
+                    taskInfo.task?.cancel(false)
+                    
+                    // 更新间隔
+                    taskInfo.setCurrentInterval(newInterval)
+                    
+                    // 重新调度任务
+                    val newTask = schedulePollingTask(taskInfo)
+                    taskInfo.task = newTask
+                    
+                    return@write true
+                } else {
+                    Log.d(TAG, "轮询间隔无需调整: recipient=$recipientId, interval=${currentInterval}ms")
+                    return@write false
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "动态调整轮询间隔失败: recipient=$recipientId", e)
+                false
+            }
         }
     }
     
     /**
-     * 获取当前网络质量
+     * 全局轮询调整
      */
-    private fun getCurrentNetworkQuality(): NetworkQuality {
-        return networkQualityDetector.getCurrentNetworkQuality()
+    fun adjustGlobalPolling(changeType: IntervalChangeType) {
+        pollingLock.write {
+            try {
+                Log.d(TAG, "全局轮询调整: changeType=$changeType, 影响任务数=${pollingTasks.size}")
+                
+                val adjustedCount = pollingTasks.values.count { taskInfo ->
+                    val currentInterval = taskInfo.getCurrentInterval()
+                    val newInterval = when (changeType) {
+                        IntervalChangeType.REEVALUATE -> {
+                            // 重新评估时，使用智能策略为每个任务单独计算
+                            val channel = channelManager.getActiveChannel(taskInfo.recipientId, taskInfo.metadata.providerType)
+                            calculatePollingInterval(taskInfo.metadata, channel)
+                        }
+                        IntervalChangeType.RESET -> {
+                            // 重置到Provider特定的默认间隔
+                            getProviderDefaultInterval(taskInfo.metadata.providerType)
+                        }
+                        else -> {
+                            calculateNewInterval(currentInterval, changeType, taskInfo.metadata.providerType)
+                        }
+                    }
+                    
+                    if (newInterval != currentInterval) {
+                        // 取消当前任务
+                        taskInfo.task?.cancel(false)
+                        
+                        // 更新间隔
+                        taskInfo.setCurrentInterval(newInterval)
+                        
+                        // 重新调度任务
+                        val newTask = schedulePollingTask(taskInfo)
+                        taskInfo.task = newTask
+                        
+                        true
+                    } else {
+                        false
+                    }
+                }
+                
+                Log.i(TAG, "全局轮询调整完成: changeType=$changeType, 调整任务数=$adjustedCount")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "全局轮询调整失败", e)
+            }
+        }
     }
     
     /**
-     * 计算最近消息频率
+     * 获取Provider特定的默认间隔
      */
-    private fun calculateRecentMessageFrequency(taskInfo: PollingTaskInfo): Double {
-        val recentMessages = taskInfo.statistics.messagesFound.get()
-        val recentPolls = taskInfo.statistics.totalPolls.get()
+    private fun getProviderDefaultInterval(providerType: String): Long {
+        return TapPollingConstants.ProviderIntervals.getBaseInterval(providerType)
+    }
+    
+    /**
+     * 根据变化类型计算新的轮询间隔
+     * @param currentInterval 当前间隔
+     * @param changeType 变化类型
+     * @param providerType Provider类型，用于获取特定限制
+     */
+    private fun calculateNewInterval(currentInterval: Long, changeType: IntervalChangeType, providerType: String = ""): Long {
+        val calculatedInterval = when (changeType) {
+            IntervalChangeType.INCREASE -> {
+                // 增加间隔（降低频率）
+                (currentInterval * 1.5).toLong()
+            }
+            IntervalChangeType.DECREASE -> {
+                // 减少间隔（提高频率）
+                (currentInterval * 0.7).toLong()
+            }
+            IntervalChangeType.RESET -> {
+                // 重置时返回Provider默认间隔
+                getProviderDefaultInterval(providerType)
+            }
+            IntervalChangeType.ERROR_BACKOFF -> {
+                // 错误退避
+                (currentInterval * 2.0).toLong()
+            }
+            IntervalChangeType.LOW_POWER -> {
+                // 低电量模式
+                (currentInterval * 3.0).toLong()
+            }
+            IntervalChangeType.REEVALUATE -> {
+                // 重新评估时返回当前间隔，实际调整在全局调整方法中处理
+                return currentInterval
+            }
+        }
         
-        return if (recentPolls > 0) {
-            recentMessages.toDouble() / recentPolls.toDouble()
+        // 应用Provider特定的限制，如果没有指定Provider则使用全局限制
+        return if (providerType.isNotEmpty()) {
+            val (minInterval, maxInterval) = TapPollingConstants.ProviderLimits.getLimits(providerType)
+            calculatedInterval.coerceIn(minInterval, maxInterval)
         } else {
-            0.0
+            // 回退到保守的全局限制
+            val globalMin = TapPollingConstants.PollingService.GLOBAL_MIN_INTERVAL_MS
+            val globalMax = when (changeType) {
+                IntervalChangeType.ERROR_BACKOFF -> TapPollingConstants.PollingService.GLOBAL_MAX_INTERVAL_10MIN_MS
+                IntervalChangeType.LOW_POWER -> TapPollingConstants.PollingService.GLOBAL_MAX_INTERVAL_15MIN_MS
+                else -> TapPollingConstants.PollingService.GLOBAL_MAX_INTERVAL_5MIN_MS
+            }
+            calculatedInterval.coerceIn(globalMin, globalMax)
         }
     }
 
     /**
-     * 处理轮询结果并下载新消息
+     * 计算轮询间隔 - 简化版本
      */
-    private suspend fun processPollingResults(
-        provider: TransportProvider,
-        taskInfo: PollingTaskInfo,
-        files: List<FileInfo>,
-        metadata: TransportMetadata
-    ): PollingExecutionResult {
-        val startTime = System.currentTimeMillis()
-        return try {
-            Log.d(TAG, "处理轮询结果: provider=${provider.providerType}, files=${files.size}")
-            
-            if (files.isEmpty()) {
-                Log.d(TAG, "没有发现文件: recipientId=${taskInfo.recipientId}")
-                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
-            }
-            
-            // 使用Provider的文件识别策略过滤消息文件
-            val messageFiles = files.filter { file ->
-                provider.isMessageFile(file)
-            }
-            
-            Log.d(TAG, "发现消息文件: ${messageFiles.size}/${files.size}")
-            
-            if (messageFiles.isEmpty()) {
-                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
-            }
-            
-            // 获取已处理的文件列表
-            val processedFiles = getProcessedFilesFromDatabase(taskInfo.recipientId, taskInfo.metadata.providerType)
-            
-            // 过滤未处理的文件
-            val newFiles = messageFiles.filter { file ->
-                !processedFiles.contains(file.name)
-            }
-            
-            Log.d(TAG, "发现新文件: ${newFiles.size}/${messageFiles.size}")
-            
-            if (newFiles.isEmpty()) {
-                return PollingExecutionResult.success(0, System.currentTimeMillis() - startTime)
-            }
-            
-            var successCount = 0
-            var errorCount = 0
-            
-            // 处理每个新文件
-            for (file in newFiles) {
-                try {
-                    val processed = processMessageFile(provider, file, metadata, taskInfo)
-                    if (processed) {
-                        successCount++
-                        // 记录已处理的文件
-                        markFileAsProcessed(taskInfo.recipientId, file.name)
-                    } else {
-                        errorCount++
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "处理消息文件失败: ${file.name}", e)
-                    errorCount++
-                }
-            }
-            
-            Log.i(TAG, "轮询处理完成: 成功=$successCount, 失败=$errorCount")
-            
-            val responseTime = System.currentTimeMillis() - startTime
-            if (errorCount == 0) {
-                PollingExecutionResult.success(successCount, responseTime)
-            } else {
-                PollingExecutionResult.partialSuccess(successCount, errorCount, responseTime)
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "处理轮询结果异常: recipientId=${taskInfo.recipientId}", e)
-            PollingExecutionResult.failure(e.message ?: "处理轮询结果失败", System.currentTimeMillis() - startTime)
+    private fun calculatePollingInterval(metadata: TransportMetadata, channel: TransportChannel?): Long {
+        // 获取Provider特定的基础间隔
+        val baseInterval = TapPollingConstants.ProviderIntervals.getBaseInterval(metadata.providerType)
+        
+        // 根据活跃度调整
+        val activityLevel = calculateActivityLevel(channel)
+        val activityMultiplier = when (activityLevel) {
+            TransportActivityLevel.ACTIVE -> TapPollingConstants.ActivityMultipliers.ACTIVE_MULTIPLIER
+            TransportActivityLevel.INACTIVE -> TapPollingConstants.ActivityMultipliers.INACTIVE_MULTIPLIER
+            TransportActivityLevel.BACKGROUND -> TapPollingConstants.ActivityMultipliers.BACKGROUND_MULTIPLIER
+            TransportActivityLevel.SUSPENDED -> TapPollingConstants.ActivityMultipliers.SUSPENDED_MULTIPLIER
+            TransportActivityLevel.DORMANT -> TapPollingConstants.ActivityMultipliers.DORMANT_MULTIPLIER
+        }
+        
+        val calculatedInterval = (baseInterval * activityMultiplier).toLong()
+        
+        // 应用Provider限制
+        val (minInterval, maxInterval) = TapPollingConstants.ProviderLimits.getLimits(metadata.providerType)
+        return calculatedInterval.coerceIn(minInterval, maxInterval)
+    }
+    
+    /**
+     * 计算传输活跃度级别 - 简化版本
+     */
+    private fun calculateActivityLevel(channel: TransportChannel?): TransportActivityLevel {
+        if (channel == null) {
+            return TransportActivityLevel.INACTIVE
+        }
+        
+        val currentTime = System.currentTimeMillis()
+        val lastActiveTime = channel.lastActiveAt
+        val timeDiffMs = currentTime - lastActiveTime
+        
+        return when {
+            timeDiffMs <= TapPollingConstants.ActivityThresholds.ACTIVE_THRESHOLD_MS -> TransportActivityLevel.ACTIVE
+            timeDiffMs <= TapPollingConstants.ActivityThresholds.INACTIVE_THRESHOLD_MS -> TransportActivityLevel.INACTIVE
+            timeDiffMs <= TapPollingConstants.ActivityThresholds.BACKGROUND_THRESHOLD_MS -> TransportActivityLevel.BACKGROUND
+            timeDiffMs <= TapPollingConstants.ActivityThresholds.SUSPENDED_THRESHOLD_MS -> TransportActivityLevel.SUSPENDED
+            else -> TransportActivityLevel.DORMANT
         }
     }
     
     /**
-     * 处理单个消息文件
+     * 判断是否应该跳过轮询 - 简化版本
      */
-    private suspend fun processMessageFile(
-        provider: TransportProvider,
-        fileInfo: FileInfo,
-        metadata: TransportMetadata,
-        taskInfo: PollingTaskInfo
-    ): Boolean {
-        return try {
-            Log.d(TAG, "开始处理消息文件: ${fileInfo.name}")
-            
-            // 使用Provider下载文件
-            val downloadResult = provider.downloadFile(fileInfo, metadata)
-            
-            if (downloadResult !is TransportResult.Success || downloadResult.data == null) {
-                Log.w(TAG, "下载文件失败: ${fileInfo.name}")
-                return false
-            }
-            
-            // 使用Provider解析传输消息
-            val transportMessage = provider.parseTransportMessage(downloadResult.data, fileInfo, metadata)
-            
-            if (transportMessage == null) {
-                Log.w(TAG, "解析传输消息失败: ${fileInfo.name}")
-                return false
-            }
-            
-            Log.d(TAG, "成功解析传输消息: messageId=${transportMessage.messageId}, fileName=${fileInfo.name}")
-            
-            // 传递消息到Signal主程序处理
-            deliverMessageToSignal(transportMessage, taskInfo)
-            
+    private fun shouldSkipPolling(recipientId: String, metadata: TransportMetadata, channel: TransportChannel?): Boolean {
+        // 检查通道状态
+        if (channel?.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FAILED ||
+            channel?.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.CLOSED) {
+            Log.d(TAG, "跳过轮询: 通道状态异常 - recipient=$recipientId, status=${channel.status}")
             return true
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "处理消息文件异常: ${fileInfo.name}", e)
-            false
         }
+        
+        // 检查活跃度级别
+        val activityLevel = calculateActivityLevel(channel)
+        if (activityLevel == TransportActivityLevel.DORMANT) {
+            Log.d(TAG, "跳过轮询: 通信已休眠 - recipient=$recipientId")
+            return true
+        }
+        
+        return false
     }
     
     /**
-     * 获取当前CPU使用率
+     * 创建简单的统计信息
      */
-    private fun getCurrentCpuUsage(): Double {
-        return try {
-            // 使用/proc/stat文件获取CPU使用率
-            val runtime = Runtime.getRuntime()
-            val availableProcessors = runtime.availableProcessors()
-            val usedMemory = runtime.totalMemory() - runtime.freeMemory()
-            val totalMemory = runtime.totalMemory()
-            
-            // 简单估算：基于内存使用率和活跃线程数
-            val memoryRatio = usedMemory.toDouble() / totalMemory.toDouble()
-            val activeThreads = pollingExecutor?.activeCount ?: 0
-            val estimatedCpuUsage = (memoryRatio * 50 + activeThreads * 10).coerceAtMost(100.0)
-            
-            estimatedCpuUsage
-        } catch (e: Exception) {
-            Log.w(TAG, "获取CPU使用率失败", e)
-            0.0
-        }
-    }
-    
-    /**
-     * 获取当前网络使用量（KB）
-     */
-    private fun getCurrentNetworkUsage(): Long {
-        return try {
-            // 累积最近一段时间的网络使用情况
-            val pollingTargets = pollingTasks.size
-            val averageMessageSize = 1024L // 平均消息大小估算
-            val estimatedUsage = pollingTargets * averageMessageSize / 1024
-            
-            estimatedUsage
-        } catch (e: Exception) {
-            Log.w(TAG, "获取网络使用量失败", e)
+    private fun createSimpleStatistics(): TapPollingStatistics {
+        val totalPolls = pollingTasks.values.sumOf { it.statistics.totalPolls.get() }
+        val successfulPolls = pollingTasks.values.sumOf { it.statistics.successfulPolls.get() }
+        val failedPolls = pollingTasks.values.sumOf { it.statistics.failedPolls.get() }
+        val messagesFound = pollingTasks.values.sumOf { it.statistics.messagesFound.get() }
+        
+        val averageResponseTime = if (totalPolls > 0) {
+            pollingTasks.values
+                .map { it.getAverageResponseTime() }
+                .filter { it > 0 }
+                .average()
+                .let { if (it.isNaN()) 0L else it.toLong() }
+        } else {
             0L
         }
+        
+        // 计算各Provider的目标数量
+        val providerTargetCounts = pollingTasks.values.groupBy { it.metadata.providerType }
+            .mapValues { (_, tasks) ->
+                val activeCount = tasks.count { it.status == PollingTaskStatus.RUNNING || it.status == PollingTaskStatus.POLLING }
+                activeCount to tasks.size
+            }
+        
+        // 计算活跃度级别的目标数量
+        val activityTargetCounts = pollingTasks.values.groupBy { it.getActivityLevel() }
+            .mapValues { (_, tasks) -> tasks.size }
+        
+        return TapPollingStatistics(
+            totalPolls = totalPolls,
+            successfulPolls = successfulPolls,
+            failedPolls = failedPolls,
+            messagesFound = messagesFound,
+            averageResponseTime = averageResponseTime,
+            providerStatistics = providerTargetCounts.mapValues { (providerType, counts) ->
+                ProviderPollingStats(
+                    providerType = providerType,
+                    totalPolls = pollingTasks.values.filter { it.metadata.providerType == providerType }
+                        .sumOf { it.statistics.totalPolls.get() },
+                    successfulPolls = pollingTasks.values.filter { it.metadata.providerType == providerType }
+                        .sumOf { it.statistics.successfulPolls.get() },
+                    failedPolls = pollingTasks.values.filter { it.metadata.providerType == providerType }
+                        .sumOf { it.statistics.failedPolls.get() },
+                    messagesFound = pollingTasks.values.filter { it.metadata.providerType == providerType }
+                        .sumOf { it.statistics.messagesFound.get() },
+                    averageResponseTime = pollingTasks.values.filter { it.metadata.providerType == providerType }
+                        .map { it.getAverageResponseTime() }
+                        .filter { it > 0 }
+                        .average()
+                        .let { if (it.isNaN()) 0L else it.toLong() },
+                    activeTargets = counts.first,
+                    totalTargets = counts.second
+                )
+            },
+            activityLevelStats = activityTargetCounts.mapValues { (activityLevel, targetCount) ->
+                ActivityLevelStats(
+                    activityLevel = activityLevel,
+                    targetCount = targetCount,
+                    totalPolls = pollingTasks.values.filter { it.getActivityLevel() == activityLevel }
+                        .sumOf { it.statistics.totalPolls.get() },
+                    successfulPolls = pollingTasks.values.filter { it.getActivityLevel() == activityLevel }
+                        .sumOf { it.statistics.successfulPolls.get() },
+                    averageInterval = activityLevel.baseIntervalMs
+                )
+            },
+            lastHourStats = RecentPollingStats(
+                timeRangeMs = 3600000L,
+                totalPolls = 0L,
+                successfulPolls = 0L,
+                messagesFound = 0L,
+                averageResponseTime = 0L,
+                peakPollingRate = 0.0,
+                averagePollingRate = 0.0
+            ),
+            last24HourStats = RecentPollingStats(
+                timeRangeMs = 86400000L,
+                totalPolls = 0L,
+                successfulPolls = 0L,
+                messagesFound = 0L,
+                averageResponseTime = 0L,
+                peakPollingRate = 0.0,
+                averagePollingRate = 0.0
+            )
+        )
     }
-    
-    /**
-     * 获取当前电池消耗率
-     */
-    private fun getCurrentBatteryDrainRate(): Double {
-        return try {
-            // 基于轮询频率和活跃度估算电池消耗
-            val pollingTargets = pollingTasks.size
-            val activeTargets = pollingTasks.values.count { it.task != null && !it.task!!.isCancelled }
-            val estimatedDrain = (activeTargets * 0.1 + pollingTargets * 0.05).coerceAtMost(10.0)
-            
-            estimatedDrain
-        } catch (e: Exception) {
-            Log.w(TAG, "获取电池消耗率失败", e)
-            0.0
-        }
-    }
-    
-    /**
-     * 获取当前电池电量
-     */
-    private fun getCurrentBatteryLevel(): Int {
-        return try {
-            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-            batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 50
-        } catch (e: Exception) {
-            Log.w(TAG, "获取电池电量失败", e)
-            50 // 默认值
-        }
-    }
-}
+} 
 
 /**
- * 轮询执行结果
+ * 间隔变化类型
  */
-private data class PollingExecutionResult(
-    val isSuccess: Boolean,
-    val messagesFound: Int,
-    val responseTime: Long,
-    val error: String,
-    val needsRetry: Boolean
-) {
-    companion object {
-        fun success(messagesFound: Int, responseTime: Long) = PollingExecutionResult(
-            isSuccess = true,
-            messagesFound = messagesFound,
-            responseTime = responseTime,
-            error = "",
-            needsRetry = false
-        )
-        
-        fun partialSuccess(successCount: Int, failureCount: Int, responseTime: Long) = PollingExecutionResult(
-            isSuccess = true,
-            messagesFound = successCount,
-            responseTime = responseTime,
-            error = "部分成功: $successCount 成功, $failureCount 失败",
-            needsRetry = false
-        )
-        
-        fun failure(error: String, responseTime: Long) = PollingExecutionResult(
-            isSuccess = false,
-            messagesFound = 0,
-            responseTime = responseTime,
-            error = error,
-            needsRetry = false
-        )
-        
-        fun retry(reason: String, responseTime: Long) = PollingExecutionResult(
-            isSuccess = false,
-            messagesFound = 0,
-            responseTime = responseTime,
-            error = reason,
-            needsRetry = true
-        )
-    }
-}
-
-/**
- * 文件轮询结果
- */
-private data class FilePollingResult(
-    val isSuccess: Boolean,
-    val processedFiles: Set<String>,
-    val messagesFound: Int,
-    val error: String,
-    val needsRetry: Boolean
-) {
-    companion object {
-        fun success(processedFiles: Set<String>, messagesFound: Int) = FilePollingResult(
-            isSuccess = true,
-            processedFiles = processedFiles,
-            messagesFound = messagesFound,
-            error = "",
-            needsRetry = false
-        )
-        
-        fun failure(error: String, needsRetry: Boolean = false) = FilePollingResult(
-            isSuccess = false,
-            processedFiles = emptySet(),
-            messagesFound = 0,
-            error = error,
-            needsRetry = needsRetry
-        )
-    }
-}
-
-// Removed duplicate PollingStatisticsCollector - using the one from TapPollingStatus.kt instead 
+enum class IntervalChangeType {
+    INCREASE,       // 增加间隔（降低频率）
+    DECREASE,       // 减少间隔（提高频率）
+    RESET,          // 重置到默认间隔
+    ERROR_BACKOFF,  // 错误退避
+    LOW_POWER,      // 低电量模式
+    REEVALUATE      // 重新评估
+} 

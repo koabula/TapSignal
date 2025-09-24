@@ -36,8 +36,6 @@ import org.thoughtcrime.securesms.util.MessageUtil;
 import org.thoughtcrime.securesms.util.SignalLocalMetrics;
 import org.thoughtcrime.securesms.util.Util;
 import org.thoughtcrime.securesms.tap.integration.TapMessageSendIntegrator;
-import org.thoughtcrime.securesms.tap.integration.TapSenderCallback;
-import org.thoughtcrime.securesms.tap.integration.TapSendResult;
 import org.thoughtcrime.securesms.tap.integration.IntegratedTapSendResult;
 import org.whispersystems.signalservice.api.SignalServiceMessageSender;
 import org.whispersystems.signalservice.api.SignalServiceMessageSender.IndividualSendEvents;
@@ -481,22 +479,14 @@ public class IndividualSendJob extends PushSendJob {
       // 获取Tap集成器实例
       TapMessageSendIntegrator integrator = TapMessageSendIntegrator.Companion.getInstance(context);
 
-      // v2 mode设计：Tap发送失败时不回退到Signal Server
-      TapSenderCallback signalCallback = new TapSenderCallback() {
-        @Override
-        public TapSendResult sendMessage(long callbackMessageId, Recipient callbackRecipient, OutgoingMessage callbackMessage) {
-          Log.w(TAG, "Tap发送失败，v2 mode不回退到Signal Server: messageId=" + callbackMessageId);
-          return new TapSendResult(false, "Tap发送失败，v2 mode不支持回退", java.util.Collections.emptyMap());
-        }
-      };
+      // v2 mode设计：仅使用Tap传输层，不提供Signal Server回退
+      Log.i(TAG, "使用Tap传输层发送消息: messageId=" + messageId);
 
       // 执行集成发送
       IntegratedTapSendResult result = integrator.sendMessage(
         messageId,
         recipient,
-        message,
-        false, // 不强制使用Signal Server
-        signalCallback
+        message
       ).get(); // 同步等待结果
 
       // 处理发送结果

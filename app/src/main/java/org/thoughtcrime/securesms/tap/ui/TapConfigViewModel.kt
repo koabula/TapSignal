@@ -57,6 +57,7 @@ class TapConfigViewModel : ViewModel() {
     private lateinit var context: Context
     private lateinit var configManager: TransportProviderConfigManager
     private lateinit var providerManager: TransportProviderManager
+    private lateinit var providerRegistry: ProviderRegistry
 
     /**
      * 初始化ViewModel
@@ -65,6 +66,7 @@ class TapConfigViewModel : ViewModel() {
         this.context = context.applicationContext
         this.configManager = TransportProviderConfigManager.getInstance(context)
         this.providerManager = TransportProviderManager.getInstance(context)
+        this.providerRegistry = ProviderRegistry.getInstance(context)
         
         loadInitialData()
     }
@@ -117,10 +119,10 @@ class TapConfigViewModel : ViewModel() {
      */
     private fun loadAvailableProviders(): List<ProviderInfo> {
         return try {
-            val providerTypes = providerManager.getAvailableProviderTypes()
+            val providerTypes = providerRegistry.getAvailableProviderTypes()
             
             providerTypes.mapNotNull { providerType ->
-                val descriptor = getProviderDescriptor(providerType)
+                val descriptor = providerRegistry.getProviderConfigDescriptor(providerType)
                 descriptor?.let {
                     ProviderInfo(
                         type = providerType,
@@ -136,16 +138,7 @@ class TapConfigViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 获取Provider配置描述器
-     */
-    private fun getProviderDescriptor(providerType: String): ProviderConfigDescriptor? {
-        return when (providerType) {
-            "cos" -> org.thoughtcrime.securesms.tap.provider.cos.CosProviderConfigDescriptor()
-            // 未来可以在这里添加其他Provider的描述器
-            else -> null
-        }
-    }
+
 
     /**
      * 选择Provider

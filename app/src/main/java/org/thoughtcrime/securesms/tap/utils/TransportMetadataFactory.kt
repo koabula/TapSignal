@@ -3,7 +3,7 @@ package org.thoughtcrime.securesms.tap.utils
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.TransportMetadata
 import org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
-import org.thoughtcrime.securesms.tap.EmailTransportMetadata
+import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 
 /**
  * 传输元数据工厂类
@@ -26,9 +26,6 @@ object TransportMetadataFactory {
             when (providerType.lowercase()) {
                 "cos" -> {
                     CosTransportMetadata.fromMap(data)
-                }
-                "email" -> {
-                    EmailTransportMetadata.fromMap(data)
                 }
                 else -> {
                     Log.w(TAG, "不支持的Provider类型: $providerType")

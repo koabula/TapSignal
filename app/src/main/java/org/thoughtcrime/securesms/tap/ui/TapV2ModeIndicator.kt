@@ -8,7 +8,7 @@ package org.thoughtcrime.securesms.tap.ui
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
-import android.util.Log
+import org.signal.core.util.logging.Log
 import android.view.LayoutInflater
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -30,14 +30,14 @@ class TapV2ModeIndicator @JvmOverloads constructor(
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
     companion object {
-        private const val TAG = "TapV2ModeIndicator"
+        private val TAG = Log.tag(TapV2ModeIndicator::class.java)
     }
 
     private val indicatorText: TextView
 
     init {
-        LayoutInflater.from(context).inflate(R.layout.cos_v2_mode_indicator, this, true)
-        indicatorText = findViewById(R.id.cos_v2_indicator_text)
+        LayoutInflater.from(context).inflate(R.layout.tap_v2_mode_indicator, this, true)
+        indicatorText = findViewById(R.id.tap_v2_indicator_text)
         
         // 设置默认样式
         orientation = HORIZONTAL
@@ -52,7 +52,7 @@ class TapV2ModeIndicator @JvmOverloads constructor(
             text = "v2"
             textSize = 10f
             setTextColor(ContextCompat.getColor(context, R.color.signal_accent_primary))
-            background = ContextCompat.getDrawable(context, R.drawable.cos_v2_indicator_background)
+            background = ContextCompat.getDrawable(context, R.drawable.tap_v2_indicator_background)
             setPadding(8, 2, 8, 2)
         }
     }

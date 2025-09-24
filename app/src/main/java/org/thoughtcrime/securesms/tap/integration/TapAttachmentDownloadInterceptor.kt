@@ -43,19 +43,26 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
     fun isTapAttachment(attachment: DatabaseAttachment): Boolean {
         return try {
             // 检查附件是否有特殊的Tap标识
-            // Tap传输的附件通常有特殊的remote ID格式或特殊标记
             val remoteDigest = attachment.remoteDigest
             val remoteKey = attachment.remoteKey
+            val fileName = attachment.fileName
             
-            // Tap附件的特征：
-            // 1. remoteDigest可能包含特殊前缀
-            // 2. 或者通过其他方式标识为Tap传输
-            val isTapAttachment = remoteDigest?.toString()?.startsWith("tap_") == true ||
-                                 remoteKey?.toString()?.startsWith("tap_") == true
+            // Tap附件的识别特征：
+            // 1. cdnKey包含"tap_attachment"前缀
+            // 2. remoteDigest包含"tap_"前缀
+            // 3. 或者通过其他元数据标识
+            val hasTapCdnKey = remoteKey?.toString()?.startsWith("tap_attachment:") == true
+            val hasTapDigestPrefix = remoteDigest?.toString()?.startsWith("tap_") == true
+            
+            // 检查文件名是否符合Tap传输的模式
+            val hasTapFileName = fileName?.contains("attachment_msg_") == true
+            
+            val isTapAttachment = hasTapCdnKey || hasTapDigestPrefix || hasTapFileName
             
             Log.d(TAG, "检查附件类型: attachmentId=${attachment.attachmentId}, " +
-                      "remoteDigest=$remoteDigest, " +
                       "remoteKey=$remoteKey, " +
+                      "remoteDigest=${remoteDigest?.toString()?.take(20)}..., " +
+                      "fileName=$fileName, " +
                       "isTapAttachment=$isTapAttachment")
             
             isTapAttachment
@@ -211,22 +218,33 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
             // 从附件的remote信息中提取Tap路径
             val remoteDigest = attachment.remoteDigest
             val remoteKey = attachment.remoteKey
+            val fileName = attachment.fileName
+            val attachmentId = attachment.attachmentId.id
             
             // 根据Tap附件的路径格式构建
-            // 假设Tap附件路径格式为: attachments/{digest}/{filename}
             when {
+                // 优先使用cdnKey中的路径信息
+                remoteKey?.toString()?.startsWith("tap_attachment:") == true -> {
+                    // 从cdnKey中提取时间戳和哈希信息
+                    val keyInfo = remoteKey.toString().substring(15) // 去掉"tap_attachment:"前缀
+                    "attachments/$attachmentId/${fileName ?: "data"}"
+                }
+                
+                // 其次使用remoteDigest中的信息
                 remoteDigest?.toString()?.startsWith("tap_") == true -> {
                     val tapPath = remoteDigest.toString().substring(4) // 去掉"tap_"前缀
                     "attachments/$tapPath"
                 }
-                remoteKey?.toString()?.startsWith("tap_") == true -> {
-                    val tapPath = remoteKey.toString().substring(4) // 去掉"tap_"前缀
-                    "attachments/$tapPath"
+                
+                // 检查fileName是否包含消息ID信息
+                fileName?.contains("attachment_msg_") == true -> {
+                    "attachments/$attachmentId/$fileName"
                 }
+                
                 else -> {
-                    // 如果没有特殊标识，尝试从文件名构建
-                    val fileName = attachment.fileName ?: "unknown_${attachment.attachmentId.id}"
-                    "attachments/${attachment.attachmentId.id}/$fileName"
+                    // 默认路径构建方式
+                    val safeFileName = fileName ?: "attachment_${attachmentId}"
+                    "attachments/$attachmentId/$safeFileName"
                 }
             }
             
@@ -266,11 +284,23 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
      * 保存附件数据到Signal存储
      */
     private fun saveAttachmentDataToSignal(messageId: Long, attachmentId: AttachmentId, data: ByteArray) {
+        var inputStreamCreated = false
         try {
             Log.d(TAG, "保存附件数据到Signal存储: attachmentId=$attachmentId, messageId=$messageId, dataSize=${data.size}")
             
-            // 创建输入流
+            // 验证数据完整性
+            if (data.isEmpty()) {
+                throw IllegalArgumentException("附件数据为空")
+            }
+            
+            if (data.size > 100 * 1024 * 1024) { // 100MB限制
+                throw IllegalArgumentException("附件数据过大: ${data.size} bytes")
+            }
+            
+            // 创建输入流并标记资源已创建
             data.inputStream().use { inputStream ->
+                inputStreamCreated = true
+                
                 // 使用Signal原生的finalizeAttachmentAfterDownload方法保存附件
                 SignalDatabase.attachments.finalizeAttachmentAfterDownload(
                     messageId,
@@ -281,8 +311,40 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
             
             Log.i(TAG, "附件数据保存完成: attachmentId=$attachmentId, messageId=$messageId, size=${data.size}")
             
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "附件数据验证失败: attachmentId=$attachmentId, messageId=$messageId", e)
+            // 标记附件为失败状态
+            try {
+                SignalDatabase.attachments.setTransferState(
+                    messageId, 
+                    attachmentId, 
+                    AttachmentTable.TRANSFER_PROGRESS_FAILED
+                )
+            } catch (updateException: Exception) {
+                Log.w(TAG, "更新附件失败状态时发生异常", updateException)
+            }
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "保存附件数据异常: attachmentId=$attachmentId, messageId=$messageId", e)
+            
+            // 尝试清理可能的部分数据
+            try {
+                if (inputStreamCreated) {
+                    Log.d(TAG, "尝试清理部分保存的附件数据")
+                    // 这里可以添加清理逻辑，如果Signal提供相应API
+                }
+                
+                // 标记附件为失败状态
+                SignalDatabase.attachments.setTransferState(
+                    messageId, 
+                    attachmentId, 
+                    AttachmentTable.TRANSFER_PROGRESS_FAILED
+                )
+                
+            } catch (cleanupException: Exception) {
+                Log.w(TAG, "附件数据保存失败后清理资源时发生异常", cleanupException)
+            }
+            
             throw e
         }
     }

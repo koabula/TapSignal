@@ -27,11 +27,13 @@ object ConfigFieldViewCreator {
      * @param fields 配置字段列表
      * @param values 当前配置值
      * @param onValueChanged 值变更回调
+     * @param fragment Fragment引用，用于文件选择器
      */
     fun createFieldConfigs(
         fields: List<ConfigField>,
         values: Map<String, Any>,
-        onValueChanged: (key: String, value: Any) -> Unit
+        onValueChanged: (key: String, value: Any) -> Unit,
+        fragment: androidx.fragment.app.Fragment? = null
     ): List<DSLConfiguration.() -> Unit> {
         return fields.map { field ->
             when (field.fieldType) {
@@ -44,7 +46,7 @@ object ConfigFieldViewCreator {
                 ConfigFieldType.MULTI_SELECT -> createMultiSelectFieldConfig(field, values, onValueChanged)
                 ConfigFieldType.CHECKBOX -> createCheckboxFieldConfig(field, values, onValueChanged)
                 ConfigFieldType.TEXTAREA -> createTextAreaFieldConfig(field, values, onValueChanged)
-                ConfigFieldType.FILE_PATH -> createFilePathFieldConfig(field, values, onValueChanged)
+                ConfigFieldType.FILE_PATH -> createFilePathFieldConfig(field, values, onValueChanged, fragment)
                 ConfigFieldType.REGION_SELECT -> createRegionSelectFieldConfig(field, values, onValueChanged)
                 ConfigFieldType.HIDDEN -> createHiddenFieldConfig(field, values, onValueChanged)
             }
@@ -214,27 +216,43 @@ object ConfigFieldViewCreator {
     }
 
     /**
-     * 创建多选字段（作为文本输入实现）
+     * 创建多选字段（真正的多选UI实现）
      */
     private fun createMultiSelectFieldConfig(
         field: ConfigField,
         values: Map<String, Any>,
         onValueChanged: (String, Any) -> Unit
     ): DSLConfiguration.() -> Unit = {
-        // 多选暂时作为逗号分隔的文本输入实现
-        customPref(
-            InlineTextInput.Model(
-                title = DSLSettingsText.from(field.displayName),
-                value = values[field.key]?.toString() ?: field.defaultValue?.toString() ?: "",
-                hint = DSLSettingsText.from("多个选项请用逗号分隔"),
-                onValueChanged = { onValueChanged(field.key, it) }
+        if (field.options.isNullOrEmpty()) {
+            // 如果没有选项，回退到文本输入
+            customPref(
+                InlineTextInput.Model(
+                    title = DSLSettingsText.from(field.displayName),
+                    value = values[field.key]?.toString() ?: field.defaultValue?.toString() ?: "",
+                    hint = DSLSettingsText.from("多个选项请用逗号分隔"),
+                    onValueChanged = { onValueChanged(field.key, it) }
+                )
             )
-        )
-        
-        field.helpText?.let { helpText ->
-            textPref(
-                title = DSLSettingsText.from(""),
-                summary = DSLSettingsText.from(helpText, DSLSettingsText.ColorModifier(0xFF666666.toInt()))
+        } else {
+            // 使用真正的多选UI组件
+            val currentValue = values[field.key]?.toString() ?: field.defaultValue?.toString() ?: ""
+            val selectedValues = if (currentValue.isNotEmpty()) {
+                currentValue.split(",").map { it.trim() }.toSet()
+            } else {
+                emptySet()
+            }
+            
+            customPref(
+                MultiSelectModel(
+                    titleText = field.displayName,
+                    options = field.options,
+                    selectedValues = selectedValues,
+                    helpText = field.helpText,
+                    onSelectionChanged = { newSelection ->
+                        val valueString = newSelection.joinToString(",")
+                        onValueChanged(field.key, valueString)
+                    }
+                )
             )
         }
     }
@@ -284,28 +302,28 @@ object ConfigFieldViewCreator {
     }
 
     /**
-     * 创建文件路径选择字段
+     * 创建文件路径选择字段（带文件选择器）
      */
     private fun createFilePathFieldConfig(
         field: ConfigField,
         values: Map<String, Any>,
-        onValueChanged: (String, Any) -> Unit
+        onValueChanged: (String, Any) -> Unit,
+        fragment: androidx.fragment.app.Fragment? = null
     ): DSLConfiguration.() -> Unit = {
-        customPref(
-            InlineTextInput.Model(
-                title = DSLSettingsText.from(field.displayName),
-                value = values[field.key]?.toString() ?: field.defaultValue?.toString() ?: "",
-                hint = DSLSettingsText.from("请输入文件路径"),
-                onValueChanged = { onValueChanged(field.key, it) }
+        val currentPath = values[field.key]?.toString() ?: field.defaultValue?.toString() ?: ""
+        
+                            customPref(
+            FilePathModel(
+                titleText = field.displayName,
+                currentPath = currentPath,
+                hint = field.placeholder ?: "请输入文件路径或点击浏览选择",
+                helpText = field.helpText,
+                fragment = fragment,
+                onPathChanged = { newPath ->
+                    onValueChanged(field.key, newPath)
+                }
             )
         )
-        
-        field.helpText?.let { helpText ->
-            textPref(
-                title = DSLSettingsText.from(""),
-                summary = DSLSettingsText.from(helpText, DSLSettingsText.ColorModifier(0xFF666666.toInt()))
-            )
-        }
     }
 
     /**

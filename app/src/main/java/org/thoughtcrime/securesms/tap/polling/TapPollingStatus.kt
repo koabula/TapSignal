@@ -2,6 +2,8 @@ package org.thoughtcrime.securesms.tap.polling
 
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /**
  * Tap轮询状态
@@ -72,7 +74,7 @@ data class TapPollingStatus(
     fun isHealthy(): Boolean {
         return isRunning && 
                pollingStatistics.getOverallSuccessRate() > 0.8 && // 成功率大于80%
-               resourceUsage.cpuUsagePercent < 50.0 // CPU使用率低于50%
+               resourceUsage.memoryUsageKB < 150 * 1024 // 内存使用率低于150MB
     }
     
     /**
@@ -87,9 +89,9 @@ data class TapPollingStatus(
 }
 
 /**
- * Tap轮询统计信息
+ * Tap轮询统计信息 - 简化版本
  * 
- * 收集和汇总轮询系统的各种统计数据，支持按Provider类型分类统计。
+ * 收集和汇总轮询系统的基础统计数据
  */
 data class TapPollingStatistics(
     /**
@@ -247,24 +249,9 @@ data class RecentPollingStats(
  */
 data class PollingResourceUsage(
     /**
-     * CPU使用率百分比
-     */
-    val cpuUsagePercent: Double,
-    
-    /**
      * 内存使用量（KB）
      */
     val memoryUsageKB: Long,
-    
-    /**
-     * 网络使用量（KB）
-     */
-    val networkUsageKB: Long,
-    
-    /**
-     * 电池耗电率（毫安/小时）
-     */
-    val batteryDrainRate: Double,
     
     /**
      * 活跃线程数
@@ -281,7 +268,7 @@ data class PollingResourceUsage(
      * 是否资源使用过高
      */
     fun isResourceUsageHigh(): Boolean {
-        return cpuUsagePercent > 70.0 || memoryUsageKB > 100 * 1024 // 100MB
+        return memoryUsageKB > 100 * 1024 // 100MB
     }
     
     /**
@@ -289,11 +276,235 @@ data class PollingResourceUsage(
      */
     fun getUsageLevel(): ResourceUsageLevel {
         return when {
-            cpuUsagePercent > 80.0 || memoryUsageKB > 150 * 1024 -> ResourceUsageLevel.HIGH
-            cpuUsagePercent > 50.0 || memoryUsageKB > 80 * 1024 -> ResourceUsageLevel.MEDIUM
+            memoryUsageKB > 150 * 1024 -> ResourceUsageLevel.HIGH
+            memoryUsageKB > 80 * 1024 -> ResourceUsageLevel.MEDIUM
             else -> ResourceUsageLevel.LOW
         }
     }
+}
+
+/**
+ * 时间窗口统计
+ * 
+ * 维护滑动时间窗口内的统计数据
+ */
+private class TimeWindowStats(private val windowSizeMs: Long) {
+    companion object {
+        private val MAX_RECORDS = TapPollingConstants.Statistics.MAX_POLL_RECORDS // 最大记录数，防止内存溢出
+        private val MEMORY_PRESSURE_THRESHOLD = TapPollingConstants.Statistics.MEMORY_PRESSURE_THRESHOLD_KB * 1024L // 内存压力阈值
+        private val CLEANUP_TRIGGER_RATIO = 0.8 // 达到80%容量时触发清理
+    }
+    
+    // 轮询记录环形缓冲区
+    private val pollRecords = ArrayDeque<PollRecord>(MAX_RECORDS)
+    private val lock = java.util.concurrent.locks.ReentrantReadWriteLock()
+    
+    // 内存使用统计
+    @Volatile
+    private var lastCleanupTime = System.currentTimeMillis()
+    private val cleanupIntervalMs = 300000L // 5分钟清理间隔
+    
+    /**
+     * 记录一次轮询
+     */
+    fun recordPoll(timestamp: Long, success: Boolean, responseTimeMs: Long, messageCount: Int) {
+        lock.write {
+            // 检查内存压力并执行必要的清理
+            if (shouldPerformMemoryPressureCleanup(timestamp)) {
+                performMemoryPressureCleanup(timestamp)
+            }
+            
+            // 清理过期记录
+            cleanupExpiredRecords(timestamp)
+            
+            // 添加新记录
+            if (pollRecords.size >= MAX_RECORDS) {
+                pollRecords.removeFirst()
+            }
+            
+            pollRecords.addLast(PollRecord(
+                timestamp = timestamp,
+                success = success,
+                responseTimeMs = responseTimeMs,
+                messageCount = messageCount
+            ))
+        }
+    }
+    
+    /**
+     * 检查是否需要执行内存压力清理
+     */
+    private fun shouldPerformMemoryPressureCleanup(currentTime: Long): Boolean {
+        // 检查时间间隔
+        if (currentTime - lastCleanupTime < cleanupIntervalMs) {
+            return false
+        }
+        
+        // 检查记录数量阈值
+        if (pollRecords.size >= (MAX_RECORDS * CLEANUP_TRIGGER_RATIO).toInt()) {
+            return true
+        }
+        
+        // 检查系统内存使用情况
+        val runtime = Runtime.getRuntime()
+        val usedMemory = runtime.totalMemory() - runtime.freeMemory()
+        
+        return usedMemory > MEMORY_PRESSURE_THRESHOLD
+    }
+    
+    /**
+     * 执行内存压力清理
+     */
+    private fun performMemoryPressureCleanup(currentTime: Long) {
+        try {
+            val targetSize = (MAX_RECORDS * 0.5).toInt() // 清理到50%容量
+            val removeCount = pollRecords.size - targetSize
+            
+            if (removeCount > 0) {
+                // 优先移除最老的记录
+                repeat(removeCount.coerceAtMost(pollRecords.size)) {
+                    if (pollRecords.isNotEmpty()) {
+                        pollRecords.removeFirst()
+                    }
+                }
+            }
+            
+            lastCleanupTime = currentTime
+            
+        } catch (e: Exception) {
+            // 静默处理清理异常，避免影响主要功能
+        }
+    }
+    
+    /**
+     * 获取时间窗口统计
+     */
+    fun getStats(): RecentPollingStats {
+        return lock.read {
+            val currentTime = System.currentTimeMillis()
+            cleanupExpiredRecords(currentTime)
+            
+            if (pollRecords.isEmpty()) {
+                return@read RecentPollingStats(
+                    timeRangeMs = windowSizeMs,
+                    totalPolls = 0L,
+                    successfulPolls = 0L,
+                    messagesFound = 0L,
+                    averageResponseTime = 0L,
+                    peakPollingRate = 0.0,
+                    averagePollingRate = 0.0
+                )
+            }
+            
+            val windowStart = currentTime - windowSizeMs
+            val validRecords = pollRecords.filter { it.timestamp >= windowStart }
+            
+            val totalPolls = validRecords.size.toLong()
+            val successfulPolls = validRecords.count { it.success }.toLong()
+            val messagesFound = validRecords.sumOf { it.messageCount }.toLong()
+            
+            val averageResponseTime = if (validRecords.isNotEmpty()) {
+                validRecords.filter { it.responseTimeMs > 0 }
+                    .map { it.responseTimeMs }
+                    .average()
+                    .let { if (it.isNaN()) 0L else it.toLong() }
+            } else {
+                0L
+            }
+            
+            // 计算轮询速率
+            val effectiveTimeRange = if (validRecords.isNotEmpty()) {
+                minOf(windowSizeMs, currentTime - validRecords.first().timestamp)
+            } else {
+                windowSizeMs
+            }
+            
+            val averageRate = if (effectiveTimeRange > 0) {
+                totalPolls.toDouble() * 1000.0 / effectiveTimeRange.toDouble()
+            } else {
+                0.0
+            }
+            
+            // 计算峰值轮询速率
+            val peakRate = calculatePeakRate(validRecords, TapPollingConstants.Statistics.PEAK_RATE_WINDOW_MS)
+            
+            RecentPollingStats(
+                timeRangeMs = effectiveTimeRange,
+                totalPolls = totalPolls,
+                successfulPolls = successfulPolls,
+                messagesFound = messagesFound,
+                averageResponseTime = averageResponseTime,
+                peakPollingRate = peakRate,
+                averagePollingRate = averageRate
+            )
+        }
+    }
+    
+    /**
+     * 计算峰值轮询速率（双指针滑窗优化）
+     */
+    private fun calculatePeakRate(records: List<PollRecord>, peakWindowMs: Long): Double {
+        if (records.isEmpty()) return 0.0
+        
+        var maxRate = 0.0
+        var left = 0
+        var right = 0
+        
+        // 双指针滑动窗口
+        while (right < records.size) {
+            // 扩展右边界
+            val windowStart = records[left].timestamp
+            val windowEnd = records[right].timestamp
+            
+            if (windowEnd - windowStart <= peakWindowMs) {
+                // 窗口大小合适，计算当前窗口的速率
+                val windowDuration = windowEnd - windowStart
+                if (windowDuration > 0) {
+                    val windowSize = right - left + 1
+                    val rate = windowSize.toDouble() * 1000.0 / windowDuration.toDouble()
+                    maxRate = maxOf(maxRate, rate)
+                }
+                right++
+            } else {
+                // 窗口过大，收缩左边界
+                left++
+                if (left > right) {
+                    right = left
+                }
+            }
+        }
+        
+        return maxRate
+    }
+    
+    /**
+     * 清理过期记录
+     */
+    private fun cleanupExpiredRecords(currentTime: Long) {
+        val cutoffTime = currentTime - windowSizeMs
+        while (pollRecords.isNotEmpty() && pollRecords.first().timestamp < cutoffTime) {
+            pollRecords.removeFirst()
+        }
+    }
+    
+    /**
+     * 重置统计
+     */
+    fun reset() {
+        lock.write {
+            pollRecords.clear()
+        }
+    }
+    
+    /**
+     * 轮询记录
+     */
+    private data class PollRecord(
+        val timestamp: Long,
+        val success: Boolean,
+        val responseTimeMs: Long,
+        val messageCount: Int
+    )
 }
 
 /**
@@ -328,6 +539,10 @@ class PollingStatisticsCollector {
     
     // 系统启动时间
     private val systemStartTime = System.currentTimeMillis()
+    
+    // 时间窗口统计
+    private val hourlyStats = TimeWindowStats(TapPollingConstants.Statistics.HOURLY_STATS_WINDOW_MS) // 1小时窗口
+    private val dailyStats = TimeWindowStats(TapPollingConstants.Statistics.DAILY_STATS_WINDOW_MS) // 24小时窗口
     
     // 初始化状态
     private var isInitialized = false
@@ -402,12 +617,20 @@ class PollingStatisticsCollector {
         // 更新活跃度级别统计
         activityLevelStats.computeIfAbsent(activityLevel) { ActivityLevelCounter(it) }
             .recordPoll(success)
+        
+        // 更新时间窗口统计
+        val currentTime = System.currentTimeMillis()
+        hourlyStats.recordPoll(currentTime, success, responseTimeMs, messageCount)
+        dailyStats.recordPoll(currentTime, success, responseTimeMs, messageCount)
     }
     
     /**
      * 获取当前统计快照
      */
-    fun getCurrentStatistics(): TapPollingStatistics {
+    fun getCurrentStatistics(
+        providerTargetCounts: Map<String, Pair<Int, Int>> = emptyMap(), // providerType -> (active, total)
+        activityTargetCounts: Map<TransportActivityLevel, Int> = emptyMap() // activityLevel -> targetCount
+    ): TapPollingStatistics {
         val averageResponseTime = if (responseTimeRecords.get() > 0) {
             totalResponseTime.get() / responseTimeRecords.get()
         } else {
@@ -420,42 +643,20 @@ class PollingStatisticsCollector {
             failedPolls = failedPolls.get(),
             messagesFound = messagesFound.get(),
             averageResponseTime = averageResponseTime,
-            providerStatistics = providerStats.mapValues { it.value.toStats() },
-            activityLevelStats = activityLevelStats.mapValues { it.value.toStats() },
-            lastHourStats = calculateRecentStats(3600000L), // 1小时
-            last24HourStats = calculateRecentStats(86400000L) // 24小时
+            providerStatistics = providerStats.mapValues { (providerType, counter) ->
+                val targetCounts = providerTargetCounts[providerType] ?: (0 to 0)
+                counter.toStats(targetCounts.first, targetCounts.second)
+            },
+            activityLevelStats = activityLevelStats.mapValues { (activityLevel, counter) ->
+                val targetCount = activityTargetCounts[activityLevel] ?: 0
+                counter.toStats(targetCount)
+            },
+            lastHourStats = hourlyStats.getStats(),
+            last24HourStats = dailyStats.getStats()
         )
     }
     
-    /**
-     * 计算最近时间段的统计
-     */
-    private fun calculateRecentStats(timeRangeMs: Long): RecentPollingStats {
-        // 这里简化实现，实际应该维护时间窗口数据
-        val currentTime = System.currentTimeMillis()
-        val systemUptime = currentTime - systemStartTime
-        val effectiveRange = minOf(timeRangeMs, systemUptime)
-        
-        val averageRate = if (effectiveRange > 0) {
-            totalPolls.get().toDouble() * 1000.0 / effectiveRange.toDouble()
-        } else {
-            0.0
-        }
-        
-        return RecentPollingStats(
-            timeRangeMs = effectiveRange,
-            totalPolls = totalPolls.get(),
-            successfulPolls = successfulPolls.get(),
-            messagesFound = messagesFound.get(),
-            averageResponseTime = if (responseTimeRecords.get() > 0) {
-                totalResponseTime.get() / responseTimeRecords.get()
-            } else {
-                0L
-            },
-            peakPollingRate = averageRate * 1.5, // 简化实现，实际应该跟踪峰值
-            averagePollingRate = averageRate
-        )
-    }
+
     
     /**
      * 重置统计信息
@@ -469,6 +670,8 @@ class PollingStatisticsCollector {
         responseTimeRecords.set(0)
         providerStats.clear()
         activityLevelStats.clear()
+        hourlyStats.reset()
+        dailyStats.reset()
     }
 }
 
@@ -498,7 +701,7 @@ private class ProviderStatCounter(private val providerType: String) {
         }
     }
     
-    fun toStats(): ProviderPollingStats {
+    fun toStats(activeTargets: Int = 0, totalTargets: Int = 0): ProviderPollingStats {
         val averageResponseTime = if (responseTimeRecords.get() > 0) {
             totalResponseTime.get() / responseTimeRecords.get()
         } else {
@@ -512,8 +715,8 @@ private class ProviderStatCounter(private val providerType: String) {
             failedPolls = failedPolls.get(),
             messagesFound = messagesFound.get(),
             averageResponseTime = averageResponseTime,
-            activeTargets = 0, // 需要从外部传入
-            totalTargets = 0   // 需要从外部传入
+            activeTargets = activeTargets,
+            totalTargets = totalTargets
         )
     }
 }
@@ -532,10 +735,10 @@ private class ActivityLevelCounter(private val activityLevel: TransportActivityL
         }
     }
     
-    fun toStats(): ActivityLevelStats {
+    fun toStats(targetCount: Int = 0): ActivityLevelStats {
         return ActivityLevelStats(
             activityLevel = activityLevel,
-            targetCount = 0, // 需要从外部传入
+            targetCount = targetCount,
             totalPolls = totalPolls.get(),
             successfulPolls = successfulPolls.get(),
             averageInterval = activityLevel.baseIntervalMs

@@ -127,14 +127,20 @@ class TapMessageProcessor private constructor(private val context: Context) {
             when (adapterResult) {
                 is TapEnvelopeProcessResult.Success -> {
                     Log.i(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
+                    // 记录处理成功统计
+                    statisticsManager.recordMessageProcessingSuccess(transportMessage.messageId)
                     TapProcessResult.Success("消息处理成功")
                 }
                 is TapEnvelopeProcessResult.Failed -> {
                     Log.w(TAG, "传输消息处理失败: messageId=${transportMessage.messageId}, error=${adapterResult.error}")
+                    // 记录处理失败统计
+                    statisticsManager.recordMessageProcessingError(transportMessage.messageId, adapterResult.error)
                     TapProcessResult.Failed(adapterResult.error)
                 }
                 is TapEnvelopeProcessResult.Duplicate -> {
                     Log.d(TAG, "传输消息重复: messageId=${transportMessage.messageId}")
+                    // 重复消息也算作成功处理（已忽略）
+                    statisticsManager.recordMessageProcessingSuccess(transportMessage.messageId)
                     TapProcessResult.Success("消息重复，已忽略")
                 }
             }
@@ -177,9 +183,17 @@ class TapMessageProcessor private constructor(private val context: Context) {
             val messageTime = message.timestamp
             val timeDiff = Math.abs(currentTime - messageTime)
             
-            // 允许24小时的时间偏差
-            if (timeDiff > 24 * 60 * 60 * 1000L) {
-                Log.w(TAG, "消息时间戳异常: messageTime=$messageTime, currentTime=$currentTime")
+            // 允许1小时的时间偏差，防止重放攻击
+            val MAX_TIME_DRIFT_MS = 60 * 60 * 1000L // 1小时
+            if (timeDiff > MAX_TIME_DRIFT_MS) {
+                Log.w(TAG, "消息时间戳偏差过大: messageTime=$messageTime, currentTime=$currentTime, diff=${timeDiff}ms")
+                return false
+            }
+            
+            // 检查时间戳是否为未来时间（允许5分钟时钟偏差）
+            val MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000L // 5分钟
+            if (messageTime > currentTime + MAX_FUTURE_DRIFT_MS) {
+                Log.w(TAG, "消息时间戳为未来时间: messageTime=$messageTime, currentTime=$currentTime")
                 return false
             }
             
@@ -191,15 +205,23 @@ class TapMessageProcessor private constructor(private val context: Context) {
         }
     }
     
+    // 统计管理器
+    private val statisticsManager by lazy { 
+        org.thoughtcrime.securesms.tap.statistics.TapMessageStatistics.getInstance(context) 
+    }
+    
     /**
      * 记录消息接收统计
      */
     private fun recordMessageReceived(message: TransportMessage) {
         try {
-            // 更新接收统计（可以扩展为更详细的统计）
-            Log.d(TAG, "记录消息接收: senderId=${message.senderId}, type=${message.messageType}")
+            // 使用真实的统计管理器记录消息接收信息
+            statisticsManager.recordMessageReceived(message)
             
-            // TODO: 可以添加到统计数据库或内存统计中
+            Log.d(TAG, "记录消息接收统计: senderId=${message.senderId}, " +
+                    "type=${message.messageType}, " +
+                    "size=${message.signalCiphertext.length}, " +
+                    "attachments=${message.attachments.size}")
             
         } catch (e: Exception) {
             Log.w(TAG, "记录消息统计失败", e)
@@ -332,10 +354,13 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 Log.i(TAG, "已关闭通道数量: $closed, senderId=$senderId")
             }
             
-            // 移除相关Token（尝试移除主要Provider类型的Token）
-            val providerTypes = listOf("cos", "email") // 支持的Provider类型
+            // 移除相关Token（遍历所有可用的Provider类型）
+            val transportManager = TransportManager.getInstance(context)
+            val availableProviders = transportManager.getAvailableProviders()
             var removed = 0
-            for (providerType in providerTypes) {
+            
+            for (provider in availableProviders) {
+                val providerType = provider.providerType
                 val token = tokenPool.getValidReceivedToken(senderId, providerType)
                 if (token != null && tokenPool.removeToken(senderId, providerType)) {
                     removed++
@@ -558,12 +583,22 @@ class TapMessageProcessor private constructor(private val context: Context) {
      */
     fun isDuplicateMessage(messageId: String, recipientId: String): Boolean {
         return try {
-            // 简化的去重检查 - 由于没有专门的transport消息表，使用内存去重
-            // 在实际实现中，可以使用TapEnvelopeAdapter中的TransportMessageDeduplicator
             Log.d(TAG, "检查消息重复性: messageId=$messageId, recipientId=$recipientId")
-            false // 暂时返回false，让TapEnvelopeAdapter处理去重
+            
+            // 使用TapEnvelopeAdapter中的TransportMessageDeduplicator进行去重检查
+            val envelopeAdapter = TapEnvelopeAdapter.getInstance(context)
+            val messageDeduplicator = org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.getInstance(context)
+            
+            // 检查消息是否已被处理过
+            val currentTimestamp = System.currentTimeMillis()
+            val isDuplicate = messageDeduplicator.isDuplicate(messageId, recipientId, currentTimestamp)
+            
+            Log.d(TAG, "消息重复性检查结果: messageId=$messageId, recipientId=$recipientId, isDuplicate=$isDuplicate")
+            isDuplicate
+            
         } catch (e: Exception) {
-            Log.w(TAG, "检查消息重复性失败", e)
+            Log.w(TAG, "检查消息重复性失败: messageId=$messageId, recipientId=$recipientId", e)
+            // 出错时保守处理，返回false避免丢失消息
             false
         }
     }
@@ -573,10 +608,15 @@ class TapMessageProcessor private constructor(private val context: Context) {
      */
     private fun markMessageAsProcessed(messageId: String, recipientId: String, timestamp: Long) {
         try {
-            // 消息已通过TapEnvelopeAdapter处理并存储到数据库
-            Log.d(TAG, "消息已标记为已处理: messageId=$messageId, recipientId=$recipientId")
+            Log.d(TAG, "标记消息为已处理: messageId=$messageId, recipientId=$recipientId")
+            
+            // 通过TransportMessageDeduplicator标记消息为已处理
+            val messageDeduplicator = org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.getInstance(context)
+            messageDeduplicator.markAsProcessed(messageId, recipientId, timestamp)
+            
+            Log.d(TAG, "消息标记完成: messageId=$messageId, recipientId=$recipientId")
         } catch (e: Exception) {
-            Log.w(TAG, "标记消息已处理失败", e)
+            Log.w(TAG, "标记消息已处理失败: messageId=$messageId, recipientId=$recipientId", e)
         }
     }
     
@@ -611,17 +651,32 @@ class TapMessageProcessor private constructor(private val context: Context) {
         senderRecipient: Recipient
     ) {
         try {
+            Log.d(TAG, "调度后处理任务: messageId=${insertResult.messageId}")
+            
             // 触发附件下载
             val attachments = insertResult.insertedAttachments
             if (attachments != null && attachments.isNotEmpty()) {
-                Log.d(TAG, "安排附件下载任务: messageId=${insertResult.messageId}")
-                // TODO: 触发附件下载任务
+                Log.d(TAG, "启动附件下载任务: messageId=${insertResult.messageId}, attachments=${attachments.size}")
+                
+                // 使用TapAttachmentDownloadInterceptor处理Tap附件下载
+                val downloadInterceptor = TapAttachmentDownloadInterceptor.getInstance(context)
+                attachments.forEach { (attachment, attachmentId) ->
+                    if (attachment is org.thoughtcrime.securesms.attachments.DatabaseAttachment && downloadInterceptor.isTapAttachment(attachment)) {
+                        Log.d(TAG, "检测到Tap附件，启动下载: attachmentId=${attachmentId}")
+                        try {
+                            downloadInterceptor.interceptAndDownload(insertResult.messageId, attachment)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Tap附件下载启动失败: attachmentId=${attachmentId}", e)
+                        }
+                    }
+                }
             }
             
-            // 触发其他后处理
-            Log.d(TAG, "安排后处理任务完成: messageId=${insertResult.messageId}")
+            // 其他后处理任务
+            Log.d(TAG, "后处理任务调度完成: messageId=${insertResult.messageId}")
+            
         } catch (e: Exception) {
-            Log.w(TAG, "安排后处理任务失败", e)
+            Log.w(TAG, "调度后处理任务失败: messageId=${insertResult.messageId}", e)
         }
     }
 }

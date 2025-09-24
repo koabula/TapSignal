@@ -87,52 +87,37 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
     
     /**
      * 集成的消息发送方法
-     * 这是外部调用的主要接口，会自动选择最佳发送方式
      * 
      * @param messageId 消息ID
      * @param recipient 接收方
      * @param outgoingMessage 待发送消息
-     * @param forceSignalServer 是否强制使用Signal Server
-     * @param signalSenderCallback Signal原生发送回调
      * @return 发送结果的Future
      */
     fun sendMessage(
         messageId: Long,
         recipient: Recipient,
-        outgoingMessage: OutgoingMessage,
-        forceSignalServer: Boolean = false,
-        signalSenderCallback: TapSenderCallback? = null
+        outgoingMessage: OutgoingMessage
     ): CompletableFuture<IntegratedTapSendResult> {
-        Log.i(TAG, "集成发送消息: messageId=$messageId, recipient=${recipient.id}, forceSignalServer=$forceSignalServer")
+        Log.i(TAG, "发送消息: messageId=$messageId, recipient=${recipient.id}")
         
         return CompletableFuture.supplyAsync {
             try {
-                // 1. 如果强制使用Signal Server，直接调用原生发送
-                if (forceSignalServer) {
-                    Log.d(TAG, "强制使用Signal Server发送: messageId=$messageId")
-                    return@supplyAsync runBlocking {
-                        executeSignalServerSend(messageId, recipient, outgoingMessage, signalSenderCallback)
-                    }
-                }
-                
-                // 2. 检查是否有可用的传输通道
+                // 检查是否有可用的传输通道
                 val hasActiveChannel = channelManager.hasActiveChannel(recipient.requireAci().toString())
                 
                 if (hasActiveChannel) {
-                    Log.i(TAG, "路由到Tap传输层: messageId=$messageId")
+                    Log.i(TAG, "使用Tap传输层发送: messageId=$messageId")
                     runBlocking {
                         executeTapSend(messageId, recipient, outgoingMessage)
                     }
                 } else {
-                    Log.d(TAG, "没有Tap通道，使用Signal Server发送: messageId=$messageId")
-                    runBlocking {
-                        executeSignalServerSend(messageId, recipient, outgoingMessage, signalSenderCallback)
-                    }
+                    Log.w(TAG, "没有可用的Tap通道: messageId=$messageId")
+                    IntegratedTapSendResult.Failed("没有可用的Tap传输通道")
                 }
                 
             } catch (e: Exception) {
-                Log.e(TAG, "集成发送失败: messageId=$messageId", e)
-                IntegratedTapSendResult.Failed("集成发送异常: ${e.message}")
+                Log.e(TAG, "消息发送失败: messageId=$messageId", e)
+                IntegratedTapSendResult.Failed("发送异常: ${e.message}")
             }
         }
     }
@@ -182,39 +167,6 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
         }
     }
     
-    /**
-     * 执行Signal Server发送（回退机制）
-     */
-    private suspend fun executeSignalServerSend(
-        messageId: Long,
-        recipient: Recipient,
-        outgoingMessage: OutgoingMessage,
-        signalSenderCallback: TapSenderCallback?
-    ): IntegratedTapSendResult {
-        return try {
-            Log.i(TAG, "执行Signal Server发送: messageId=$messageId")
-            
-            // 调用原生Signal发送逻辑
-            val sendResult = signalSenderCallback?.sendMessage(messageId, recipient, outgoingMessage)
-            
-            if (sendResult?.isSuccess == true) {
-                Log.i(TAG, "Signal Server发送成功: messageId=$messageId")
-                IntegratedTapSendResult.Success(
-                    method = IntegratedSendMethod.SIGNAL_SERVER,
-                    path = "signal-server",
-                    metadata = mapOf("fallback" to "true")
-                )
-            } else {
-                Log.e(TAG, "Signal Server发送失败: messageId=$messageId, reason=${sendResult?.errorMessage}")
-                IntegratedTapSendResult.Failed("Signal Server发送失败: ${sendResult?.errorMessage ?: "未知错误"}")
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Signal Server发送异常: messageId=$messageId", e)
-            IntegratedTapSendResult.Failed("Signal Server发送异常: ${e.message}")
-        }
-    }
-    
     // buildTransportMessage方法已移动到TapSignalServiceAdapter中
     
     // determineMessageType方法已移动到TapSignalServiceAdapter中
@@ -230,8 +182,7 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
  * 集成发送方法枚举
  */
 enum class IntegratedSendMethod {
-    TAP_TRANSPORT,
-    SIGNAL_SERVER
+    TAP_TRANSPORT
 }
 
 /**
@@ -246,20 +197,4 @@ sealed class IntegratedTapSendResult {
     
     data class Failed(val reason: String) : IntegratedTapSendResult()
     data class RetryScheduled(val message: String) : IntegratedTapSendResult()
-}
-
-/**
- * TAP发送回调接口
- */
-interface TapSenderCallback {
-    fun sendMessage(messageId: Long, recipient: org.thoughtcrime.securesms.recipients.Recipient, outgoingMessage: org.thoughtcrime.securesms.mms.OutgoingMessage): TapSendResult
-}
-
-/**
- * TAP发送结果
- */
-data class TapSendResult(
-    val isSuccess: Boolean,
-    val errorMessage: String? = null,
-    val metadata: Map<String, Any> = emptyMap()
-) 
+} 

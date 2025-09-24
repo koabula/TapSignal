@@ -154,11 +154,12 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                     
                     // 使用Signal的SessionCipher进行加密
                     val protocolStore = org.thoughtcrime.securesms.dependencies.AppDependencies.protocolStore.aci()
+                    val localDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId
                     val sessionCipher = org.signal.libsignal.protocol.SessionCipher(
                         protocolStore,
                         org.signal.libsignal.protocol.SignalProtocolAddress(
                             address.serviceId.toString(),
-                            1 // 默认设备ID
+                            localDeviceId  // 使用真实的设备ID
                         )
                     )
                     
@@ -241,8 +242,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                     .contentType(attachment.contentType)
                     .size(attachmentData.size)
                     .fileName(attachment.fileName.orElse(""))
-                    // 使用特殊的ID标识这是Tap传输的附件
-                    .cdnKey("tap:${System.currentTimeMillis()}")
+                    // 使用消息相关的ID标识这是Tap传输的附件
+                    .cdnKey("tap_attachment:${System.currentTimeMillis()}_${attachmentData.hashCode()}")
                     .digest(calculateDigest(attachmentData).toByteString())
                     .build()
             }
@@ -376,14 +377,19 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         )
         
         // 构建附件列表
-        val transportAttachments = outgoingMessage.attachments.map { attachment ->
+        val transportAttachments = outgoingMessage.attachments.mapIndexed { index, attachment ->
+            val attachmentId = when (attachment) {
+                is DatabaseAttachment -> attachment.attachmentId.id.toString()
+                else -> "msg_${messageId}_att_${index}"
+            }
+            
             org.thoughtcrime.securesms.tap.TransportAttachment(
-                attachmentId = (attachment as? DatabaseAttachment)?.attachmentId?.id?.toString() ?: "unknown",
-                fileName = attachment.fileName ?: "attachment",
+                attachmentId = attachmentId,
+                fileName = attachment.fileName ?: "attachment_${attachmentId}",
                 mimeType = attachment.contentType ?: "application/octet-stream",
                 size = attachment.size,
-                fileHash = null, // TAP模式下附件单独处理
-                transportPath = null // 传输路径稍后设置
+                fileHash = calculateAttachmentHashForTransport(attachment),
+                transportPath = "attachments/${attachmentId}/${attachment.fileName ?: "data"}"
             )
         }
         
@@ -459,9 +465,9 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             val mimeType = attachment.contentType ?: "application/octet-stream"
             val size = attachment.size
             
-            // 计算文件哈希（简化处理）
+            // 计算文件哈希
             val fileHash = try {
-                calculateAttachmentHash(attachment)
+                calculateAttachmentHashForTransport(attachment)
             } catch (e: Exception) {
                 Log.w(TAG, "计算附件哈希失败: $attachmentId", e)
                 null
@@ -478,10 +484,12 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         }
     }
     
+    // calculateAttachmentHash方法已合并到calculateAttachmentHashForTransport
+
     /**
-     * 计算附件哈希（简化实现）
+     * 计算附件哈希（用于TransportMessage）
      */
-    private fun calculateAttachmentHash(attachment: Attachment): String? {
+    private fun calculateAttachmentHashForTransport(attachment: Attachment): String? {
         return try {
             when (attachment) {
                 is DatabaseAttachment -> {

@@ -5,6 +5,7 @@
 
 package org.thoughtcrime.securesms.tap.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -37,6 +38,10 @@ class TapConfigFragment : DSLSettingsFragment(
     override fun bindAdapter(adapter: MappingAdapter) {
         // 注册内联文本输入组件
         InlineTextInput.register(adapter)
+        // 注册多选组件
+        MultiSelectModel.register(adapter)
+        // 注册文件路径组件
+        FilePathModel.register(adapter)
 
         viewModel.state.observe(viewLifecycleOwner) { state ->
             adapter.submitList(getConfiguration(state).toMappingModelList())
@@ -46,6 +51,37 @@ class TapConfigFragment : DSLSettingsFragment(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel.initialize(requireContext())
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        // 处理文件选择结果
+        if (requestCode == FilePathConfigView.FILE_PICKER_REQUEST_CODE) {
+            // 遍历当前显示的所有FilePathConfigView，让它们处理结果
+            view?.let { rootView ->
+                findFilePathViews(rootView).forEach { filePathView ->
+                    filePathView.handleActivityResult(requestCode, resultCode, data)
+                }
+            }
+        }
+    }
+
+    /**
+     * 递归查找所有FilePathConfigView
+     */
+    private fun findFilePathViews(view: View): List<FilePathConfigView> {
+        val filePathViews = mutableListOf<FilePathConfigView>()
+        
+        if (view is FilePathConfigView) {
+            filePathViews.add(view)
+        } else if (view is android.view.ViewGroup) {
+            for (i in 0 until view.childCount) {
+                filePathViews.addAll(findFilePathViews(view.getChildAt(i)))
+            }
+        }
+        
+        return filePathViews
     }
 
     private fun getConfiguration(state: TapConfigState): DSLConfiguration {
@@ -139,7 +175,8 @@ class TapConfigFragment : DSLSettingsFragment(
             values = state.configValues,
             onValueChanged = { key, value ->
                 viewModel.updateConfigValue(key, value)
-            }
+            },
+            fragment = this@TapConfigFragment
         )
         
         fieldConfigs.forEach { fieldConfig ->
@@ -149,6 +186,7 @@ class TapConfigFragment : DSLSettingsFragment(
         // 测试按钮（如果支持）
         if (descriptor.supportsConfigTest) {
             ConfigTestButtonCreator.createTestButton(
+                context = requireContext(),
                 state = state.testState,
                 testResult = state.testResult,
                 enabled = state.isConfigValid,
@@ -160,6 +198,7 @@ class TapConfigFragment : DSLSettingsFragment(
 
         // 保存按钮
         ConfigTestButtonCreator.createSaveButton(
+            context = requireContext(),
             enabled = state.isConfigValid,
             onClick = {
                 val success = viewModel.saveConfig()
@@ -173,7 +212,9 @@ class TapConfigFragment : DSLSettingsFragment(
 
         // 删除配置按钮（仅在有现有配置时显示）
         if (state.hasExistingConfig) {
-            ConfigTestButtonCreator.createDeleteButton {
+            ConfigTestButtonCreator.createDeleteButton(
+                context = requireContext()
+            ) {
                 showDeleteConfigConfirmDialog()
             }.invoke(this)
         }
