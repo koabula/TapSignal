@@ -9,6 +9,44 @@ Tap (Transport-as-a-Plugin) 是Signal Android客户端的可插拔传输层，�
 - 插件化架构：支持多种存储服务Provider，易于扩展
 - 抽象层设计：主模块提供接口和基础实现，具体Provider在子目录实现
 
+## 📚 文档导航
+
+### 开发者文档
+- **[集成工程说明](INTEGRATION_GUIDE.md)** - Signal集成详解和修改指南
+- **[架构概览](ARCHITECTURE_OVERVIEW.md)** - 快速架构参考和调试指南
+
+### 功能文档
+- **[用户指南](#使用流程)** - 用户使用说明
+- **[配置说明](#配置说明)** - Provider配置方法
+- **[故障排除](#故障排除)** - 常见问题解决
+
+## 🔧 快速上手
+
+### 开发新Provider
+```bash
+# 1. 创建Provider目录
+mkdir -p provider/[name]
+
+# 2. 参考COS Provider实现
+cp -r provider/cos/ provider/[name]/
+
+# 3. 修改关键文件
+# - [Name]TransportProvider.kt
+# - [Name]ProviderConfigDescriptor.kt  
+# - [Name]ProviderRegistrar.kt
+```
+
+### 调试集成问题
+```bash
+# 1. 搜索关键日志
+adb logcat | grep -E "(IndividualSendJob|TapPolling|TapEnvelope)"
+
+# 2. 检查集成点
+# - IndividualSendJob.java:191 (发送路由)
+# - DataMessageProcessor.kt:200 (v2检测)
+# - TapPollingService.kt:541 (接收处理)
+```
+
 ## 核心组件
 
 ### 主要接口和管理器
@@ -81,35 +119,6 @@ Signal集成层，实现Tap与Signal核心的对接
 ### `factory/`
 工厂模式实现，负责Provider实例创建和管理
 
-## 开发指南
-
-### 添加新Provider
-
-1. 在`provider/`下创建新目录（如`email/`）
-2. 实现`TransportProvider`接口
-3. 创建`ProviderRegistrar`和`ProviderConfigDescriptor`
-4. 添加`provider.json`配置文件
-5. Provider会被自动发现和注册
-
-### 关键设计模式
-
-- **抽象工厂模式**：ProviderRegistry + TransportProviderFactory
-- **策略模式**：不同Provider的实现策略
-- **观察者模式**：轮询状态和配置变更通知
-- **单例模式**：各管理器采用线程安全单例
-
-### 并发控制
-
-- 使用`ReentrantReadWriteLock`保证线程安全
-- 协程用于异步操作，避免阻塞UI
-- 单例实例采用双重检查锁定
-
-### 安全注意事项
-
-- 所有敏感信息必须通过`LogSanitizer`脱敏
-- Token和密钥信息不得记录到日志
-- 输入数据必须进行边界检查和验证
-
 ## 使用流程
 
 ### v2模式建立
@@ -135,6 +144,16 @@ Provider配置通过`TransportProviderConfigManager`管理，支持：
 2. **Token失效**：查看TransportTokenPool状态
 3. **通道异常**：检查TransportChannelManager日志
 4. **轮询问题**：查看polling/目录下的状态信息
+5. **发送失败**：查看IndividualSendJob路由决策日志
+6. **接收异常**：检查TapPollingService和TapEnvelopeAdapter
+
+## 集成状态
+
+✅ **完全集成** - Tap模块已完整集成到Signal Android中
+- **消息发送**: 在`IndividualSendJob`中实现智能路由
+- **消息接收**: 通过轮询和`TapEnvelopeAdapter`完整处理
+- **v2模式检测**: 在`DataMessageProcessor`中正确识别
+- **模块初始化**: 在应用启动时自动初始化
 
 ## 扩展建议
 
@@ -144,5 +163,9 @@ Provider配置通过`TransportProviderConfigManager`管理，支持：
 - 定期监控Token过期和通道健康状态
 
 ---
+
+**开发团队**: Signal Tap模块开发组  
+**最后更新**: 2024年  
+**版本**: v1.0 (生产就绪)
 
 更多详细信息请参考各子目录的README文件。 
