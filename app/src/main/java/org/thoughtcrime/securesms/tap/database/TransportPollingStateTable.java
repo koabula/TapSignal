@@ -83,9 +83,7 @@ public class TransportPollingStateTable extends DatabaseTable {
         "CREATE INDEX IF NOT EXISTS transport_polling_state_recipient_idx ON " + TABLE_NAME + " (" + RECIPIENT_ID + ")",
         "CREATE INDEX IF NOT EXISTS transport_polling_state_provider_idx ON " + TABLE_NAME + " (" + PROVIDER_TYPE + ")",
         "CREATE INDEX IF NOT EXISTS transport_polling_state_last_processed_idx ON " + TABLE_NAME + " (" + LAST_PROCESSED_TIME + ")",
-        "CREATE INDEX IF NOT EXISTS transport_polling_state_errors_idx ON " + TABLE_NAME + " (" + CONSECUTIVE_ERRORS + ", " + LAST_ERROR_TIME + ")",
-        "CREATE INDEX IF NOT EXISTS transport_processed_messages_key_idx ON " + PROCESSED_MESSAGES_TABLE + " (" + PM_DUPLICATION_KEY + ")",
-        "CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx ON " + PROCESSED_MESSAGES_TABLE + " (" + PM_PROCESSED_TIMESTAMP + ")"
+        "CREATE INDEX IF NOT EXISTS transport_polling_state_errors_idx ON " + TABLE_NAME + " (" + CONSECUTIVE_ERRORS + ", " + LAST_ERROR_TIME + ")"
     };
 
     /**

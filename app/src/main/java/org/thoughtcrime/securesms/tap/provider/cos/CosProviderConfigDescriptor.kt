@@ -217,7 +217,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
         }
     }
 
-    override suspend fun testConfig(config: Map<String, Any>): ConfigTestResult {
+    override suspend fun testConfig(config: Map<String, Any>, context: android.content.Context): ConfigTestResult {
         return try {
             Log.i(TAG, "开始测试COS配置连接性")
             
@@ -245,9 +245,9 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 bucketName = config["bucketName"]?.toString() ?: return ConfigTestResult.Failed("缺少存储桶名称")
             )
             
-            // 创建测试客户端（使用tap模块的CosClientFactory）
+            // 创建测试客户端（使用tap模块的CosClientFactory，传入有效的Context）
             val cosClient = try {
-                CosClientFactory.createClient(cosConfig, null)
+                CosClientFactory.createClient(cosConfig, context)
             } catch (e: Exception) {
                 return ConfigTestResult.Failed("无法创建COS客户端", LogSanitizer.sanitizeGeneric(e.message ?: "未知错误"))
             }
@@ -340,9 +340,7 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 
                 // 6. 清理远端测试文件
                 val deleteSuccess = try {
-                    // 使用反射调用deleteFile方法（原始CosClient接口未包含此方法但实现类有）
-                    val deleteMethod = cosClient.javaClass.getMethod("deleteFile", String::class.java)
-                    deleteMethod.invoke(cosClient, uploadPath) as Boolean
+                    cosClient.deleteFile(uploadPath)
                 } catch (e: Exception) {
                     Log.w(TAG, "删除测试文件时出现异常（非致命）: ${LogSanitizer.sanitizeThrowable(e)}")
                     false

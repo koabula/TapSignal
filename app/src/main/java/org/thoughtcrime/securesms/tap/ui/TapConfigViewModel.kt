@@ -68,6 +68,13 @@ class TapConfigViewModel : ViewModel() {
         this.providerManager = TransportProviderManager.getInstance(context)
         this.providerRegistry = ProviderRegistry.getInstance(context)
         
+        // 确保Provider注册中心已初始化（幂等）
+        try {
+            providerRegistry.initialize()
+        } catch (e: Exception) {
+            Log.e(TAG, "初始化ProviderRegistry失败: ${LogSanitizer.sanitizeThrowable(e)}")
+        }
+        
         loadInitialData()
     }
 
@@ -150,11 +157,22 @@ class TapConfigViewModel : ViewModel() {
                 val descriptor = currentState.availableProviders.find { it.type == providerType }?.descriptor
                     ?: return@launch
 
+                // 初始化所有字段的默认值到configValues中
+                val initialConfigValues = mutableMapOf<String, Any>()
+                descriptor.getConfigFields().forEach { field ->
+                    field.defaultValue?.let { defaultValue ->
+                        initialConfigValues[field.key] = defaultValue
+                    }
+                }
+
+                // 计算初始配置的有效性
+                val isInitiallyValid = descriptor.isConfigComplete(initialConfigValues)
+
                 _state.value = currentState.copy(
                     selectedProviderType = providerType,
                     currentProviderDescriptor = descriptor,
-                    configValues = emptyMap(),
-                    isConfigValid = false,
+                    configValues = initialConfigValues,
+                    isConfigValid = isInitiallyValid,
                     testState = ConfigTestState.READY,
                     testResult = null
                 )
@@ -211,7 +229,7 @@ class TapConfigViewModel : ViewModel() {
                 )
 
                 // 执行测试
-                val testResult = descriptor.testConfig(currentState.configValues)
+                val testResult = descriptor.testConfig(currentState.configValues, context)
 
                 // 更新测试结果
                 _state.value = _state.value?.copy(

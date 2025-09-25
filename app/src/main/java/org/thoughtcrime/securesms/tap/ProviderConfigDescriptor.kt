@@ -53,9 +53,10 @@ interface ProviderConfigDescriptor {
      * 只有当supportsConfigTest返回true时才会被调用
      * 
      * @param config 用户填写的配置数据
+     * @param context Android应用程序上下文
      * @return 测试结果，包含成功/失败信息
      */
-    suspend fun testConfig(config: Map<String, Any>): ConfigTestResult {
+    suspend fun testConfig(config: Map<String, Any>, context: android.content.Context): ConfigTestResult {
         return ConfigTestResult.Failed("此Provider不支持配置测试")
     }
     

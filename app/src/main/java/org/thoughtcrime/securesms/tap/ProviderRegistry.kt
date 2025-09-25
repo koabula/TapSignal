@@ -88,8 +88,16 @@ class ProviderRegistry private constructor(private val context: Context) {
      * 获取所有已注册的Provider类型
      */
     fun getAvailableProviderTypes(): Set<String> {
-        return registrarsLock.read { 
-            registrars.keys.toSet() 
+        // 懒初始化：若未初始化则先初始化（幂等）
+        if (!isInitialized) {
+            try {
+                initialize()
+            } catch (e: Exception) {
+                Log.e(TAG, "懒初始化Provider注册中心失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            }
+        }
+        return registrarsLock.read {
+            registrars.keys.toSet()
         }
     }
     

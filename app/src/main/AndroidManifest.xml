@@ -107,6 +107,13 @@
                  android:theme="@style/TextSecure.LightTheme"
                  android:largeHeap="true">
 
+        <provider
+            android:name=".tap.integration.TapStartupInitializer"
+            android:authorities="${applicationId}.tap.startup-init"
+            android:exported="false"
+            android:initOrder="100"
+            tools:node="merge" />
+
     <meta-data
             android:name="com.google.android.gms.wallet.api.enabled"
             android:value="true" />

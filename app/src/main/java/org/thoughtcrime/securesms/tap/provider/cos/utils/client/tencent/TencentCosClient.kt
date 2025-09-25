@@ -7,6 +7,8 @@ import com.tencent.cos.xml.exception.CosXmlServiceException
 import com.tencent.cos.xml.model.`object`.*
 import com.tencent.cos.xml.model.bucket.GetBucketRequest
 import com.tencent.qcloud.core.auth.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
@@ -46,13 +48,15 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         Log.d(TAG, "腾讯云COS客户端初始化完成 - 区域: ${config.region}, 存储桶: ${config.bucketName}")
     }
 
-    override fun createDirectory(directoryPath: String): Boolean {
+    override suspend fun createDirectory(directoryPath: String): Boolean {
         return try {
             val normalized = if (directoryPath.endsWith("/")) directoryPath else "$directoryPath/"
 
             // 在COS中，目录是通过上传一个0字节的对象来创建的
             val putObjectRequest = PutObjectRequest(config.bucketName, normalized, ByteArray(0))
-            val putObjectResult = cosXmlService.putObject(putObjectRequest)
+            val putObjectResult = withContext(Dispatchers.IO) {
+                cosXmlService.putObject(putObjectRequest)
+            }
 
             Log.d(TAG, "创建目录成功: $normalized")
             true
@@ -68,10 +72,12 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun uploadFile(localFile: File, remotePath: String): Boolean {
+    override suspend fun uploadFile(localFile: File, remotePath: String): Boolean {
         return try {
             val putObjectRequest = PutObjectRequest(config.bucketName, remotePath, localFile.absolutePath)
-            val putObjectResult = cosXmlService.putObject(putObjectRequest)
+            val putObjectResult = withContext(Dispatchers.IO) {
+                cosXmlService.putObject(putObjectRequest)
+            }
 
             Log.d(TAG, "上传文件成功: $remotePath")
             true
@@ -87,9 +93,9 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun downloadFile(remotePath: String, localFile: File): Boolean {
+    override suspend fun downloadFile(remotePath: String, localFile: File): Boolean {
         return try {
-            Log.d(TAG, "🔽 开始下载文件:")
+            Log.d(TAG, "开始下载文件:")
             Log.d(TAG, "  - 远程路径: $remotePath")
             Log.d(TAG, "  - 本地文件: ${localFile.absolutePath}")
             Log.d(TAG, "  - 本地文件存在: ${localFile.exists()}")
@@ -99,9 +105,9 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
             localFile.parentFile?.let { parentDir ->
                 if (!parentDir.exists()) {
                     parentDir.mkdirs()
-                    Log.d(TAG, "📁 创建父目录: ${parentDir.absolutePath}")
+                    Log.d(TAG, "创建父目录: ${parentDir.absolutePath}")
                 } else {
-                    Log.d(TAG, "📁 父目录已存在: ${parentDir.absolutePath}")
+                    Log.d(TAG, "父目录已存在: ${parentDir.absolutePath}")
                 }
             }
 
@@ -110,14 +116,14 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
                 if (localFile.isDirectory()) {
                     // 如果是目录，删除整个目录
                     localFile.deleteRecursively()
-                    Log.d(TAG, "🗑️ 删除已存在的目录: ${localFile.absolutePath}")
+                    Log.d(TAG, "删除已存在的目录: ${localFile.absolutePath}")
                 } else {
                     localFile.delete()
-                    Log.d(TAG, "🗑️ 删除已存在的文件: ${localFile.absolutePath}")
+                    Log.d(TAG, "删除已存在的文件: ${localFile.absolutePath}")
                 }
             }
 
-            Log.d(TAG, "📡 调用腾讯云SDK下载:")
+            Log.d(TAG, "调用腾讯云SDK下载:")
             Log.d(TAG, "  - 存储桶: ${config.bucketName}")
             Log.d(TAG, "  - 远程路径: $remotePath")
             Log.d(TAG, "  - 本地路径: ${localFile.absolutePath}")
@@ -125,13 +131,15 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
             // 修复：使用父目录作为下载目录，让SDK自动创建文件
             val downloadDir = localFile.parentFile!!
             val getObjectRequest = GetObjectRequest(config.bucketName, remotePath, downloadDir.absolutePath)
-            val getObjectResult = cosXmlService.getObject(getObjectRequest)
+            val getObjectResult = withContext(Dispatchers.IO) {
+                cosXmlService.getObject(getObjectRequest)
+            }
 
             // SDK会在downloadDir下创建文件，文件名是remotePath的最后一部分
             val fileName = remotePath.substringAfterLast("/")
             val sdkCreatedFile = File(downloadDir, fileName)
 
-            Log.d(TAG, "🔍 SDK创建的文件:")
+            Log.d(TAG, "SDK创建的文件:")
             Log.d(TAG, "  - 预期文件: ${sdkCreatedFile.absolutePath}")
             Log.d(TAG, "  - 文件存在: ${sdkCreatedFile.exists()}")
             Log.d(TAG, "  - 是否为目录: ${sdkCreatedFile.isDirectory()}")
@@ -144,17 +152,17 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
                         localFile.delete()
                     }
                     val renamed = sdkCreatedFile.renameTo(localFile)
-                    Log.d(TAG, "📝 重命名文件: ${if (renamed) "成功" else "失败"}")
+                    Log.d(TAG, "重命名文件: ${if (renamed) "成功" else "失败"}")
                     if (!renamed) {
                         // 如果重命名失败，尝试复制
                         sdkCreatedFile.copyTo(localFile, overwrite = true)
                         sdkCreatedFile.delete()
-                        Log.d(TAG, "📋 复制文件完成")
+                        Log.d(TAG, "复制文件完成")
                     }
                 }
             }
 
-            Log.d(TAG, "✅ 腾讯云SDK下载和文件处理完成，最终检查:")
+            Log.d(TAG, "腾讯云SDK下载和文件处理完成，最终检查:")
             Log.d(TAG, "  - 目标文件存在: ${localFile.exists()}")
             Log.d(TAG, "  - 目标文件大小: ${if (localFile.exists()) localFile.length() else "N/A"}")
             Log.d(TAG, "  - 目标是否为目录: ${localFile.isDirectory()}")
@@ -195,7 +203,7 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun listFiles(directoryPath: String): List<CosFileInfo> {
+    override suspend fun listFiles(directoryPath: String): List<CosFileInfo> {
         return try {
             // 处理路径前缀，移除前导斜杠（如果存在）
             val normalizedPath = if (directoryPath.startsWith("/")) directoryPath.substring(1) else directoryPath
@@ -218,7 +226,9 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
             getBucketRequest.setDelimiter("/")
             getBucketRequest.setMaxKeys(1000)
 
-            val getBucketResult = cosXmlService.getBucket(getBucketRequest)
+            val getBucketResult = withContext(Dispatchers.IO) {
+                cosXmlService.getBucket(getBucketRequest)
+            }
 
             val fileList = mutableListOf<CosFileInfo>()
 
@@ -257,7 +267,7 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun generateTemporaryAccessToken(directoryPath: String, durationMinutes: Int): CosAccessToken {
+    override suspend fun generateTemporaryAccessToken(directoryPath: String, durationMinutes: Int): CosAccessToken {
         return try {
             // 使用腾讯云STS API获取联合身份临时访问凭证
             val host = "sts.tencentcloudapi.com"
@@ -306,7 +316,10 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
                 .build()
 
             val okHttpClient = okhttp3.OkHttpClient()
-            okHttpClient.newCall(request).execute().use { resp ->
+            val resp = withContext(Dispatchers.IO) {
+                okHttpClient.newCall(request).execute()
+            }
+            resp.use { resp ->
                 if (!resp.isSuccessful) {
                     val errorBody = resp.body?.string() ?: "No error body"
                     Log.e(TAG, "STS API请求失败，状态码: ${resp.code}, 响应: $errorBody")
@@ -335,10 +348,12 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun deleteFile(remotePath: String): Boolean {
+    override suspend fun deleteFile(remotePath: String): Boolean {
         return try {
             val deleteObjectRequest = DeleteObjectRequest(config.bucketName, remotePath)
-            val deleteObjectResult = cosXmlService.deleteObject(deleteObjectRequest)
+            val deleteObjectResult = withContext(Dispatchers.IO) {
+                cosXmlService.deleteObject(deleteObjectRequest)
+            }
             
             Log.d(TAG, "删除文件成功: $remotePath")
             true
@@ -354,10 +369,12 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
-    override fun fileExists(remotePath: String): Boolean {
+    override suspend fun fileExists(remotePath: String): Boolean {
         return try {
             val headObjectRequest = HeadObjectRequest(config.bucketName, remotePath)
-            val headObjectResult = cosXmlService.headObject(headObjectRequest)
+            val headObjectResult = withContext(Dispatchers.IO) {
+                cosXmlService.headObject(headObjectRequest)
+            }
             
             Log.d(TAG, "文件存在检查成功: $remotePath")
             true

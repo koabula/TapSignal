@@ -1,5 +1,7 @@
 package org.thoughtcrime.securesms.tap.provider.cos.utils.client.aws
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.*
 import okio.ByteString.Companion.encodeUtf8
 import org.signal.core.util.logging.Log
@@ -16,7 +18,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
 
     private fun endpointHost(): String = "${config.bucketName}.s3.${config.region}.amazonaws.com"
 
-    override fun createDirectory(directoryPath: String): Boolean {
+    override suspend fun createDirectory(directoryPath: String): Boolean {
         // S3 目录本质上是对象, 上传一个 0 字节对象即可
         val normalized = if (directoryPath.endsWith("/")) directoryPath else "$directoryPath/"
         val tmpFile = File.createTempFile("empty", null)
@@ -24,7 +26,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         return uploadFile(tmpFile, normalized)
     }
 
-    override fun uploadFile(localFile: File, remotePath: String): Boolean {
+    override suspend fun uploadFile(localFile: File, remotePath: String): Boolean {
         val requestBody = localFile.readBytes()
         val canonicalUri = "/$remotePath"
         val date = Date()
@@ -50,7 +52,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             .header("Authorization", authorization)
             .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             if (!resp.isSuccessful) {
                 val errorBody = resp.body?.string() ?: "无响应内容"
                 Log.w(TAG, "AWS S3上传失败: code=${resp.code}, message=${resp.message}, path=$remotePath, error=$errorBody")
@@ -59,7 +64,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         }
     }
 
-    override fun downloadFile(remotePath: String, localFile: File): Boolean {
+    override suspend fun downloadFile(remotePath: String, localFile: File): Boolean {
         val canonicalUri = "/$remotePath"
         val date = Date()
         val amzDate = iso8601(date)
@@ -83,7 +88,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             .header("Authorization", authorization)
             .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             if (!resp.isSuccessful) {
                 val errorBody = resp.body?.string() ?: "无响应内容"
                 Log.w(TAG, "AWS S3下载失败: code=${resp.code}, message=${resp.message}, path=$remotePath, error=$errorBody")
@@ -96,7 +104,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         }
     }
 
-    override fun listFiles(directoryPath: String): List<CosFileInfo> {
+    override suspend fun listFiles(directoryPath: String): List<CosFileInfo> {
         val prefix = if (directoryPath.endsWith("/")) directoryPath else "$directoryPath/"
         val query = "list-type=2&prefix=${prefix.encodeUtf8().utf8()}&delimiter=/"
         val canonicalUri = "/"
@@ -120,7 +128,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             .header("x-amz-date", amzDate)
             .header("Authorization", authorization)
             .build()
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             if (!resp.isSuccessful) {
                 Log.w(TAG, "List files failed: ${resp.code}")
                 return emptyList()
@@ -130,7 +141,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         }
     }
 
-    override fun generateTemporaryAccessToken(directoryPath: String, durationMinutes: Int): CosAccessToken {
+    override suspend fun generateTemporaryAccessToken(directoryPath: String, durationMinutes: Int): CosAccessToken {
         // 使用 AWS STS GetSessionToken API
         val date = Date()
         val amzDate = iso8601(date)
@@ -160,7 +171,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
 
         Log.d(TAG, "Requesting STS session token with duration: ${durationMinutes} minutes")
 
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             if (!resp.isSuccessful) {
                 val errorBody = resp.body?.string() ?: "No error body"
                 Log.e(TAG, "STS API failed with code: ${resp.code}, body: $errorBody")
@@ -172,7 +186,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         }
     }
 
-    override fun deleteFile(remotePath: String): Boolean {
+    override suspend fun deleteFile(remotePath: String): Boolean {
         val canonicalUri = "/$remotePath"
         val date = Date()
         val amzDate = iso8601(date)
@@ -196,7 +210,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             .header("Authorization", authorization)
             .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             if (!resp.isSuccessful) {
                 Log.w(TAG, "Delete failed: ${resp.code}")
                 return false
@@ -205,7 +222,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
         }
     }
 
-    override fun fileExists(remotePath: String): Boolean {
+    override suspend fun fileExists(remotePath: String): Boolean {
         val canonicalUri = "/$remotePath"
         val date = Date()
         val amzDate = iso8601(date)
@@ -229,7 +246,10 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             .header("Authorization", authorization)
             .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
+        val resp = withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute()
+        }
+        resp.use { resp ->
             return resp.isSuccessful
         }
     }
