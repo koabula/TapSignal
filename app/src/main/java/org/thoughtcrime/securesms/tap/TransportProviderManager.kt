@@ -101,10 +101,11 @@ class TransportProviderManager private constructor(private val context: Context)
      * 注册Provider实例
      */
     fun registerProvider(provider: TransportProvider) {
+        val normalizedProviderType = provider.providerType.lowercase()
         providerLock.write {
-            providers[provider.providerType] = provider
-            providerStatus[provider.providerType] = ProviderStatusInfo(
-                providerType = provider.providerType,
+            providers[normalizedProviderType] = provider
+            providerStatus[normalizedProviderType] = ProviderStatusInfo(
+                providerType = normalizedProviderType,
                 isActive = true,
                 lastCheckTime = System.currentTimeMillis(),
                 errorCount = 0
@@ -117,8 +118,9 @@ class TransportProviderManager private constructor(private val context: Context)
      * 获取Provider实例
      */
     fun getProvider(providerType: String): TransportProvider? {
+        val normalizedProviderType = providerType.lowercase()
         return providerLock.read {
-            providers[providerType]
+            providers[normalizedProviderType]
         }
     }
     
@@ -144,33 +146,54 @@ class TransportProviderManager private constructor(private val context: Context)
     }
     
     /**
+     * 检查指定Provider是否已注册
+     */
+    fun isProviderRegistered(providerType: String): Boolean {
+        return providerLock.read {
+            providers.containsKey(providerType)
+        }
+    }
+    
+    /**
+     * 检查指定Provider是否可用（已注册且活跃）
+     */
+    fun isProviderAvailable(providerType: String): Boolean {
+        return providerLock.read {
+            val provider = providers[providerType]
+            val status = providerStatus[providerType]
+            provider != null && status?.isActive == true
+        }
+    }
+    
+    /**
      * 创建Provider实例
      */
     suspend fun createProvider(providerType: String, config: Map<String, Any>): TransportProvider? {
+        val normalizedProviderType = providerType.lowercase()
         return withContext(Dispatchers.IO) {
             try {
-                val factory = findSuitableFactory(providerType)
+                val factory = findSuitableFactory(normalizedProviderType)
                 if (factory == null) {
-                    Log.w(TAG, "未找到支持Provider类型的工厂: $providerType")
+                    Log.w(TAG, "未找到支持Provider类型的工厂: $normalizedProviderType")
                     return@withContext null
                 }
                 
-                val provider = factory.createProvider(providerType, config)
+                val provider = factory.createProvider(normalizedProviderType, config)
                 if (provider != null) {
                     providerLock.write {
-                        providers[providerType] = provider
-                        providerStatus[providerType] = ProviderStatusInfo(
-                            providerType = providerType,
+                        providers[normalizedProviderType] = provider
+                        providerStatus[normalizedProviderType] = ProviderStatusInfo(
+                            providerType = normalizedProviderType,
                             isActive = true,
                             lastCheckTime = System.currentTimeMillis()
                         )
                     }
-                    Log.i(TAG, "成功创建Provider: $providerType")
+                    Log.i(TAG, "成功创建Provider: $normalizedProviderType")
                 }
                 
                 provider
             } catch (e: Exception) {
-                Log.e(TAG, "创建Provider失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
+                Log.e(TAG, "创建Provider失败: $normalizedProviderType - ${LogSanitizer.sanitizeThrowable(e)}")
                 null
             }
         }
@@ -300,16 +323,29 @@ class TransportProviderManager private constructor(private val context: Context)
             val configManager = TransportProviderConfigManager.getInstance(context)
             val enabledProviders = configManager.getEnabledProviders()
             
-            Log.d(TAG, "开始加载已配置的Provider: $enabledProviders")
+            Log.d(TAG, "开始加载已配置的Provider，启用的Provider: $enabledProviders")
             
+            var successCount = 0
             for (providerType in enabledProviders) {
                 val config = configManager.getProviderConfig(providerType)
                 if (config != null) {
-                    createProvider(providerType, config)
+                    Log.d(TAG, "为Provider加载配置: $providerType")
+                    val provider = createProvider(providerType, config)
+                    if (provider != null) {
+                        successCount++
+                        Log.i(TAG, "Provider加载成功: $providerType")
+                    } else {
+                        Log.w(TAG, "Provider创建失败: $providerType")
+                    }
                 } else {
                     Log.w(TAG, "Provider配置不存在: $providerType")
                 }
             }
+            
+            // 输出最终加载结果
+            val loadedProviders = providers.keys.toList()
+            Log.i(TAG, "Provider加载完成，成功加载: $successCount/${enabledProviders.size}，已加载Provider: $loadedProviders")
+            
         } catch (e: Exception) {
             Log.e(TAG, "加载已配置Provider失败: ${LogSanitizer.sanitizeThrowable(e)}")
         }
@@ -320,9 +356,37 @@ class TransportProviderManager private constructor(private val context: Context)
      */
     private fun findSuitableFactory(providerType: String): TransportProviderFactory? {
         return providerLock.read {
-            providerFactories.values.find { factory ->
+            // 首先尝试查找现有工厂
+            var factory = providerFactories.values.find { factory ->
                 factory.supportedProviderTypes.contains(providerType)
             }
+            
+            // 如果找不到工厂，尝试重新注册默认工厂
+            if (factory == null) {
+                Log.w(TAG, "未找到支持Provider类型的工厂: $providerType，尝试重新初始化默认工厂")
+                
+                // 在写锁中重新注册默认工厂
+                providerLock.write {
+                    val defaultFactory = DefaultTransportProviderFactory(context)
+                    providerFactories["default"] = defaultFactory
+                    
+                    Log.d(TAG, "重新注册默认工厂，支持的Provider类型: ${defaultFactory.supportedProviderTypes}")
+                    
+                    // 再次查找
+                    factory = providerFactories.values.find { f ->
+                        f.supportedProviderTypes.contains(providerType)
+                    }
+                    
+                    if (factory != null) {
+                        Log.i(TAG, "重新注册默认工厂后找到支持的工厂: $providerType")
+                    } else {
+                        Log.e(TAG, "重新注册默认工厂后仍未找到支持的工厂: $providerType")
+                        Log.d(TAG, "当前所有工厂支持的类型: ${providerFactories.values.flatMap { it.supportedProviderTypes }}")
+                    }
+                }
+            }
+            
+            factory
         }
     }
 }

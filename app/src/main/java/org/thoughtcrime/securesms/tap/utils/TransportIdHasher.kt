@@ -53,7 +53,7 @@ object TransportIdHasher {
             val aci = ServiceId.ACI.parseOrThrow(aciString)
             hashAci(aci)
         } catch (e: Exception) {
-            Log.w(TAG, "解析ACI字符串失败，使用直接哈希: ${LogSanitizer.sanitize(aciString)}", e)
+            Log.d(TAG, "ACI字符串格式转换，使用安全哈希: ${LogSanitizer.sanitize(aciString)}")
             generateSecureHash(aciString)
         }
     }

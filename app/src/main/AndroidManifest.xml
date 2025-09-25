@@ -1384,6 +1384,15 @@
         </intent-filter>
     </receiver>
 
+    <receiver android:name=".tap.integration.TapTokenExchangeReceiver"
+              android:enabled="true"
+              android:exported="false">
+        <intent-filter>
+            <action android:name="ACCEPT_TOKEN_EXCHANGE"/>
+            <action android:name="REJECT_TOKEN_EXCHANGE"/>
+        </intent-filter>
+    </receiver>
+
     <receiver
         android:name=".service.PanicResponderListener"
         android:exported="true">

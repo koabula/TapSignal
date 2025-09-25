@@ -1,0 +1,63 @@
+--------- beginning of main
+--------- beginning of system
+2025-09-25 19:39:35.296  5870-5904  MessageProcessorV2      org.thoughtcrime.securesms           I  [1758800374501] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=922
+2025-09-25 19:39:35.297  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=922
+2025-09-25 19:39:35.301  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
+2025-09-25 19:39:35.386  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token提供请求: senderId=RecipientId::8, providerType=cos
+2025-09-25 19:39:35.392  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  收到Token交换请求: senderId=RecipientId::8, senderName=koalaawang, providerType=cos
+2025-09-25 19:39:35.403  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1758800362956-2547-1758800362956","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKID52mLitsfHhvxoUwCIExSmS3KQL4at1yi","secretAccessKey":"b3IK9nHZeWDhy3wc6NTN4Zu41qTvCF5k","region":"ap-nanjing","bucketName":"newsignal1-1316759135","cloudProvider":"TENCENT"}
+2025-09-25 19:39:35.438  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  Token交换确认通知已显示: senderId=RecipientId::8, senderName=koalaawang
+2025-09-25 19:39:35.445  5870-5904  MessageProcessorV2      org.thoughtcrime.securesms           I  [1758800374501] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
+2025-09-25 19:39:39.998  5870-5870  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  收到Token交换操作: action=ACCEPT_TOKEN_EXCHANGE
+2025-09-25 19:39:39.998  5870-5870  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  用户接受Token交换请求: senderId=RecipientId::8
+2025-09-25 19:39:40.106  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  接收Token保存成功: senderId=RecipientId::8, senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, tokenId=cos-signal-cos-signal-v2-1758800362956-2547-1758800362956
+2025-09-25 19:39:40.107  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始生成响应Token: senderId=RecipientId::8
+2025-09-25 19:39:40.148  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：Provider列表为空，强制重新初始化
+2025-09-25 19:39:40.151  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
+2025-09-25 19:39:40.160  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
+2025-09-25 19:39:40.164  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           W  Provider不存在，尝试按需创建: cos
+2025-09-25 19:39:40.168  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
+2025-09-25 19:39:40.174  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  找到Provider配置，尝试通过ProviderRegistry创建实例: cos
+2025-09-25 19:39:40.193  5870-5904  ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-25 19:39:40.198  5870-5904  ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-25 19:39:40.208  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  找到Provider注册器: cos
+2025-09-25 19:39:40.245  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  通过ProviderRegistry创建Provider成功: cos
+2025-09-25 19:39:48.830  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  响应Token生成成功: tokenId=cos-signal-cos-signal-v2-1758800380256-8907-1758800380256
+2025-09-25 19:39:48.867  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始发送Token交换响应: senderId=RecipientId::8
+2025-09-25 19:39:48.869  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  发送响应消息目标: targetAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=RecipientId::8
+2025-09-25 19:39:49.010  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  Token交换响应已发送: senderId=RecipientId::8
+2025-09-25 19:39:49.042  5870-5904  IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=1125
+2025-09-25 19:39:49.139  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientId=RecipientId::8
+2025-09-25 19:39:49.143  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
+2025-09-25 19:39:49.148  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
+2025-09-25 19:39:50.213  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientId=RecipientId::8
+2025-09-25 19:39:50.235  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
+2025-09-25 19:39:50.237  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
+2025-09-25 19:39:50.365   791-829   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@48ddbd TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=843 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=138405682 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@fc42fb2} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{2bcbb03 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+2025-09-25 19:39:51.381   573-596   WindowManager           system_server                        V  Sent Transition #476 createdAt=09-25 11:39:50.354 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=843 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=138405682 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{c1a17ea Task{24604e1 #843 type=standard A=10194:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{9c951a1 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+--------- beginning of kernel
+
+
+--------- beginning of main
+--------- beginning of system
+2025-09-25 19:39:22.542  6924-6960  TransportChannelManager org.thoughtcrime.securesms           I  初始化通道管理器...
+2025-09-25 19:39:22.543  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  开始从数据库恢复通道状态...
+2025-09-25 19:39:22.617  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道状态恢复完成，恢复 13 个通道
+2025-09-25 19:39:22.618  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  重启通道清理任务
+2025-09-25 19:39:22.619  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  停止通道清理任务
+2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  启动通道清理任务，间隔: 3600000ms
+2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  停止通道清理任务
+2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  启动通道清理任务，间隔: 3600000ms
+2025-09-25 19:39:22.621  6924-6960  TransportChannelManager org.thoughtcrime.securesms           I  通道管理器初始化完成
+--------- beginning of kernel
+2025-09-25 19:39:34.408  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  创建通道: recipientId=********-****-****-****-*********461
+2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  解析Token信息成功: providerType=cos, tokenId=cos-*************************************************2956
+2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  处理包含完整token数据的通道创建请求
+2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  创建通道元数据: recipientId=********-****-****-****-*********461, providerType=cos
+2025-09-25 19:39:34.419  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=a3adde1ba3b08264, peerHashedId=053abb43f297ee1d, mySendPath=/outbox/053abb43f297ee1d/text/, peerReceivePath=/outbox/a3adde1ba3b08264/text/
+2025-09-25 19:39:34.425  6924-6960  TransportChannelManager org.thoughtcrime.securesms           V  保存通道到数据库成功: ch_********-****-****-****-*********461_cos_1758800374419
+2025-09-25 19:39:34.456  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  建立通道: ch_********-****-****-****-*********461_cos_1758800374419, 接收者: ********-****-****-****-*********461, 提供者: cos
+2025-09-25 19:39:34.456  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道创建成功: channelId=ch_********-****-****-****-*********461_cos_1758800374419
+2025-09-25 19:39:34.908  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道健康检查通过，状态更新为: FULL_ACTIVE, channelId: ch_********-****-****-****-*********461_cos_1758800374419
+2025-09-25 19:39:49.499  6924-6960  TransportChannelManager org.thoughtcrime.securesms           W  通道状态不支持升级: channelId=ch_********-****-****-****-*********461_cos_1758800374419, currentStatus=ESTABLISHING, recipientId=********-****-****-****-*********461
+2025-09-25 19:39:49.500  6924-6960  TransportChannelManager org.thoughtcrime.securesms           W  未找到可升级的通道: recipientId=********-****-****-****-*********461, providerType=cos, 检查了1个通道

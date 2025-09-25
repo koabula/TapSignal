@@ -55,20 +55,29 @@ class ProviderRegistry private constructor(private val context: Context) {
     fun initialize(): Boolean {
         return try {
             if (isInitialized) {
-                Log.d(TAG, "Provider注册中心已初始化")
-                return true
+                Log.d(TAG, "Provider注册中心已初始化，验证注册器状态")
+                
+                // 即使已初始化，也验证注册器是否正确加载
+                if (registrars.isEmpty()) {
+                    Log.w(TAG, "Provider注册中心已标记为初始化，但注册器列表为空，强制重新初始化")
+                    isInitialized = false
+                } else {
+                    Log.d(TAG, "Provider注册中心验证通过，已注册Provider类型: ${registrars.keys}")
+                    return true
+                }
             }
             
             Log.i(TAG, "开始初始化Provider注册中心")
             
             // 发现并注册所有可用的providers
             val discoveredProviders = discoverProviders()
-            Log.i(TAG, "发现了 ${discoveredProviders.size} 个provider")
+            Log.i(TAG, "发现了 ${discoveredProviders.size} 个provider: ${discoveredProviders.map { it.type }}")
             
             var successCount = 0
             discoveredProviders.forEach { providerInfo ->
                 if (registerProviderFromInfo(providerInfo)) {
                     successCount++
+                    Log.d(TAG, "注册provider成功: ${providerInfo.type}")
                 } else {
                     Log.w(TAG, "注册provider失败: ${providerInfo.type}")
                 }
@@ -76,6 +85,7 @@ class ProviderRegistry private constructor(private val context: Context) {
             
             isInitialized = true
             Log.i(TAG, "Provider注册中心初始化完成，成功注册了 $successCount 个provider")
+            Log.d(TAG, "最终注册的Provider类型: ${registrars.keys}")
             
             true
         } catch (e: Exception) {
@@ -266,11 +276,14 @@ class ProviderRegistry private constructor(private val context: Context) {
      */
     private fun registerProviderFromInfo(providerInfo: ProviderInfo): Boolean {
         return try {
-            Log.d(TAG, "尝试注册provider: ${providerInfo.type}")
+            Log.d(TAG, "尝试注册provider: ${providerInfo.type}, 注册器类: ${providerInfo.registrarClass}")
             
             // 通过反射创建注册器实例
             val registrarClass = Class.forName(providerInfo.registrarClass)
+            Log.d(TAG, "成功加载注册器类: ${providerInfo.registrarClass}")
+            
             val registrar = registrarClass.getDeclaredConstructor().newInstance() as ProviderRegistrar
+            Log.d(TAG, "成功创建注册器实例: ${providerInfo.type}")
             
             // 验证provider类型匹配
             if (registrar.providerType.lowercase() != providerInfo.type.lowercase()) {
@@ -298,6 +311,8 @@ class ProviderRegistry private constructor(private val context: Context) {
                     dependencies = registrar.getDependencies()
                 )
                 providerMetadata[key] = metadata
+                
+                Log.d(TAG, "Provider注册到注册表: key=$key, 显示名称=${metadata.displayName}")
             }
             
             Log.i(TAG, "成功注册provider: ${providerInfo.type}")

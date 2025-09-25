@@ -28,7 +28,8 @@ object CosClientFactory {
         bucketName: String,
         accessKeyId: String,
         secretAccessKey: String,
-        sessionToken: String?
+        sessionToken: String?,
+        context: Context? = null
     ): CosClient {
         val cosProvider = when (provider.uppercase()) {
             "AWS" -> CosConfig.Provider.AWS
@@ -45,6 +46,6 @@ object CosClientFactory {
             sessionToken = sessionToken
         )
 
-        return createClient(config, null)
+        return createClient(config, context)
     }
 } 

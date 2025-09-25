@@ -35,7 +35,26 @@ class DefaultTransportProviderFactory(
     }
     
     override val supportedProviderTypes: Set<String>
-        get() = providerRegistry.getAvailableProviderTypes()
+        get() {
+            try {
+                // 确保ProviderRegistry已初始化
+                if (!providerRegistry.initialize()) {
+                    Log.w(TAG, "ProviderRegistry初始化失败")
+                }
+                
+                val types = providerRegistry.getAvailableProviderTypes()
+                Log.d(TAG, "获取支持的Provider类型: $types")
+                
+                if (types.isEmpty()) {
+                    Log.w(TAG, "支持的Provider类型为空，可能存在初始化问题")
+                }
+                
+                return types
+            } catch (e: Exception) {
+                Log.e(TAG, "获取支持的Provider类型失败: ${LogSanitizer.sanitizeThrowable(e)}")
+                return emptySet()
+            }
+        }
     
     override fun createProvider(providerType: String, config: Map<String, Any>): TransportProvider? {
         return try {

@@ -62,7 +62,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
         return messageBody.startsWith("TAP_MSG:") || 
                messageBody.startsWith("TAP_REQ:") || 
                messageBody.startsWith("TAP_RESP:") ||
-               messageBody.startsWith("TAP_REVOKE:")
+               messageBody.startsWith("TAP_REVOKE:") ||
+               org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.isTapTokenExchangeMessage(messageBody)
     }
     
     /**
@@ -72,7 +73,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
      * @param messageBody 消息体
      * @return 处理结果
      */
-    suspend fun processTapMessage(senderId: String, messageBody: String): TapProcessResult {
+    suspend fun processTapMessage(senderId: org.thoughtcrime.securesms.recipients.RecipientId, messageBody: String): TapProcessResult {
         Log.i(TAG, "处理Tap传输层控制消息: senderId=$senderId, bodyLength=${messageBody.length}")
         
         return try {
@@ -88,6 +89,9 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 }
                 messageBody.startsWith("TAP_MSG:") -> {
                     processControlMessage(senderId, messageBody.substring(8))
+                }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.isTapTokenExchangeMessage(messageBody) -> {
+                    processTokenExchangeMessage(senderId, messageBody)
                 }
                 else -> {
                     Log.w(TAG, "未知的Tap控制消息类型: senderId=$senderId")
@@ -200,7 +204,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
     /**
      * 处理传输通道请求
      */
-    private suspend fun processChannelRequest(senderId: String, requestData: String): TapProcessResult {
+    private suspend fun processChannelRequest(senderId: org.thoughtcrime.securesms.recipients.RecipientId, requestData: String): TapProcessResult {
         Log.i(TAG, "处理传输通道请求: senderId=$senderId")
         
         return try {
@@ -212,9 +216,9 @@ class TapMessageProcessor private constructor(private val context: Context) {
             }
             
             // 检查是否已有活跃通道
-            if (channelManager.hasActiveChannel(senderId)) {
+            if (channelManager.hasActiveChannel(senderId.toString())) {
                 Log.i(TAG, "已存在活跃通道，更新配置: senderId=$senderId")
-                val updated = channelManager.updateChannelConfig(senderId, requestInfo.config)
+                val updated = channelManager.updateChannelConfig(senderId.toString(), requestInfo.config)
                 if (updated) {
                     TapProcessResult.Success("通道配置已更新")
                 } else {
@@ -227,7 +231,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().writeValueAsString(it)
                 } ?: ""
                 val channelResult = channelManager.createChannel(
-                    recipientId = senderId,
+                    recipientId = senderId.toString(),
                     config = requestInfo.config,
                     token = tokenString
                 )
@@ -248,7 +252,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
     /**
      * 处理传输通道响应
      */
-    private suspend fun processChannelResponse(senderId: String, responseData: String): TapProcessResult {
+    private suspend fun processChannelResponse(senderId: org.thoughtcrime.securesms.recipients.RecipientId, responseData: String): TapProcessResult {
         Log.i(TAG, "处理传输通道响应: senderId=$senderId")
         
         return try {
@@ -265,14 +269,14 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     
                     if (responseInfo.token != null) {
                         // 存储对方提供的Token
-                        val addResult = tokenPool.addReceivedToken(senderId, responseInfo.token)
+                        val addResult = tokenPool.addReceivedToken(senderId.toString(), responseInfo.token)
                         if (!addResult) {
                             Log.w(TAG, "添加接收Token失败: senderId=$senderId")
                         }
                     }
                     
                     // 由于activateChannel是私有方法，使用公开的updateChannelConfig激活通道
-                    val updated = channelManager.updateChannelConfig(senderId, TransportChannelConfig())
+                    val updated = channelManager.updateChannelConfig(senderId.toString(), TransportChannelConfig())
                     if (updated) {
                         TapProcessResult.Success("传输通道已激活")
                     } else {
@@ -301,7 +305,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
     /**
      * 处理传输通道撤销
      */
-    private suspend fun processChannelRevoke(senderId: String, revokeData: String): TapProcessResult {
+    private suspend fun processChannelRevoke(senderId: org.thoughtcrime.securesms.recipients.RecipientId, revokeData: String): TapProcessResult {
         Log.i(TAG, "处理传输通道撤销: senderId=$senderId")
         
         return try {
@@ -312,15 +316,18 @@ class TapMessageProcessor private constructor(private val context: Context) {
             }
             
             // 关闭相关通道
-            val channels = channelManager.getActiveChannels(senderId)
-            var closed = 0
-            for (channel in channels) {
-                if (channelManager.closeChannel(channel.channelId)) {
-                    closed++
+            val senderAci = recipientIdToAci(senderId)
+            if (senderAci != null) {
+                val channels = channelManager.getActiveChannels(senderAci)
+                var closed = 0
+                for (channel in channels) {
+                    if (channelManager.closeChannel(channel.channelId)) {
+                        closed++
+                    }
                 }
-            }
-            if (closed > 0) {
-                Log.i(TAG, "已关闭通道数量: $closed, senderId=$senderId")
+                if (closed > 0) {
+                    Log.i(TAG, "已关闭通道数量: $closed, senderId=$senderId")
+                }
             }
             
             // 移除相关Token（遍历所有可用的Provider类型）
@@ -330,8 +337,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
             
             for (provider in availableProviders) {
                 val providerType = provider.providerType
-                val token = tokenPool.getValidReceivedToken(senderId, providerType)
-                if (token != null && tokenPool.removeToken(senderId, providerType)) {
+                val token = tokenPool.getValidReceivedToken(senderId.toString(), providerType)
+                if (token != null && tokenPool.removeToken(senderId.toString(), providerType)) {
                     removed++
                 }
             }
@@ -350,8 +357,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
     /**
      * 处理控制消息
      */
-    private suspend fun processControlMessage(senderId: String, controlData: String): TapProcessResult {
-        Log.i(TAG, "处理控制消息: senderId=$senderId")
+    private suspend fun processControlMessage(senderId: org.thoughtcrime.securesms.recipients.RecipientId, controlData: String): TapProcessResult {
+        Log.d(TAG, "处理控制消息: senderId=$senderId")
         
         return try {
             val controlInfo = parseControlMessage(controlData)
@@ -365,11 +372,14 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     // 心跳消息
                     Log.d(TAG, "收到心跳消息: senderId=$senderId")
                     // 通过更新通道配置来刷新最后访问时间
-                    val channels = channelManager.getActiveChannels(senderId)
-                    for (channel in channels) {
-                        // 使用默认配置来刷新通道
-                        val defaultConfig = TransportChannelConfig()
-                        channelManager.updateChannelConfig(senderId, defaultConfig)
+                    val senderAci = recipientIdToAci(senderId)
+                    if (senderAci != null) {
+                        val channels = channelManager.getActiveChannels(senderAci)
+                        for (channel in channels) {
+                            // 使用默认配置来刷新通道
+                            val defaultConfig = TransportChannelConfig()
+                            channelManager.updateChannelConfig(senderAci, defaultConfig)
+                        }
                     }
                     TapProcessResult.Success("心跳处理完成")
                 }
@@ -390,6 +400,195 @@ class TapMessageProcessor private constructor(private val context: Context) {
             Log.e(TAG, "处理控制消息异常: senderId=$senderId", e)
             TapProcessResult.Failed("处理异常: ${e.message}")
         }
+    }
+    
+    /**
+     * 处理Token交换消息
+     */
+    private suspend fun processTokenExchangeMessage(senderId: org.thoughtcrime.securesms.recipients.RecipientId, messageBody: String): TapProcessResult {
+        Log.i(TAG, "处理Token交换消息: senderId=$senderId")
+        
+        return try {
+            val tokenExchangeMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.decode(messageBody)
+            if (tokenExchangeMessage == null) {
+                Log.w(TAG, "无法解析Token交换消息: senderId=$senderId")
+                return TapProcessResult.Failed("无法解析Token交换消息")
+            }
+            
+            when (tokenExchangeMessage.requestType) {
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER -> {
+                    // 处理Token交换请求（A发送给B）
+                    processTokenOffer(senderId, tokenExchangeMessage)
+                }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT -> {
+                    // 处理Token交换接受（B发送给A）
+                    processTokenAccept(senderId, tokenExchangeMessage)
+                }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM -> {
+                    // 处理Token交换确认（A发送给B）
+                    processTokenConfirm(senderId, tokenExchangeMessage)
+                }
+                else -> {
+                    Log.w(TAG, "未知的Token交换类型: ${tokenExchangeMessage.requestType}")
+                    TapProcessResult.Failed("未知的Token交换类型")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "处理Token交换消息异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 处理Token提供请求（A发送给B的请求）
+     */
+    private suspend fun processTokenOffer(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
+        Log.i(TAG, "处理Token提供请求: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+        
+        return withContext(Dispatchers.Main) {
+            try {
+                // 显示确认对话框给用户
+                showTokenExchangeConfirmDialog(senderId, tokenExchangeMessage)
+                TapProcessResult.Success("Token交换确认对话框已显示")
+            } catch (e: Exception) {
+                Log.e(TAG, "显示Token交换确认对话框失败", e)
+                TapProcessResult.Failed("显示确认对话框失败: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * 处理Token接受回应（B发送给A的回应）
+     */
+    private suspend fun processTokenAccept(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
+        Log.i(TAG, "处理Token接受回应: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+        
+        return try {
+            // 将RecipientId转换为ACI作为统一键
+            val senderAci = recipientIdToAci(senderId)
+            if (senderAci == null) {
+                Log.w(TAG, "无法获取发送者ACI: senderId=$senderId")
+                return TapProcessResult.Failed("无法获取发送者ACI")
+            }
+            
+            // 将对方的Token保存到TokenPool，使用ACI作为键
+            val peerToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(tokenExchangeMessage.tokenData)
+            if (peerToken == null) {
+                Log.w(TAG, "无法解析对方Token: senderId=$senderId")
+                return TapProcessResult.Failed("无法解析对方Token")
+            }
+            
+            val saved = tokenPool.addReceivedToken(senderAci, peerToken)
+            if (!saved) {
+                Log.w(TAG, "保存对方Token失败: senderId=$senderId, senderAci=$senderAci")
+                return TapProcessResult.Failed("保存对方Token失败")
+            }
+            
+            Log.i(TAG, "已保存对方Token: senderId=$senderId, senderAci=$senderAci, tokenId=${peerToken.tokenId}")
+            
+            // 更新通道状态为FULL_ACTIVE，使用ACI作为键
+            val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
+            if (upgraded) {
+                Log.i(TAG, "通道成功升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                
+                // 发送确认消息给B端，通知其也升级通道
+                try {
+                    sendTapConfirmationMessage(senderAci, tokenExchangeMessage.providerType)
+                    Log.i(TAG, "已发送Tap确认消息: senderAci=$senderAci")
+                } catch (e: Exception) {
+                    Log.e(TAG, "发送Tap确认消息失败: senderAci=$senderAci", e)
+                }
+                
+                // 插入v2 mode启用提示消息
+                insertV2ModeEnabledMessage(senderId)
+                
+            } else {
+                Log.w(TAG, "通道升级失败: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+            }
+            
+            TapProcessResult.Success("Token交换完成，通道已升级")
+        } catch (e: Exception) {
+            Log.e(TAG, "处理Token接受回应异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 显示Token交换确认对话框
+     * 使用通知方式显示，用户可以确认或拒绝Token交换请求
+     */
+    private fun showTokenExchangeConfirmDialog(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage) {
+        // 获取发送者信息
+        val senderRecipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+        val senderName = senderRecipient.getDisplayName(context)
+        
+        Log.i(TAG, "收到Token交换请求: senderId=$senderId, senderName=$senderName, providerType=${tokenExchangeMessage.providerType}")
+        Log.i(TAG, "Token数据: ${org.thoughtcrime.securesms.util.JsonUtils.toJson(tokenExchangeMessage.tokenData)}")
+        
+        // 显示确认通知
+        showTokenExchangeNotification(senderId, senderName, tokenExchangeMessage)
+    }
+    
+    /**
+     * 显示Token交换确认通知
+     */
+    private fun showTokenExchangeNotification(senderId: org.thoughtcrime.securesms.recipients.RecipientId, senderName: String, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage) {
+        val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        
+        // 创建通知渠道（如果不存在）
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "tap_token_exchange",
+                "Tap Token Exchange",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Token交换请求通知"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        // 创建确认按钮的Intent
+        val acceptIntent = android.content.Intent(context, TapTokenExchangeReceiver::class.java).apply {
+            action = "ACCEPT_TOKEN_EXCHANGE"
+            putExtra("senderId", senderId.toString())
+            putExtra("tokenExchangeMessage", org.thoughtcrime.securesms.util.JsonUtils.toJson(tokenExchangeMessage))
+        }
+        val acceptPendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            (senderId.toString() + "accept").hashCode(),
+            acceptIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        // 创建拒绝按钮的Intent
+        val rejectIntent = android.content.Intent(context, TapTokenExchangeReceiver::class.java).apply {
+            action = "REJECT_TOKEN_EXCHANGE"
+            putExtra("senderId", senderId.toString())
+        }
+        val rejectPendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            (senderId.toString() + "reject").hashCode(),
+            rejectIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        // 构建通知
+        val notification = androidx.core.app.NotificationCompat.Builder(context, "tap_token_exchange")
+            .setSmallIcon(org.thoughtcrime.securesms.R.drawable.ic_notification)
+            .setContentTitle("Tap v2模式请求")
+            .setContentText("$senderName 想要与您建立v2模式传输通道")
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle()
+                .bigText("$senderName 想要与您建立v2模式传输通道。这将允许消息通过${tokenExchangeMessage.providerType}传输层发送，而不是通过Signal服务器。"))
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .addAction(org.thoughtcrime.securesms.R.drawable.v2_media_check, "接受", acceptPendingIntent)
+            .addAction(org.thoughtcrime.securesms.R.drawable.symbol_x_white_24, "拒绝", rejectPendingIntent)
+            .build()
+        
+        // 显示通知
+        notificationManager.notify(senderId.toString().hashCode(), notification)
+        
+        Log.i(TAG, "Token交换确认通知已显示: senderId=$senderId, senderName=$senderName")
     }
     
     /**
@@ -648,6 +847,123 @@ class TapMessageProcessor private constructor(private val context: Context) {
             Log.w(TAG, "调度后处理任务失败: messageId=${insertResult.messageId}", e)
         }
     }
+
+/**
+ * 将RecipientId转换为ACI字符串
+ */
+private fun recipientIdToAci(recipientId: org.thoughtcrime.securesms.recipients.RecipientId): String? {
+    return try {
+        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
+        recipient.requireAci().toString()
+    } catch (e: Exception) {
+        Log.e(TAG, "无法从RecipientId获取ACI: $recipientId", e)
+        null
+    }
+}
+
+/**
+ * 发送Tap确认消息
+ */
+private suspend fun sendTapConfirmationMessage(recipientAci: String, providerType: String) {
+    withContext(Dispatchers.IO) {
+        try {
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            val serviceId = org.whispersystems.signalservice.api.push.ServiceId.ACI.parseOrThrow(recipientAci)
+            val recipient = org.thoughtcrime.securesms.recipients.Recipient.externalPush(serviceId)
+            
+            val confirmMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
+                senderAci = myAci,
+                providerType = providerType,
+                tokenData = emptyMap(), // 确认消息不需要token数据
+                metadata = mapOf(
+                    "confirmationType" to "channel_upgrade",
+                    "timestamp" to System.currentTimeMillis()
+                ),
+                requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM
+            )
+            
+            val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(confirmMessage)
+            val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
+                threadRecipient = recipient,
+                sentTimeMillis = System.currentTimeMillis(),
+                expiresIn = 0,
+                tokenExchangeData = encodedMessage
+            )
+            
+            // 通过Signal Server发送确认消息
+            val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+            val messageId = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertMessageOutbox(outgoingMessage, threadId, false, null)
+            if (messageId > 0) {
+                org.thoughtcrime.securesms.jobs.IndividualSendJob.enqueue(context, org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager, messageId, recipient, false)
+                Log.i(TAG, "Tap确认消息已加入发送队列: messageId=$messageId")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "发送Tap确认消息异常", e)
+            throw e
+        }
+    }
+}
+
+/**
+ * 处理Token交换确认（A发送给B的确认）
+ */
+private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
+    Log.i(TAG, "处理Token交换确认: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+    
+    return try {
+        val senderAci = recipientIdToAci(senderId)
+        if (senderAci == null) {
+            Log.w(TAG, "无法获取发送者ACI: senderId=$senderId")
+            return TapProcessResult.Failed("无法获取发送者ACI")
+        }
+        
+        // B端收到A的确认消息，将自己的通道升级为FULL_ACTIVE
+        val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
+        if (upgraded) {
+            Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+            
+            // 插入v2 mode启用提示消息
+            insertV2ModeEnabledMessage(senderId)
+            
+        } else {
+            Log.w(TAG, "收到确认消息但通道升级失败: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+        }
+        
+        TapProcessResult.Success("Token交换确认处理完成")
+    } catch (e: Exception) {
+        Log.e(TAG, "处理Token交换确认异常: senderId=$senderId", e)
+        TapProcessResult.Failed("处理异常: ${e.message}")
+    }
+}
+
+/**
+ * 插入v2 mode启用提示消息
+ */
+private suspend fun insertV2ModeEnabledMessage(recipientId: org.thoughtcrime.securesms.recipients.RecipientId) {
+    withContext(Dispatchers.IO) {
+        try {
+            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
+            val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+            
+            // 创建系统提示消息 - 使用Profile名称变更消息的方式
+            val messageBody = "🔒 Tap v2 mode enabled"
+            
+            // 使用insertChatSessionRefreshedMessage作为模板，插入系统消息
+            val insertResult = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertChatSessionRefreshedMessage(
+                recipientId,
+                0, // senderDeviceId
+                System.currentTimeMillis() // sentTimestamp
+            )
+            
+            Log.i(TAG, "已插入v2 mode启用提示消息: messageId=${insertResult.messageId}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "插入v2 mode启用提示消息失败，跳过此步骤", e)
+            // 不抛出异常，避免影响主流程
+        }
+    }
+}
 }
 
 /**

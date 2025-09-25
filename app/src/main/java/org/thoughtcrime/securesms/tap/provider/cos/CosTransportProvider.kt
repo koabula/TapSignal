@@ -917,6 +917,52 @@ class CosTransportProvider(
     }
     
     /**
+     * 测试发送能力（无需对端Token）
+     * 用于健康检查时验证是否可以正常发送，不依赖对端的Token
+     */
+    suspend fun testSendCapability(metadata: TransportMetadata): TransportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "测试发送能力: recipientId=${metadata.recipientId}")
+                
+                // 验证元数据类型
+                val cosMetadata = metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                    ?: return@withContext TransportResult.failure(
+                        TransportError.INVALID_FORMAT,
+                        false,
+                        "元数据不是COS类型"
+                    )
+
+                // 获取发送元数据（使用本端凭证和存储）
+                val sendMetadata = cosMetadata.getSendMetadata()
+                
+                // 创建COS客户端（使用本端原始配置，完整权限）
+                val cosClient = try {
+                    CosClientFactory.createClient(cosConfig, context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "创建发送COS客户端失败", e)
+                    return@withContext TransportResult.failure(
+                        TransportError.PROVIDER_UNAVAILABLE,
+                        true,
+                        "无法创建发送COS客户端: ${e.message}"
+                    )
+                }
+
+                // 测试列举自己的发送目录（不需要对端Token）
+                val testPath = sendMetadata.path
+                val files = cosClient.listFiles(testPath)
+                
+                Log.d(TAG, "发送能力测试成功: 可访问发送目录 $testPath，包含 ${files.size} 个文件")
+                TransportResult.success(null, mapOf("testPath" to testPath, "fileCount" to files.size))
+
+            } catch (e: Exception) {
+                Log.e(TAG, "发送能力测试失败: recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
+                TransportResult.fromException(e, true)
+            }
+        }
+    }
+    
+    /**
      * 验证完整权限（读、写、删除、列举）
      */
     private suspend fun validateFullPermissions(cosClient: CosClient, cosToken: CosTransportToken): Boolean {
@@ -1287,7 +1333,8 @@ class CosTransportProvider(
                     bucketName = cosToken.bucketName,
                     accessKeyId = cosToken.accessKeyId,
                     secretAccessKey = cosToken.secretAccessKey,
-                    sessionToken = cosToken.sessionToken
+                    sessionToken = cosToken.sessionToken,
+                    context = context
                 )
             } else {
                 // 使用配置创建客户端
@@ -1313,7 +1360,8 @@ class CosTransportProvider(
                     bucketName = metadata.myBucketName,
                     accessKeyId = cosToken.accessKeyId,
                     secretAccessKey = cosToken.secretAccessKey,
-                    sessionToken = cosToken.sessionToken
+                    sessionToken = cosToken.sessionToken,
+                    context = context
                 )
             } else {
                 // 使用配置创建客户端（发送时使用本端配置）
@@ -1339,10 +1387,11 @@ class CosTransportProvider(
                     bucketName = metadata.peerBucketName,
                     accessKeyId = cosToken.accessKeyId,
                     secretAccessKey = cosToken.secretAccessKey,
-                    sessionToken = cosToken.sessionToken
+                    sessionToken = cosToken.sessionToken,
+                    context = context
                 )
             } else {
-                Log.w(TAG, "接收时缺少对端Token，无法创建客户端")
+                Log.d(TAG, "接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=${metadata.recipientId}")
                 null
             }
         } catch (e: Exception) {
@@ -1366,7 +1415,8 @@ class CosTransportProvider(
                 bucketName = cosToken.bucketName,
                 accessKeyId = cosToken.accessKeyId,
                 secretAccessKey = cosToken.secretAccessKey,
-                sessionToken = cosToken.sessionToken
+                sessionToken = cosToken.sessionToken,
+                context = context
             )
         } catch (e: Exception) {
             Log.e(TAG, "创建COS客户端失败: ${LogSanitizer.sanitizeThrowable(e)}")

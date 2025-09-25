@@ -174,7 +174,8 @@ public class IndividualSendJob extends PushSendJob {
           messageBody.startsWith("TAP_REQ:") || 
           messageBody.startsWith("TAP_RESP:") || 
           messageBody.startsWith("TAP_REVOKE:") || 
-          messageBody.startsWith("TAP_MSG:")
+          messageBody.startsWith("TAP_MSG:") ||
+          messageBody.startsWith("TAP_TOKEN_EXCHANGE:")
       );
 
       if (isTapControlMessage) {

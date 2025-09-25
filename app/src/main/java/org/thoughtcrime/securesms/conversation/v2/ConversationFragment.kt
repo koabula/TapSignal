@@ -1468,18 +1468,203 @@ class ConversationFragment :
             return@launch
           }
           
-          // 尝试建立通道（这里简化实现，实际应该发送请求消息等待对方响应）
-          val channelId = channelManager.createChannel(
-            recipientId = recipient.id.toString(),
-            config = org.thoughtcrime.securesms.tap.TransportChannelConfig(),
-            token = ""  // 实际应该从Token池获取
+          // 1. 确保TaP模块已完全初始化
+          try {
+            val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(requireContext())
+            tapInitializer.initializeSync()
+            Log.d(TAG, "TaP模块同步初始化确认完成")
+          } catch (e: Exception) {
+            Log.e(TAG, "TaP模块初始化失败", e)
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "传输模块初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            return@launch
+          }
+          
+          // 2. 获取传输管理器和TokenPool
+          val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(requireContext())
+          val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(requireContext())
+          
+          // 验证TransportManager是否真正初始化
+          if (transportManager.isInitialized() == false) {
+            Log.w(TAG, "TransportManager未初始化，尝试强制初始化")
+            val initSuccess = transportManager.initialize()
+            if (!initSuccess) {
+              Log.e(TAG, "TransportManager强制初始化失败")
+              requireActivity().runOnUiThread {
+                Toast.makeText(requireContext(), "传输管理器初始化失败", Toast.LENGTH_LONG).show()
+              }
+              return@launch
+            }
+            Log.i(TAG, "TransportManager强制初始化成功")
+          }
+          
+          // 3. 检查可用的Provider类型
+          val availableProviders = transportManager.getAvailableProviders()
+          Log.d(TAG, "可用的Provider数量: ${availableProviders.size}")
+          availableProviders.forEach { provider ->
+            Log.d(TAG, "可用Provider: ${provider.providerType} - ${provider.displayName}")
+          }
+          
+          // 4. 检查COS Provider是否可用
+          val providerManager = org.thoughtcrime.securesms.tap.TransportProviderManager.getInstance(requireContext())
+          if (!providerManager.isProviderAvailable("cos")) {
+            Log.w(TAG, "COS Provider不可用，尝试重新创建")
+            
+            // 获取COS配置
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(requireContext())
+            val cosConfig = configManager.getProviderConfig("cos")
+            
+            if (cosConfig != null) {
+              // 尝试重新创建COS Provider
+              val newProvider = providerManager.createProvider("cos", cosConfig)
+              if (newProvider == null) {
+                Log.e(TAG, "重新创建COS Provider失败")
+                requireActivity().runOnUiThread {
+                  Toast.makeText(requireContext(), "COS传输服务创建失败", Toast.LENGTH_LONG).show()
+                }
+                return@launch
+              }
+              Log.i(TAG, "成功重新创建COS Provider")
+            } else {
+              Log.e(TAG, "未找到COS配置")
+              requireActivity().runOnUiThread {
+                Toast.makeText(requireContext(), "COS传输服务未配置，请先在设置中配置", Toast.LENGTH_LONG).show()
+              }
+              return@launch
+            }
+          }
+          
+          // 5. 获取COS Provider
+          val provider = transportManager.getProvider("cos")
+          if (provider == null) {
+            Log.e(TAG, "无法获取COS Provider，可用Provider: ${availableProviders.map { it.providerType }}")
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "COS传输服务不可用，请检查设置", Toast.LENGTH_LONG).show()
+            }
+            return@launch
+          }
+          
+          Log.i(TAG, "COS Provider获取成功: ${provider.displayName}")
+          
+          // 6. 为对方生成专用的Token（供对方访问我们的存储）
+          val recipientAci = recipient.requireAci().toString()
+          val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
+            recipientId = recipientAci,
+            providerType = "cos",
+            requestedPermissions = setOf(
+              org.thoughtcrime.securesms.tap.TransportPermission.READ,
+              org.thoughtcrime.securesms.tap.TransportPermission.LIST
+            ),
+            validityDurationMs = 0L, // 长期有效
+            providerConfig = providerConfig,
+            purpose = "v2_mode_channel_for_peer"
           )
           
-          requireActivity().runOnUiThread {
-            if (channelId != null) {
-              Toast.makeText(requireContext(), "Tap传输请求已发送", Toast.LENGTH_SHORT).show()
-            } else {
-              Toast.makeText(requireContext(), "发送Tap传输请求失败", Toast.LENGTH_SHORT).show()
+          val generatedToken = provider.generateToken(tokenRequest)
+          if (generatedToken == null) {
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "生成传输Token失败", Toast.LENGTH_LONG).show()
+            }
+            return@launch
+          }
+          
+          // 7. 将生成的Token保存到共享Token池（供对方使用）
+          val tokenSaved = tokenPool.addSharedToken(recipientAci, generatedToken)
+          if (!tokenSaved) {
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "保存传输Token失败", Toast.LENGTH_LONG).show()
+            }
+            return@launch
+          }
+          
+          Log.i(TAG, "为对方生成Token成功: tokenId=${generatedToken.tokenId}")
+          
+          // 8. 创建包含Token信息的JSON字符串（用于通道创建）
+          val tokenInfoJson = createTokenExchangeJson(generatedToken, providerConfig)
+          
+          // 9. 尝试建立通道
+          val channelId = channelManager.createChannel(
+            recipientId = recipientAci,
+            config = org.thoughtcrime.securesms.tap.TransportChannelConfig(),
+            token = tokenInfoJson
+          )
+          
+          if (channelId != null) {
+            Log.i(TAG, "Tap v2模式通道创建成功: $channelId, 对方ACI: $recipientAci, 状态: 发送就绪（等待对方Token）")
+            
+            // 10. 发送Token交换消息给对方
+            try {
+              Log.i(TAG, "开始发送Token交换消息给对方")
+              
+              val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+              Log.d(TAG, "获取自己的ACI成功: ${myAci.take(10)}...")
+              
+              val tokenExchangeMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
+                senderAci = myAci,
+                providerType = "cos",
+                tokenData = generatedToken.toMap(),
+                metadata = mapOf(
+                  "providerConfig" to providerConfig,
+                  "channelId" to channelId,
+                  "recipientAci" to recipientAci
+                ),
+                requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER
+              )
+              Log.d(TAG, "Token交换消息对象创建成功")
+              
+              val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(tokenExchangeMessage)
+              Log.d(TAG, "Token交换消息编码完成，长度: ${encodedMessage.length}")
+              
+              val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
+                threadRecipient = recipient,
+                sentTimeMillis = System.currentTimeMillis(),
+                expiresIn = recipient.expiresInSeconds * 1000L,
+                tokenExchangeData = encodedMessage
+              )
+              Log.d(TAG, "OutgoingMessage创建成功")
+              
+              // 获取线程ID并发送消息
+              val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+              Log.d(TAG, "获取线程ID成功: $threadId")
+              
+              // 使用异步方式发送消息
+              kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                try {
+                                     Log.i(TAG, "开始通过Signal Server发送Token交换消息")
+                   org.thoughtcrime.securesms.sms.MessageSender.send(
+                     requireContext(),
+                     outgoingMessage,
+                     threadId,
+                     org.thoughtcrime.securesms.sms.MessageSender.SendType.SIGNAL,
+                     null,
+                     null
+                   )
+                  
+                  Log.i(TAG, "Token交换消息已提交发送队列")
+                  
+                  requireActivity().runOnUiThread {
+                    Toast.makeText(requireContext(), "Tap传输请求已发送给对方", Toast.LENGTH_SHORT).show()
+                  }
+                  
+                } catch (sendException: Exception) {
+                  Log.e(TAG, "发送Token交换消息到Signal Server失败", sendException)
+                  requireActivity().runOnUiThread {
+                    Toast.makeText(requireContext(), "发送Token交换消息失败: ${sendException.message}", Toast.LENGTH_SHORT).show()
+                  }
+                }
+              }
+              
+            } catch (e: Exception) {
+              Log.e(TAG, "创建Token交换消息失败", e)
+              requireActivity().runOnUiThread {
+                Toast.makeText(requireContext(), "创建Token交换消息失败: ${e.message}", Toast.LENGTH_SHORT).show()
+              }
+            }
+          } else {
+            Log.w(TAG, "Tap v2模式通道创建失败: 对方ACI: $recipientAci")
+            requireActivity().runOnUiThread {
+              Toast.makeText(requireContext(), "建立传输通道失败，请检查网络连接", Toast.LENGTH_SHORT).show()
             }
           }
           
@@ -1493,6 +1678,35 @@ class ConversationFragment :
 
     } catch (e: Exception) {
       Toast.makeText(requireContext(), "Error sending Tap request: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+  }
+
+  /**
+   * 创建Token交换JSON字符串
+   */
+  private fun createTokenExchangeJson(token: org.thoughtcrime.securesms.tap.TransportToken, providerConfig: Map<String, Any>): String {
+    return try {
+      val tokenData = mapOf(
+        "providerType" to token.providerType,
+        "tokenId" to token.tokenId,
+        "recipientId" to token.recipientId,
+        "permissions" to token.permissions.map { it.name },
+        "expirationTime" to token.expirationTime,
+        "tokenData" to token.toMap(),
+        "providerConfig" to mapOf(
+          "region" to (providerConfig["region"] ?: ""),
+          "bucketName" to (providerConfig["bucketName"] ?: ""),
+          "provider" to (providerConfig["provider"] ?: "tencent")
+        ),
+        "timestamp" to System.currentTimeMillis(),
+        "version" to "1.0"
+      )
+      
+      val mapper = com.fasterxml.jackson.databind.ObjectMapper()
+      mapper.writeValueAsString(tokenData)
+    } catch (e: Exception) {
+      Log.e(TAG, "创建Token交换JSON失败", e)
+      "{}" // 返回空JSON对象作为fallback
     }
   }
 

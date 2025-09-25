@@ -485,6 +485,27 @@ data class OutgoingMessage(
       )
     }
 
+    /**
+     * Message for Tap Token exchange
+     */
+    @JvmStatic
+    fun tapTokenExchangeMessage(
+      threadRecipient: Recipient,
+      sentTimeMillis: Long,
+      expiresIn: Long,
+      tokenExchangeData: String
+    ): OutgoingMessage {
+      return OutgoingMessage(
+        threadRecipient = threadRecipient,
+        sentTimeMillis = sentTimeMillis,
+        expiresIn = expiresIn,
+        body = tokenExchangeData,
+        isGroup = false, // Token交换只在1对1聊天中
+        isUrgent = true, // 高优先级，确保及时传达
+        isSecure = true
+      )
+    }
+
     @JvmStatic
     fun quickReply(
       threadRecipient: Recipient,

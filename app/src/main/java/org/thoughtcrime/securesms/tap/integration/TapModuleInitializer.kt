@@ -90,6 +90,64 @@ class TapModuleInitializer private constructor(private val context: Context) {
         }
     }
     
+    /**
+     * 同步初始化方法（阻塞直到初始化完成）
+     */
+    fun initializeSync(forceReinit: Boolean = false) {
+        // 即使isInitialized=true，也要验证核心组件是否真正可用
+        if (isInitialized && !forceReinit) {
+            try {
+                // 验证TransportManager是否真正可用
+                val transportManager = TransportManager.getInstance(context)
+                val availableProviders = transportManager.getAvailableProviders()
+                
+                if (availableProviders.isNotEmpty()) {
+                    Log.d(TAG, "TaP模块已正确初始化，Provider数量: ${availableProviders.size}")
+                    availableProviders.forEach { provider ->
+                        Log.d(TAG, "验证已注册Provider: ${provider.providerType} - ${provider.displayName}")
+                    }
+                    return
+                } else {
+                    Log.w(TAG, "TaP模块状态异常：Provider列表为空，强制重新初始化")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "TaP模块状态验证失败，强制重新初始化: ${e.message}")
+            }
+        }
+        
+        Log.i(TAG, "开始同步初始化TaP模块...")
+        
+        runBlocking {
+            try {
+                // 1. 检查是否需要执行初始化
+                if (!tapValues.shouldPerformInitialization() && !forceReinit) {
+                    Log.d(TAG, "TaP模块已完成初始化")
+                    isInitialized = true
+                    return@runBlocking
+                }
+                
+                // 2. 初始化核心组件
+                initializeCoreComponents()
+                
+                // 3. 注册传输Provider
+                registerTransportProviders()
+                
+                // 4. 启动轮询服务
+                startPollingService()
+                
+                // 5. 标记初始化完成
+                tapValues.markInitializationComplete()
+                
+                isInitialized = true
+                Log.i(TAG, "TaP模块同步初始化完成")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "TaP模块同步初始化失败: ${LogSanitizer.sanitizeThrowable(e)}")
+                throw e
+            }
+        }
+    }
+    
     // shouldPerformInitialization方法已移到TapValues中
     
     /**
@@ -105,14 +163,35 @@ class TapModuleInitializer private constructor(private val context: Context) {
             
             // 2. 初始化Token池
             val tokenPool = TransportTokenPool.getInstance(context)
+            val tokenPoolInitialized = tokenPool.initialize(TransportTokenConfig())
+            if (!tokenPoolInitialized) {
+                Log.e(TAG, "Token池初始化失败")
+                throw RuntimeException("TokenPool初始化失败")
+            }
             Log.d(TAG, "Token池初始化完成")
             
             // 3. 初始化传输管理器
             val transportManager = TransportManager.getInstance(context)
-            Log.d(TAG, "传输管理器初始化完成")
+            val transportInitialized = transportManager.initialize()
+            if (!transportInitialized) {
+                Log.e(TAG, "传输管理器初始化失败")
+                throw RuntimeException("TransportManager初始化失败")
+            }
+            
+            // 验证Provider是否正确注册
+            val availableProviders = transportManager.getAvailableProviders()
+            Log.d(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}")
+            availableProviders.forEach { provider ->
+                Log.d(TAG, "已注册Provider: ${provider.providerType} - ${provider.displayName}")
+            }
             
             // 4. 初始化通道管理器
             val channelManager = TransportChannelManager.getInstance(context)
+            val channelManagerInitialized = channelManager.initialize(TransportChannelConfig())
+            if (!channelManagerInitialized) {
+                Log.e(TAG, "通道管理器初始化失败")
+                throw RuntimeException("ChannelManager初始化失败")
+            }
             Log.d(TAG, "通道管理器初始化完成")
             
         } catch (e: Exception) {
@@ -130,6 +209,15 @@ class TapModuleInitializer private constructor(private val context: Context) {
         try {
             val transportManager = TransportManager.getInstance(context)
             val providerManager = TransportProviderManager.getInstance(context)
+            
+            // 确保ProviderManager已初始化
+            val providerManagerInitialized = providerManager.initialize()
+            if (!providerManagerInitialized) {
+                Log.e(TAG, "Provider管理器初始化失败")
+                throw RuntimeException("ProviderManager初始化失败")
+            }
+            Log.d(TAG, "Provider管理器初始化完成")
+            
             val factory = DefaultTransportProviderFactory(context)
             
             // 注册工厂

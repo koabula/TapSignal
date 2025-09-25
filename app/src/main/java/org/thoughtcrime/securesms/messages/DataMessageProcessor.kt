@@ -1007,7 +1007,7 @@ object DataMessageProcessor {
 
       // 处理Tap传输层控制消息（请求/响应/撤销）
       val result = kotlinx.coroutines.runBlocking { 
-        tapMessageProcessor.processTapMessage(senderRecipient.id.toString(), body)
+        tapMessageProcessor.processTapMessage(senderRecipient.id, body)
       }
       log(envelope.timestamp!!, "🎛️ Tap传输层控制消息处理完成，不插入消息数据库")
 

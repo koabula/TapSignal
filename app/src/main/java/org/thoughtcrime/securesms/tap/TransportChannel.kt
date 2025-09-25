@@ -17,10 +17,31 @@ enum class TransportChannelStatus(
         isActive = false
     ),
     
-    /** 活跃 - 通道正常工作，可以传输消息 */
+    /** 发送就绪 - 本端Token已生成，可以发送消息，等待对端Token */
+    SEND_READY(
+        displayName = "发送就绪",
+        description = "本端Token已生成，可以发送消息，等待对端Token",
+        isActive = true
+    ),
+    
+    /** 等待对端Token - 已发送Token交换请求，等待对端响应 */
+    AWAITING_PEER_TOKEN(
+        displayName = "等待对端Token",
+        description = "已发送Token交换请求，等待对端响应",
+        isActive = false
+    ),
+    
+    /** 活跃 - 通道正常工作，可以传输消息（兼容性保留） */
     ACTIVE(
         displayName = "活跃",
         description = "传输通道正常工作，可以传输消息",
+        isActive = true
+    ),
+    
+    /** 完全激活 - 双向Token交换完成，支持完整的双向通信 */
+    FULL_ACTIVE(
+        displayName = "完全激活",
+        description = "双向Token交换完成，支持完整的双向通信",
         isActive = true
     ),
     
@@ -79,13 +100,16 @@ enum class TransportChannelStatus(
          */
         fun canTransitionTo(from: TransportChannelStatus, to: TransportChannelStatus): Boolean {
             return when (from) {
-                ESTABLISHING -> to in listOf(ACTIVE, FAILED, CLOSED)
-                ACTIVE -> to in listOf(INACTIVE, FAILED, CLOSED, SUSPENDED, MAINTENANCE)
-                INACTIVE -> to in listOf(ACTIVE, FAILED, CLOSED, SUSPENDED)
+                ESTABLISHING -> to in listOf(SEND_READY, AWAITING_PEER_TOKEN, ACTIVE, FULL_ACTIVE, FAILED, CLOSED)
+                SEND_READY -> to in listOf(AWAITING_PEER_TOKEN, FULL_ACTIVE, ACTIVE, INACTIVE, FAILED, CLOSED)
+                AWAITING_PEER_TOKEN -> to in listOf(FULL_ACTIVE, ACTIVE, FAILED, CLOSED)
+                ACTIVE -> to in listOf(FULL_ACTIVE, SEND_READY, INACTIVE, FAILED, CLOSED, SUSPENDED, MAINTENANCE)
+                FULL_ACTIVE -> to in listOf(ACTIVE, SEND_READY, INACTIVE, FAILED, CLOSED, SUSPENDED, MAINTENANCE)
+                INACTIVE -> to in listOf(SEND_READY, ACTIVE, FULL_ACTIVE, FAILED, CLOSED, SUSPENDED)
                 FAILED -> to in listOf(ESTABLISHING, CLOSED)
                 CLOSED -> false // 已关闭的通道不能转换到其他状态
-                SUSPENDED -> to in listOf(ACTIVE, INACTIVE, CLOSED)
-                MAINTENANCE -> to in listOf(ACTIVE, INACTIVE, FAILED, CLOSED)
+                SUSPENDED -> to in listOf(SEND_READY, ACTIVE, FULL_ACTIVE, INACTIVE, CLOSED)
+                MAINTENANCE -> to in listOf(SEND_READY, ACTIVE, FULL_ACTIVE, INACTIVE, FAILED, CLOSED)
             }
         }
     }

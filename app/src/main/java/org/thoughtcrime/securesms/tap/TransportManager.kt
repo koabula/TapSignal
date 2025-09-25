@@ -110,6 +110,13 @@ class TransportManager private constructor(private val context: Context) {
                         return@withContext false
                     }
                     
+                    // 输出初始化后的provider状态
+                    val availableProviders = getAvailableProviders()
+                    Log.i(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}")
+                    availableProviders.forEach { provider ->
+                        Log.d(TAG, "可用Provider: ${provider.providerType} - ${provider.displayName}")
+                    }
+                    
                     isInitialized = true
                     Log.i(TAG, "传输管理器初始化完成")
                     true
@@ -126,7 +133,32 @@ class TransportManager private constructor(private val context: Context) {
      * 获取传输提供者
      */
     fun getProvider(providerType: String): TransportProvider? {
-        return providerManager.getProvider(providerType)
+        val normalizedProviderType = providerType.lowercase()
+        
+        // 首先从已注册的provider中获取
+        var provider = providerManager.getProvider(normalizedProviderType)
+        
+        // 如果provider不存在且管理器已初始化，尝试按需创建
+        if (provider == null && isInitialized()) {
+            Log.d(TAG, "Provider不存在，尝试按需创建: $normalizedProviderType")
+            provider = createProviderIfConfigured(normalizedProviderType)
+            if (provider != null) {
+                Log.i(TAG, "按需创建Provider成功: $normalizedProviderType")
+            } else {
+                Log.w(TAG, "按需创建Provider失败: $normalizedProviderType")
+            }
+        }
+        
+        return provider
+    }
+    
+    /**
+     * 检查传输管理器是否已初始化
+     */
+    fun isInitialized(): Boolean {
+        return initializationLock.read {
+            isInitialized
+        }
     }
     
     /**
@@ -323,15 +355,6 @@ class TransportManager private constructor(private val context: Context) {
     }
     
     /**
-     * 检查是否已初始化
-     */
-    fun isInitialized(): Boolean {
-        initializationLock.read {
-            return isInitialized
-        }
-    }
-    
-    /**
      * 获取当前配置
      */
     fun getCurrentConfig(): TransportConfig {
@@ -472,8 +495,23 @@ class TransportManager private constructor(private val context: Context) {
         return try {
             val config = transportConfig.getProviderConfig(providerType)
             if (config != null && transportConfig.isProviderEnabled(providerType)) {
-                providerManager.createProviderFromConfig(providerType, config)
+                Log.d(TAG, "找到Provider配置且已启用: $providerType")
+                val provider = providerManager.createProviderFromConfig(providerType, config)
+                if (provider != null) {
+                    // 确保创建的provider被注册到管理器中
+                    providerManager.registerProvider(provider)
+                    Log.i(TAG, "Provider创建并注册成功: $providerType")
+                    provider
+                } else {
+                    Log.w(TAG, "Provider创建失败: $providerType")
+                    null
+                }
             } else {
+                if (config == null) {
+                    Log.d(TAG, "Provider配置不存在: $providerType")
+                } else {
+                    Log.d(TAG, "Provider未启用: $providerType")
+                }
                 null
             }
         } catch (e: Exception) {

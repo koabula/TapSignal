@@ -177,9 +177,17 @@ class TransportChannelManager private constructor(private val context: Context) 
                     
                     Log.d(TAG, "建立通道: $channelId, 接收者: $recipientId, 提供者: $providerType")
                     
-                    // 异步激活通道
-                    managerScope.launch {
+                    // 同步激活通道，确保通道在创建完成时就处于正确状态
+                    try {
                         activateChannel(channelId)
+                        Log.d(TAG, "通道同步激活完成: $channelId")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "通道同步激活失败: $channelId", e)
+                        // 激活失败时清理已创建的通道
+                        channels.remove(channelId)
+                        recipientChannels[recipientId]?.remove(channelId)
+                        providerChannels[providerType]?.remove(channelId)
+                        return@withContext null
                     }
                     
                     channel
@@ -354,6 +362,66 @@ class TransportChannelManager private constructor(private val context: Context) 
                     Log.e(TAG, "关闭通道失败: $channelId", e)
                     false
                 }
+            }
+        }
+    }
+    
+    /**
+     * 将通道升级为FULL_ACTIVE状态
+     * 当双向Token交换完成时调用
+     */
+    suspend fun upgradeChannelToFullActive(recipientId: String, providerType: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                val channelIds = recipientChannels[recipientId] ?: run {
+                    Log.w(TAG, "未找到recipientId对应的通道: recipientId=$recipientId, 现有keys=${recipientChannels.keys}")
+                    return@withContext false
+                }
+                
+                for (channelId in channelIds) {
+                    val channel = channels[channelId]
+                    if (channel != null && channel.providerType == providerType) {
+                        // 如果通道已经是FULL_ACTIVE状态，直接返回成功
+                        if (channel.status == TransportChannelStatus.FULL_ACTIVE) {
+                            Log.i(TAG, "通道已经是FULL_ACTIVE状态: channelId=$channelId, recipientId=$recipientId, providerType=$providerType")
+                            return@withContext true
+                        }
+                        
+                        // 扩展升级条件：允许从ESTABLISHING、SEND_READY、ACTIVE状态升级到FULL_ACTIVE
+                        if (channel.status == TransportChannelStatus.ESTABLISHING ||
+                            channel.status == TransportChannelStatus.SEND_READY || 
+                            channel.status == TransportChannelStatus.ACTIVE) {
+                            
+                            val upgradedChannel = channel.updateStatus(TransportChannelStatus.FULL_ACTIVE)
+                            channels[channelId] = upgradedChannel
+                            saveChannelToDatabase(upgradedChannel)
+                            
+                            Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}")
+                            return@withContext true
+                        } else {
+                            Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, recipientId=$recipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
+                        }
+                    } else if (channel != null) {
+                        Log.d(TAG, "通道providerType不匹配: channelId=$channelId, expected=$providerType, actual=${channel.providerType}")
+                    } else {
+                        Log.w(TAG, "通道不存在: channelId=$channelId")
+                    }
+                }
+                
+                Log.w(TAG, "未找到可升级的通道: recipientId=$recipientId, providerType=$providerType, 检查了${channelIds.size}个通道")
+
+                // 增强调试信息：记录所有通道的详细状态
+                if (channelIds.isNotEmpty()) {
+                    val channelDetails = channelIds.mapNotNull { channelId ->
+                        channels[channelId]?.let { channel ->
+                            "channelId=$channelId, status=${channel.status}, providerType=${channel.providerType}, createdAt=${channel.createdAt}"
+                        }
+                    }
+                    Log.d(TAG, "通道详细状态: ${channelDetails.joinToString("; ")}")
+                } else {
+                    Log.d(TAG, "recipientChannels中没有找到对应的通道ID列表")
+                }
+                return@withContext false
             }
         }
     }
@@ -591,9 +659,9 @@ class TransportChannelManager private constructor(private val context: Context) 
         val myTokenInfo = tokenPool.getMyTokenInfo(recipientId, "cos")
         val peerTokenInfo = tokenPool.getPeerTokenInfo(recipientId, "cos")
         
+        // 在v2模式建立初期，可能还没有对端Token信息，此时使用默认值
         if (peerTokenInfo == null) {
-            Log.w(TAG, "未找到对端Token信息: recipientId=$recipientId")
-            return null
+            Log.w(TAG, "未找到对端Token信息，使用默认配置进行通道建立: recipientId=$recipientId")
         }
         
         // 3. 构建本端地址和参数
@@ -609,10 +677,10 @@ class TransportChannelManager private constructor(private val context: Context) 
                 return null
             }
         
-        // 4. 从对端Token信息中获取对端参数
-        val peerAddress = peerTokenInfo.address
-        val peerRegion = peerTokenInfo.region ?: myRegion // 回退到本端region
-        val peerBucketName = peerTokenInfo.bucketName ?: myBucketName // 回退到本端bucket
+        // 4. 从对端Token信息中获取对端参数（如果没有对端Token则使用默认值）
+        val peerAddress = peerTokenInfo?.address ?: myAddress // 回退到本端地址
+        val peerRegion = peerTokenInfo?.region ?: myRegion // 回退到本端region
+        val peerBucketName = peerTokenInfo?.bucketName ?: myBucketName // 回退到本端bucket
         
         // 5. 生成本端Token（如果不存在）
         val myToken = myTokenInfo?.token ?: run {
@@ -679,7 +747,7 @@ class TransportChannelManager private constructor(private val context: Context) 
             myBucketName = myBucketName,
             mySendPath = mySendPath,
             peerAddress = peerAddress,
-            peerToken = peerTokenInfo.token,
+            peerToken = peerTokenInfo?.token,
             peerRegion = peerRegion,
             peerBucketName = peerBucketName,
             peerReceivePath = peerReceivePath,
@@ -788,8 +856,15 @@ class TransportChannelManager private constructor(private val context: Context) 
                 val currentChannel = channels[channelId]
                 if (currentChannel != null && currentChannel.status == TransportChannelStatus.ESTABLISHING) {
                     if (healthCheckResult) {
-                        channels[channelId] = currentChannel.updateStatus(TransportChannelStatus.ACTIVE)
-                        Log.d(TAG, "通道健康检查通过，激活成功: $channelId")
+                        // 根据是否有对端Token设置不同的状态
+                        val cosMetadata = currentChannel.metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                        val newStatus = if (cosMetadata != null && cosMetadata.peerToken != null) {
+                            TransportChannelStatus.FULL_ACTIVE
+                        } else {
+                            TransportChannelStatus.SEND_READY
+                        }
+                        channels[channelId] = currentChannel.updateStatus(newStatus)
+                        Log.d(TAG, "通道健康检查通过，状态更新为: $newStatus, channelId: $channelId")
                     } else {
                         channels[channelId] = currentChannel.updateStatus(TransportChannelStatus.FAILED)
                         Log.w(TAG, "通道健康检查失败: $channelId")
@@ -810,21 +885,45 @@ class TransportChannelManager private constructor(private val context: Context) 
             // 根据Provider类型执行不同的健康检查
             when (provider.providerType) {
                 "cos" -> {
-                    // 对COS执行目录列举检查（轻量操作）
-                    val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
-                    when (listResult) {
-                        is TransportResult.Success -> true
-                        is TransportResult.Failed -> {
-                            Log.w(TAG, "COS健康检查失败: ${LogSanitizer.sanitizeGeneric(listResult.error.toString())}")
-                            false
+                    // 对COS执行健康检查
+                    val cosMetadata = metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                    if (cosMetadata != null && cosMetadata.peerToken != null) {
+                        // 有对端Token，可以测试双向能力（接收）
+                        val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
+                        when (listResult) {
+                            is TransportResult.Success -> true
+                            is TransportResult.Failed -> {
+                                Log.w(TAG, "COS健康检查失败: ${LogSanitizer.sanitizeGeneric(listResult.error.toString())}")
+                                false
+                            }
+                            is TransportResult.RetryScheduled -> {
+                                Log.w(TAG, "COS健康检查需要重试: ${LogSanitizer.sanitizeGeneric(listResult.reason)}")
+                                false
+                            }
+                            is TransportResult.PartialSuccess -> {
+                                Log.w(TAG, "COS健康检查部分成功: ${listResult.successCount}/${listResult.successCount + listResult.failureCount}")
+                                listResult.successCount > 0
+                            }
                         }
-                        is TransportResult.RetryScheduled -> {
-                            Log.w(TAG, "COS健康检查需要重试: ${LogSanitizer.sanitizeGeneric(listResult.reason)}")
+                    } else {
+                        // 没有对端Token，只测试发送能力
+                        Log.d(TAG, "COS健康检查：缺少对端Token，当前为单向发送模式，recipientId=${metadata.recipientId}")
+                        val cosProvider = provider as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider
+                        if (cosProvider != null) {
+                            val sendTestResult = cosProvider.testSendCapability(metadata)
+                            when (sendTestResult) {
+                                is TransportResult.Success -> {
+                                    Log.d(TAG, "COS发送能力测试通过，通道将设置为SEND_READY状态")
+                                    true
+                                }
+                                else -> {
+                                    Log.w(TAG, "COS发送能力测试失败，通道将标记为FAILED：$sendTestResult")
+                                    false
+                                }
+                            }
+                        } else {
+                            Log.w(TAG, "无法转换为CosTransportProvider，健康检查失败")
                             false
-                        }
-                        is TransportResult.PartialSuccess -> {
-                            Log.w(TAG, "COS健康检查部分成功: ${listResult.successCount}/${listResult.successCount + listResult.failureCount}")
-                            listResult.successCount > 0
                         }
                     }
                 }
@@ -1248,6 +1347,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                     return@withContext null
                 }
                 
+                Log.d(TAG, "解析Token信息成功: providerType=${tokenInfo.providerType}, tokenId=${LogSanitizer.sanitize(tokenInfo.tokenId)}")
+                
                 // 2. 获取对应的Provider
                 val transportManager = getTransportManager()
                 val provider = transportManager.getProvider(tokenInfo.providerType)
@@ -1256,7 +1357,12 @@ class TransportChannelManager private constructor(private val context: Context) 
                     return@withContext null
                 }
                 
-                // 3. 创建或获取通道
+                // 3. 如果token信息包含完整的token数据，处理token信息
+                if (tokenInfo.tokenData.containsKey("tokenData") && !tokenInfo.tokenData.containsKey("isEmpty")) {
+                    Log.d(TAG, "处理包含完整token数据的通道创建请求")
+                }
+                
+                // 4. 创建或获取通道
                 val channel = getOrCreateChannel(recipientId, tokenInfo.providerType, provider)
                 if (channel == null) {
                     Log.e(TAG, "无法创建通道")
@@ -1278,6 +1384,12 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     private fun parseTokenInfo(token: String): TokenInfo? {
         return try {
+            // 检查token是否为空或null
+            if (token.isBlank()) {
+                Log.w(TAG, "Token字符串为空，使用默认配置")
+                return TokenInfo("cos", "empty_token", mapOf("isEmpty" to true))
+            }
+            
             // 尝试解析JSON格式的Token信息
             val mapper = com.fasterxml.jackson.databind.ObjectMapper()
             val tokenData = mapper.readValue(token, Map::class.java) as Map<String, Any>
@@ -1288,7 +1400,7 @@ class TransportChannelManager private constructor(private val context: Context) 
             TokenInfo(providerType, tokenId, tokenData)
             
         } catch (e: Exception) {
-            Log.w(TAG, "解析Token信息失败，使用默认配置", e)
+            Log.w(TAG, "解析Token信息失败，使用默认配置")
             // 回退到默认配置
             TokenInfo("cos", "legacy_token", mapOf("data" to token))
         }
