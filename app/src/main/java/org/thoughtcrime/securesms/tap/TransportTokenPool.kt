@@ -148,27 +148,55 @@ class TransportTokenPool private constructor(private val context: Context) {
             tokenLock.write {
                 try {
                     if (!isInitialized) {
-                        Log.w(TAG, "Token池管理器未初始化")
+                        Log.w(TAG, "Token池管理器未初始化，recipientId=${LogSanitizer.sanitize(recipientId)}")
                         return@withContext false
                     }
                     
-                    // 验证Token有效性
+                    Log.d(TAG, "开始添加接收Token: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
+                    
+                    // 验证Token有效性，并提供详细的验证失败信息
                     if (!token.validate()) {
-                        Log.w(TAG, "接收到无效Token: ${LogSanitizer.sanitize(token.tokenId)}")
+                        Log.w(TAG, "接收到无效Token，详细验证失败信息:")
+                        Log.w(TAG, "  tokenId: ${if (token.tokenId.isBlank()) "空白" else "有效"}")
+                        Log.w(TAG, "  recipientId: ${if (token.recipientId.isBlank()) "空白" else "有效"}")
+                        Log.w(TAG, "  providerType: ${token.providerType}")
+                        Log.w(TAG, "  permissions: ${token.permissions.size}个权限")
+                        
+                        if (token is CosTransportToken) {
+                            Log.w(TAG, "  COS Token详情:")
+                            Log.w(TAG, "    accessKeyId: ${if (token.accessKeyId.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    secretAccessKey: ${if (token.secretAccessKey.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    region: ${if (token.region.isBlank()) "空白" else token.region}")
+                            Log.w(TAG, "    bucketName: ${if (token.bucketName.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    cloudProvider: ${if (token.cloudProvider.isBlank()) "空白" else token.cloudProvider}")
+                            Log.w(TAG, "    providerType匹配: ${token.providerType == "cos"}")
+                            Log.w(TAG, "    cloudProvider有效: ${token.cloudProvider == "AWS" || token.cloudProvider == "TENCENT"}")
+                        }
                         return@withContext false
                     }
                     
                     // 检查是否超过缓存大小限制
-                    if (getTotalReceivedTokens() >= config.maxTokens) {
+                    val currentReceivedTokens = getTotalReceivedTokens()
+                    if (currentReceivedTokens >= config.maxTokens) {
+                        Log.d(TAG, "接收Token缓存接近限制($currentReceivedTokens/${config.maxTokens})，清理过期Token")
                         cleanExpiredReceivedTokens()
-                        if (getTotalReceivedTokens() >= config.maxTokens) {
-                            Log.w(TAG, "接收Token缓存已满，无法添加新Token")
+                        val afterCleanup = getTotalReceivedTokens()
+                        if (afterCleanup >= config.maxTokens) {
+                            Log.w(TAG, "接收Token缓存已满，清理后仍有${afterCleanup}个Token，无法添加新Token")
                             return@withContext false
+                        } else {
+                            Log.d(TAG, "清理过期Token成功，从${currentReceivedTokens}减少到${afterCleanup}")
                         }
                     }
                     
-                    // 添加到缓存
+                    // 检查是否已存在相同Token
                     val providerTokens = receivedTokens.computeIfAbsent(recipientId) { mutableMapOf() }
+                    val existingToken = providerTokens[token.providerType]
+                    if (existingToken != null) {
+                        Log.d(TAG, "替换已存在的接收Token: 旧tokenId=${LogSanitizer.sanitize(existingToken.tokenId)}, 新tokenId=${LogSanitizer.sanitize(token.tokenId)}")
+                    }
+                    
+                    // 添加到缓存
                     providerTokens[token.providerType] = token
                     
                     // 记录元数据
@@ -183,13 +211,19 @@ class TransportTokenPool private constructor(private val context: Context) {
                     tokenMetadata[token.tokenId] = metadata
                     
                     // 持久化存储
-                    saveTokensToStorage()
+                    try {
+                        saveTokensToStorage()
+                        Log.d(TAG, "Token持久化存储成功")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Token持久化存储失败，但内存缓存已更新", e)
+                        // 持久化失败不影响内存操作的成功
+                    }
                     
-                    Log.d(TAG, "添加接收Token: ${LogSanitizer.sanitize(token.tokenId)}, 接收者: ${LogSanitizer.sanitize(recipientId)}, 提供者: ${token.providerType}")
+                    Log.i(TAG, "添加接收Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
                     true
                     
                 } catch (e: Exception) {
-                    Log.e(TAG, "添加接收Token失败", e)
+                    Log.e(TAG, "添加接收Token异常: recipientId=${LogSanitizer.sanitize(recipientId)}, tokenId=${LogSanitizer.sanitize(token.tokenId)}", e)
                     false
                 }
             }
@@ -204,27 +238,55 @@ class TransportTokenPool private constructor(private val context: Context) {
             tokenLock.write {
                 try {
                     if (!isInitialized) {
-                        Log.w(TAG, "Token池管理器未初始化")
+                        Log.w(TAG, "Token池管理器未初始化，recipientId=${LogSanitizer.sanitize(recipientId)}")
                         return@withContext false
                     }
                     
-                    // 验证Token有效性
+                    Log.d(TAG, "开始添加共享Token: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
+                    
+                    // 验证Token有效性，并提供详细的验证失败信息
                     if (!token.validate()) {
-                        Log.w(TAG, "共享Token无效: ${token.tokenId}")
+                        Log.w(TAG, "共享Token无效，详细验证失败信息:")
+                        Log.w(TAG, "  tokenId: ${if (token.tokenId.isBlank()) "空白" else "有效"}")
+                        Log.w(TAG, "  recipientId: ${if (token.recipientId.isBlank()) "空白" else "有效"}")
+                        Log.w(TAG, "  providerType: ${token.providerType}")
+                        Log.w(TAG, "  permissions: ${token.permissions.size}个权限")
+                        
+                        if (token is CosTransportToken) {
+                            Log.w(TAG, "  COS Token详情:")
+                            Log.w(TAG, "    accessKeyId: ${if (token.accessKeyId.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    secretAccessKey: ${if (token.secretAccessKey.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    region: ${if (token.region.isBlank()) "空白" else token.region}")
+                            Log.w(TAG, "    bucketName: ${if (token.bucketName.isBlank()) "空白" else "有效"}")
+                            Log.w(TAG, "    cloudProvider: ${if (token.cloudProvider.isBlank()) "空白" else token.cloudProvider}")
+                            Log.w(TAG, "    providerType匹配: ${token.providerType == "cos"}")
+                            Log.w(TAG, "    cloudProvider有效: ${token.cloudProvider == "AWS" || token.cloudProvider == "TENCENT"}")
+                        }
                         return@withContext false
                     }
                     
                     // 检查是否超过缓存大小限制
-                    if (getTotalSharedTokens() >= config.maxTokens) {
+                    val currentSharedTokens = getTotalSharedTokens()
+                    if (currentSharedTokens >= config.maxTokens) {
+                        Log.d(TAG, "共享Token缓存接近限制($currentSharedTokens/${config.maxTokens})，清理过期Token")
                         cleanExpiredSharedTokens()
-                        if (getTotalSharedTokens() >= config.maxTokens) {
-                            Log.w(TAG, "共享Token缓存已满，无法添加新Token")
+                        val afterCleanup = getTotalSharedTokens()
+                        if (afterCleanup >= config.maxTokens) {
+                            Log.w(TAG, "共享Token缓存已满，清理后仍有${afterCleanup}个Token，无法添加新Token")
                             return@withContext false
+                        } else {
+                            Log.d(TAG, "清理过期Token成功，从${currentSharedTokens}减少到${afterCleanup}")
                         }
                     }
                     
-                    // 添加到缓存
+                    // 检查是否已存在相同Token
                     val providerTokens = sharedTokens.computeIfAbsent(recipientId) { mutableMapOf() }
+                    val existingToken = providerTokens[token.providerType]
+                    if (existingToken != null) {
+                        Log.d(TAG, "替换已存在的共享Token: 旧tokenId=${LogSanitizer.sanitize(existingToken.tokenId)}, 新tokenId=${LogSanitizer.sanitize(token.tokenId)}")
+                    }
+                    
+                    // 添加到缓存
                     providerTokens[token.providerType] = token
                     
                     // 记录元数据
@@ -239,13 +301,19 @@ class TransportTokenPool private constructor(private val context: Context) {
                     tokenMetadata[token.tokenId] = metadata
                     
                     // 持久化存储
-                    saveTokensToStorage()
+                    try {
+                        saveTokensToStorage()
+                        Log.d(TAG, "Token持久化存储成功")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Token持久化存储失败，但内存缓存已更新", e)
+                        // 持久化失败不影响内存操作的成功
+                    }
                     
-                    Log.d(TAG, "添加共享Token: ${token.tokenId}, 接收者: $recipientId, 提供者: ${token.providerType}")
+                    Log.i(TAG, "添加共享Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
                     true
                     
                 } catch (e: Exception) {
-                    Log.e(TAG, "添加共享Token失败", e)
+                    Log.e(TAG, "添加共享Token异常: recipientId=${LogSanitizer.sanitize(recipientId)}, tokenId=${LogSanitizer.sanitize(token.tokenId)}", e)
                     false
                 }
             }

@@ -1,117 +1,140 @@
---------- beginning of main
---------- beginning of kernel
---------- beginning of system
-2025-09-26 18:49:01.881 25858-25896 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758883740278] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=922
-2025-09-26 18:49:01.882 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=922
-2025-09-26 18:49:01.882 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
-2025-09-26 18:49:01.984 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token提供请求: senderId=RecipientId::8, providerType=cos
-2025-09-26 18:49:01.985 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  收到Token交换请求: senderId=RecipientId::8, senderName=koalaawang, providerType=cos
-2025-09-26 18:49:01.996 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1758883731214-5750-1758883731214","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKIDd8Ts79xmV3VzazCCzY0FH6h4D8pIammb","secretAccessKey":"f6OSI2cz96qMfkdR4WntoY8VgeS3bx74","region":"ap-nanjing","bucketName":"newsignal1-1316759135","cloudProvider":"TENCENT"}
-2025-09-26 18:49:02.037 25858-25896 TapMessageProcessor     org.thoughtcrime.securesms           I  Token交换确认通知已显示: senderId=RecipientId::8, senderName=koalaawang
-2025-09-26 18:49:02.038 25858-25896 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758883740278] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
-2025-09-26 18:49:04.556 25858-25858 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  收到Token交换操作: action=ACCEPT_TOKEN_EXCHANGE
-2025-09-26 18:49:04.557 25858-25858 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  用户接受Token交换请求: senderId=RecipientId::8
-2025-09-26 18:49:04.635 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  接收Token保存成功: senderId=RecipientId::8, senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, tokenId=cos-signal-cos-signal-v2-1758883731214-5750-1758883731214
-2025-09-26 18:49:04.636 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始生成响应Token: senderId=RecipientId::8
-2025-09-26 18:49:04.658 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：TransportManager未初始化，强制重新初始化
-2025-09-26 18:49:04.659 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
-2025-09-26 18:49:04.659 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  初始化核心组件...
-2025-09-26 18:49:04.659 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  配置管理器初始化完成
-2025-09-26 18:49:04.661 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  Token池初始化完成
-2025-09-26 18:49:04.664 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
-2025-09-26 18:49:04.678 25858-25896 ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-26 18:49:04.681 25858-25896 ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-26 18:49:04.717 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
-2025-09-26 18:49:04.723 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
-2025-09-26 18:49:04.724 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
-2025-09-26 18:49:04.726 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
-2025-09-26 18:49:04.741 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  传输管理器初始化完成，可用Provider数量: 1
-2025-09-26 18:49:04.743 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  已注册Provider: cos - 云对象存储 (COS)
-2025-09-26 18:49:04.746 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  通道管理器初始化完成
-2025-09-26 18:49:04.747 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
-2025-09-26 18:49:04.747 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
-2025-09-26 18:49:04.774 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
-2025-09-26 18:49:04.775 25858-26066 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
-2025-09-26 18:49:04.775 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 3
-2025-09-26 18:49:04.776 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 3
-2025-09-26 18:49:04.778 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
-2025-09-26 18:49:04.778 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 3
-2025-09-26 18:49:04.779 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
-2025-09-26 18:49:04.780 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I    - ********-****-****-****-*********973
-2025-09-26 18:49:04.781 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I    - 8
-2025-09-26 18:49:04.782 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I    - RecipientId::8
-2025-09-26 18:49:04.792 25858-26066 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=6, memory=11967MB, performance=HIGH, lowPower=false, memoryPressure=false]
-2025-09-26 18:49:04.792 25858-26066 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
-2025-09-26 18:49:04.795 25858-26066 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
-2025-09-26 18:49:04.801 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 3
-2025-09-26 18:49:04.806 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=********-****-****-****-*********973
-2025-09-26 18:49:04.811 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
-2025-09-26 18:49:04.816 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=8
-2025-09-26 18:49:04.819 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=RecipientId::8
-2025-09-26 18:49:04.820 25858-25896 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
-2025-09-26 18:49:14.960 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  响应Token生成成功: tokenId=cos-signal-cos-signal-v2-1758883744817-6666-1758883744817
-2025-09-26 18:49:15.360 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端成功建立传输通道: channelId=ch_c716a84d-2fbd-4598-8bc3-b12cbba41973_cos_1758883754998, recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:15.360 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  B端通道建立后启动轮询: recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:15.360 25858-26066 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-09-26 18:49:15.360 25858-26066 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-09-26 18:49:15.370 25858-26066 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, interval=5000ms
-2025-09-26 18:49:15.371 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端通道建立后轮询启动成功: recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:15.371 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始发送Token交换响应: senderId=RecipientId::8
-2025-09-26 18:49:15.372 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  发送响应消息目标: targetAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=RecipientId::8
-2025-09-26 18:49:15.447 25858-26066 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  Token交换响应已发送: senderId=RecipientId::8
-2025-09-26 18:49:15.455 25858-25896 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=1190
-2025-09-26 18:49:16.452 25858-26059 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端响应发送后确认通道状态正常: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, fullActiveChannels=1
-2025-09-26 18:49:16.454 25858-26059 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  B端Token状态验证: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, hasReceivedToken=true, hasSharedToken=true
-2025-09-26 18:49:20.086 25858-26059 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
-2025-09-26 18:49:20.348 25858-26059 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:20.998 25858-25896 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=c716a84d-2...
-2025-09-26 18:49:21.004 25858-25896 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=true
-2025-09-26 18:49:21.025 25858-25896 TapV2ModeIndicator      org.thoughtcrime.securesms           D  显示Tap v2指示器（非活跃）: status=FULL_ACTIVE, provider=cos
-2025-09-26 18:49:25.086 25858-26067 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
-2025-09-26 18:49:25.374 25858-26067 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:30.089 25858-26067 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
-2025-09-26 18:49:30.354 25858-26067 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:35.092 25858-26067 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
-2025-09-26 18:49:35.217   791-829   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@d189125 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=886 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=177825340 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@74d42fa} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{da9e0ab org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[android.os.BinderProxy@57a993a] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
-2025-09-26 18:49:35.391 25858-26067 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:36.202   573-596   WindowManager           system_server                        V  Sent Transition #612 createdAt=09-26 10:49:35.210 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=886 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=177825340 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{619b1be Task{28736c5 #886 type=standard A=10194:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{298c419 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[android.os.BinderProxy@f8e496c] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
-2025-09-26 18:49:40.094 25858-26190 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=80.00%]
-2025-09-26 18:49:40.423 25858-26190 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:45.097 25858-26190 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=83.33%]
-2025-09-26 18:49:45.367 25858-26190 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:50.099 25858-25994 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=85.71%]
-2025-09-26 18:49:50.702 25858-25994 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:55.100 25858-25994 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=87.50%]
-2025-09-26 18:49:55.460 25858-25994 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:49:56.735 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::8
-2025-09-26 18:49:56.786 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
-2025-09-26 18:49:56.791 25858-25896 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=1192
-2025-09-26 18:49:56.800 25858-25896 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=1192, recipient=RecipientId::8
-2025-09-26 18:49:56.800 25858-25896 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=1192
-2025-09-26 18:49:56.801 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=1192, recipient=RecipientId::8
-2025-09-26 18:49:56.845 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=1192
-2025-09-26 18:49:56.846 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=1192
-2025-09-26 18:49:56.861 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=1192, recipient=RecipientId::8
-2025-09-26 18:49:56.863 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientAci=********-****-****-****-*********973
-2025-09-26 18:49:56.913 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider
-2025-09-26 18:49:56.914 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
-2025-09-26 18:49:56.915 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********973
-2025-09-26 18:49:56.921 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=66
-2025-09-26 18:49:56.925 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=1192, ciphertextLength=66
-2025-09-26 18:49:56.928 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********786
-2025-09-26 18:49:56.935 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
-2025-09-26 18:49:56.936 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
-2025-09-26 18:49:56.936 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
-2025-09-26 18:49:56.937 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
-2025-09-26 18:49:56.948 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
-2025-09-26 18:49:56.956 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********973_cos_1758883754998, status=FULL_ACTIVE, provider=cos
-2025-09-26 18:49:57.013 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
-2025-09-26 18:49:57.669 25858-25896 TencentCosClient        org.thoughtcrime.securesms           E  上传文件失败 - 服务异常: Access Denied.
-                                                                                                    CosXmlServiceException{Access Denied. (Service: /outbox/a3adde1ba3b08264/text/ed78856c-e258-4e6c-ae47-f7640c57b786_1758883797135.dat; Status Code: 403; Status Message: Forbidden; Error Code: AccessDenied; Request ID: NjhkNjZmZDZfYzU5MmFhMDlfYzRhOV84YzM2MzFj)}
-                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.parseCOSXMLError(ResponseXmlS3BodySerializer.java:66)
-                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.convert(ResponseXmlS3BodySerializer.java:57)
+2025-09-26 20:08:40.128 28880-28913 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758888517797] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=922
+2025-09-26 20:08:40.131 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=922
+2025-09-26 20:08:40.132 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
+2025-09-26 20:08:40.200 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token提供请求: senderId=RecipientId::8, providerType=cos
+2025-09-26 20:08:40.200 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  收到Token交换请求: senderId=RecipientId::8, senderName=koalaawang, providerType=cos
+2025-09-26 20:08:40.209 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1758888505657-5194-1758888505657","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKID1ymQs8GF4gDYbgbKp7F7oLq9HFYjieNu","secretAccessKey":"OZHoGWZbS6WlpT1PcfinnnneNvLbhcbZ","region":"ap-nanjing","bucketName":"newsignal1-1316759135","cloudProvider":"TENCENT"}
+2025-09-26 20:08:40.255 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  Token交换确认通知已显示: senderId=RecipientId::8, senderName=koalaawang
+2025-09-26 20:08:40.256 28880-28913 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758888517797] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
+2025-09-26 20:08:43.796 28880-28880 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  收到Token交换操作: action=ACCEPT_TOKEN_EXCHANGE
+2025-09-26 20:08:43.796 28880-28880 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  用户接受Token交换请求: senderId=RecipientId::8
+2025-09-26 20:08:43.864 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  接收Token保存成功: senderId=RecipientId::8, senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, tokenId=cos-signal-cos-signal-v2-1758888505657-5194-1758888505657
+2025-09-26 20:08:43.866 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始生成响应Token: senderId=RecipientId::8
+2025-09-26 20:08:43.888 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：TransportManager未初始化，强制重新初始化
+2025-09-26 20:08:43.888 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
+2025-09-26 20:08:43.889 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  初始化核心组件...
+2025-09-26 20:08:43.891 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  配置管理器初始化完成
+2025-09-26 20:08:43.891 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  Token池初始化完成
+2025-09-26 20:08:43.892 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
+2025-09-26 20:08:43.922 28880-28913 ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 20:08:43.923 28880-28913 ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 20:08:43.959 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
+2025-09-26 20:08:43.965 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
+2025-09-26 20:08:43.967 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
+2025-09-26 20:08:43.969 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
+2025-09-26 20:08:43.982 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  传输管理器初始化完成，可用Provider数量: 1
+2025-09-26 20:08:43.982 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  已注册Provider: cos - 云对象存储 (COS)
+2025-09-26 20:08:43.983 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  通道管理器初始化完成
+2025-09-26 20:08:43.984 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
+2025-09-26 20:08:43.984 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
+2025-09-26 20:08:44.000 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
+2025-09-26 20:08:44.002 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 3
+2025-09-26 20:08:44.002 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 3
+2025-09-26 20:08:44.002 28880-29001 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
+2025-09-26 20:08:44.002 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
+2025-09-26 20:08:44.003 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 3
+2025-09-26 20:08:44.003 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
+2025-09-26 20:08:44.003 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I    - ********-****-****-****-*********973
+2025-09-26 20:08:44.003 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I    - 8
+2025-09-26 20:08:44.004 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I    - RecipientId::8
+2025-09-26 20:08:44.007 28880-29001 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=6, memory=11967MB, performance=HIGH, lowPower=false, memoryPressure=false]
+2025-09-26 20:08:44.007 28880-29001 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
+2025-09-26 20:08:44.008 28880-29001 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
+2025-09-26 20:08:44.009 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 3
+2025-09-26 20:08:44.013 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
+2025-09-26 20:08:44.013 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=********-****-****-****-*********973
+2025-09-26 20:08:44.015 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=8
+2025-09-26 20:08:44.019 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=RecipientId::8
+2025-09-26 20:08:44.019 28880-28913 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
+2025-09-26 20:08:52.337 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  响应Token生成成功: tokenId=cos-signal-cos-signal-v2-1758888524019-7104-1758888524019
+2025-09-26 20:08:52.727 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端成功建立传输通道: channelId=ch_c716a84d-2fbd-4598-8bc3-b12cbba41973_cos_1758888532377, recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 20:08:52.727 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  B端通道建立后启动轮询: recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 20:08:52.727 28880-29001 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
+2025-09-26 20:08:52.728 28880-29001 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-09-26 20:08:52.737 28880-29001 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, interval=5000ms
+2025-09-26 20:08:52.737 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端通道建立后轮询启动成功: recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 20:08:52.738 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始发送Token交换响应: senderId=RecipientId::8
+2025-09-26 20:08:52.738 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  发送响应消息目标: targetAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=RecipientId::8
+2025-09-26 20:08:52.844 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  Token交换响应已发送: senderId=RecipientId::8
+2025-09-26 20:08:52.861 28880-28913 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=1202
+2025-09-26 20:08:53.851 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端响应发送后确认通道状态正常: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, fullActiveChannels=1
+2025-09-26 20:08:53.852 28880-29001 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  B端Token状态验证: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, hasReceivedToken=true, hasSharedToken=true
+2025-09-26 20:08:54.756 28880-29001 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-09-26 20:08:54.831 28880-28913 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758888533108] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=219
+2025-09-26 20:08:54.834 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=219
+2025-09-26 20:08:54.835 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
+2025-09-26 20:08:54.836 28880-28928 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
+2025-09-26 20:08:54.836 28880-28928 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-09-26 20:08:54.837 28880-28928 TapPollingService       org.thoughtcrime.securesms           D  检测到已存在的轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 现有Provider=cos, 新Provider=cos
+2025-09-26 20:08:54.837 28880-28928 TapPollingService       org.thoughtcrime.securesms           D  Provider匹配，检查任务状态: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=POLLING
+2025-09-26 20:08:54.837 28880-28928 TapPollingService       org.thoughtcrime.securesms           I  轮询目标已存在且状态正常: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=POLLING
+2025-09-26 20:08:54.838 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换确认: senderId=RecipientId::8, providerType=cos
+2025-09-26 20:08:54.840 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  收到确认消息，通道升级为FULL_ACTIVE: senderId=RecipientId::8, senderAci=********-****-****-****-*********973, providerType=cos
+2025-09-26 20:08:54.840 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           D  通道升级后启动轮询: senderAci=********-****-****-****-*********973, providerType=cos
+2025-09-26 20:08:54.841 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  通道升级后轮询启动成功: senderAci=********-****-****-****-*********973
+2025-09-26 20:08:54.845 28880-28913 Job                     org.thoughtcrime.securesms           I  [JOB::3259397e-fb53-4541-b5ac-a2a836d8c2bf][TapInsertV2EnabledMessageJob] onSubmit() (Time Since Submission: 3 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 20:08:54.847 28880-28913 JobRunner               org.thoughtcrime.securesms           I  [JOB::3259397e-fb53-4541-b5ac-a2a836d8c2bf][TapInsertV2EnabledMessageJob][5] Running job. (Time Since Submission: 6 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 20:08:54.849 28880-28913 TapMessageProcessor     org.thoughtcrime.securesms           I  已调度v2模式启用提示消息插入Job: recipientId=RecipientId::8
+2025-09-26 20:08:54.865 28880-28913 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758888533108] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
+2025-09-26 20:08:54.904 28880-28913 TapInsertV2EnabledMessa org.thoughtcrime.securesms           I  Inserted v2-enabled system message: messageId=1203, threadId=6
+2025-09-26 20:08:54.907 28880-28913 JobRunner               org.thoughtcrime.securesms           I  [JOB::3259397e-fb53-4541-b5ac-a2a836d8c2bf][TapInsertV2EnabledMessageJob][5] Job finished with result SUCCESS in 59 ms. (Time Since Submission: 66 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 20:08:55.114 28880-29001 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 20:08:55.393 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invokeSuspend(TencentCosClient.kt:135)
+2025-09-26 20:08:55.393 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.393 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:4)
+2025-09-26 20:08:55.394 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.downloadFile(TencentCosClient.kt:134)
+2025-09-26 20:08:55.394 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invokeSuspend(CosTransportProvider.kt:274)
+2025-09-26 20:08:55.395 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:8)
+2025-09-26 20:08:55.395 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:4)
+2025-09-26 20:08:55.396 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.downloadFile(CosTransportProvider.kt:250)
+2025-09-26 20:08:55.397 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invokeSuspend(TapPollingService.kt:569)
+2025-09-26 20:08:55.397 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.397 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:2)
+2025-09-26 20:08:55.398 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.TransportErrorHandler.executeWithRetry(TransportErrorHandler.kt:120)
+2025-09-26 20:08:55.398 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invokeSuspend(TapPollingService.kt:568)
+2025-09-26 20:08:55.398 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.398 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:4)
+2025-09-26 20:08:55.399 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:567)
+2025-09-26 20:08:55.399 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:480)
+2025-09-26 20:08:55.399 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+2025-09-26 20:08:55.400 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:438)
+2025-09-26 20:08:55.469 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invokeSuspend(TencentCosClient.kt:135)
+2025-09-26 20:08:55.469 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.469 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:4)
+2025-09-26 20:08:55.470 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.downloadFile(TencentCosClient.kt:134)
+2025-09-26 20:08:55.471 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invokeSuspend(CosTransportProvider.kt:274)
+2025-09-26 20:08:55.471 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:8)
+2025-09-26 20:08:55.471 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:4)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.downloadFile(CosTransportProvider.kt:250)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invokeSuspend(TapPollingService.kt:569)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:2)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.TransportErrorHandler.executeWithRetry(TransportErrorHandler.kt:120)
+2025-09-26 20:08:55.472 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invokeSuspend(TapPollingService.kt:568)
+2025-09-26 20:08:55.473 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:8)
+2025-09-26 20:08:55.474 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:4)
+2025-09-26 20:08:55.475 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:567)
+2025-09-26 20:08:55.475 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:480)
+2025-09-26 20:08:55.475 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+2025-09-26 20:08:55.476 28880-29001 System.err              org.thoughtcrime.securesms           W  	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:438)
+2025-09-26 20:08:55.509 28880-28913 TencentCosClient        org.thoughtcrime.securesms           E  下载文件失败 - 服务异常: The specified key does not exist.
+                                                                                                    CosXmlServiceException{The specified key does not exist. (Service: /outbox/053abb43f297ee1d/text/outbox/053abb43f297ee1d/text/3d717a66-3090-499c-98ea-54f62b2ce854_1758885595850.dat; Status Code: 404; Status Message: Not Found; Error Code: NoSuchKey; Request ID: NjhkNjgyNThfNzE0ZWZhMWVfNzRjM184YjBmYTBm)}
+                                                                                                    	at com.tencent.cos.xml.transfer.ResponseFileBodySerializer.parseCOSXMLError(ResponseFileBodySerializer.java:74)
+                                                                                                    	at com.tencent.cos.xml.transfer.ResponseFileBodySerializer.convert(ResponseFileBodySerializer.java:64)
                                                                                                     	at com.tencent.qcloud.core.http.NetworkProxy.convertResponse(NetworkProxy.java:104)
-                                                                                                    	at com.tencent.qcloud.core.http.OkHttpProxy.executeHttpRequest(OkHttpProxy.java:95)
+                                                                                                    	at com.tencent.qcloud.core.http.HttpTask.convertResponse(HttpTask.java:408)
+                                                                                                    	at com.tencent.qcloud.core.http.interceptor.TrafficControlInterceptor.intercept(TrafficControlInterceptor.java:217)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at com.tencent.qcloud.core.http.interceptor.RetryInterceptor.processSingleRequest(RetryInterceptor.java:335)
+                                                                                                    	at com.tencent.qcloud.core.http.interceptor.RetryInterceptor.executeTaskOnce(RetryInterceptor.java:306)
+                                                                                                    	at com.tencent.qcloud.core.http.interceptor.RetryInterceptor.processRequest(RetryInterceptor.java:215)
+                                                                                                    	at com.tencent.qcloud.core.http.interceptor.RetryInterceptor.intercept(RetryInterceptor.java:142)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at com.tencent.qcloud.core.http.HttpLoggingInterceptor.intercept(HttpLoggingInterceptor.java:146)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160)
+                                                                                                    	at com.tencent.qcloud.core.http.OkHttpProxy.executeHttpRequest(OkHttpProxy.java:87)
                                                                                                     	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:289)
                                                                                                     	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:55)
                                                                                                     	at com.tencent.qcloud.core.task.QCloudTask.call(QCloudTask.java:306)
@@ -124,24 +147,38 @@
                                                                                                     	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:517)
                                                                                                     	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:507)
                                                                                                     	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:500)
-                                                                                                    	at com.tencent.cos.xml.CosXmlSimpleService.putObject(CosXmlSimpleService.java:122)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invokeSuspend(TencentCosClient.kt:79)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invoke(Unknown Source:4)
+                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.getObject(CosXmlBaseService.java:735)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invokeSuspend(TencentCosClient.kt:135)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$downloadFile$getObjectResult$1.invoke(Unknown Source:4)
                                                                                                     	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
                                                                                                     	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
                                                                                                     	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
                                                                                                     	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.uploadFile(TencentCosClient.kt:78)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invokeSuspend(CosTransportProvider.kt:109)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invoke(Unknown Source:4)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.downloadFile(TencentCosClient.kt:134)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invokeSuspend(CosTransportProvider.kt:274)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$downloadFile$2.invoke(Unknown Source:4)
+2025-09-26 20:08:55.514 28880-28913 TencentCosClient        org.thoughtcrime.securesms           E  	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
                                                                                                     	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
                                                                                                     	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
                                                                                                     	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.push(CosTransportProvider.kt:66)
-                                                                                                    	at org.thoughtcrime.securesms.tap.TransportManager$routeMessage$2.invokeSuspend(TransportManager.kt:783)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.downloadFile(CosTransportProvider.kt:250)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invokeSuspend(TapPollingService.kt:569)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1$1.invoke(Unknown Source:2)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportErrorHandler.executeWithRetry(TransportErrorHandler.kt:120)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invokeSuspend(TapPollingService.kt:568)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$downloadResult$1.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturnIgnoreTimeout(Undispatched.kt:50)
+                                                                                                    	at kotlinx.coroutines.TimeoutKt.setupTimeout(Timeout.kt:149)
+                                                                                                    	at kotlinx.coroutines.TimeoutKt.withTimeout(Timeout.kt:44)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:567)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:480)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:438)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
                                                                                                     	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
                                                                                                     	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
@@ -150,102 +187,6 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-09-26 18:49:57.688 25858-26233 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-09-26 18:49:57.692 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-09-26 18:49:57.694 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  检测到已存在的轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 现有Provider=cos, 新Provider=cos
-2025-09-26 18:49:57.694 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  Provider匹配，检查任务状态: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=RUNNING
-2025-09-26 18:49:57.694 25858-26233 TapPollingService       org.thoughtcrime.securesms           I  轮询目标已存在且状态正常: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=RUNNING
-2025-09-26 18:49:57.697 25858-26233 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-09-26 18:49:57.697 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-09-26 18:49:57.697 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  检测到已存在的轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 现有Provider=cos, 新Provider=cos
-2025-09-26 18:49:57.697 25858-26233 TapPollingService       org.thoughtcrime.securesms           D  Provider匹配，检查任务状态: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=RUNNING
-2025-09-26 18:49:57.698 25858-26233 TapPollingService       org.thoughtcrime.securesms           I  轮询目标已存在且状态正常: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, status=RUNNING
-2025-09-26 18:49:57.699 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败后的系统诊断:
-2025-09-26 18:49:57.755 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  === TAP系统状态诊断 ===
-                                                                                                    1. TransportManager状态:
-                                                                                                       - 初始化状态: true
-                                                                                                    2. Provider状态:
-                                                                                                       - 可用Provider数: 1
-                                                                                                       - 启用Provider数: 1
-                                                                                                       - 可用: cos (云对象存储 (COS))
-                                                                                                       - 启用: cos (云对象存储 (COS))
-                                                                                                    3. 通道状态:
-                                                                                                       - 活跃通道数: 1
-                                                                                                       - 通道: ch_********-****-****-****-*********973_cos_1758883754998
-                                                                                                         * 状态: FULL_ACTIVE
-                                                                                                         * Provider: cos
-                                                                                                         * recipientId: ********-****-****-****-*********973
-                                                                                                         * 是否活跃: true
-                                                                                                    4. Token状态:
-                                                                                                       - 接收Token数: 2
-                                                                                                       - 共享Token数: 2
-                                                                                                       - 接收Token: cos-signal-cos-signal-v2-1758883731214-5750-1758883731214 (cos)
-                                                                                                       - 共享Token: cos-signal-cos-signal-v2-1758883744817-6666-1758883744817 (cos)
-                                                                                                    5. 轮询状态:
-                                                                                                       - 轮询服务启动结果: true
-                                                                                                       - 轮询目标添加测试: true
-                                                                                                    6. 配置状态:
-                                                                                                       - 已配置Provider: cos
-                                                                                                       - 持久化启用Provider: cos
-                                                                                                       - 应执行初始化: false
-                                                                                                    === 诊断完成 ===
-2025-09-26 18:49:57.755 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           W  TAP路由失败，尝试自动修复...
-2025-09-26 18:49:57.756 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始自动修复TAP系统问题
-2025-09-26 18:49:57.783 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复成功: 已添加轮询目标
-2025-09-26 18:49:57.808 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，修复问题数: 1
-2025-09-26 18:49:57.809 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，重新尝试路由...
-2025-09-26 18:49:58.209 25858-25896 TencentCosClient        org.thoughtcrime.securesms           E  上传文件失败 - 服务异常: Access Denied.
-                                                                                                    CosXmlServiceException{Access Denied. (Service: /outbox/a3adde1ba3b08264/text/ed78856c-e258-4e6c-ae47-f7640c57b786_1758883797836.dat; Status Code: 403; Status Message: Forbidden; Error Code: AccessDenied; Request ID: NjhkNjZmZDdfOGM2ZTdlMWVfM2NiXzVmNmMyYjA=)}
-                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.parseCOSXMLError(ResponseXmlS3BodySerializer.java:66)
-                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.convert(ResponseXmlS3BodySerializer.java:57)
-                                                                                                    	at com.tencent.qcloud.core.http.NetworkProxy.convertResponse(NetworkProxy.java:104)
-                                                                                                    	at com.tencent.qcloud.core.http.OkHttpProxy.executeHttpRequest(OkHttpProxy.java:95)
-                                                                                                    	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:289)
-                                                                                                    	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:55)
-                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.call(QCloudTask.java:306)
-                                                                                                    	at bolts.Task$4.run(Task.java:357)
-                                                                                                    	at bolts.BoltsExecutors$ImmediateExecutor.execute(BoltsExecutors.java:105)
-                                                                                                    	at bolts.Task.call(Task.java:348)
-                                                                                                    	at bolts.Task.call(Task.java:379)
-                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.executeNowSilently(QCloudTask.java:122)
-                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.executeNow(QCloudTask.java:103)
-                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:517)
-                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:507)
-                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:500)
-                                                                                                    	at com.tencent.cos.xml.CosXmlSimpleService.putObject(CosXmlSimpleService.java:122)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invokeSuspend(TencentCosClient.kt:79)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$uploadFile$putObjectResult$1.invoke(Unknown Source:4)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
-                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
-                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.uploadFile(TencentCosClient.kt:78)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invokeSuspend(CosTransportProvider.kt:109)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$push$2.invoke(Unknown Source:4)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
-                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
-                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.push(CosTransportProvider.kt:66)
-                                                                                                    	at org.thoughtcrime.securesms.tap.TransportManager$routeMessage$2.invokeSuspend(TransportManager.kt:783)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-09-26 18:49:58.246 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           W  自动修复后路由仍然失败
-2025-09-26 18:49:58.251 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用providers=1
-2025-09-26 18:49:58.254 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用provider: cos - 云对象存储 (COS)
-2025-09-26 18:49:58.255 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败: messageId=********-****-****-****-*********786, error=NETWORK_ERROR
-2025-09-26 18:49:58.258 25858-25896 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP传输失败: messageId=1192, error=NETWORK_ERROR
-2025-09-26 18:49:58.263 25858-25896 TapMessageSendIntegrato org.thoughtcrime.securesms           W  Tap传输层发送需要重试: messageId=1192, reason=TAP传输失败: 文件上传失败
-2025-09-26 18:49:58.264 25858-25896 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送重试已安排: messageId=1192, message=Tap发送重试: TAP传输失败: 文件上传失败
-2025-09-26 18:50:00.102 25858-26188 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=88.89%]
-2025-09-26 18:50:00.500 25858-26188 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-26 18:50:05.104 25858-26188 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=90.00%]
-2025-09-26 18:50:05.427 25858-26188 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 20:08:55.515 28880-29001 TapPollingService       org.thoughtcrime.securesms           W  文件下载失败: outbox/053abb43f297ee1d/text/3d717a66-3090-499c-98ea-54f62b2ce854_1758885595850.dat
+2025-09-26 20:08:59.759 28880-28964 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
+2025-09-26 20:09:00.091 28880-28964 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973

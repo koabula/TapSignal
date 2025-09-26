@@ -17,6 +17,7 @@ import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.tap.TransportChannelManager
 import org.thoughtcrime.securesms.tap.TransportChannelStatus
 import org.thoughtcrime.securesms.recipients.Recipient
+import kotlinx.coroutines.*
 
 /**
  * Tap v2模式指示器组件
@@ -34,6 +35,8 @@ class TapV2ModeIndicator @JvmOverloads constructor(
     }
 
     private val indicatorText: TextView
+    private val indicatorScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var currentUpdateJob: Job? = null
 
     init {
         LayoutInflater.from(context).inflate(R.layout.tap_v2_mode_indicator, this, true)
@@ -58,59 +61,101 @@ class TapV2ModeIndicator @JvmOverloads constructor(
     }
 
     /**
-     * 更新指示器状态
+     * 更新指示器状态（异步版本，避免主线程死锁）
      *
      * @param recipient 接收方
      */
     fun updateStatus(recipient: Recipient) {
-        try {
-            val channelManager = TransportChannelManager.getInstance(context)
-            
-            // 修复：使用ACI字符串作为查询键，与通道管理保持一致
-            val recipientAci = try {
-                recipient.requireAci().toString()
+        // 取消之前的更新任务，避免重复操作
+        currentUpdateJob?.cancel()
+        
+        currentUpdateJob = indicatorScope.launch {
+            try {
+                // 获取recipient ACI（在主线程安全操作）
+                val recipientAci = try {
+                    recipient.requireAci().toString()
+                } catch (e: Exception) {
+                    Log.w(TAG, "无法获取recipient ACI，跳过Tap v2指示器更新: ${e.message}")
+                    visibility = GONE
+                    return@launch
+                }
+
+                Log.d(TAG, "更新Tap v2指示器状态: recipientAci=${recipientAci.take(10)}...")
+
+                // 切换到IO线程进行通道状态检查，避免主线程阻塞
+                val channelInfo = withContext(Dispatchers.IO) {
+                    try {
+                        val channelManager = TransportChannelManager.getInstance(context)
+                        
+                        // 异步检查通道状态，避免主线程死锁
+                        val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+                        
+                        Log.d(TAG, "通道查询结果: hasActiveChannel=$hasActiveChannel")
+                        
+                        if (hasActiveChannel) {
+                            // 获取通道详细信息
+                            val channels = channelManager.getActiveChannels(recipientAci)
+                            if (channels.isNotEmpty()) {
+                                val activeChannel = channels.find { it.status == TransportChannelStatus.ACTIVE }
+                                if (activeChannel != null) {
+                                    ChannelInfo(true, activeChannel.status, activeChannel.providerType)
+                                } else {
+                                    // 有通道但不是活跃状态
+                                    val firstChannel = channels.first()
+                                    ChannelInfo(true, firstChannel.status, firstChannel.providerType)
+                                }
+                            } else {
+                                // 理论上不应该出现这种情况，但提供备用显示
+                                ChannelInfo(true, TransportChannelStatus.ACTIVE, "tap")
+                            }
+                        } else {
+                            ChannelInfo(false, null, null)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "检查通道状态时出错", e)
+                        ChannelInfo(false, null, null)
+                    }
+                }
+                
+                // 确保在主线程上更新UI
+                withContext(Dispatchers.Main) {
+                    updateUI(channelInfo)
+                }
+                
+            } catch (e: CancellationException) {
+                Log.d(TAG, "通道状态更新被取消")
             } catch (e: Exception) {
-                Log.w(TAG, "无法获取recipient ACI，跳过Tap v2指示器更新: ${e.message}")
-                visibility = GONE
-                return
+                Log.e(TAG, "更新Tap v2指示器状态时出错", e)
+                // 出错时在主线程隐藏指示器
+                withContext(Dispatchers.Main) {
+                    visibility = GONE
+                }
             }
-
-            Log.d(TAG, "更新Tap v2指示器状态: recipientAci=${recipientAci.take(10)}...")
-
-            val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
-
-            Log.d(TAG, "通道查询结果: hasActiveChannel=$hasActiveChannel")
-
-            visibility = if (hasActiveChannel) VISIBLE else GONE
-
-                         if (hasActiveChannel) {
-                 // 获取通道详细信息
-                 val channels = channelManager.getActiveChannels(recipientAci)
-                 if (channels.isNotEmpty()) {
-                     val activeChannel = channels.find { it.status == TransportChannelStatus.ACTIVE }
-                     if (activeChannel != null) {
-                         updateIndicatorStyle(activeChannel.status, activeChannel.providerType)
-                         Log.d(TAG, "显示Tap v2指示器: status=${activeChannel.status}, provider=${activeChannel.providerType}")
-                     } else {
-                         // 有通道但不是活跃状态
-                         val firstChannel = channels.first()
-                         updateIndicatorStyle(firstChannel.status, firstChannel.providerType)
-                         Log.d(TAG, "显示Tap v2指示器（非活跃）: status=${firstChannel.status}, provider=${firstChannel.providerType}")
-                     }
-                 } else {
-                     // 理论上不应该出现这种情况，但提供备用显示
-                     updateIndicatorStyle(TransportChannelStatus.ACTIVE, "tap")
-                     Log.d(TAG, "显示Tap v2指示器（备用显示）")
-                 }
-             } else {
-                 Log.d(TAG, "隐藏Tap v2指示器: hasActiveChannel=$hasActiveChannel")
-             }
-        } catch (e: Exception) {
-            Log.e(TAG, "更新Tap v2指示器状态时出错", e)
-            // 出错时隐藏指示器
-            visibility = GONE
         }
     }
+    
+    /**
+     * 在主线程上更新UI显示
+     */
+    private fun updateUI(channelInfo: ChannelInfo) {
+        visibility = if (channelInfo.hasActiveChannel) VISIBLE else GONE
+        
+        if (channelInfo.hasActiveChannel && channelInfo.status != null && channelInfo.providerType != null) {
+            updateIndicatorStyle(channelInfo.status, channelInfo.providerType)
+            Log.d(TAG, "显示Tap v2指示器: status=${channelInfo.status}, provider=${channelInfo.providerType}")
+        } else {
+            Log.d(TAG, "隐藏Tap v2指示器: hasActiveChannel=${channelInfo.hasActiveChannel}")
+        }
+    }
+    
+    /**
+     * 通道信息数据类
+     */
+    private data class ChannelInfo(
+        val hasActiveChannel: Boolean,
+        val status: TransportChannelStatus?,
+        val providerType: String?
+    )
 
     /**
      * 根据通道状态和Provider类型更新指示器样式
@@ -129,16 +174,16 @@ class TapV2ModeIndicator @JvmOverloads constructor(
                     else -> "T2"  // Tap的通用标识
                 }
             }
-                         TransportChannelStatus.ESTABLISHING, TransportChannelStatus.INACTIVE -> {
-                 indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorSecondary))
-                 indicatorText.text = when (providerType) {
-                     "cos" -> "v2?"
-                     "email" -> "E2?"  
-                     "ipfs" -> "I2?"
-                     else -> "T2?"
-                 }
-             }
-             TransportChannelStatus.FAILED, TransportChannelStatus.SUSPENDED -> {
+            TransportChannelStatus.ESTABLISHING, TransportChannelStatus.INACTIVE -> {
+                indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorSecondary))
+                indicatorText.text = when (providerType) {
+                    "cos" -> "v2?"
+                    "email" -> "E2?"  
+                    "ipfs" -> "I2?"
+                    else -> "T2?"
+                }
+            }
+            TransportChannelStatus.FAILED, TransportChannelStatus.SUSPENDED -> {
                 indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorError))
                 indicatorText.text = when (providerType) {
                     "cos" -> "v2!"
@@ -171,7 +216,7 @@ class TapV2ModeIndicator @JvmOverloads constructor(
     /**
      * 设置文本颜色
      * 
-     * @param color 颜色资源ID
+     @param color 颜色资源ID
      */
     fun setTextColor(color: Int) {
         indicatorText.setTextColor(ContextCompat.getColor(context, color))
@@ -198,5 +243,13 @@ class TapV2ModeIndicator @JvmOverloads constructor(
      */
     fun hide() {
         visibility = GONE
+    }
+    
+    /**
+     * 清理资源
+     */
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        indicatorScope.cancel()
     }
 } 

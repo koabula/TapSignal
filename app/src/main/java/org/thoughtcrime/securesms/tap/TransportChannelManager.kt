@@ -998,8 +998,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                 return null
             }
         
-        // 2. 获取本端和对端Token信息
-        val myTokenInfo = tokenPool.getMyTokenInfo(recipientId, "cos")
+        // 2. 获取对端Token信息（用于轮询对方消息）
         val peerTokenInfo = tokenPool.getPeerTokenInfo(recipientId, "cos")
         
         // 在v2模式建立初期，可能还没有对端Token信息，此时使用默认值
@@ -1025,53 +1024,60 @@ class TransportChannelManager private constructor(private val context: Context) 
         val peerRegion = peerTokenInfo?.region ?: myRegion // 回退到本端region
         val peerBucketName = peerTokenInfo?.bucketName ?: myBucketName // 回退到本端bucket
         
-        // 5. 生成本端Token（如果不存在）
-        val myToken = myTokenInfo?.token ?: run {
-            Log.d(TAG, "本端Token不存在，生成新的长期最高权限Token")
-            try {
-                // 创建Token请求：长期有效 + 最高权限
-                val tokenRequest = TransportTokenRequest(
-                    recipientId = recipientId,
-                    providerType = "cos",
-                    requestedPermissions = setOf(
-                        TransportPermission.READ,
-                        TransportPermission.WRITE,
-                        TransportPermission.DELETE,
-                        TransportPermission.LIST
-                    ),
-                    validityDurationMs = 0L, // 0表示使用默认（长期有效）
-                    providerConfig = myProviderConfig,
-                    purpose = "channel_metadata_generation"
-                )
-                
-                // 使用Provider生成Token
-                val generatedToken = provider.generateToken(tokenRequest)
-                if (generatedToken != null) {
-                    // 保存到Token池（作为共享Token，供对方访问我们的存储）
-                    val saveSuccess = tokenPool.addSharedToken(recipientId, generatedToken)
-                    if (saveSuccess) {
-                        Log.i(TAG, "本端Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
-                        generatedToken
+        // 5. 生成本端Token供对方使用（如果不存在）
+        // 注意：此Token仅用于分享给对方，让对方能轮询我们的消息
+        // 本端发送消息时不使用此Token，而是直接使用本地高权限配置
+        val sharedTokenForPeer = run {
+            // 检查是否已经为此对方生成了shared token
+            val existingSharedToken = tokenPool.getValidSharedToken(recipientId, "cos")
+            if (existingSharedToken != null) {
+                Log.d(TAG, "已存在共享Token，复用: tokenId=${LogSanitizer.sanitize(existingSharedToken.tokenId)}")
+                existingSharedToken
+            } else {
+                Log.d(TAG, "共享Token不存在，生成新的只读Token供对方轮询")
+                try {
+                    // 创建Token请求：只读权限，供对方轮询我们的outbox
+                    val tokenRequest = TransportTokenRequest(
+                        recipientId = recipientId,
+                        providerType = "cos",
+                        requestedPermissions = setOf(
+                            TransportPermission.READ,
+                            TransportPermission.LIST
+                        ),
+                        validityDurationMs = 0L, // 0表示使用默认（长期有效）
+                        providerConfig = myProviderConfig,
+                        purpose = "peer_polling_token"
+                    )
+                    
+                    // 使用Provider生成Token
+                    val generatedToken = provider.generateToken(tokenRequest)
+                    if (generatedToken != null) {
+                        // 保存到Token池（作为共享Token，供对方访问我们的存储）
+                        val saveSuccess = tokenPool.addSharedToken(recipientId, generatedToken)
+                        if (saveSuccess) {
+                            Log.i(TAG, "对方轮询Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
+                            generatedToken
+                        } else {
+                            Log.w(TAG, "对方轮询Token保存失败")
+                            null
+                        }
                     } else {
-                        Log.w(TAG, "本端Token保存失败")
+                        Log.w(TAG, "Provider生成对方轮询Token失败")
                         null
                     }
-                } else {
-                    Log.w(TAG, "Provider生成Token失败")
+                } catch (e: Exception) {
+                    Log.e(TAG, "生成对方轮询Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
                     null
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "生成本端Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
-                null
             }
         }
         
-        // 5. 生成哈希化ID
+        // 6. 生成哈希化ID
         val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
         val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
         val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientId)
         
-        // 6. 构建路径
+        // 7. 构建路径
         val mySendPath = provider.getSendPath(peerHashedId)
         val peerReceivePath = provider.getReceivePath(myHashedId)
         
@@ -1085,12 +1091,12 @@ class TransportChannelManager private constructor(private val context: Context) 
             recipientId = recipientId,
             providerType = "cos",
             myAddress = myAddress,
-            myToken = myToken,
+            myToken = null, // 重要：发送消息时不使用token，直接使用本地高权限配置
             myRegion = myRegion,
             myBucketName = myBucketName,
             mySendPath = mySendPath,
             peerAddress = peerAddress,
-            peerToken = peerTokenInfo?.token,
+            peerToken = peerTokenInfo?.token, // 用于轮询对方消息的只读token
             peerRegion = peerRegion,
             peerBucketName = peerBucketName,
             peerReceivePath = peerReceivePath,
