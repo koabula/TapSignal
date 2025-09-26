@@ -377,7 +377,21 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
     suspend fun validateContactTapStatus(recipientId: RecipientId): ContactValidationResult {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "验证联系人TAP状态: ${LogSanitizer.sanitize(recipientId.toString())}")
+                // 修复：获取ACI字符串作为查询键，与通道管理保持一致
+                val recipientAci = try {
+                    Recipient.resolved(recipientId).requireAci().toString()
+                } catch (e: Exception) {
+                    Log.w(TAG, "无法获取recipient ACI进行TAP状态验证: ${e.message}")
+                    return@withContext ContactValidationResult(
+                        recipientId = recipientId.toString(),
+                        hasActiveChannel = false,
+                        canUseTap = false,
+                        tokenInfos = emptyList(),
+                        issues = listOf("无法获取recipient ACI")
+                    )
+                }
+                
+                Log.d(TAG, "验证联系人TAP状态: ${LogSanitizer.sanitize(recipientAci.take(10))}...")
                 
                 val channelManager = TransportChannelManager.getInstance(context)
                 val tokenPool = TransportTokenPool.getInstance(context)
@@ -385,7 +399,7 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
                 val issues = mutableListOf<String>()
                 
                 // 1. 检查活跃通道
-                val hasActiveChannel = channelManager.hasActiveChannel(recipientId.toString())
+                val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
                 if (!hasActiveChannel) {
                     issues.add("无活跃传输通道")
                 }
@@ -397,15 +411,15 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
                 
                 availableProviders.forEach { provider ->
                     val providerType = provider.providerType
-                    val receivedToken = tokenPool.getValidReceivedToken(recipientId.toString(), providerType)
-                    val sharedToken = tokenPool.getValidSharedToken(recipientId.toString(), providerType)
+                    val receivedToken = tokenPool.getValidReceivedToken(recipientAci, providerType)
+                    val sharedToken = tokenPool.getValidSharedToken(recipientAci, providerType)
                     
                     tokenInfos.add(TokenValidationInfo(
                         providerType = providerType,
                         hasReceivedToken = receivedToken != null,
                         hasSharedToken = sharedToken != null,
-                        receivedTokenValid = receivedToken?.validate() == true,
-                        sharedTokenValid = sharedToken?.validate() == true
+                        receivedTokenValid = receivedToken != null, // 简化：getValidReceivedToken已经返回有效token
+                        sharedTokenValid = sharedToken != null      // 简化：getValidSharedToken已经返回有效token
                     ))
                 }
                 
@@ -451,11 +465,19 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
                 return false
             }
             
+            // 修复：获取发送者ACI字符串作为查询键，与通道管理保持一致
+            val senderAci = try {
+                senderRecipient.requireAci().toString()
+            } catch (e: Exception) {
+                Log.w(TAG, "无法获取发送者ACI进行v2模式检测: ${e.message}")
+                return false
+            }
+            
             val channelManager = TransportChannelManager.getInstance(context)
             val tokenPool = TransportTokenPool.getInstance(context)
             
             // 检查是否有活跃的通道
-            val hasActiveChannel = channelManager.hasActiveChannel(senderRecipient.id.toString())
+            val hasActiveChannel = channelManager.hasActiveChannel(senderAci)
             if (!hasActiveChannel) {
                 return false
             }
@@ -468,8 +490,8 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
             var hasLongTermCredentials = false
             for (provider in availableProviders) {
                 val providerType = provider.providerType
-                val receivedToken = tokenPool.getValidReceivedToken(senderRecipient.id.toString(), providerType)
-                val sharedToken = tokenPool.getValidSharedToken(senderRecipient.id.toString(), providerType)
+                val receivedToken = tokenPool.getValidReceivedToken(senderAci, providerType)
+                val sharedToken = tokenPool.getValidSharedToken(senderAci, providerType)
                 
                 // 检查Token是否为长期Token（没有过期时间或过期时间很远）
                 val isReceivedLongTerm = receivedToken?.let { isLongTermToken(it) } ?: false

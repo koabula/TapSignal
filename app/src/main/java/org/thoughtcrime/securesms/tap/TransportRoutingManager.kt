@@ -133,7 +133,18 @@ class TransportRoutingManager private constructor(private val context: Context) 
                     val selectedProvider = when (routingPolicy) {
                         TransportRoutingPolicy.TRANSPORT_FIRST -> selectTransportFirstProvider(availableProviders)
                         TransportRoutingPolicy.SIGNAL_FIRST -> null // Signal优先时不使用传输服务
-                        TransportRoutingPolicy.INTELLIGENT -> selectIntelligentProvider(recipientId, message, availableProviders)
+                        TransportRoutingPolicy.INTELLIGENT -> {
+                            Log.d(TAG, "使用INTELLIGENT策略选择Provider")
+                            Log.d(TAG, "  - recipientId: $recipientId")
+                            Log.d(TAG, "  - 可用Provider数: ${availableProviders.size}")
+                            availableProviders.forEach { provider ->
+                                Log.d(TAG, "    * ${provider.providerType}: ${provider.displayName}")
+                            }
+                            
+                            val result = selectIntelligentProvider(recipientId, message, availableProviders)
+                            Log.d(TAG, "INTELLIGENT策略选择结果: ${result?.providerType ?: "null"}")
+                            result
+                        }
                         TransportRoutingPolicy.TRANSPORT_ONLY -> selectTransportOnlyProvider(availableProviders)
                         TransportRoutingPolicy.SIGNAL_ONLY -> null // 仅Signal时不使用传输服务
                     }
@@ -439,15 +450,35 @@ class TransportRoutingManager private constructor(private val context: Context) 
         message: TransportMessage,
         providers: List<TransportProvider>
     ): TransportProvider? {
+        Log.d(TAG, "开始智能Provider选择")
+        Log.d(TAG, "  - recipientId: $recipientId")
+        Log.d(TAG, "  - 候选Provider数: ${providers.size}")
+        
         // 为每个Provider计算综合评分
         val scoredProviders = providers.map { provider ->
+            Log.d(TAG, "计算Provider评分: ${provider.providerType}")
             val score = calculateProviderScore(provider.providerType, recipientId, message)
+            Log.d(TAG, "  - ${provider.providerType}最终评分: ${String.format("%.3f", score)}")
             provider to score
         }.sortedByDescending { it.second }
         
-        Log.d(TAG, "Provider评分排序: ${scoredProviders.map { "${it.first.providerType}:${String.format("%.2f", it.second)}" }}")
+        Log.d(TAG, "Provider评分排序结果:")
+        scoredProviders.forEach { (provider, score) ->
+            Log.d(TAG, "  - ${provider.providerType}: ${String.format("%.3f", score)}")
+        }
         
-        return scoredProviders.firstOrNull()?.first
+        val selectedProvider = scoredProviders.firstOrNull()?.first
+        Log.d(TAG, "智能选择结果: ${selectedProvider?.providerType ?: "无合适Provider"}")
+        
+        if (selectedProvider == null && providers.isNotEmpty()) {
+            Log.w(TAG, "警告：有可用Provider但智能选择返回null")
+            Log.w(TAG, "最高评分: ${scoredProviders.firstOrNull()?.second ?: "N/A"}")
+            if (scoredProviders.isNotEmpty() && scoredProviders.first().second <= 0.0) {
+                Log.e(TAG, "所有Provider评分都为0或负数，可能是评分逻辑问题")
+            }
+        }
+        
+        return selectedProvider
     }
     
     /**
@@ -458,29 +489,45 @@ class TransportRoutingManager private constructor(private val context: Context) 
         recipientId: String?,
         message: TransportMessage?
     ): Double {
+        Log.d(TAG, "    计算${providerType}综合评分:")
+        
         var score = 0.0
         
         // 性能评分
         val performanceScore = calculatePerformanceScore(providerType)
-        score += performanceScore * WEIGHT_PERFORMANCE
+        val performanceWeightedScore = performanceScore * WEIGHT_PERFORMANCE
+        score += performanceWeightedScore
+        Log.d(TAG, "      - 性能评分: ${String.format("%.3f", performanceScore)} × ${String.format("%.3f", WEIGHT_PERFORMANCE)} = ${String.format("%.3f", performanceWeightedScore)}")
         
         // 可靠性评分
         val reliabilityScore = calculateReliabilityScore(providerType)
-        score += reliabilityScore * WEIGHT_RELIABILITY
+        val reliabilityWeightedScore = reliabilityScore * WEIGHT_RELIABILITY
+        score += reliabilityWeightedScore
+        Log.d(TAG, "      - 可靠性评分: ${String.format("%.3f", reliabilityScore)} × ${String.format("%.3f", WEIGHT_RELIABILITY)} = ${String.format("%.3f", reliabilityWeightedScore)}")
         
         // 通道状态评分
         val channelScore = calculateChannelScore(providerType, recipientId)
-        score += channelScore * WEIGHT_CHANNEL_STATUS
+        val channelWeightedScore = channelScore * WEIGHT_CHANNEL_STATUS
+        score += channelWeightedScore
+        Log.d(TAG, "      - 通道状态评分: ${String.format("%.3f", channelScore)} × ${String.format("%.3f", WEIGHT_CHANNEL_STATUS)} = ${String.format("%.3f", channelWeightedScore)}")
         
         // Provider偏好评分
         val preferenceScore = calculatePreferenceScore(providerType, recipientId)
-        score += preferenceScore * WEIGHT_PROVIDER_PREFERENCE
+        val preferenceWeightedScore = preferenceScore * WEIGHT_PROVIDER_PREFERENCE
+        score += preferenceWeightedScore
+        Log.d(TAG, "      - 偏好评分: ${String.format("%.3f", preferenceScore)} × ${String.format("%.3f", WEIGHT_PROVIDER_PREFERENCE)} = ${String.format("%.3f", preferenceWeightedScore)}")
         
         // 消息类型适配评分
         val messageTypeScore = calculateMessageTypeScore(providerType, message)
-        score += messageTypeScore * WEIGHT_MESSAGE_TYPE_FIT
+        val messageTypeWeightedScore = messageTypeScore * WEIGHT_MESSAGE_TYPE_FIT
+        score += messageTypeWeightedScore
+        Log.d(TAG, "      - 消息类型适配: ${String.format("%.3f", messageTypeScore)} × ${String.format("%.3f", WEIGHT_MESSAGE_TYPE_FIT)} = ${String.format("%.3f", messageTypeWeightedScore)}")
         
-        return score.coerceIn(0.0, 1.0)
+        val finalScore = score.coerceIn(0.0, 1.0)
+        Log.d(TAG, "      - 原始总分: ${String.format("%.3f", score)}")
+        Log.d(TAG, "      - 限制后总分: ${String.format("%.3f", finalScore)}")
+        
+        return finalScore
     }
     
     /**
@@ -526,20 +573,59 @@ class TransportRoutingManager private constructor(private val context: Context) 
      * 计算通道状态评分
      */
     private suspend fun calculateChannelScore(providerType: String, recipientId: String?): Double {
+        Log.d(TAG, "计算通道状态评分: providerType=$providerType, recipientId=$recipientId")
+        
         if (recipientId == null) {
+            Log.d(TAG, "recipientId为null，返回默认评分0.5")
             return 0.5
         }
         
         val channelManager = TransportChannelManager.getInstance(context)
-        val channel = channelManager.getActiveChannel(recipientId, providerType)
         
-        return when {
-            channel == null -> 0.3                        // 没有通道
-            channel.isActive() -> 0.9                     // 活跃通道
-            channel.isAvailable() -> 0.7                  // 可用通道
-            channel.isFailed() -> 0.1                     // 失败通道
-            else -> 0.5                                    // 其他状态
+        // 首先检查getActiveChannels的结果
+        val allActiveChannels = channelManager.getActiveChannels(recipientId)
+        Log.d(TAG, "getActiveChannels($recipientId)返回: ${allActiveChannels.size}个通道")
+        allActiveChannels.forEach { channel ->
+            Log.d(TAG, "  - 通道: ${channel.channelId}, provider=${channel.providerType}, status=${channel.status}, isActive=${channel.isActive()}")
         }
+        
+        // 然后调用getActiveChannel
+        val channel = channelManager.getActiveChannel(recipientId, providerType)
+        Log.d(TAG, "getActiveChannel($recipientId, $providerType)返回: ${if (channel != null) channel.channelId else "null"}")
+        
+        val score = when {
+            channel == null -> {
+                Log.w(TAG, "没有找到匹配的活跃通道，评分0.3")
+                // 检查是否有该providerType的通道但不活跃
+                val allChannelsForProvider = allActiveChannels.filter { it.providerType == providerType }
+                if (allChannelsForProvider.isNotEmpty()) {
+                    Log.w(TAG, "发现${allChannelsForProvider.size}个${providerType}通道但getActiveChannel返回null")
+                    allChannelsForProvider.forEach { ch ->
+                        Log.w(TAG, "  - 通道${ch.channelId}: status=${ch.status}, isActive=${ch.isActive()}")
+                    }
+                }
+                0.3
+            }
+            channel.isActive() -> {
+                Log.d(TAG, "通道活跃，评分0.9")
+                0.9
+            }
+            channel.isAvailable() -> {
+                Log.d(TAG, "通道可用，评分0.7")
+                0.7
+            }
+            channel.isFailed() -> {
+                Log.d(TAG, "通道失败，评分0.1")
+                0.1
+            }
+            else -> {
+                Log.d(TAG, "通道其他状态，评分0.5")
+                0.5
+            }
+        }
+        
+        Log.d(TAG, "通道状态评分结果: $score")
+        return score
     }
     
     /**

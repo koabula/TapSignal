@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
 import org.thoughtcrime.securesms.tap.TransportTokenPool
@@ -233,7 +234,34 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 return
             }
             
-            // 8. 创建响应消息
+            // 8. 建立传输通道 (B端为接收方建立通道)
+            try {
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                
+                // 确保通道管理器已初始化
+                val initialized = channelManager.initialize(org.thoughtcrime.securesms.tap.TransportChannelConfig())
+                if (!initialized) {
+                    Log.w(TAG, "通道管理器初始化失败，跳过通道建立")
+                } else {
+                    // 使用getOrCreateChannel方法，它会自动处理metadata创建
+                    val channel = channelManager.getOrCreateChannel(
+                        recipientId = originalMessage.senderAci,
+                        providerType = originalMessage.providerType,
+                        provider = provider
+                    )
+                    
+                    if (channel != null) {
+                        Log.i(TAG, "B端成功建立传输通道: channelId=${channel.channelId}, recipientId=${originalMessage.senderAci}")
+                    } else {
+                        Log.w(TAG, "B端建立传输通道失败: recipientId=${originalMessage.senderAci}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "建立传输通道异常", e)
+                // 不返回，继续发送响应消息
+            }
+            
+            // 9. 创建响应消息
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
             val responseMessage = TapTokenExchangeMessage(
                 senderAci = myAci,
@@ -247,8 +275,35 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT
             )
             
-            // 9. 发送响应消息
+            // 10. 发送响应消息
             sendTokenExchangeResponse(context, senderId, responseMessage)
+            
+            // 11. 验证B端通道状态和Token状态
+            delay(1000L) // 等待响应处理完成
+            try {
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val channels = channelManager.getActiveChannels(originalMessage.senderAci)
+                val fullActiveChannels = channels.filter { it.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE }
+                
+                if (fullActiveChannels.isEmpty()) {
+                    Log.w(TAG, "B端响应发送后未发现FULL_ACTIVE通道，状态可能异常: senderAci=${originalMessage.senderAci}")
+                    channels.forEach { channel ->
+                        Log.d(TAG, "B端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
+                    }
+                } else {
+                    Log.i(TAG, "B端响应发送后确认通道状态正常: senderAci=${originalMessage.senderAci}, fullActiveChannels=${fullActiveChannels.size}")
+                }
+                
+                // 验证Token状态
+                val tokenPool = TransportTokenPool.getInstance(context)
+                val receivedToken = tokenPool.getValidReceivedToken(originalMessage.senderAci, originalMessage.providerType)
+                val sharedToken = tokenPool.getValidSharedToken(originalMessage.senderAci, originalMessage.providerType)
+                
+                Log.d(TAG, "B端Token状态验证: senderAci=${originalMessage.senderAci}, hasReceivedToken=${receivedToken != null}, hasSharedToken=${sharedToken != null}")
+                
+            } catch (verifyException: Exception) {
+                Log.w(TAG, "B端状态验证失败，但不影响主流程: senderAci=${originalMessage.senderAci}", verifyException)
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "生成和发送响应Token失败", e)

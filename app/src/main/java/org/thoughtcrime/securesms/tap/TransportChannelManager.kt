@@ -233,16 +233,32 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     fun getActiveChannels(recipientId: String): List<TransportChannel> {
         channelLock.read {
-            val channelIds = recipientChannels[recipientId] ?: return emptyList()
+            Log.d(TAG, "getActiveChannels查询: recipientId=$recipientId")
+            Log.d(TAG, "recipientChannels映射大小: ${recipientChannels.size}")
+            Log.d(TAG, "现有recipientChannels keys: ${recipientChannels.keys.joinToString(", ")}")
+            
+            val channelIds = recipientChannels[recipientId] ?: run {
+                Log.w(TAG, "recipientChannels中没有找到recipientId: $recipientId")
+                return emptyList()
+            }
+            
+            Log.d(TAG, "找到channelIds: $channelIds")
+            
             // 先获取所有通道快照，避免在读锁内调用可能修改状态的方法
             val channelSnapshots = channelIds.mapNotNull { channelId ->
-                channels[channelId]
+                channels[channelId]?.also { channel ->
+                    Log.d(TAG, "通道详情: channelId=$channelId, status=${channel.status}, recipientId=${channel.recipientId}")
+                }
             }
+            
+            Log.d(TAG, "获取到${channelSnapshots.size}个通道快照")
             
             // 在读锁外进行状态检查和排序
             return channelSnapshots.filter { channel ->
                 try {
-                    channel.isActive()
+                    val isActive = channel.isActive()
+                    Log.d(TAG, "通道活跃状态检查: channelId=${channel.channelId}, isActive=$isActive, status=${channel.status}")
+                    isActive
                 } catch (e: Exception) {
                     Log.w(TAG, "检查通道状态时出错: ${channel.channelId}", e)
                     false
@@ -397,6 +413,15 @@ class TransportChannelManager private constructor(private val context: Context) 
                             saveChannelToDatabase(upgradedChannel)
                             
                             Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}")
+                            
+                            // 自动启动轮询任务
+                            try {
+                                startPollingForChannel(recipientId, upgradedChannel)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "启动轮询失败，但通道升级成功: channelId=$channelId", e)
+                                // 不阻断升级成功的返回，轮询启动失败不影响通道状态
+                            }
+                            
                             return@withContext true
                         } else {
                             Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, recipientId=$recipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
@@ -422,6 +447,74 @@ class TransportChannelManager private constructor(private val context: Context) 
                     Log.d(TAG, "recipientChannels中没有找到对应的通道ID列表")
                 }
                 return@withContext false
+            }
+        }
+    }
+    
+    /**
+     * 禁用指定接收者的v2模式
+     * 将所有相关通道关闭并插入禁用消息
+     */
+    suspend fun disableV2Mode(recipientId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    val channelIds = recipientChannels[recipientId]
+                    if (channelIds.isNullOrEmpty()) {
+                        Log.i(TAG, "没有找到通道需要禁用: recipientId=$recipientId")
+                        return@withContext false
+                    }
+                    
+                    var disabledCount = 0
+                    val channelsToClose = mutableListOf<TransportChannel>()
+                    
+                    // 收集需要关闭的通道
+                    for (channelId in channelIds.toList()) {
+                        channels[channelId]?.let { channel ->
+                            if (channel.isActive()) {
+                                channelsToClose.add(channel)
+                            }
+                        }
+                    }
+                    
+                    // 关闭通道并更新状态
+                    for (channel in channelsToClose) {
+                        val closedChannel = channel.updateStatus(TransportChannelStatus.CLOSED)
+                        channels[channel.channelId] = closedChannel
+                        saveChannelToDatabase(closedChannel)
+                        disabledCount++
+                        
+                        Log.d(TAG, "已关闭通道: ${channel.channelId}, provider=${channel.providerType}")
+                    }
+                    
+                    // 清理索引
+                    recipientChannels.remove(recipientId)
+                    channelsToClose.forEach { channel ->
+                        providerChannels[channel.providerType]?.remove(channel.channelId)
+                        if (providerChannels[channel.providerType]?.isEmpty() == true) {
+                            providerChannels.remove(channel.providerType)
+                        }
+                    }
+                    
+                    if (disabledCount > 0) {
+                        Log.i(TAG, "v2模式已禁用: recipientId=$recipientId, 关闭了${disabledCount}个通道")
+                        
+                        // 插入禁用系统消息
+                        try {
+                            val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId)
+                            SignalDatabase.messages.insertTapV2ModeDisabledMessage(recipientIdObj)
+                            Log.d(TAG, "已插入v2模式禁用消息: recipientId=$recipientId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "插入v2模式禁用消息失败: recipientId=$recipientId", e)
+                        }
+                    }
+                    
+                    return@withContext disabledCount > 0
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "禁用v2模式失败: recipientId=$recipientId", e)
+                    return@withContext false
+                }
             }
         }
     }
@@ -1077,23 +1170,36 @@ class TransportChannelManager private constructor(private val context: Context) 
             try {
                 Log.d(TAG, "开始从数据库恢复通道状态...")
                 
-                // 从数据库获取所有通道
-                val dbChannels = transportChannelTable.getAllChannels()
+                // 从数据库获取所有活跃通道
+                val activeChannels = transportChannelTable.getAllActiveChannels()
                 
                 channelLock.write {
-                    // 清空当前内存中的通道
+                    // 清空当前内存缓存
                     channels.clear()
+                    recipientChannels.clear()
+                    providerChannels.clear()
                     
-                    // 将数据库中的通道加载到内存
-                    for (channel in dbChannels) {
+                    // 将数据库中的活跃通道加载到内存并重建索引
+                    for (channel in activeChannels) {
                         channels[channel.channelId] = channel
+                        
+                        // 重建recipientChannels索引
+                        recipientChannels.computeIfAbsent(channel.recipientId) { mutableSetOf() }
+                            .add(channel.channelId)
+                        
+                        // 重建providerChannels索引
+                        providerChannels.computeIfAbsent(channel.providerType) { mutableSetOf() }
+                            .add(channel.channelId)
                     }
                 }
                 
-                Log.d(TAG, "通道状态恢复完成，恢复 ${dbChannels.size} 个通道")
+                Log.i(TAG, "通道状态恢复完成，恢复 ${activeChannels.size} 个活跃通道")
+                activeChannels.forEach { channel ->
+                    Log.d(TAG, "恢复通道: ${channel.channelId}, recipient=${channel.recipientId}, provider=${channel.providerType}, status=${channel.status}")
+                }
                 
                 // 启动恢复后的清理任务
-                if (dbChannels.isNotEmpty()) {
+                if (activeChannels.isNotEmpty()) {
                     restartCleanupTask()
                 }
                 
@@ -1508,6 +1614,43 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 为通道启动轮询任务
+     */
+    private fun startPollingForChannel(recipientId: String, channel: TransportChannel) {
+        try {
+            Log.d(TAG, "为通道启动轮询任务: recipientId=$recipientId, channelId=${channel.channelId}")
+            
+            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+            
+            // 检查轮询服务状态（通过尝试启动来判断）
+            Log.d(TAG, "确保轮询服务已启动")
+            val startResult = pollingService.startPolling()
+            if (!startResult) {
+                Log.e(TAG, "轮询服务启动失败，无法为通道启动轮询")
+                throw RuntimeException("轮询服务启动失败")
+            }
+            
+            // 添加轮询目标
+            val metadata = channel.metadata
+            if (metadata == null) {
+                Log.e(TAG, "通道元数据为空，无法启动轮询: channelId=${channel.channelId}")
+                throw RuntimeException("通道元数据为空")
+            }
+            
+            val success = pollingService.addPollingTarget(recipientId, metadata)
+            
+            if (success) {
+                Log.i(TAG, "轮询任务启动成功: recipientId=$recipientId, providerType=${channel.providerType}, channelId=${channel.channelId}")
+            } else {
+                Log.w(TAG, "轮询任务启动失败: recipientId=$recipientId, providerType=${channel.providerType}, channelId=${channel.channelId}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "启动轮询任务异常: recipientId=$recipientId, channelId=${channel.channelId}", e)
+            throw e
         }
     }
 }

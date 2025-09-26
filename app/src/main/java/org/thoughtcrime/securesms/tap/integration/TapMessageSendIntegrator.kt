@@ -63,20 +63,33 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
                 return false
             }
             
-            // 2. 检查传输管理器是否已初始化
+            // 2. 检查传输管理器是否已初始化，如果未初始化则尝试按需初始化
             if (!transportManager.isInitialized()) {
-                Log.w(TAG, "传输管理器未初始化: recipientId=$recipientId")
-                return false
+                Log.w(TAG, "传输管理器未初始化，尝试按需初始化: recipientId=$recipientId")
+                try {
+                    val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+                    tapInitializer.initializeSync(false)
+                    
+                    // 再次检查初始化状态
+                    if (!transportManager.isInitialized()) {
+                        Log.w(TAG, "传输管理器按需初始化失败: recipientId=$recipientId")
+                        return false
+                    }
+                    Log.i(TAG, "传输管理器按需初始化成功: recipientId=$recipientId")
+                } catch (initException: Exception) {
+                    Log.e(TAG, "传输管理器按需初始化异常: recipientId=$recipientId", initException)
+                    return false
+                }
             }
             
             // 3. 检查是否有可用的Provider
-            val availableProviders = transportManager.getAvailableProviders()
-            if (availableProviders.isEmpty()) {
-                Log.w(TAG, "没有可用的传输提供者: recipientId=$recipientId")
+            val enabledProviders = transportManager.getEnabledProviders()
+            if (enabledProviders.isEmpty()) {
+                Log.w(TAG, "没有启用的Provider: recipientId=$recipientId")
                 return false
             }
             
-            Log.i(TAG, "Tap传输层可用: recipientId=$recipientId, providers=${availableProviders.size}")
+            Log.i(TAG, "Tap传输层可用: recipientId=$recipientId, providers=${enabledProviders.size}")
             true
             
         } catch (e: Exception) {

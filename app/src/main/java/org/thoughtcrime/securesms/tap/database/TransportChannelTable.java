@@ -213,11 +213,12 @@ public class TransportChannelTable extends DatabaseTable {
         try (Cursor cursor = getReadableDatabase().query(
             TABLE_NAME,
             null,
-            RECIPIENT_ID + " = ? AND " + STATUS + " IN (?, ?)",
+            RECIPIENT_ID + " = ? AND " + STATUS + " IN (?, ?, ?)",
             new String[]{
                 recipientId,
                 String.valueOf(TransportChannelStatus.ACTIVE.ordinal()),
-                String.valueOf(TransportChannelStatus.ESTABLISHING.ordinal())
+                String.valueOf(TransportChannelStatus.FULL_ACTIVE.ordinal()),
+                String.valueOf(TransportChannelStatus.SEND_READY.ordinal())
             },
             null,
             null,
@@ -233,6 +234,42 @@ public class TransportChannelTable extends DatabaseTable {
             }
         } catch (Exception e) {
             Log.e(TAG, "查询接收者活跃通道失败: " + recipientId, e);
+        }
+        
+        return channels;
+    }
+
+    /**
+     * 获取所有活跃通道
+     */
+    @WorkerThread
+    @NonNull
+    public List<TransportChannel> getAllActiveChannels() {
+        List<TransportChannel> channels = new ArrayList<>();
+        
+        try (Cursor cursor = getReadableDatabase().query(
+            TABLE_NAME,
+            null,
+            STATUS + " IN (?, ?, ?)",
+            new String[]{
+                String.valueOf(TransportChannelStatus.ACTIVE.ordinal()),
+                String.valueOf(TransportChannelStatus.FULL_ACTIVE.ordinal()),
+                String.valueOf(TransportChannelStatus.SEND_READY.ordinal())
+            },
+            null,
+            null,
+            PRIORITY + " DESC, " + LAST_ACTIVE_AT + " DESC"
+        )) {
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    TransportChannel channel = readTransportChannel(cursor);
+                    if (channel != null) {
+                        channels.add(channel);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "查询所有活跃通道失败", e);
         }
         
         return channels;

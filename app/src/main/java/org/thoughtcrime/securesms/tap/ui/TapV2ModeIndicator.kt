@@ -65,11 +65,19 @@ class TapV2ModeIndicator @JvmOverloads constructor(
     fun updateStatus(recipient: Recipient) {
         try {
             val channelManager = TransportChannelManager.getInstance(context)
-            val recipientIdStr = recipient.id.toString()
+            
+            // 修复：使用ACI字符串作为查询键，与通道管理保持一致
+            val recipientAci = try {
+                recipient.requireAci().toString()
+            } catch (e: Exception) {
+                Log.w(TAG, "无法获取recipient ACI，跳过Tap v2指示器更新: ${e.message}")
+                visibility = GONE
+                return
+            }
 
-            Log.d(TAG, "更新Tap v2指示器状态: recipientId=$recipientIdStr")
+            Log.d(TAG, "更新Tap v2指示器状态: recipientAci=${recipientAci.take(10)}...")
 
-            val hasActiveChannel = channelManager.hasActiveChannel(recipientIdStr)
+            val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
 
             Log.d(TAG, "通道查询结果: hasActiveChannel=$hasActiveChannel")
 
@@ -77,7 +85,7 @@ class TapV2ModeIndicator @JvmOverloads constructor(
 
                          if (hasActiveChannel) {
                  // 获取通道详细信息
-                 val channels = channelManager.getActiveChannels(recipientIdStr)
+                 val channels = channelManager.getActiveChannels(recipientAci)
                  if (channels.isNotEmpty()) {
                      val activeChannel = channels.find { it.status == TransportChannelStatus.ACTIVE }
                      if (activeChannel != null) {

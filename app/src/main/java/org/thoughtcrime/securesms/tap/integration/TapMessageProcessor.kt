@@ -3,6 +3,9 @@ package org.thoughtcrime.securesms.tap.integration
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.tap.TransportManager
@@ -21,6 +24,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * Tap消息处理器
@@ -335,13 +340,19 @@ class TapMessageProcessor private constructor(private val context: Context) {
             val availableProviders = transportManager.getAvailableProviders()
             var removed = 0
             
-            for (provider in availableProviders) {
-                val providerType = provider.providerType
-                val token = tokenPool.getValidReceivedToken(senderId.toString(), providerType)
-                if (token != null && tokenPool.removeToken(senderId.toString(), providerType)) {
-                    removed++
+            // 修复：使用ACI字符串作为键，与通道管理保持一致
+            if (senderAci != null) {
+                for (provider in availableProviders) {
+                    val providerType = provider.providerType
+                    val token = tokenPool.getValidReceivedToken(senderAci, providerType)
+                    if (token != null && tokenPool.removeToken(senderAci, providerType)) {
+                        removed++
+                    }
                 }
+            } else {
+                Log.w(TAG, "无法获取senderAci，跳过Token清理: senderId=$senderId")
             }
+            
             if (removed > 0) {
                 Log.i(TAG, "已移除Token数量: $removed, senderId=$senderId")
             }
@@ -489,21 +500,40 @@ class TapMessageProcessor private constructor(private val context: Context) {
             // 更新通道状态为FULL_ACTIVE，使用ACI作为键
             val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
             if (upgraded) {
-                Log.i(TAG, "通道成功升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                Log.i(TAG, "A端通道成功升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
                 
-                // 发送确认消息给B端，通知其也升级通道
-                try {
-                    sendTapConfirmationMessage(senderAci, tokenExchangeMessage.providerType)
-                    Log.i(TAG, "已发送Tap确认消息: senderAci=$senderAci")
-                } catch (e: Exception) {
-                    Log.e(TAG, "发送Tap确认消息失败: senderAci=$senderAci", e)
+                // A端发送确认消息并插入v2启用提示消息
+                GlobalScope.launch(Dispatchers.IO) {
+                    delay(100L) // 给数据库连接释放时间
+                    try {
+                        // 1. 发送确认消息
+                        sendTapConfirmationMessage(senderAci, tokenExchangeMessage.providerType)
+                        Log.i(TAG, "已发送Tap确认消息: senderAci=$senderAci")
+                        
+                        // 2. A端也插入v2启用提示消息
+                        delay(200L) // 给确认消息发送完成的时间
+                        try {
+                            insertV2ModeEnabledMessage(senderId)
+                            Log.i(TAG, "A端已插入v2模式启用提示消息: senderId=$senderId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "A端插入v2模式提示消息失败: senderId=$senderId", e)
+                        }
+                        
+                    } catch (e: Exception) {
+                        Log.e(TAG, "发送Tap确认消息失败: senderAci=$senderAci", e)
+                    }
                 }
                 
-                // 插入v2 mode启用提示消息
-                insertV2ModeEnabledMessage(senderId)
-                
             } else {
-                Log.w(TAG, "通道升级失败: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                Log.w(TAG, "A端通道升级失败，检查通道状态: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                // 添加调试信息，检查当前通道状态
+                val channels = channelManager.getActiveChannels(senderAci)
+                channels.forEach { channel ->
+                    Log.d(TAG, "A端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
+                }
+                if (channels.isEmpty()) {
+                    Log.w(TAG, "A端未找到任何活跃通道: senderAci=$senderAci")
+                }
             }
             
             TapProcessResult.Success("Token交换完成，通道已升级")
@@ -866,41 +896,54 @@ private fun recipientIdToAci(recipientId: org.thoughtcrime.securesms.recipients.
  */
 private suspend fun sendTapConfirmationMessage(recipientAci: String, providerType: String) {
     withContext(Dispatchers.IO) {
-        try {
-            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-            val serviceId = org.whispersystems.signalservice.api.push.ServiceId.ACI.parseOrThrow(recipientAci)
-            val recipient = org.thoughtcrime.securesms.recipients.Recipient.externalPush(serviceId)
-            
-            val confirmMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
-                senderAci = myAci,
-                providerType = providerType,
-                tokenData = emptyMap(), // 确认消息不需要token数据
-                metadata = mapOf(
-                    "confirmationType" to "channel_upgrade",
-                    "timestamp" to System.currentTimeMillis()
-                ),
-                requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM
-            )
-            
-            val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(confirmMessage)
-            val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
-                threadRecipient = recipient,
-                sentTimeMillis = System.currentTimeMillis(),
-                expiresIn = 0,
-                tokenExchangeData = encodedMessage
-            )
-            
-            // 通过Signal Server发送确认消息
-            val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
-            val messageId = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertMessageOutbox(outgoingMessage, threadId, false, null)
-            if (messageId > 0) {
-                org.thoughtcrime.securesms.jobs.IndividualSendJob.enqueue(context, org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager, messageId, recipient, false)
-                Log.i(TAG, "Tap确认消息已加入发送队列: messageId=$messageId")
+        val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+        val serviceId = org.whispersystems.signalservice.api.push.ServiceId.ACI.parseOrThrow(recipientAci)
+        val recipient = org.thoughtcrime.securesms.recipients.Recipient.externalPush(serviceId)
+        
+        val confirmMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
+            senderAci = myAci,
+            providerType = providerType,
+            tokenData = emptyMap(), // 确认消息不需要token数据
+            metadata = mapOf(
+                "confirmationType" to "channel_upgrade",
+                "timestamp" to System.currentTimeMillis()
+            ),
+            requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM
+        )
+        
+        val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(confirmMessage)
+        val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
+            threadRecipient = recipient,
+            sentTimeMillis = System.currentTimeMillis(),
+            expiresIn = 0,
+            tokenExchangeData = encodedMessage
+        )
+        
+        // 通过Signal Server发送确认消息，添加重试机制避免数据库连接冲突
+        var retryCount = 0
+        val maxRetries = 3
+        
+        while (retryCount < maxRetries) {
+            try {
+                val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+                val messageId = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertMessageOutbox(outgoingMessage, threadId, false, null)
+                if (messageId > 0) {
+                    org.thoughtcrime.securesms.jobs.IndividualSendJob.enqueue(context, org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager, messageId, recipient, false)
+                    Log.i(TAG, "Tap确认消息已加入发送队列: messageId=$messageId")
+                }
+                return@withContext // 成功则退出
+                
+            } catch (e: Exception) {
+                retryCount++
+                Log.w(TAG, "数据库操作失败，重试 $retryCount/$maxRetries: recipientAci=$recipientAci", e)
+                
+                if (retryCount < maxRetries) {
+                    delay(200L * retryCount) // 指数退避：200ms, 400ms, 600ms
+                } else {
+                    Log.e(TAG, "发送Tap确认消息异常，重试失败: recipientAci=$recipientAci", e)
+                    throw e
+                }
             }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "发送Tap确认消息异常", e)
-            throw e
         }
     }
 }
@@ -923,8 +966,21 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
         if (upgraded) {
             Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
             
-            // 插入v2 mode启用提示消息
-            insertV2ModeEnabledMessage(senderId)
+            // B端插入v2 mode启用提示消息
+            try {
+                // 改为后台Job异步插入，避免与主处理流程争用数据库连接
+                try {
+                    org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager.add(
+                        org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob(senderId)
+                    )
+                    Log.i(TAG, "已调度v2模式启用提示消息插入Job: recipientId=$senderId")
+                } catch (e: Exception) {
+                    Log.w(TAG, "调度v2模式启用消息Job失败，尝试直接插入（可能阻塞）: recipientId=$senderId", e)
+                    insertV2ModeEnabledMessage(senderId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "插入v2模式提示消息失败: senderAci=$senderAci", e)
+            }
             
         } else {
             Log.w(TAG, "收到确认消息但通道升级失败: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
@@ -943,23 +999,25 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
 private suspend fun insertV2ModeEnabledMessage(recipientId: org.thoughtcrime.securesms.recipients.RecipientId) {
     withContext(Dispatchers.IO) {
         try {
-            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
-            val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+            // 添加超时保护，避免长时间阻塞
+            withTimeout(10000) { // 10秒超时
+                val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
+                val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+                
+                // 创建系统提示消息 - 使用Profile名称变更消息的方式
+                val messageBody = "🔒 Tap v2 mode enabled"
+                
+                // 插入TAP v2 mode启用系统消息
+                val insertResult = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertTapV2ModeEnabledMessage(recipientId)
+                
+                Log.i(TAG, "已插入v2 mode启用提示消息: messageId=${insertResult.messageId}")
+            }
             
-            // 创建系统提示消息 - 使用Profile名称变更消息的方式
-            val messageBody = "🔒 Tap v2 mode enabled"
-            
-            // 使用insertChatSessionRefreshedMessage作为模板，插入系统消息
-            val insertResult = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertChatSessionRefreshedMessage(
-                recipientId,
-                0, // senderDeviceId
-                System.currentTimeMillis() // sentTimestamp
-            )
-            
-            Log.i(TAG, "已插入v2 mode启用提示消息: messageId=${insertResult.messageId}")
-            
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "插入v2 mode启用提示消息超时，跳过此步骤: recipientId=$recipientId")
+            // 超时时不插入消息，避免阻塞主流程
         } catch (e: Exception) {
-            Log.e(TAG, "插入v2 mode启用提示消息失败，跳过此步骤", e)
+            Log.e(TAG, "插入v2 mode启用提示消息失败，跳过此步骤: recipientId=$recipientId", e)
             // 不抛出异常，避免影响主流程
         }
     }

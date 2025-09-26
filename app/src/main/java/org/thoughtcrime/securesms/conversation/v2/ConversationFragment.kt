@@ -1721,14 +1721,20 @@ class ConversationFragment :
         try {
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
           
-          // 关闭所有与该联系人的活跃通道
-          val activeChannels = channelManager.getActiveChannels(recipient.id.toString())
-          var successCount = 0
+          // 使用ACI作为键查找活跃通道，而不是RecipientId
+          val recipientAci = recipient.requireAci().toString()
+          val activeChannels = channelManager.getActiveChannels(recipientAci)
           
+          Log.d(TAG, "查找活跃通道: recipientAci=$recipientAci, 找到${activeChannels.size}个通道")
+          
+          var successCount = 0
           for (channel in activeChannels) {
             val success = channelManager.closeChannel(channel.channelId)
             if (success) {
               successCount++
+              Log.d(TAG, "成功关闭通道: ${channel.channelId}")
+            } else {
+              Log.w(TAG, "关闭通道失败: ${channel.channelId}")
             }
           }
           
@@ -4019,10 +4025,42 @@ class ConversationFragment :
       }
 
       // 检查当前Tap v2模式状态
+            // 检查当前Tap v2模式状态
       val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
-      val hasActiveChannel = channelManager.hasActiveChannel(recipient.id.toString())
+      
+      // 修复：使用ACI字符串查询通道状态，与通道管理保持一致
+      val recipientAci = try {
+        recipient.requireAci().toString()
+      } catch (e: Exception) {
+        Log.w(TAG, "无法获取recipient ACI进行Tap通道查询: ${e.message}")
+        return
+      }
+      
+      val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+      
+      try {
+        val activeChannels = channelManager.getActiveChannels(recipientAci)
+        
+        if (activeChannels.isNotEmpty()) {
+          Log.i(TAG, "发现 ${activeChannels.size} 个活跃的Tap通道")
+          
+          activeChannels.forEach { channel ->
+            Log.d(TAG, "通道详情: channelId=${channel.channelId}, status=${channel.status}, provider=${channel.providerType}, priority=${channel.priority}")
+          }
+          
+          // 获取优先级最高的通道
+          val primaryChannel = activeChannels.maxByOrNull { it.priority }
+          if (primaryChannel != null) {
+            Log.i(TAG, "使用主通道: channelId=${primaryChannel.channelId}, provider=${primaryChannel.providerType}")
+          }
+        } else {
+          Log.i(TAG, "没有发现活跃的Tap通道")
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "调试Tap通道信息时出错", e)
+      }
 
-      if (hasActiveChannel) {
+        if (hasActiveChannel) {
         // 当前已启用v2模式，显示断开确认对话框
         showCosV2ModeDisconnectDialog(recipient)
       } else {

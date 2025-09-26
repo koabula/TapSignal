@@ -402,7 +402,7 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
       """.toSingleLine()
 
     private const val IS_STORY_CLAUSE = "$STORY_TYPE > 0 AND $REMOTE_DELETED = 0"
-    private const val RAW_ID_WHERE = "$TABLE_NAME.$ID = ?"
+    private val RAW_ID_WHERE = "$TABLE_NAME.$ID = ?"
 
     private val SNIPPET_QUERY =
       """
@@ -2893,6 +2893,70 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
     threads.incrementUnread(threadId, 1, 0)
     threads.update(threadId, true)
 
+    notifyConversationListeners(threadId)
+    TrimThreadJob.enqueueAsync(threadId)
+
+    return InsertResult(
+      messageId = messageId,
+      threadId = threadId,
+      threadWasNewlyCreated = threadIdResult.newlyCreated
+    )
+  }
+
+  fun insertTapV2ModeEnabledMessage(recipientId: RecipientId): InsertResult {
+    val recipient = Recipient.resolved(recipientId)
+    val threadIdResult = threads.getOrCreateThreadIdResultFor(recipient.id, recipient.isGroup)
+    val threadId = threadIdResult.threadId
+    val type = MessageTypes.TAP_V2_MODE_ENABLED_TYPE
+
+    val messageId = writableDatabase
+      .insertInto(TABLE_NAME)
+      .values(
+        FROM_RECIPIENT_ID to recipientId.serialize(),
+        FROM_DEVICE_ID to 1,
+        TO_RECIPIENT_ID to Recipient.self().id.serialize(),
+        DATE_RECEIVED to System.currentTimeMillis(),
+        DATE_SENT to System.currentTimeMillis(),
+        DATE_SERVER to -1,
+        READ to 1,
+        TYPE to type,
+        THREAD_ID to threadId
+      )
+      .run()
+
+    threads.update(threadId, true)
+    notifyConversationListeners(threadId)
+    TrimThreadJob.enqueueAsync(threadId)
+
+    return InsertResult(
+      messageId = messageId,
+      threadId = threadId,
+      threadWasNewlyCreated = threadIdResult.newlyCreated
+    )
+  }
+
+  fun insertTapV2ModeDisabledMessage(recipientId: RecipientId): InsertResult {
+    val recipient = Recipient.resolved(recipientId)
+    val threadIdResult = threads.getOrCreateThreadIdResultFor(recipient.id, recipient.isGroup)
+    val threadId = threadIdResult.threadId
+    val type = MessageTypes.TAP_V2_MODE_DISABLED_TYPE
+
+    val messageId = writableDatabase
+      .insertInto(TABLE_NAME)
+      .values(
+        FROM_RECIPIENT_ID to recipientId.serialize(),
+        FROM_DEVICE_ID to 1,
+        TO_RECIPIENT_ID to Recipient.self().id.serialize(),
+        DATE_RECEIVED to System.currentTimeMillis(),
+        DATE_SENT to System.currentTimeMillis(),
+        DATE_SERVER to -1,
+        READ to 1,
+        TYPE to type,
+        THREAD_ID to threadId
+      )
+      .run()
+
+    threads.update(threadId, true)
     notifyConversationListeners(threadId)
     TrimThreadJob.enqueueAsync(threadId)
 

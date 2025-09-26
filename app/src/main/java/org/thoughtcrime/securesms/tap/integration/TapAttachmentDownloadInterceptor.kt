@@ -87,17 +87,23 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
                 return false
             }
             
-            val senderId = message.fromRecipient.id.toString()
+            // 修复：使用发送者ACI字符串查询通道状态，与通道管理保持一致
+            val senderAci = try {
+                message.fromRecipient.requireAci().toString()
+            } catch (e: Exception) {
+                Log.w(TAG, "无法获取发送者ACI: messageId=$messageId, error=${e.message}")
+                return false
+            }
             
             // 检查是否有活跃的Tap通道
-            if (!channelManager.hasActiveChannel(senderId)) {
-                Log.w(TAG, "没有活跃的Tap通道: senderId=$senderId")
+            if (!channelManager.hasActiveChannel(senderAci)) {
+                Log.w(TAG, "没有活跃的Tap通道: senderAci=${senderAci.take(10)}...")
                 return false
             }
             
             // 通过Tap下载附件
             val downloadResult = runBlocking {
-                downloadAttachmentViaTap(senderId, attachment)
+                downloadAttachmentViaTap(senderAci, attachment)
             }
             
             if (downloadResult) {

@@ -264,8 +264,17 @@ internal object ConversationOptionsMenu {
 
         try {
           val context = callback.getContext()
+          // 检查是否有活跃的Tap通道
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-          val hasActiveChannel = channelManager.hasActiveChannel(recipient.id.toString())
+          
+          // 修复：使用ACI字符串查询通道状态，与通道管理保持一致
+          val hasActiveChannel = try {
+              val recipientAci = recipient.requireAci().toString()
+              channelManager.hasActiveChannel(recipientAci)
+          } catch (e: Exception) {
+              Log.w("ConversationOptionsMenu", "无法获取recipient ACI进行Tap通道查询: ${e.message}")
+              false
+          }
 
           cosMenuItem.isVisible = true
           if (hasActiveChannel) {

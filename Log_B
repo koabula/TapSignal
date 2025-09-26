@@ -1,63 +1,167 @@
+--------- beginning of kernel
 --------- beginning of main
 --------- beginning of system
-2025-09-25 19:39:35.296  5870-5904  MessageProcessorV2      org.thoughtcrime.securesms           I  [1758800374501] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=922
-2025-09-25 19:39:35.297  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=922
-2025-09-25 19:39:35.301  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
-2025-09-25 19:39:35.386  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token提供请求: senderId=RecipientId::8, providerType=cos
-2025-09-25 19:39:35.392  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  收到Token交换请求: senderId=RecipientId::8, senderName=koalaawang, providerType=cos
-2025-09-25 19:39:35.403  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1758800362956-2547-1758800362956","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKID52mLitsfHhvxoUwCIExSmS3KQL4at1yi","secretAccessKey":"b3IK9nHZeWDhy3wc6NTN4Zu41qTvCF5k","region":"ap-nanjing","bucketName":"newsignal1-1316759135","cloudProvider":"TENCENT"}
-2025-09-25 19:39:35.438  5870-5904  TapMessageProcessor     org.thoughtcrime.securesms           I  Token交换确认通知已显示: senderId=RecipientId::8, senderName=koalaawang
-2025-09-25 19:39:35.445  5870-5904  MessageProcessorV2      org.thoughtcrime.securesms           I  [1758800374501] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
-2025-09-25 19:39:39.998  5870-5870  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  收到Token交换操作: action=ACCEPT_TOKEN_EXCHANGE
-2025-09-25 19:39:39.998  5870-5870  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  用户接受Token交换请求: senderId=RecipientId::8
-2025-09-25 19:39:40.106  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  接收Token保存成功: senderId=RecipientId::8, senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, tokenId=cos-signal-cos-signal-v2-1758800362956-2547-1758800362956
-2025-09-25 19:39:40.107  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始生成响应Token: senderId=RecipientId::8
-2025-09-25 19:39:40.148  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：Provider列表为空，强制重新初始化
-2025-09-25 19:39:40.151  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
-2025-09-25 19:39:40.160  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
-2025-09-25 19:39:40.164  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           W  Provider不存在，尝试按需创建: cos
-2025-09-25 19:39:40.168  5870-5904  TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
-2025-09-25 19:39:40.174  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  找到Provider配置，尝试通过ProviderRegistry创建实例: cos
-2025-09-25 19:39:40.193  5870-5904  ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-25 19:39:40.198  5870-5904  ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-25 19:39:40.208  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  找到Provider注册器: cos
-2025-09-25 19:39:40.245  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  通过ProviderRegistry创建Provider成功: cos
-2025-09-25 19:39:48.830  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  响应Token生成成功: tokenId=cos-signal-cos-signal-v2-1758800380256-8907-1758800380256
-2025-09-25 19:39:48.867  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始发送Token交换响应: senderId=RecipientId::8
-2025-09-25 19:39:48.869  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           D  发送响应消息目标: targetAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=RecipientId::8
-2025-09-25 19:39:49.010  5870-5897  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  Token交换响应已发送: senderId=RecipientId::8
-2025-09-25 19:39:49.042  5870-5904  IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=1125
-2025-09-25 19:39:49.139  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientId=RecipientId::8
-2025-09-25 19:39:49.143  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
-2025-09-25 19:39:49.148  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
-2025-09-25 19:39:50.213  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientId=RecipientId::8
-2025-09-25 19:39:50.235  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
-2025-09-25 19:39:50.237  5870-5904  TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
-2025-09-25 19:39:50.365   791-829   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@48ddbd TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=843 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=138405682 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@fc42fb2} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{2bcbb03 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
-2025-09-25 19:39:51.381   573-596   WindowManager           system_server                        V  Sent Transition #476 createdAt=09-25 11:39:50.354 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=843 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=138405682 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{c1a17ea Task{24604e1 #843 type=standard A=10194:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{9c951a1 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
---------- beginning of kernel
-
-
---------- beginning of main
---------- beginning of system
-2025-09-25 19:39:22.542  6924-6960  TransportChannelManager org.thoughtcrime.securesms           I  初始化通道管理器...
-2025-09-25 19:39:22.543  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  开始从数据库恢复通道状态...
-2025-09-25 19:39:22.617  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道状态恢复完成，恢复 13 个通道
-2025-09-25 19:39:22.618  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  重启通道清理任务
-2025-09-25 19:39:22.619  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  停止通道清理任务
-2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  启动通道清理任务，间隔: 3600000ms
-2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  停止通道清理任务
-2025-09-25 19:39:22.620  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  启动通道清理任务，间隔: 3600000ms
-2025-09-25 19:39:22.621  6924-6960  TransportChannelManager org.thoughtcrime.securesms           I  通道管理器初始化完成
---------- beginning of kernel
-2025-09-25 19:39:34.408  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  创建通道: recipientId=********-****-****-****-*********461
-2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  解析Token信息成功: providerType=cos, tokenId=cos-*************************************************2956
-2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  处理包含完整token数据的通道创建请求
-2025-09-25 19:39:34.412  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  创建通道元数据: recipientId=********-****-****-****-*********461, providerType=cos
-2025-09-25 19:39:34.419  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=a3adde1ba3b08264, peerHashedId=053abb43f297ee1d, mySendPath=/outbox/053abb43f297ee1d/text/, peerReceivePath=/outbox/a3adde1ba3b08264/text/
-2025-09-25 19:39:34.425  6924-6960  TransportChannelManager org.thoughtcrime.securesms           V  保存通道到数据库成功: ch_********-****-****-****-*********461_cos_1758800374419
-2025-09-25 19:39:34.456  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  建立通道: ch_********-****-****-****-*********461_cos_1758800374419, 接收者: ********-****-****-****-*********461, 提供者: cos
-2025-09-25 19:39:34.456  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道创建成功: channelId=ch_********-****-****-****-*********461_cos_1758800374419
-2025-09-25 19:39:34.908  6924-6960  TransportChannelManager org.thoughtcrime.securesms           D  通道健康检查通过，状态更新为: FULL_ACTIVE, channelId: ch_********-****-****-****-*********461_cos_1758800374419
-2025-09-25 19:39:49.499  6924-6960  TransportChannelManager org.thoughtcrime.securesms           W  通道状态不支持升级: channelId=ch_********-****-****-****-*********461_cos_1758800374419, currentStatus=ESTABLISHING, recipientId=********-****-****-****-*********461
-2025-09-25 19:39:49.500  6924-6960  TransportChannelManager org.thoughtcrime.securesms           W  未找到可升级的通道: recipientId=********-****-****-****-*********461, providerType=cos, 检查了1个通道
+2025-09-26 15:45:27.148 18028-18063 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872725268] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=922
+2025-09-26 15:45:27.148 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=922
+2025-09-26 15:45:27.150 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
+2025-09-26 15:45:27.221 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token提供请求: senderId=RecipientId::8, providerType=cos
+2025-09-26 15:45:27.221 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  收到Token交换请求: senderId=RecipientId::8, senderName=koalaawang, providerType=cos
+2025-09-26 15:45:27.230 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1758872709916-4992-1758872709916","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKIDHg8piaJyVqzX7ViiWBdtvmRt8B1e9SaY","secretAccessKey":"pQp10mNwJUSFtMcjeMr9FCvXxBD3g7MP","region":"ap-nanjing","bucketName":"newsignal1-1316759135","cloudProvider":"TENCENT"}
+2025-09-26 15:45:27.260 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  Token交换确认通知已显示: senderId=RecipientId::8, senderName=koalaawang
+2025-09-26 15:45:27.262 18028-18063 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872725268] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
+2025-09-26 15:45:30.728 18028-18028 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  收到Token交换操作: action=ACCEPT_TOKEN_EXCHANGE
+2025-09-26 15:45:30.728 18028-18028 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  用户接受Token交换请求: senderId=RecipientId::8
+2025-09-26 15:45:30.783 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  接收Token保存成功: senderId=RecipientId::8, senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, tokenId=cos-signal-cos-signal-v2-1758872709916-4992-1758872709916
+2025-09-26 15:45:30.784 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始生成响应Token: senderId=RecipientId::8
+2025-09-26 15:45:30.807 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：TransportManager未初始化，强制重新初始化
+2025-09-26 15:45:30.807 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
+2025-09-26 15:45:30.808 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  初始化核心组件...
+2025-09-26 15:45:30.808 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  配置管理器初始化完成
+2025-09-26 15:45:30.809 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  Token池初始化完成
+2025-09-26 15:45:30.811 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
+2025-09-26 15:45:30.820 18028-18063 ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 15:45:30.823 18028-18063 ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 15:45:30.859 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
+2025-09-26 15:45:30.862 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
+2025-09-26 15:45:30.863 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
+2025-09-26 15:45:30.866 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
+2025-09-26 15:45:30.884 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  传输管理器初始化完成，可用Provider数量: 1
+2025-09-26 15:45:30.884 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  已注册Provider: cos - 云对象存储 (COS)
+2025-09-26 15:45:30.885 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  通道管理器初始化完成
+2025-09-26 15:45:30.887 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
+2025-09-26 15:45:30.887 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
+2025-09-26 15:45:30.896 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
+2025-09-26 15:45:30.897 18028-18183 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
+2025-09-26 15:45:30.901 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 3
+2025-09-26 15:45:30.902 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 3
+2025-09-26 15:45:30.903 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
+2025-09-26 15:45:30.904 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 3
+2025-09-26 15:45:30.904 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
+2025-09-26 15:45:30.904 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I    - ********-****-****-****-*********973
+2025-09-26 15:45:30.905 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I    - 8
+2025-09-26 15:45:30.905 18028-18183 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=6, memory=11967MB, performance=HIGH, lowPower=false, memoryPressure=false]
+2025-09-26 15:45:30.905 18028-18183 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
+2025-09-26 15:45:30.905 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I    - RecipientId::8
+2025-09-26 15:45:30.906 18028-18183 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
+2025-09-26 15:45:30.907 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 3
+2025-09-26 15:45:30.908 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
+2025-09-26 15:45:30.911 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=********-****-****-****-*********973
+2025-09-26 15:45:30.914 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=8
+2025-09-26 15:45:30.916 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=RecipientId::8
+2025-09-26 15:45:30.916 18028-18063 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
+2025-09-26 15:45:38.504 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  响应Token生成成功: tokenId=cos-signal-cos-signal-v2-1758872730915-8891-1758872730915
+2025-09-26 15:45:38.820 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端成功建立传输通道: channelId=ch_c716a84d-2fbd-4598-8bc3-b12cbba41973_cos_1758872738537, recipientId=c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 15:45:38.821 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  开始发送Token交换响应: senderId=RecipientId::8
+2025-09-26 15:45:38.822 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  发送响应消息目标: targetAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=RecipientId::8
+2025-09-26 15:45:38.940 18028-18183 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  Token交换响应已发送: senderId=RecipientId::8
+2025-09-26 15:45:38.998 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=1169
+2025-09-26 15:45:39.944 18028-18182 TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端响应发送后确认通道状态正常: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, fullActiveChannels=1
+2025-09-26 15:45:39.945 18028-18182 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  B端Token状态验证: senderAci=c716a84d-2fbd-4598-8bc3-b12cbba41973, hasReceivedToken=true, hasSharedToken=true
+2025-09-26 15:45:40.293 18028-18063 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872738769] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=219
+2025-09-26 15:45:40.295 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::8, bodyLength=219
+2025-09-26 15:45:40.296 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
+2025-09-26 15:45:40.296 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换确认: senderId=RecipientId::8, providerType=cos
+2025-09-26 15:45:40.307 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  收到确认消息，通道升级为FULL_ACTIVE: senderId=RecipientId::8, senderAci=********-****-****-****-*********973, providerType=cos
+2025-09-26 15:45:40.316 18028-18063 Job                     org.thoughtcrime.securesms           I  [JOB::fdf9aea6-af9e-4327-8eee-c61d674930e1][TapInsertV2EnabledMessageJob] onSubmit() (Time Since Submission: 5 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 15:45:40.319 18028-18063 TapMessageProcessor     org.thoughtcrime.securesms           I  已调度v2模式启用提示消息插入Job: recipientId=RecipientId::8
+2025-09-26 15:45:40.319 18028-18063 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872738769] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
+2025-09-26 15:45:40.329 18028-18063 JobRunner               org.thoughtcrime.securesms           I  [JOB::fdf9aea6-af9e-4327-8eee-c61d674930e1][TapInsertV2EnabledMessageJob][1] Running job. (Time Since Submission: 15 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 15:45:40.357 18028-18063 TapInsertV2EnabledMessa org.thoughtcrime.securesms           I  Inserted v2-enabled system message: messageId=1170, threadId=6
+2025-09-26 15:45:40.365 18028-18063 JobRunner               org.thoughtcrime.securesms           I  [JOB::fdf9aea6-af9e-4327-8eee-c61d674930e1][TapInsertV2EnabledMessageJob][1] Job finished with result SUCCESS in 33 ms. (Time Since Submission: 49 ms, Lifespan: Immortal, Run Attempt: 1/1, Queue: RecipientId::8)
+2025-09-26 15:46:21.135 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::8
+2025-09-26 15:46:21.143 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
+2025-09-26 15:46:21.144 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=1172
+2025-09-26 15:46:21.145 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=1172, recipient=RecipientId::8
+2025-09-26 15:46:21.145 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=1172
+2025-09-26 15:46:21.145 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=1172, recipient=RecipientId::8
+2025-09-26 15:46:21.230 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=1172
+2025-09-26 15:46:21.231 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=1172
+2025-09-26 15:46:21.231 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=1172, recipient=RecipientId::8
+2025-09-26 15:46:21.244 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientAci=********-****-****-****-*********973
+2025-09-26 15:46:21.280 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider
+2025-09-26 15:46:21.286 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
+2025-09-26 15:46:21.287 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********973
+2025-09-26 15:46:21.332 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=66
+2025-09-26 15:46:21.333 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=1172, ciphertextLength=66
+2025-09-26 15:46:21.338 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********936
+2025-09-26 15:46:21.339 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-09-26 15:46:21.343 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-09-26 15:46:21.346 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-09-26 15:46:21.351 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-09-26 15:46:21.371 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
+2025-09-26 15:46:21.374 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********973_cos_1758872738537, status=FULL_ACTIVE, provider=cos
+2025-09-26 15:46:21.378 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-09-26 15:46:21.477 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败后的系统诊断:
+2025-09-26 15:46:21.499 18028-18288 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
+2025-09-26 15:46:21.503 18028-18288 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-09-26 15:46:21.527 18028-18288 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, interval=5000ms
+2025-09-26 15:46:21.533 18028-18288 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
+2025-09-26 15:46:21.533 18028-18288 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-09-26 15:46:21.533 18028-18288 TapPollingService       org.thoughtcrime.securesms           W  轮询目标已存在: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-26 15:46:21.539 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  === TAP系统状态诊断 ===
+                                                                                                    1. TransportManager状态:
+                                                                                                       - 初始化状态: true
+                                                                                                    2. Provider状态:
+                                                                                                       - 可用Provider数: 1
+                                                                                                       - 启用Provider数: 1
+                                                                                                       - 可用: cos (云对象存储 (COS))
+                                                                                                       - 启用: cos (云对象存储 (COS))
+                                                                                                    3. 通道状态:
+                                                                                                       - 活跃通道数: 1
+                                                                                                       - 通道: ch_********-****-****-****-*********973_cos_1758872738537
+                                                                                                         * 状态: FULL_ACTIVE
+                                                                                                         * Provider: cos
+                                                                                                         * recipientId: ********-****-****-****-*********973
+                                                                                                         * 是否活跃: true
+                                                                                                    4. Token状态:
+                                                                                                       - 接收Token数: 2
+                                                                                                       - 共享Token数: 2
+                                                                                                       - 接收Token: cos-signal-cos-signal-v2-1758872709916-4992-1758872709916 (cos)
+                                                                                                       - 共享Token: cos-signal-cos-signal-v2-1758872730915-8891-1758872730915 (cos)
+                                                                                                    5. 轮询状态:
+                                                                                                       - 轮询服务启动结果: true
+                                                                                                       - 轮询目标添加测试: true
+                                                                                                    6. 配置状态:
+                                                                                                       - 已配置Provider: cos
+                                                                                                       - 持久化启用Provider: cos
+                                                                                                       - 应执行初始化: false
+                                                                                                    === 诊断完成 ===
+2025-09-26 15:46:21.543 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           W  TAP路由失败，尝试自动修复...
+2025-09-26 15:46:21.543 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始自动修复TAP系统问题
+2025-09-26 15:46:21.564 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，修复问题数: 0
+2025-09-26 15:46:21.564 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           W  自动修复未能解决问题
+2025-09-26 15:46:21.566 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用providers=1
+2025-09-26 15:46:21.566 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用provider: cos - 云对象存储 (COS)
+2025-09-26 15:46:21.567 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败: messageId=********-****-****-****-*********936, error=PROVIDER_UNAVAILABLE
+2025-09-26 15:46:21.569 18028-18063 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP传输失败: messageId=1172, error=PROVIDER_UNAVAILABLE
+2025-09-26 15:46:21.569 18028-18063 TapMessageSendIntegrato org.thoughtcrime.securesms           E  Tap传输层发送失败: messageId=1172, reason=TAP传输失败: 没有可用的传输提供者 (详见日志)
+2025-09-26 15:46:21.576 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           E  Tap传输层集成发送失败: messageId=1172, reason=Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
+2025-09-26 15:46:21.579 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           E  Tap传输层集成发送异常: messageId=1172
+                                                                                                    java.io.IOException: Tap传输层集成发送失败: Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:510)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31)
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88)
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51)
+2025-09-26 15:46:21.580 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           W  Tap发送异常，v2 mode不回退到Signal Server: messageId=1172
+2025-09-26 15:46:21.582 18028-18063 IndividualSendJob       org.thoughtcrime.securesms           W  Tap检查异常，回退到原生发送: messageId=1172
+                                                                                                    java.lang.RuntimeException: Tap发送失败，v2 mode不支持回退
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:535)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31)
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88)
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51)
+                                                                                                    Caused by: java.io.IOException: Tap传输层集成发送失败: Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:510)
+                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192) 
+                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131) 
+                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42) 
+                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31) 
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88) 
+                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51) 
+2025-09-26 15:46:23.136 18028-18182 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-09-26 15:46:23.423 18028-18182 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973

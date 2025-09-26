@@ -282,6 +282,9 @@ public final class JobManagerFactories {
       put(TypingSendJob.KEY,                           new TypingSendJob.Factory());
       put(UploadAttachmentToArchiveJob.KEY,            new UploadAttachmentToArchiveJob.Factory());
 
+      // Tap
+      put(org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob.KEY, new org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob.Factory());
+
       // Migrations
       put(AccountConsistencyMigrationJob.KEY,             new AccountConsistencyMigrationJob.Factory());
       put(AccountRecordMigrationJob.KEY,                  new AccountRecordMigrationJob.Factory());

@@ -105,14 +105,89 @@ class TransportManager private constructor(private val context: Context) {
                     routingPolicy = config.routingPolicy
                     
                     // 初始化Provider管理器（内部注册默认工厂并加载配置）
-                    if (!providerManager.initialize()) {
-                        Log.e(TAG, "Provider管理器初始化失败")
-                        return@withContext false
+                    Log.d(TAG, "开始初始化Provider管理器...")
+                    val providerInitResult = providerManager.initialize()
+                    Log.d(TAG, "Provider管理器初始化结果: $providerInitResult")
+                    
+                    if (!providerInitResult) {
+                        // 增强错误诊断
+                        Log.e(TAG, "Provider管理器初始化失败 - 详细诊断:")
+                        try {
+                            val providerRegistry = org.thoughtcrime.securesms.tap.ProviderRegistry.getInstance(context)
+                            val registeredProviderTypes = providerRegistry.getAvailableProviderTypes()
+                            Log.e(TAG, "  - 已注册Provider数量: ${registeredProviderTypes.size}")
+                            registeredProviderTypes.forEach { providerType ->
+                                val registrar = providerRegistry.getProviderRegistrar(providerType)
+                                Log.e(TAG, "    * $providerType: ${registrar?.javaClass?.simpleName ?: "未知"}")
+                            }
+                            
+                            // 检查Provider配置
+                            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                            val configuredProviders = configManager.getConfiguredProviders()
+                            Log.e(TAG, "  - 已配置Provider数量: ${configuredProviders.size}")
+                            configuredProviders.forEach { providerType ->
+                                Log.e(TAG, "    * 配置的Provider: $providerType")
+                            }
+                            
+                        } catch (diagnosisException: Exception) {
+                            Log.e(TAG, "Provider诊断异常", diagnosisException)
+                        }
+                        
+                        // 尝试强制重新初始化ProviderRegistry
+                        Log.w(TAG, "尝试强制重新初始化ProviderRegistry...")
+                        try {
+                            val providerRegistry = org.thoughtcrime.securesms.tap.ProviderRegistry.getInstance(context)
+                            // 使用ProviderRegistry的resetInstance方法
+                            val resetMethod = org.thoughtcrime.securesms.tap.ProviderRegistry::class.java.getDeclaredMethod("resetInstance")
+                            resetMethod.isAccessible = true
+                            resetMethod.invoke(null)
+                            
+                            // 重新获取实例并初始化
+                            val newProviderRegistry = org.thoughtcrime.securesms.tap.ProviderRegistry.getInstance(context)
+                            newProviderRegistry.initialize()
+                            
+                            // 重新初始化
+                            val retryResult = providerManager.initialize()
+                            Log.i(TAG, "Provider管理器重新初始化结果: $retryResult")
+                            
+                            if (!retryResult) {
+                                Log.e(TAG, "Provider管理器重新初始化仍然失败")
+                                return@withContext false
+                            }
+                        } catch (retryException: Exception) {
+                            Log.e(TAG, "Provider管理器重新初始化异常", retryException)
+                            return@withContext false
+                        }
+                    }
+                    
+                    // 从持久化存储恢复启用的Provider配置
+                    val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                    val persistedEnabledProviders = tapValues.getEnabledProviders()
+                    
+                    // 自动启用已注册的活跃Provider，确保检查和发送阶段的一致性
+                    val activeProviders = providerManager.getActiveProviders()
+                    if (activeProviders.isNotEmpty()) {
+                        val activeProviderTypes = activeProviders.map { it.providerType }.toSet()
+                        val finalEnabledProviders = persistedEnabledProviders + activeProviderTypes
+                        
+                        currentConfig = currentConfig.copy(enabledProviders = finalEnabledProviders)
+                        
+                        // 持久化最新的启用Provider列表
+                        tapValues.setEnabledProviders(finalEnabledProviders)
+                        
+                        Log.i(TAG, "恢复启用Provider: ${persistedEnabledProviders.joinToString(", ")}")
+                        Log.i(TAG, "自动启用活跃Provider: ${activeProviderTypes.joinToString(", ")}")
+                        Log.i(TAG, "最终启用Provider: ${finalEnabledProviders.joinToString(", ")}")
+                    } else if (persistedEnabledProviders.isNotEmpty()) {
+                        // 只有持久化的Provider，没有活跃的Provider
+                        currentConfig = currentConfig.copy(enabledProviders = persistedEnabledProviders)
+                        Log.i(TAG, "恢复启用Provider（无活跃Provider）: ${persistedEnabledProviders.joinToString(", ")}")
                     }
                     
                     // 输出初始化后的provider状态
                     val availableProviders = getAvailableProviders()
-                    Log.i(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}")
+                    val enabledProviders = getEnabledProviders()
+                    Log.i(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}，已启用: ${enabledProviders.size}")
                     availableProviders.forEach { provider ->
                         Log.d(TAG, "可用Provider: ${provider.providerType} - ${provider.displayName}")
                     }
@@ -174,7 +249,17 @@ class TransportManager private constructor(private val context: Context) {
     fun getEnabledProviders(): List<TransportProvider> {
         // 以ProviderManager的活跃Provider为准，同时检查当前配置启用状态
         val active = providerManager.getActiveProviders()
-        return active.filter { provider -> currentConfig.isProviderEnabled(provider.providerType) }
+        Log.d(TAG, "获取启用Provider: 活跃Provider数量=${active.size}, 配置启用列表=${currentConfig.enabledProviders}")
+        
+        // 当未配置任何启用项时，默认启用所有活跃Provider，避免启用态与活跃态脱节
+        if (currentConfig.enabledProviders.isEmpty()) {
+            Log.d(TAG, "配置启用列表为空，返回所有活跃Provider: ${active.map { it.providerType }}")
+            return active
+        }
+        
+        val filtered = active.filter { provider -> currentConfig.isProviderEnabled(provider.providerType) }
+        Log.d(TAG, "根据配置过滤Provider: 结果=${filtered.map { it.providerType }}")
+        return filtered
     }
     
     /**
@@ -377,26 +462,196 @@ class TransportManager private constructor(private val context: Context) {
                     )
                 }
                 
-                Log.d(TAG, "路由消息: messageId=${message.messageId}, recipientId=$recipientId")
+                // recipientId格式标准化和诊断
+                Log.d(TAG, "原始recipientId: $recipientId")
                 
-                // 使用路由管理器选择最佳提供者
+                // 检查recipientId格式
+                val isUUID = try {
+                    java.util.UUID.fromString(recipientId)
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+                
+                val isRecipientIdFormat = recipientId.startsWith("RecipientId::")
+                Log.d(TAG, "recipientId格式检查: isUUID=$isUUID, isRecipientIdFormat=$isRecipientIdFormat")
+                
+                val normalizedRecipientId = when {
+                    isUUID -> {
+                        // 已经是UUID格式，直接使用
+                        Log.d(TAG, "recipientId已是UUID格式，直接使用")
+                        recipientId
+                    }
+                    isRecipientIdFormat -> {
+                        // RecipientId格式，需要转换为ACI
+                        try {
+                            val recipientIdNumber = recipientId.substringAfter("RecipientId::").toLong()
+                            val recipientObj = org.thoughtcrime.securesms.recipients.Recipient.resolved(
+                                org.thoughtcrime.securesms.recipients.RecipientId.from(recipientIdNumber)
+                            )
+                            val aci = recipientObj.requireServiceId().toString()
+                            Log.d(TAG, "RecipientId格式转换: $recipientId -> $aci")
+                            aci
+                        } catch (e: Exception) {
+                            Log.e(TAG, "RecipientId格式转换失败: $recipientId", e)
+                            recipientId
+                        }
+                    }
+                    else -> {
+                        // 其他格式，可能是数字ID，尝试转换
+                        try {
+                            val recipientIdNumber = recipientId.toLong()
+                            val recipientObj = org.thoughtcrime.securesms.recipients.Recipient.resolved(
+                                org.thoughtcrime.securesms.recipients.RecipientId.from(recipientIdNumber)
+                            )
+                            val aci = recipientObj.requireServiceId().toString()
+                            Log.d(TAG, "数字ID格式转换: $recipientId -> $aci")
+                            aci
+                        } catch (e: Exception) {
+                            Log.w(TAG, "无法识别的recipientId格式，直接使用: $recipientId")
+                            recipientId
+                        }
+                    }
+                }
+                
+                Log.d(TAG, "标准化后recipientId: $normalizedRecipientId")
+                
+                if (normalizedRecipientId != recipientId) {
+                    Log.i(TAG, "recipientId已标准化: $recipientId -> $normalizedRecipientId")
+                }
+                
+                Log.d(TAG, "开始消息路由诊断: messageId=${message.messageId}, 原始recipientId=$recipientId, 标准化recipientId=$normalizedRecipientId")
+                
+                // 详细的系统状态检查
+                Log.d(TAG, "路由诊断 - 系统状态:")
+                Log.d(TAG, "  - 初始化状态: $isInitialized")
+                Log.d(TAG, "  - 配置启用Provider: ${currentConfig.enabledProviders}")
+                Log.d(TAG, "  - ProviderManager状态: 已初始化")
+                
+                // Provider状态详细检查
+                val activeProviders = providerManager.getActiveProviders()
+                Log.d(TAG, "  - 活跃Provider数量: ${activeProviders.size}")
+                activeProviders.forEach { provider ->
+                    Log.d(TAG, "    * ${provider.providerType}: ${provider.displayName}")
+                }
+                
+                // 通道状态检查（使用标准化的recipientId）
+                val hasActiveChannel = channelManager.value.hasActiveChannel(normalizedRecipientId)
+                Log.d(TAG, "  - 通道状态: hasActiveChannel=$hasActiveChannel (使用标准化recipientId)")
+                
+                // 获取可用Provider并记录详细信息
+                var enabledProviders = getEnabledProviders()
+                Log.d(TAG, "当前启用Provider列表: ${enabledProviders.map { "${it.providerType}(${it.javaClass.simpleName})" }}")
+                
+                // 如果没有启用的Provider，但有活跃的Provider，则自动启用活跃Provider
+                if (enabledProviders.isEmpty()) {
+                    val activeProviders = providerManager.getActiveProviders()
+                    Log.w(TAG, "没有启用的Provider，但有 ${activeProviders.size} 个活跃Provider，尝试自动修复")
+                    
+                    if (activeProviders.isNotEmpty()) {
+                        val activeProviderTypes = activeProviders.map { it.providerType }.toSet()
+                        currentConfig = currentConfig.copy(enabledProviders = activeProviderTypes)
+                        enabledProviders = getEnabledProviders()
+                        
+                        // 持久化自动修复的结果
+                        val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                        tapValues.setEnabledProviders(activeProviderTypes)
+                        
+                        Log.i(TAG, "自动修复完成，已启用活跃Provider: ${activeProviderTypes.joinToString(", ")}")
+                        Log.i(TAG, "自动修复诊断: 配置已持久化，重新获取启用Provider数量=${enabledProviders.size}")
+                    } else {
+                        Log.w(TAG, "自动修复失败: 没有活跃Provider可以启用")
+                    }
+                } else {
+                    Log.d(TAG, "Provider状态正常: 启用Provider数量=${enabledProviders.size}")
+                }
+                
+                // 使用路由管理器选择最佳提供者（使用标准化的recipientId）
                 val bestProvider = routingManager.selectBestProvider(
-                    recipientId = recipientId,
+                    recipientId = normalizedRecipientId,
                     message = message,
-                    availableProviders = getEnabledProviders()
+                    availableProviders = enabledProviders
                 )
                 
                 if (bestProvider == null) {
+                    // === 实时故障诊断 ===
+                    Log.e(TAG, "=== selectBestProvider失败，开始实时诊断 ===")
+                    Log.e(TAG, "诊断时间点: 路由选择失败时")
+                    Log.e(TAG, "传入参数:")
+                    Log.e(TAG, "  - recipientId: $normalizedRecipientId")
+                    Log.e(TAG, "  - 原始recipientId: $recipientId")
+                    Log.e(TAG, "  - messageId: ${message.messageId}")
+                    Log.e(TAG, "  - enabledProviders数量: ${enabledProviders.size}")
+                    
+                    // 实时检查通道状态
+                    val immediateChannels = channelManager.value.getActiveChannels(normalizedRecipientId)
+                    Log.e(TAG, "实时通道检查:")
+                    Log.e(TAG, "  - getActiveChannels()返回数量: ${immediateChannels.size}")
+                    immediateChannels.forEach { channel ->
+                        Log.e(TAG, "    * 通道: ${channel.channelId}")
+                        Log.e(TAG, "      - 状态: ${channel.status}")
+                        Log.e(TAG, "      - Provider: ${channel.providerType}")
+                        Log.e(TAG, "      - recipientId: ${channel.recipientId}")
+                        Log.e(TAG, "      - isActive(): ${channel.isActive()}")
+                        Log.e(TAG, "      - metadata != null: ${channel.metadata != null}")
+                    }
+                    
+                    // 检查是否是recipientId格式问题
+                    if (normalizedRecipientId != recipientId) {
+                        Log.e(TAG, "尝试用原始recipientId查询:")
+                        val channelsWithOriginalId = channelManager.value.getActiveChannels(recipientId)
+                        Log.e(TAG, "  - 原始ID查询结果: ${channelsWithOriginalId.size}个通道")
+                    }
+                    
+                    // 检查所有活跃通道中是否有相关的
+                    val allActiveChannels = channelManager.value.getAllActiveChannels()
+                    val relatedChannels = allActiveChannels.filter { 
+                        it.recipientId == normalizedRecipientId || it.recipientId == recipientId 
+                    }
+                    Log.e(TAG, "在所有活跃通道中查找:")
+                    Log.e(TAG, "  - 总活跃通道数: ${allActiveChannels.size}")
+                    Log.e(TAG, "  - 相关通道数: ${relatedChannels.size}")
+                    relatedChannels.forEach { channel ->
+                        Log.e(TAG, "    * 相关通道: ${channel.channelId}, recipientId=${channel.recipientId}")
+                    }
+                    
+                    // 检查enabledProviders是否与通道的Provider匹配
+                    enabledProviders.forEach { provider ->
+                        Log.e(TAG, "启用Provider检查: ${provider.providerType}")
+                        val matchingChannels = immediateChannels.filter { it.providerType == provider.providerType }
+                        Log.e(TAG, "  - 匹配此Provider的通道数: ${matchingChannels.size}")
+                    }
+                    
+                    // 详细的错误诊断
+                    Log.e(TAG, "=== Provider选择失败详细诊断 ===")
+                    Log.e(TAG, "启用Provider数量: ${enabledProviders.size}")
+                    Log.e(TAG, "活跃Provider数量: ${activeProviders.size}")
+                    Log.e(TAG, "配置启用列表: ${currentConfig.enabledProviders}")
+                    Log.e(TAG, "系统初始化状态: $isInitialized")
+                    Log.e(TAG, "通道状态: hasActiveChannel=$hasActiveChannel")
+                    
+                    if (enabledProviders.isEmpty() && activeProviders.isNotEmpty()) {
+                        Log.e(TAG, "问题分析: 有活跃Provider但启用列表为空，可能是配置同步问题")
+                        Log.e(TAG, "活跃Provider详情: ${activeProviders.map { "${it.providerType}:${it.javaClass.simpleName}" }}")
+                    } else if (activeProviders.isEmpty()) {
+                        Log.e(TAG, "问题分析: 没有活跃Provider，可能是Provider初始化问题")
+                    } else if (immediateChannels.isNotEmpty() && enabledProviders.isNotEmpty()) {
+                        Log.e(TAG, "问题分析: 有通道有Provider但选择失败，可能是selectBestProvider逻辑问题")
+                        Log.e(TAG, "需要检查routingManager.selectBestProvider方法的实现")
+                    } else {
+                        Log.e(TAG, "问题分析: Provider选择逻辑异常")
+                    }
+                    
                     return@withContext TransportResult.failure(
                         TransportError.PROVIDER_UNAVAILABLE,
                         false,
-                        "没有可用的传输提供者"
+                        "没有可用的传输提供者 (详见日志)"
                     )
                 }
                 
-                // 获取或创建传输通道
+                // 获取或创建传输通道（使用标准化的recipientId）
                 val channel = channelManager.value.getOrCreateChannel(
-                    recipientId = recipientId,
+                    recipientId = normalizedRecipientId,
                     providerType = bestProvider.providerType,
                     provider = bestProvider
                 )

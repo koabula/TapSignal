@@ -74,6 +74,13 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         return try {
             Log.i(TAG, "开始Signal加密+Tap传输: messageId=$messageId, recipient=${recipient.id}")
             
+            // 0. 发送前状态验证和同步
+            val recipientAci = recipient.requireAci().toString()
+            if (!validateAndSyncStateBeforeSend(recipientAci)) {
+                Log.e(TAG, "发送前状态验证失败: messageId=$messageId, recipientAci=$recipientAci")
+                return TapSignalSendResult.Failed("发送前状态验证失败")
+            }
+            
             // 1. 构建Signal数据消息
             val signalDataMessage = buildSignalDataMessage(outgoingMessage)
             val signalServiceAddress = SignalServiceAddress(recipient.requireServiceId())
@@ -416,8 +423,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         return try {
             Log.d(TAG, "通过TAP传输层发送: messageId=${transportMessage.messageId}")
             
-            // 获取传输路由
-            val routingResult = transportManager.routeMessage(transportMessage, recipient.requireAci().toString())
+            // 路由前诊断
+            val routingResult = routeMessageWithDiagnostics(transportMessage, recipient.requireAci().toString())
             
             when (routingResult) {
                 is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
@@ -449,6 +456,92 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 "TAP传输异常: ${e.message}"
             )
         }
+    }
+    
+    /**
+     * 带诊断信息的消息路由
+     */
+    private suspend fun routeMessageWithDiagnostics(
+        transportMessage: org.thoughtcrime.securesms.tap.TransportMessage,
+        recipientAci: String
+    ): org.thoughtcrime.securesms.tap.TransportResult {
+        Log.d(TAG, "开始路由消息，进行详细诊断")
+        
+        // 1. 检查TransportManager状态
+        if (!transportManager.isInitialized()) {
+            Log.w(TAG, "路由时发现TransportManager未初始化，尝试重新初始化")
+            val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+            tapInitializer.initializeSync(false)
+        }
+        
+        // 2. 详细检查provider状态
+        val availableProviders = transportManager.getAvailableProviders()
+        val enabledProviders = transportManager.getEnabledProviders()
+        
+        Log.d(TAG, "路由诊断: 可用providers=${availableProviders.size}, 启用providers=${enabledProviders.size}")
+        availableProviders.forEach { provider ->
+            Log.d(TAG, "可用provider: ${provider.providerType} - ${provider.displayName}")
+        }
+        enabledProviders.forEach { provider ->
+            Log.d(TAG, "启用provider: ${provider.providerType} - ${provider.displayName}")
+        }
+        
+        // 3. 检查通道状态
+        val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+        val activeChannels = channelManager.getActiveChannels(recipientAci)
+        
+        Log.d(TAG, "路由诊断: 活跃通道数=${activeChannels.size}")
+        activeChannels.forEach { channel ->
+            Log.d(TAG, "活跃通道: ${channel.channelId}, status=${channel.status}, provider=${channel.providerType}")
+        }
+        
+        // 4. 检查Token状态
+        val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+        for (channel in activeChannels) {
+            val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
+            val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
+            Log.d(TAG, "Token状态检查: provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken")
+        }
+        
+        // 5. 尝试路由
+        val routeResult = transportManager.routeMessage(transportMessage, recipientAci)
+        
+        if (routeResult is org.thoughtcrime.securesms.tap.TransportResult.Failed) {
+            // 输出详细的系统诊断信息
+            Log.e(TAG, "TAP路由失败后的系统诊断:")
+            val diagnostics = diagnoseTapSystemState(recipientAci)
+            Log.e(TAG, diagnostics)
+            
+            // 尝试自动修复
+            Log.w(TAG, "TAP路由失败，尝试自动修复...")
+            try {
+                val fixResult = autoFixTapSystemIssues(recipientAci)
+                if (fixResult) {
+                    Log.i(TAG, "自动修复完成，重新尝试路由...")
+                    // 重新尝试路由
+                    val retryResult = transportManager.routeMessage(transportMessage, recipientAci)
+                    if (retryResult is org.thoughtcrime.securesms.tap.TransportResult.Success) {
+                        Log.i(TAG, "自动修复后路由成功")
+                        return retryResult
+                    } else {
+                        Log.w(TAG, "自动修复后路由仍然失败")
+                    }
+                } else {
+                    Log.w(TAG, "自动修复未能解决问题")
+                }
+            } catch (fixException: Exception) {
+                Log.e(TAG, "自动修复过程异常", fixException)
+            }
+            
+            // 重新检查状态，看是否在路由过程中发生了变化
+            val newEnabledProviders = transportManager.getEnabledProviders()
+            Log.e(TAG, "路由失败后的启用providers=${newEnabledProviders.size}")
+            newEnabledProviders.forEach { provider ->
+                Log.e(TAG, "路由失败后的启用provider: ${provider.providerType} - ${provider.displayName}")
+            }
+        }
+        
+        return routeResult
     }
     
     /**
@@ -552,6 +645,302 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         } catch (e: Exception) {
             Log.e(TAG, "计算数据摘要失败", e)
             ByteArray(0)
+        }
+    }
+    
+    /**
+     * 发送前状态验证和同步
+     */
+    private suspend fun validateAndSyncStateBeforeSend(recipientAci: String): Boolean {
+        Log.d(TAG, "发送前状态验证和同步: recipientAci=$recipientAci")
+        
+        return try {
+            // 1. 确保TransportManager已初始化
+            if (!transportManager.isInitialized()) {
+                Log.w(TAG, "发送前发现TransportManager未初始化，强制初始化")
+                val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+                tapInitializer.initializeSync(true)
+            }
+            
+            // 2. 验证通道状态
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            val activeChannels = channelManager.getActiveChannels(recipientAci)
+            val fullActiveChannels = activeChannels.filter { it.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE }
+            
+            if (fullActiveChannels.isEmpty()) {
+                Log.w(TAG, "发送前验证失败：没有FULL_ACTIVE状态的通道")
+                return false
+            }
+            
+            // 3. 验证Token状态
+            val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+            for (channel in fullActiveChannels) {
+                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
+                val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
+                
+                if (!hasReceivedToken || !hasSharedToken) {
+                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken")
+                    return false
+                }
+            }
+            
+            // 4. 验证Provider状态
+            val enabledProviders = transportManager.getEnabledProviders()
+            val matchingProviders = enabledProviders.filter { provider ->
+                fullActiveChannels.any { channel -> channel.providerType == provider.providerType }
+            }
+            
+            if (matchingProviders.isEmpty()) {
+                Log.w(TAG, "发送前验证失败：没有匹配的启用Provider")
+                return false
+            }
+            
+            Log.i(TAG, "发送前状态验证通过：${fullActiveChannels.size}个FULL_ACTIVE通道，${matchingProviders.size}个匹配Provider")
+            return true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "发送前状态验证异常", e)
+            return false
+        }
+    }
+    
+    /**
+     * 获取与指定接收者匹配的可用Provider
+     */
+    private fun getAvailableProviderForRecipient(recipientAci: String): org.thoughtcrime.securesms.tap.TransportProvider? {
+        return try {
+            // 使用与TapMessageSendIntegrator.canUseTapForSending相同的逻辑
+            if (!transportManager.isInitialized()) {
+                Log.w(TAG, "传输管理器未初始化，尝试按需初始化")
+                val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+                tapInitializer.initializeSync(false)
+            }
+            
+            val enabledProviders = transportManager.getEnabledProviders()
+            if (enabledProviders.isEmpty()) {
+                Log.w(TAG, "没有启用的Provider")
+                return null
+            }
+            
+            // 检查是否有与recipient匹配的活跃通道
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            val activeChannels = channelManager.getActiveChannels(recipientAci)
+            
+            // 优先选择有活跃通道的provider
+            for (channel in activeChannels) {
+                if (channel.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE) {
+                    val provider = enabledProviders.find { it.providerType == channel.providerType }
+                    if (provider != null) {
+                        Log.d(TAG, "找到匹配的活跃provider: ${provider.providerType}")
+                        return provider
+                    }
+                }
+            }
+            
+            Log.w(TAG, "未找到匹配的活跃provider")
+            return null
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "获取可用provider失败", e)
+            return null
+        }
+    }
+
+    /**
+     * 系统诊断方法 - 全面检查TAP系统状态
+     */
+    private fun diagnoseTapSystemState(recipientAci: String): String {
+        val sb = StringBuilder("=== TAP系统状态诊断 ===\n")
+        
+        try {
+            // 1. TransportManager状态
+            val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+            sb.append("1. TransportManager状态:\n")
+            sb.append("   - 初始化状态: ${transportManager.isInitialized()}\n")
+            
+            // 2. Provider状态
+            try {
+                val availableProviders = transportManager.getAvailableProviders()
+                val enabledProviders = transportManager.getEnabledProviders()
+                sb.append("2. Provider状态:\n")
+                sb.append("   - 可用Provider数: ${availableProviders.size}\n")
+                sb.append("   - 启用Provider数: ${enabledProviders.size}\n")
+                
+                availableProviders.forEach { provider ->
+                    sb.append("   - 可用: ${provider.providerType} (${provider.displayName})\n")
+                }
+                enabledProviders.forEach { provider ->
+                    sb.append("   - 启用: ${provider.providerType} (${provider.displayName})\n")
+                }
+            } catch (providerEx: Exception) {
+                sb.append("   - Provider状态检查异常: ${providerEx.message}\n")
+            }
+            
+            // 3. 通道状态
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            sb.append("3. 通道状态:\n")
+            try {
+                val activeChannels = channelManager.getActiveChannels(recipientAci)
+                sb.append("   - 活跃通道数: ${activeChannels.size}\n")
+                
+                activeChannels.forEach { channel ->
+                    sb.append("   - 通道: ${channel.channelId}\n")
+                    sb.append("     * 状态: ${channel.status}\n")
+                    sb.append("     * Provider: ${channel.providerType}\n")
+                    sb.append("     * recipientId: ${channel.recipientId}\n")
+                    sb.append("     * 是否活跃: ${channel.isActive()}\n")
+                }
+                
+                // 检查所有通道（不仅是活跃的）
+                val allChannels = channelManager.getAllActiveChannels()
+                val relevantChannels = allChannels.filter { it.recipientId == recipientAci }
+                if (relevantChannels.size != activeChannels.size) {
+                    sb.append("   - 注意: 总通道数(${relevantChannels.size}) != getActiveChannels结果(${activeChannels.size})\n")
+                    relevantChannels.forEach { channel ->
+                        sb.append("   - 所有通道: ${channel.channelId} (${channel.status})\n")
+                    }
+                }
+            } catch (channelEx: Exception) {
+                sb.append("   - 通道状态检查异常: ${channelEx.message}\n")
+            }
+            
+            // 4. Token状态
+            val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+            sb.append("4. Token状态:\n")
+            try {
+                val receivedTokens = tokenPool.getAllValidReceivedTokens()
+                val sharedTokens = tokenPool.getAllValidSharedTokens()
+                sb.append("   - 接收Token数: ${receivedTokens.size}\n")
+                sb.append("   - 共享Token数: ${sharedTokens.size}\n")
+                
+                receivedTokens.filter { it.first == recipientAci }.forEach { (recipientId, token) ->
+                    sb.append("   - 接收Token: ${token.tokenId} (${token.providerType})\n")
+                }
+                sharedTokens.filter { it.first == recipientAci }.forEach { (recipientId, token) ->
+                    sb.append("   - 共享Token: ${token.tokenId} (${token.providerType})\n")
+                }
+            } catch (tokenEx: Exception) {
+                sb.append("   - Token状态检查异常: ${tokenEx.message}\n")
+            }
+            
+            // 5. 轮询状态
+            sb.append("5. 轮询状态:\n")
+            try {
+                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                // 由于没有直接的状态查询方法，我们通过尝试启动来检查
+                val startResult = pollingService.startPolling()
+                sb.append("   - 轮询服务启动结果: $startResult\n")
+                
+                // 尝试添加轮询目标来验证功能
+                val channels = channelManager.getActiveChannels(recipientAci)
+                if (channels.isNotEmpty()) {
+                    val testChannel = channels.first()
+                    if (testChannel.metadata != null) {
+                        val addResult = pollingService.addPollingTarget(recipientAci, testChannel.metadata!!)
+                        sb.append("   - 轮询目标添加测试: $addResult\n")
+                    } else {
+                        sb.append("   - 轮询目标添加测试: 失败 (元数据为空)\n")
+                    }
+                } else {
+                    sb.append("   - 轮询目标添加测试: 跳过 (无活跃通道)\n")
+                }
+            } catch (pollingEx: Exception) {
+                sb.append("   - 轮询状态检查异常: ${pollingEx.message}\n")
+            }
+            
+            // 6. 配置状态
+            sb.append("6. 配置状态:\n")
+            try {
+                val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                val configuredProviders = configManager.getConfiguredProviders()
+                val enabledProviders = tapValues.getEnabledProviders()
+                sb.append("   - 已配置Provider: ${configuredProviders.joinToString(", ")}\n")
+                sb.append("   - 持久化启用Provider: ${enabledProviders.joinToString(", ")}\n")
+                sb.append("   - 应执行初始化: ${tapValues.shouldPerformInitialization()}\n")
+            } catch (configEx: Exception) {
+                sb.append("   - 配置状态检查异常: ${configEx.message}\n")
+            }
+            
+        } catch (e: Exception) {
+            sb.append("诊断过程异常: ${e.message}\n")
+        }
+        
+        sb.append("=== 诊断完成 ===")
+        return sb.toString()
+    }
+    
+    /**
+     * 自动修复TAP系统问题
+     */
+    private suspend fun autoFixTapSystemIssues(recipientAci: String): Boolean {
+        Log.i(TAG, "开始自动修复TAP系统问题")
+        
+        try {
+            var fixedIssues = 0
+            
+            // 1. 修复TransportManager初始化问题
+            val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+            if (!transportManager.isInitialized()) {
+                Log.w(TAG, "自动修复: TransportManager未初始化")
+                try {
+                    val tapInitializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+                    tapInitializer.initializeSync(forceReinit = true)
+                    if (transportManager.isInitialized()) {
+                        Log.i(TAG, "自动修复成功: TransportManager已初始化")
+                        fixedIssues++
+                    }
+                } catch (initEx: Exception) {
+                    Log.e(TAG, "自动修复失败: TransportManager初始化异常", initEx)
+                }
+            }
+            
+            // 2. 修复Provider配置问题
+            val enabledProviders = transportManager.getEnabledProviders()
+            val availableProviders = transportManager.getAvailableProviders()
+            if (enabledProviders.isEmpty() && availableProviders.isNotEmpty()) {
+                Log.w(TAG, "自动修复: 有可用Provider但未启用")
+                try {
+                    val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                    val activeProviderTypes = availableProviders.map { it.providerType }.toSet()
+                    tapValues.setEnabledProviders(activeProviderTypes)
+                    Log.i(TAG, "自动修复成功: 已启用可用Provider: ${activeProviderTypes.joinToString(", ")}")
+                    fixedIssues++
+                } catch (providerEx: Exception) {
+                    Log.e(TAG, "自动修复失败: Provider启用异常", providerEx)
+                }
+            }
+            
+            // 3. 修复轮询问题
+            try {
+                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val channels = channelManager.getActiveChannels(recipientAci)
+                
+                if (channels.isNotEmpty()) {
+                    val startResult = pollingService.startPolling()
+                    if (startResult) {
+                        channels.forEach { channel ->
+                            if (channel.metadata != null) {
+                                val addResult = pollingService.addPollingTarget(recipientAci, channel.metadata!!)
+                                if (addResult) {
+                                    Log.i(TAG, "自动修复成功: 已添加轮询目标")
+                                    fixedIssues++
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (pollingEx: Exception) {
+                Log.e(TAG, "自动修复失败: 轮询启动异常", pollingEx)
+            }
+            
+            Log.i(TAG, "自动修复完成，修复问题数: $fixedIssues")
+            return fixedIssues > 0
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "自动修复过程异常", e)
+            return false
         }
     }
 }
