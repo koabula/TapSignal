@@ -436,8 +436,12 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     processTokenAccept(senderId, tokenExchangeMessage)
                 }
                 org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM -> {
-                    // 处理Token交换确认（A发送给B）
+                    // 处理Token交换确认（A发送给A）
                     processTokenConfirm(senderId, tokenExchangeMessage)
+                }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_DISABLE -> {
+                    // 处理v2模式禁用请求
+                    processV2ModeDisable(senderId, tokenExchangeMessage)
                 }
                 else -> {
                     Log.w(TAG, "未知的Token交换类型: ${tokenExchangeMessage.requestType}")
@@ -501,6 +505,35 @@ class TapMessageProcessor private constructor(private val context: Context) {
             val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
             if (upgraded) {
                 Log.i(TAG, "A端通道成功升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                
+                // A端通道升级成功后立即启动轮询
+                try {
+                    val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                    val channel = channelManager.getActiveChannel(senderAci, tokenExchangeMessage.providerType)
+                    
+                    if (channel?.metadata != null) {
+                        Log.d(TAG, "A端通道升级后启动轮询: senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                        val pollingStarted = pollingService.startPolling()
+                        if (pollingStarted) {
+                            val targetAdded = pollingService.addPollingTarget(senderAci, channel.metadata!!)
+                            if (targetAdded) {
+                                Log.i(TAG, "A端通道升级后轮询启动成功: senderAci=$senderAci")
+                            } else {
+                                Log.w(TAG, "A端通道升级后轮询目标添加失败: senderAci=$senderAci")
+                                // 增强诊断：详细分析轮询目标添加失败的原因
+                                diagnosisPollingTargetFailure(pollingService, senderAci, channel.metadata!!)
+                            }
+                        } else {
+                            Log.w(TAG, "A端通道升级后轮询服务启动失败: senderAci=$senderAci")
+                        }
+                    } else {
+                        Log.w(TAG, "A端通道升级后无法获取metadata，跳过轮询启动: senderAci=$senderAci")
+                        // 诊断metadata为null的原因
+                        diagnosisChannelMetadataIssue(channel, senderAci, tokenExchangeMessage.providerType)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "A端通道升级后启动轮询异常: senderAci=$senderAci", e)
+                }
                 
                 // A端发送确认消息并插入v2启用提示消息
                 GlobalScope.launch(Dispatchers.IO) {
@@ -966,6 +999,35 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
         if (upgraded) {
             Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
             
+            // 通道升级成功后立即启动轮询
+            try {
+                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                val channel = channelManager.getActiveChannel(senderAci, tokenExchangeMessage.providerType)
+                
+                                    if (channel?.metadata != null) {
+                        Log.d(TAG, "通道升级后启动轮询: senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                        val pollingStarted = pollingService.startPolling()
+                        if (pollingStarted) {
+                            val targetAdded = pollingService.addPollingTarget(senderAci, channel.metadata!!)
+                            if (targetAdded) {
+                                Log.i(TAG, "通道升级后轮询启动成功: senderAci=$senderAci")
+                            } else {
+                                Log.w(TAG, "通道升级后轮询目标添加失败: senderAci=$senderAci")
+                                // 增强诊断：详细分析轮询目标添加失败的原因
+                                diagnosisPollingTargetFailure(pollingService, senderAci, channel.metadata!!)
+                            }
+                        } else {
+                            Log.w(TAG, "通道升级后轮询服务启动失败: senderAci=$senderAci")
+                        }
+                    } else {
+                        Log.w(TAG, "通道升级后无法获取metadata，跳过轮询启动: senderAci=$senderAci")
+                        // 诊断metadata为null的原因
+                        diagnosisChannelMetadataIssue(channel, senderAci, tokenExchangeMessage.providerType)
+                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "通道升级后启动轮询异常: senderAci=$senderAci", e)
+            }
+            
             // B端插入v2 mode启用提示消息
             try {
                 // 改为后台Job异步插入，避免与主处理流程争用数据库连接
@@ -990,6 +1052,140 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
     } catch (e: Exception) {
         Log.e(TAG, "处理Token交换确认异常: senderId=$senderId", e)
         TapProcessResult.Failed("处理异常: ${e.message}")
+    }
+}
+
+/**
+ * 处理v2模式禁用请求
+ */
+private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
+    Log.i(TAG, "处理v2模式禁用请求: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+    
+    return try {
+        val senderAci = recipientIdToAci(senderId)
+        if (senderAci == null) {
+            Log.w(TAG, "无法获取发送者ACI: senderId=$senderId")
+            return TapProcessResult.Failed("无法获取发送者ACI")
+        }
+        
+        Log.i(TAG, "对方请求禁用v2模式: senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+        
+        // 禁用本地的v2模式
+        val disabled = channelManager.disableV2Mode(senderAci)
+        if (disabled) {
+            Log.i(TAG, "本地v2模式已禁用: senderAci=$senderAci")
+            
+            // 插入禁用系统消息
+            try {
+                org.thoughtcrime.securesms.database.SignalDatabase.messages.insertTapV2ModeDisabledMessage(senderId)
+                Log.d(TAG, "已插入v2模式禁用消息: senderId=$senderId")
+            } catch (e: Exception) {
+                Log.e(TAG, "插入v2模式禁用消息失败: senderId=$senderId", e)
+            }
+            
+            TapProcessResult.Success("v2模式禁用处理完成")
+        } else {
+            Log.w(TAG, "v2模式禁用失败: senderAci=$senderAci")
+            TapProcessResult.Failed("v2模式禁用失败")
+        }
+        
+    } catch (e: Exception) {
+        Log.e(TAG, "处理v2模式禁用请求异常: senderId=$senderId", e)
+        TapProcessResult.Failed("处理异常: ${e.message}")
+    }
+}
+
+/**
+ * 诊断轮询目标添加失败的原因
+ */
+private fun diagnosisPollingTargetFailure(
+    pollingService: org.thoughtcrime.securesms.tap.polling.TapPollingService,
+    recipientAci: String,
+    metadata: org.thoughtcrime.securesms.tap.TransportMetadata
+) {
+    try {
+        Log.w(TAG, "=== 轮询目标添加失败诊断 ===")
+        Log.w(TAG, "recipientAci: $recipientAci")
+        Log.w(TAG, "metadata.providerType: ${metadata.providerType}")
+        Log.w(TAG, "metadata.recipientId: ${metadata.recipientId}")
+        
+        // 检查轮询服务状态
+        val pollingStatus = pollingService.getPollingStatus()
+        Log.w(TAG, "轮询服务状态:")
+        Log.w(TAG, "  - isRunning: ${pollingStatus.isRunning}")
+        Log.w(TAG, "  - activePollingTargets: ${pollingStatus.activePollingTargets}")
+        Log.w(TAG, "  - totalPollingTargets: ${pollingStatus.totalPollingTargets}")
+        
+        // 检查是否已存在相同的轮询目标
+        Log.w(TAG, "检查现有轮询目标...")
+        // 这里可以添加更多的轮询状态检查
+        
+        // 检查metadata有效性
+        val isMetadataValid = metadata.validate()
+        Log.w(TAG, "metadata.validate(): $isMetadataValid")
+        
+        if (!isMetadataValid) {
+            Log.e(TAG, "metadata验证失败，这可能是轮询目标添加失败的原因")
+            Log.e(TAG, "metadata详情:")
+            try {
+                val sendMetadata = metadata.getSendMetadata()
+                val receiveMetadata = metadata.getReceiveMetadata()
+                Log.e(TAG, "  - sendMetadata.address: ${sendMetadata.address}")
+                Log.e(TAG, "  - sendMetadata.path: ${sendMetadata.path}")
+                Log.e(TAG, "  - receiveMetadata.address: ${receiveMetadata.address}")
+                Log.e(TAG, "  - receiveMetadata.path: ${receiveMetadata.path}")
+            } catch (e: Exception) {
+                Log.e(TAG, "获取metadata详情时异常", e)
+            }
+        }
+        
+        Log.w(TAG, "=== 轮询目标添加失败诊断完成 ===")
+    } catch (e: Exception) {
+        Log.e(TAG, "轮询目标添加失败诊断过程异常", e)
+    }
+}
+
+/**
+ * 诊断通道metadata为null的原因
+ */
+private fun diagnosisChannelMetadataIssue(
+    channel: org.thoughtcrime.securesms.tap.TransportChannel?,
+    recipientAci: String,
+    providerType: String
+) {
+    try {
+        Log.w(TAG, "=== 通道metadata问题诊断 ===")
+        Log.w(TAG, "recipientAci: $recipientAci")
+        Log.w(TAG, "providerType: $providerType")
+        
+        if (channel == null) {
+            Log.e(TAG, "channel为null，无法获取metadata")
+            
+            // 检查是否有该recipient的其他通道
+            val allChannels = channelManager.getActiveChannels(recipientAci)
+            Log.w(TAG, "该recipient的所有活跃通道数: ${allChannels.size}")
+            allChannels.forEach { ch ->
+                Log.w(TAG, "  - 通道: ${ch.channelId}, provider=${ch.providerType}, status=${ch.status}")
+            }
+        } else {
+            Log.w(TAG, "channel存在但metadata为null")
+            Log.w(TAG, "channel详情:")
+            Log.w(TAG, "  - channelId: ${channel.channelId}")
+            Log.w(TAG, "  - status: ${channel.status}")
+            Log.w(TAG, "  - providerType: ${channel.providerType}")
+            Log.w(TAG, "  - recipientId: ${channel.recipientId}")
+            Log.w(TAG, "  - isActive(): ${channel.isActive()}")
+            Log.w(TAG, "  - metadata: ${channel.metadata}")
+            
+            if (channel.metadata == null) {
+                Log.e(TAG, "metadata确实为null，可能是通道创建时metadata生成失败")
+                Log.e(TAG, "建议检查Provider配置和Token状态")
+            }
+        }
+        
+        Log.w(TAG, "=== 通道metadata问题诊断完成 ===")
+    } catch (e: Exception) {
+        Log.e(TAG, "通道metadata问题诊断过程异常", e)
     }
 }
 

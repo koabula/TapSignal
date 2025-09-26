@@ -77,6 +77,32 @@ class TransportMessageRouter private constructor(private val context: Context) {
                 val provider = providerManager.getProvider(selectedChannel.providerType)
                 if (provider == null) {
                     Log.w(TAG, "Provider实例不存在: ${selectedChannel.providerType}")
+                    
+                    // 详细诊断Provider状态
+                    val diagnostics = StringBuilder()
+                    diagnostics.append("Provider诊断信息:\n")
+                    diagnostics.append("- 请求的Provider类型: ${selectedChannel.providerType}\n")
+                    
+                    try {
+                        val availableProviders = providerManager.getActiveProviders()
+                        diagnostics.append("- 可用Provider数量: ${availableProviders.size}\n")
+                        availableProviders.forEach { p ->
+                            diagnostics.append("  * ${p.providerType} (${p.displayName})\n")
+                        }
+                        
+                        val transportManager = TransportManager.getInstance(context)
+                        val allProviders = transportManager.getAvailableProviders()
+                        diagnostics.append("- TransportManager中Provider数量: ${allProviders.size}\n")
+                        allProviders.forEach { provider ->
+                            diagnostics.append("  * ${provider.providerType} (${provider.displayName})\n")
+                        }
+                        
+                    } catch (diagEx: Exception) {
+                        diagnostics.append("- 诊断过程异常: ${diagEx.message}\n")
+                    }
+                    
+                    Log.w(TAG, diagnostics.toString())
+                    
                     return@withContext TransportResult.failure(
                         TransportError.PROVIDER_UNAVAILABLE,
                         true,
@@ -217,8 +243,12 @@ class TransportMessageRouter private constructor(private val context: Context) {
             // 更新通道使用统计
             if (result.isSuccess()) {
                 channelManager.recordSuccessfulSend(channel.channelId)
+                // 更新Provider健康状态
+                providerManager.updateProviderHealth(provider.providerType, true)
             } else {
                 channelManager.recordFailedSend(channel.channelId, result.getResultError() ?: TransportError.UNKNOWN_ERROR)
+                // 更新Provider健康状态
+                providerManager.updateProviderHealth(provider.providerType, false)
             }
             
             result

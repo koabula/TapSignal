@@ -571,6 +571,50 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
+     * 移除指定联系人的所有Token
+     */
+    suspend fun removeAllTokensForRecipient(recipientId: String): Int {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    var removedCount = 0
+                    
+                    // 移除接收Token
+                    receivedTokens[recipientId]?.values?.forEach { token ->
+                        tokenMetadata.remove(token.tokenId)
+                        removedCount++
+                        Log.d(TAG, "移除接收Token: ${token.tokenId}")
+                    }
+                    receivedTokens.remove(recipientId)
+                    
+                    // 移除共享Token
+                    sharedTokens[recipientId]?.values?.forEach { token ->
+                        tokenMetadata.remove(token.tokenId)
+                        removedCount++
+                        Log.d(TAG, "移除共享Token: ${token.tokenId}")
+                    }
+                    sharedTokens.remove(recipientId)
+                    
+                    if (removedCount > 0) {
+                        // 清理空的映射
+                        cleanupEmptyMaps()
+                        
+                        // 持久化存储
+                        saveTokensToStorage()
+                        
+                        Log.i(TAG, "移除联系人所有Token: recipientId=$recipientId, count=$removedCount")
+                    }
+                    
+                    removedCount
+                } catch (e: Exception) {
+                    Log.e(TAG, "移除联系人所有Token失败", e)
+                    0
+                }
+            }
+        }
+    }
+    
+    /**
      * 刷新Token（如果支持）
      */
     suspend fun refreshToken(tokenId: String): Boolean {

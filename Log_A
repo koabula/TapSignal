@@ -1,166 +1,660 @@
 --------- beginning of main
 --------- beginning of system
-2025-09-26 15:45:06.460  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1036.956, y[0]=155.93262, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166864180, downTime=166864180, deviceId=4, source=0x5002, displayId=0, eventId=62044388 }
-2025-09-26 15:45:06.543  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1036.956, y[0]=155.93262, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166864264, downTime=166864180, deviceId=4, source=0x5002, displayId=0, eventId=621521912 }
-2025-09-26 15:45:07.854  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=796.94824, y[0]=509.9121, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166865574, downTime=166865574, deviceId=4, source=0x5002, displayId=0, eventId=189195306 }
-2025-09-26 15:45:07.898  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=796.94824, y[0]=509.9121, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166865620, downTime=166865574, deviceId=4, source=0x5002, displayId=0, eventId=848011306 }
-2025-09-26 15:45:08.026 19218-19254 ConversationFragment    org.thoughtcrime.securesms           I  没有发现活跃的Tap通道
-2025-09-26 15:45:09.436  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=935.9697, y[0]=1342.8955, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166867155, downTime=166867155, deviceId=4, source=0x5002, displayId=0, eventId=869732588 }
-2025-09-26 15:45:09.520  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=935.9697, y[0]=1342.8955, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166867241, downTime=166867155, deviceId=4, source=0x5002, displayId=0, eventId=593609298 }
-2025-09-26 15:45:09.553 19218-19254 ConversationFragment    org.thoughtcrime.securesms           I  发送Tap v2模式请求: recipientId=RecipientId::4
-2025-09-26 15:45:09.604 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：TransportManager未初始化，强制重新初始化
-2025-09-26 15:45:09.606 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
-2025-09-26 15:45:09.608 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  初始化核心组件...
-2025-09-26 15:45:09.610 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  配置管理器初始化完成
-2025-09-26 15:45:09.668 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  Token池初始化完成
-2025-09-26 15:45:09.672 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
-2025-09-26 15:45:09.688 19218-19254 ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-26 15:45:09.697 19218-19254 ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
-2025-09-26 15:45:09.815 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
-2025-09-26 15:45:09.834 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
-2025-09-26 15:45:09.835 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
-2025-09-26 15:45:09.837 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
-2025-09-26 15:45:09.864 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  传输管理器初始化完成，可用Provider数量: 1
-2025-09-26 15:45:09.867 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  已注册Provider: cos - 云对象存储 (COS)
-2025-09-26 15:45:09.868 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  通道管理器初始化完成
-2025-09-26 15:45:09.868 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
-2025-09-26 15:45:09.869 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
-2025-09-26 15:45:09.891 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
-2025-09-26 15:45:09.893 19218-19218 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
-2025-09-26 15:45:09.897 19218-19218 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=4, memory=7947MB, performance=HIGH, lowPower=false, memoryPressure=false]
-2025-09-26 15:45:09.897 19218-19218 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
-2025-09-26 15:45:09.903 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 3
-2025-09-26 15:45:09.903 19218-19218 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
-2025-09-26 15:45:09.907 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 3
-2025-09-26 15:45:09.907 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
-2025-09-26 15:45:09.921 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 3
-2025-09-26 15:45:09.921 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
-2025-09-26 15:45:09.923 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I    - ********-****-****-****-*********461
-2025-09-26 15:45:09.923 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I    - 4
-2025-09-26 15:45:09.923 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I    - RecipientId::4
-2025-09-26 15:45:09.924 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 3
-2025-09-26 15:45:09.943 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=********-****-****-****-*********461
-2025-09-26 15:45:09.950 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=4
-2025-09-26 15:45:09.953 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=RecipientId::4
-2025-09-26 15:45:09.955 19218-19254 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
-2025-09-26 15:45:09.956 19218-19254 ConversationFragment    org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
-2025-09-26 15:45:25.223 19218-19254 ConversationFragment    org.thoughtcrime.securesms           I  Tap v2模式通道创建成功: ch_********-****-****-****-*********461_cos_1758872724931, 对方ACI: ********-****-****-****-*********461, 状态: 发送就绪（等待对方Token）
-2025-09-26 15:45:25.468 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=805
-2025-09-26 15:45:38.285 19218-19254 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872738834] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=931
-2025-09-26 15:45:38.287 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=931
-2025-09-26 15:45:38.288 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
-2025-09-26 15:45:38.316 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token接受回应: senderId=RecipientId::4, providerType=cos
-2025-09-26 15:45:38.333 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存对方Token: senderId=RecipientId::4, senderAci=********-****-****-****-*********461, tokenId=cos-signal-cos-signal-v2-1758872730915-8891-1758872730915
-2025-09-26 15:45:38.336 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  A端通道成功升级为FULL_ACTIVE: senderId=RecipientId::4, senderAci=********-****-****-****-*********461, providerType=cos
-2025-09-26 15:45:38.337 19218-19254 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758872738834] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
-2025-09-26 15:45:38.858 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  Tap确认消息已加入发送队列: messageId=806
-2025-09-26 15:45:38.868 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  已发送Tap确认消息: senderAci=********-****-****-****-*********461
-2025-09-26 15:45:38.869 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=806
-2025-09-26 15:45:39.050 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  已插入v2 mode启用提示消息: messageId=807
-2025-09-26 15:45:39.052 19218-19254 TapMessageProcessor     org.thoughtcrime.securesms           I  A端已插入v2模式启用提示消息: senderId=RecipientId::4
+2025-09-26 18:48:47.720  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1014.93945, y[0]=149.92676, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177885440, downTime=177885440, deviceId=4, source=0x5002, displayId=0, eventId=93974741 }
+2025-09-26 18:48:47.796  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1014.93945, y[0]=149.92676, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177885517, downTime=177885440, deviceId=4, source=0x5002, displayId=0, eventId=881959124 }
+2025-09-26 18:48:49.097  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=780.9629, y[0]=537.96387, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177886781, downTime=177886781, deviceId=4, source=0x5002, displayId=0, eventId=601163350 }
+2025-09-26 18:48:49.120  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=780.9629, y[0]=537.96387, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177886841, downTime=177886781, deviceId=4, source=0x5002, displayId=0, eventId=586726007 }
+2025-09-26 18:48:49.229 27295-27332 ConversationFragment    org.thoughtcrime.securesms           I  没有发现活跃的Tap通道
+2025-09-26 18:48:50.715  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=906.9658, y[0]=1349.9268, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177888432, downTime=177888432, deviceId=4, source=0x5002, displayId=0, eventId=230309869 }
+2025-09-26 18:48:50.784  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=906.9658, y[0]=1349.9268, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177888506, downTime=177888432, deviceId=4, source=0x5002, displayId=0, eventId=895673661 }
+2025-09-26 18:48:50.822 27295-27332 ConversationFragment    org.thoughtcrime.securesms           I  发送Tap v2模式请求: recipientId=RecipientId::4
+2025-09-26 18:48:50.840 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           W  TaP模块状态异常：TransportManager未初始化，强制重新初始化
+2025-09-26 18:48:50.845 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
+2025-09-26 18:48:50.849 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  初始化核心组件...
+2025-09-26 18:48:50.853 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  配置管理器初始化完成
+2025-09-26 18:48:50.958 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  Token池初始化完成
+2025-09-26 18:48:50.959 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
+2025-09-26 18:48:51.015 27295-27332 ProviderRegistry        org.thoughtcrime.securesms           D  尝试注册provider: cos, 注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 18:48:51.021 27295-27332 ProviderRegistry        org.thoughtcrime.securesms           D  成功加载注册器类: org.thoughtcrime.securesms.tap.provider.cos.CosProviderRegistrar
+2025-09-26 18:48:51.091 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
+2025-09-26 18:48:51.124 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
+2025-09-26 18:48:51.124 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
+2025-09-26 18:48:51.135 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
+2025-09-26 18:48:51.142 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  传输管理器初始化完成，可用Provider数量: 1
+2025-09-26 18:48:51.143 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  已注册Provider: cos - 云对象存储 (COS)
+2025-09-26 18:48:51.144 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  通道管理器初始化完成
+2025-09-26 18:48:51.145 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
+2025-09-26 18:48:51.145 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
+2025-09-26 18:48:51.180 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
+2025-09-26 18:48:51.180 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 2
+2025-09-26 18:48:51.180 27295-27295 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
+2025-09-26 18:48:51.180 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 2
+2025-09-26 18:48:51.180 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
+2025-09-26 18:48:51.181 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 2
+2025-09-26 18:48:51.188 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
+2025-09-26 18:48:51.188 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I    - 4
+2025-09-26 18:48:51.192 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I    - RecipientId::4
+2025-09-26 18:48:51.192 27295-27295 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=4, memory=7947MB, performance=HIGH, lowPower=false, memoryPressure=false]
+2025-09-26 18:48:51.192 27295-27295 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
+2025-09-26 18:48:51.200 27295-27295 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
+2025-09-26 18:48:51.202 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 2
+2025-09-26 18:48:51.204 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=4
+2025-09-26 18:48:51.206 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           W  联系人无活跃通道，跳过轮询: recipientId=RecipientId::4
+2025-09-26 18:48:51.207 27295-27332 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
+2025-09-26 18:48:51.207 27295-27332 ConversationFragment    org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
+2025-09-26 18:49:00.229 27295-27332 ConversationFragment    org.thoughtcrime.securesms           I  Tap v2模式通道创建成功: ch_********-****-****-****-*********461_cos_1758883739704, 对方ACI: ********-****-****-****-*********461, 状态: 发送就绪（等待对方Token）
+2025-09-26 18:49:00.432 27295-27332 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=831
+2025-09-26 18:49:14.712 27295-27332 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758883755377] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=931
+2025-09-26 18:49:14.713 27295-27332 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=931
+2025-09-26 18:49:14.714 27295-27332 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
+2025-09-26 18:49:14.745 27295-27332 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token接受回应: senderId=RecipientId::4, providerType=cos
+2025-09-26 18:49:14.776 27295-27332 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存对方Token: senderId=RecipientId::4, senderAci=********-****-****-****-*********461, tokenId=cos-signal-cos-signal-v2-1758883744817-6666-1758883744817
+2025-09-26 18:49:18.677 27295-27332 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-09-26 18:49:18.762 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  Found multiple blocked threads! Possible deadlock.
+                                                                                                    -- [2] main | WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2365)
+                                                                                                    androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:918)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.constraintlayout.widget.ConstraintLayout.onLayout(ConstraintLayout.java:1961)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder.onLayout(AndroidViewHolder.android.kt:261)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.layoutAccordingTo(AndroidViewHolder.android.kt:603)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.access$layoutAccordingTo(AndroidViewHolder.android.kt:1)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:415)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:414)
+2025-09-26 18:49:18.771 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  org.thoughtcrime.securesms.database.InAppPaymentTable.consumeDonationPaymentsToNotifyUser(InAppPaymentTable.kt:515)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.handleInAppPaymentDonationSheets$lambda$3(InAppPaymentsBottomSheetDelegate.kt:102)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.$r8$lambda$o63etkFU1S6wOWy6zKZviO_Kzb4(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate$$ExternalSyntheticLambda0.call(D8$$SyntheticClass:0)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleFromCallable.subscribeActual(SingleFromCallable.java:43)
+                                                                                                    io.reactivex.rxjava3.core.Single.subscribe(Single.java:4813)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleSubscribeOn$SubscribeOnObserver.run(SingleSubscribeOn.java:89)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:38)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:25)
+                                                                                                    java.util.concurrent.FutureTask.run(FutureTask.java:264)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    java.lang.Thread.run(Thread.java:1012)
+                                                                                                    org.signal.core.util.concurrent.SignalExecutors$NumberedThreadFactory$1.run(SignalExecutors.java:100)
+                                                                                                    
+                                                                                                    -- [300] DefaultDispatcher-worker-9 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:590)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteStatement.<init>(SQLiteStatement.java:38)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.updateWithOnConflict(SQLiteDatabase.java:1869)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.update(SQLiteDatabase.java:1817)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$update$15(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$FAm5jDhBcoiLSdkNNftoR0AhNUc(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda5.run(D8$$SyntheticClass:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.traceSql(SQLiteDatabase.java:112)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.update(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.tap.database.TransportChannelTable.insertOrUpdateChannel(TransportChannelTable.java:113)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.saveChannelToDatabase(TransportChannelManager.kt:1467)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.access$saveChannelToDatabase(TransportChannelManager.kt:29)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager$upgradeChannelToFullActive$2.invokeSuspend(TransportChannelManager.kt:414)
+                                                                                                    kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    
+                                                                                                    -- [222] signal-JobRunner-7 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+2025-09-26 18:49:23.769 27295-27332 AnrDetector             org.thoughtcrime.securesms           W  Main thread dumps:
+                                                                                                    --- 2025-09-26 10:49:19.674 GMT:
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2365)
+                                                                                                    androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:918)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.constraintlayout.widget.ConstraintLayout.onLayout(ConstraintLayout.java:1961)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder.onLayout(AndroidViewHolder.android.kt:261)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.layoutAccordingTo(AndroidViewHolder.android.kt:603)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.access$layoutAccordingTo(AndroidViewHolder.android.kt:1)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:415)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:414)
+2025-09-26 18:49:23.777 27295-27332 AnrDetector             org.thoughtcrime.securesms           W  android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.draw(View.java:23892)
+                                                                                                    com.android.internal.policy.DecorView.draw(DecorView.java:809)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22756)
+                                                                                                    android.view.ThreadedRenderer.updateViewTreeDisplayList(ThreadedRenderer.java:694)
+                                                                                                    android.view.ThreadedRenderer.updateRootDisplayList(ThreadedRenderer.java:700)
+                                                                                                    android.view.ThreadedRenderer.draw(ThreadedRenderer.java:798)
+                                                                                                    android.view.ViewRootImpl.draw(ViewRootImpl.java:4939)
+                                                                                                    android.view.ViewRootImpl.performDraw(ViewRootImpl.java:4643)
+                                                                                                    android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:3822)
+                                                                                                    android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:2465)
+                                                                                                    android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:9305)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1339)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1348)
+                                                                                                    android.view.Choreographer.doCallbacks(Choreographer.java:952)
+                                                                                                    android.view.Choreographer.doFrame(Choreographer.java:882)
+                                                                                                    android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1322)
+                                                                                                    android.os.Handler.handleCallback(Handler.java:958)
+                                                                                                    android.os.Handler.dispatchMessage(Handler.java:99)
+                                                                                                    android.os.Looper.loopOnce(Looper.java:205)
+                                                                                                    android.os.Looper.loop(Looper.java:294)
+                                                                                                    android.app.ActivityThread.main(ActivityThread.java:8177)
+                                                                                                    java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+                                                                                                    com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+                                                                                                    
+                                                                                                    --- 2025-09-26 10:49:20.685 GMT:
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+2025-09-26 18:49:23.789 27295-27332 AnrDetector             org.thoughtcrime.securesms           W  android.view.ThreadedRenderer.updateViewTreeDisplayList(ThreadedRenderer.java:694)
+                                                                                                    android.view.ThreadedRenderer.updateRootDisplayList(ThreadedRenderer.java:700)
+                                                                                                    android.view.ThreadedRenderer.draw(ThreadedRenderer.java:798)
+                                                                                                    android.view.ViewRootImpl.draw(ViewRootImpl.java:4939)
+                                                                                                    android.view.ViewRootImpl.performDraw(ViewRootImpl.java:4643)
+                                                                                                    android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:3822)
+                                                                                                    android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:2465)
+                                                                                                    android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:9305)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1339)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1348)
+                                                                                                    android.view.Choreographer.doCallbacks(Choreographer.java:952)
+                                                                                                    android.view.Choreographer.doFrame(Choreographer.java:882)
+                                                                                                    android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1322)
+                                                                                                    android.os.Handler.handleCallback(Handler.java:958)
+                                                                                                    android.os.Handler.dispatchMessage(Handler.java:99)
+                                                                                                    android.os.Looper.loopOnce(Looper.java:205)
+                                                                                                    android.os.Looper.loop(Looper.java:294)
+                                                                                                    android.app.ActivityThread.main(ActivityThread.java:8177)
+                                                                                                    java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+                                                                                                    com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+                                                                                                    
+                                                                                                    --- 2025-09-26 10:49:21.693 GMT:
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+2025-09-26 18:49:23.795 27295-27332 AnrDetector             org.thoughtcrime.securesms           W  com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+                                                                                                    
+                                                                                                    --- 2025-09-26 10:49:22.701 GMT:
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2365)
+                                                                                                    androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:918)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.constraintlayout.widget.ConstraintLayout.onLayout(ConstraintLayout.java:1961)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder.onLayout(AndroidViewHolder.android.kt:261)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.layoutAccordingTo(AndroidViewHolder.android.kt:603)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.access$layoutAccordingTo(AndroidViewHolder.android.kt:1)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:415)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:414)
+2025-09-26 18:49:23.798 27295-27332 AnrDetector             org.thoughtcrime.securesms           W  android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22747)
+                                                                                                    android.view.View.draw(View.java:23620)
+                                                                                                    android.view.ViewGroup.drawChild(ViewGroup.java:4556)
+                                                                                                    android.view.ViewGroup.dispatchDraw(ViewGroup.java:4317)
+                                                                                                    android.view.View.draw(View.java:23892)
+                                                                                                    com.android.internal.policy.DecorView.draw(DecorView.java:809)
+                                                                                                    android.view.View.updateDisplayListIfDirty(View.java:22756)
+                                                                                                    android.view.ThreadedRenderer.updateViewTreeDisplayList(ThreadedRenderer.java:694)
+                                                                                                    android.view.ThreadedRenderer.updateRootDisplayList(ThreadedRenderer.java:700)
+                                                                                                    android.view.ThreadedRenderer.draw(ThreadedRenderer.java:798)
+                                                                                                    android.view.ViewRootImpl.draw(ViewRootImpl.java:4939)
+                                                                                                    android.view.ViewRootImpl.performDraw(ViewRootImpl.java:4643)
+                                                                                                    android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:3822)
+                                                                                                    android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:2465)
+                                                                                                    android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:9305)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1339)
+                                                                                                    android.view.Choreographer$CallbackRecord.run(Choreographer.java:1348)
+                                                                                                    android.view.Choreographer.doCallbacks(Choreographer.java:952)
+                                                                                                    android.view.Choreographer.doFrame(Choreographer.java:882)
+                                                                                                    android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1322)
+                                                                                                    android.os.Handler.handleCallback(Handler.java:958)
+                                                                                                    android.os.Handler.dispatchMessage(Handler.java:99)
+                                                                                                    android.os.Looper.loopOnce(Looper.java:205)
+                                                                                                    android.os.Looper.loop(Looper.java:294)
+                                                                                                    android.app.ActivityThread.main(ActivityThread.java:8177)
+                                                                                                    java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+                                                                                                    com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+                                                                                                    
+                                                                                                    --- 2025-09-26 10:49:23.708 GMT:
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+2025-09-26 18:49:23.824 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  Found multiple blocked threads! Possible deadlock.
+                                                                                                    -- [2] main | WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2365)
+                                                                                                    androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:918)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.constraintlayout.widget.ConstraintLayout.onLayout(ConstraintLayout.java:1961)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder.onLayout(AndroidViewHolder.android.kt:261)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.layoutAccordingTo(AndroidViewHolder.android.kt:603)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.access$layoutAccordingTo(AndroidViewHolder.android.kt:1)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:415)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:414)
+2025-09-26 18:49:23.832 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  org.thoughtcrime.securesms.database.InAppPaymentTable.consumeDonationPaymentsToNotifyUser(InAppPaymentTable.kt:515)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.handleInAppPaymentDonationSheets$lambda$3(InAppPaymentsBottomSheetDelegate.kt:102)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.$r8$lambda$o63etkFU1S6wOWy6zKZviO_Kzb4(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate$$ExternalSyntheticLambda0.call(D8$$SyntheticClass:0)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleFromCallable.subscribeActual(SingleFromCallable.java:43)
+                                                                                                    io.reactivex.rxjava3.core.Single.subscribe(Single.java:4813)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleSubscribeOn$SubscribeOnObserver.run(SingleSubscribeOn.java:89)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:38)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:25)
+                                                                                                    java.util.concurrent.FutureTask.run(FutureTask.java:264)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    java.lang.Thread.run(Thread.java:1012)
+                                                                                                    org.signal.core.util.concurrent.SignalExecutors$NumberedThreadFactory$1.run(SignalExecutors.java:100)
+                                                                                                    
+                                                                                                    -- [300] DefaultDispatcher-worker-9 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:590)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteStatement.<init>(SQLiteStatement.java:38)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.updateWithOnConflict(SQLiteDatabase.java:1869)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.update(SQLiteDatabase.java:1817)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$update$15(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$FAm5jDhBcoiLSdkNNftoR0AhNUc(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda5.run(D8$$SyntheticClass:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.traceSql(SQLiteDatabase.java:112)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.update(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.tap.database.TransportChannelTable.insertOrUpdateChannel(TransportChannelTable.java:113)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.saveChannelToDatabase(TransportChannelManager.kt:1467)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.access$saveChannelToDatabase(TransportChannelManager.kt:29)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager$upgradeChannelToFullActive$2.invokeSuspend(TransportChannelManager.kt:414)
+                                                                                                    kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    
+                                                                                                    -- [222] signal-JobRunner-7 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+2025-09-26 18:49:28.819 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  Found multiple blocked threads! Possible deadlock.
+                                                                                                    -- [2] main | WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:715)
+                                                                                                    java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1027)
+                                                                                                    java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:738)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.hasActiveChannel(TransportChannelManager.kt:1659)
+                                                                                                    org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator.updateStatus(TapV2ModeIndicator.kt:80)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.setTapV2Indicator(ConversationListItem.java:308)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bindThread(ConversationListItem.java:292)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListItem.bind(ConversationListItem.java:220)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:170)
+                                                                                                    org.thoughtcrime.securesms.conversationlist.ConversationListAdapter.onBindViewHolder(ConversationListAdapter.java:146)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Adapter.bindViewHolder(RecyclerView.java:7953)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryBindViewHolderByDeadline(RecyclerView.java:6742)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.tryGetViewHolderForPositionByDeadline(RecyclerView.java:7013)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6853)
+                                                                                                    androidx.recyclerview.widget.RecyclerView$Recycler.getViewForPosition(RecyclerView.java:6849)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager$LayoutState.next(LinearLayoutManager.java:2422)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1722)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1682)
+                                                                                                    androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:747)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4737)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4459)
+                                                                                                    androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:5011)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:149)
+                                                                                                    com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2365)
+                                                                                                    androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:918)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.constraintlayout.widget.ConstraintLayout.onLayout(ConstraintLayout.java:1961)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder.onLayout(AndroidViewHolder.android.kt:261)
+                                                                                                    android.view.View.layout(View.java:24421)
+                                                                                                    android.view.ViewGroup.layout(ViewGroup.java:6440)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.layoutAccordingTo(AndroidViewHolder.android.kt:603)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder_androidKt.access$layoutAccordingTo(AndroidViewHolder.android.kt:1)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:415)
+                                                                                                    androidx.compose.ui.viewinterop.AndroidViewHolder$layoutNode$1$5$measure$2.invoke(AndroidViewHolder.android.kt:414)
+2025-09-26 18:49:28.824 27295-27332 DeadlockDetector        org.thoughtcrime.securesms           W  org.thoughtcrime.securesms.database.InAppPaymentTable.consumeDonationPaymentsToNotifyUser(InAppPaymentTable.kt:515)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.handleInAppPaymentDonationSheets$lambda$3(InAppPaymentsBottomSheetDelegate.kt:102)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate.$r8$lambda$o63etkFU1S6wOWy6zKZviO_Kzb4(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.components.settings.app.subscription.completed.InAppPaymentsBottomSheetDelegate$$ExternalSyntheticLambda0.call(D8$$SyntheticClass:0)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleFromCallable.subscribeActual(SingleFromCallable.java:43)
+                                                                                                    io.reactivex.rxjava3.core.Single.subscribe(Single.java:4813)
+                                                                                                    io.reactivex.rxjava3.internal.operators.single.SingleSubscribeOn$SubscribeOnObserver.run(SingleSubscribeOn.java:89)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:38)
+                                                                                                    io.reactivex.rxjava3.internal.schedulers.ScheduledDirectTask.call(ScheduledDirectTask.java:25)
+                                                                                                    java.util.concurrent.FutureTask.run(FutureTask.java:264)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    java.lang.Thread.run(Thread.java:1012)
+                                                                                                    org.signal.core.util.concurrent.SignalExecutors$NumberedThreadFactory$1.run(SignalExecutors.java:100)
+                                                                                                    
+                                                                                                    -- [300] DefaultDispatcher-worker-9 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:590)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteStatement.<init>(SQLiteStatement.java:38)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.updateWithOnConflict(SQLiteDatabase.java:1869)
+                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.update(SQLiteDatabase.java:1817)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$update$15(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$FAm5jDhBcoiLSdkNNftoR0AhNUc(Unknown Source:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda5.run(D8$$SyntheticClass:0)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.traceSql(SQLiteDatabase.java:112)
+                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.update(SQLiteDatabase.java:398)
+                                                                                                    org.thoughtcrime.securesms.tap.database.TransportChannelTable.insertOrUpdateChannel(TransportChannelTable.java:113)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.saveChannelToDatabase(TransportChannelManager.kt:1467)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager.access$saveChannelToDatabase(TransportChannelManager.kt:29)
+                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager$upgradeChannelToFullActive$2.invokeSuspend(TransportChannelManager.kt:414)
+                                                                                                    kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    
+                                                                                                    -- [222] signal-JobRunner-7 | TIMED_WAITING
+                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
+2025-09-26 18:49:30.314  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=461.95312, y[0]=1222.9248, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177928031, downTime=177928031, deviceId=4, source=0x5002, displayId=0, eventId=589383588 }
+2025-09-26 18:49:30.388  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=461.95312, y[0]=1222.9248, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177928109, downTime=177928031, deviceId=4, source=0x5002, displayId=0, eventId=573371208 }
+2025-09-26 18:49:31.771   556-1963  WindowManager           system_server                        W  Exception thrown during dispatchAppVisibility Window{28c4a42 u0 org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity EXITING}
+                                                                                                    android.os.DeadObjectException
+                                                                                                    	at android.os.BinderProxy.transactNative(Native Method)
+                                                                                                    	at android.os.BinderProxy.transact(BinderProxy.java:584)
+                                                                                                    	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+                                                                                                    	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+                                                                                                    	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+                                                                                                    	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+                                                                                                    	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+                                                                                                    	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+                                                                                                    	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+                                                                                                    	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+                                                                                                    	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+                                                                                                    	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+                                                                                                    	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+                                                                                                    	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+                                                                                                    	at android.os.Binder.execTransactInternal(Binder.java:1339)
+                                                                                                    	at android.os.Binder.execTransact(Binder.java:1275)
+2025-09-26 18:49:32.492  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  Main / Touch event: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=196.96289, y[0]=1516.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177930211, downTime=177930211, deviceId=4, source=0x5002, displayId=0, eventId=858983349 }
+2025-09-26 18:49:32.496  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=196.96289, y[0]=1516.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177930211, downTime=177930211, deviceId=4, source=0x5002, displayId=0, eventId=858983349 }
+2025-09-26 18:49:32.571  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  Main / Touch event: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=196.96289, y[0]=1516.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177930292, downTime=177930211, deviceId=4, source=0x5002, displayId=0, eventId=96795065 }
+2025-09-26 18:49:32.572  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=196.96289, y[0]=1516.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177930292, downTime=177930211, deviceId=4, source=0x5002, displayId=0, eventId=96795065 }
+2025-09-26 18:49:32.597  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  Main / start: startAppShortcutOrInfoActivity
+2025-09-26 18:49:32.636   775-796   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@178cc93 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=770 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=1 lastActiveTime=177930350 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@b7614d0} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{47e6cc9 org.thoughtcrime.securesms.RoutingActivity} launchCookies=[android.os.BinderProxy@b6fbfce] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2599eef, appThread = android.app.IApplicationThread$Stub$Proxy@a6fadfc, debugName = QuickstepLaunch }, displayChange = null }
+2025-09-26 18:49:32.818   556-580   WindowManager           system_server                        V  Sent Transition #677 createdAt=09-26 10:49:32.621 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=770 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=1 lastActiveTime=177930350 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{9ebf13 Task{4d6b295 #770 type=standard A=10200:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{d815550 org.thoughtcrime.securesms.RoutingActivity} launchCookies=[android.os.BinderProxy@3efe349] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@7da344e, appThread = android.app.IApplicationThread$Stub$Proxy@62c396f, debugName = QuickstepLaunch }, displayChange = null }
+2025-09-26 18:49:35.645 27554-27587 TapModuleInitializer    org.thoughtcrime.securesms           I  开始初始化TaP模块...
+2025-09-26 18:49:35.647 27554-27587 ApplicationContext      org.thoughtcrime.securesms           I  Tap传输层模块初始化已启动
+2025-09-26 18:49:35.648 27554-27587 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已完成初始化
+2025-09-26 18:49:37.294 27554-27587 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758883755377] 🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=931
+2025-09-26 18:49:37.298 27554-27587 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=931
+2025-09-26 18:49:37.300 27554-27587 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
+2025-09-26 18:49:38.468 27554-27587 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token接受回应: senderId=RecipientId::4, providerType=cos
+2025-09-26 18:49:38.473 27554-27587 TapMessageProcessor     org.thoughtcrime.securesms           W  保存对方Token失败: senderId=RecipientId::4, senderAci=********-****-****-****-*********461
+2025-09-26 18:49:38.476 27554-27587 MessageProcessorV2      org.thoughtcrime.securesms           I  [1758883755377] 🎛️ Tap传输层控制消息处理完成，不插入消息数据库
 --------- beginning of kernel
-2025-09-26 15:45:44.418  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=486.96875, y[0]=2255.8594, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166902138, downTime=166902138, deviceId=4, source=0x5002, displayId=0, eventId=801406545 }
-2025-09-26 15:45:44.506  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=486.96875, y[0]=2255.8594, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166902227, downTime=166902138, deviceId=4, source=0x5002, displayId=0, eventId=110198890 }
-2025-09-26 15:45:46.434  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=985.9678, y[0]=1405.957, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166904154, downTime=166904154, deviceId=4, source=0x5002, displayId=0, eventId=312269762 }
-2025-09-26 15:45:46.523  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=985.9678, y[0]=1405.957, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=166904243, downTime=166904154, deviceId=4, source=0x5002, displayId=0, eventId=756379983 }
-2025-09-26 15:45:46.830 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
-2025-09-26 15:45:46.951 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
-2025-09-26 15:45:46.951 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=808
-2025-09-26 15:45:46.952 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=808, recipient=RecipientId::4
-2025-09-26 15:45:46.952 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=808
-2025-09-26 15:45:47.016 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=808, recipient=RecipientId::4
-2025-09-26 15:45:47.077 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=808
-2025-09-26 15:45:47.077 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=808
-2025-09-26 15:45:47.086 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=808, recipient=RecipientId::4
-2025-09-26 15:45:47.090 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientAci=********-****-****-****-*********461
-2025-09-26 15:45:47.121 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider
-2025-09-26 15:45:47.121 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
-2025-09-26 15:45:47.121 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
-2025-09-26 15:45:47.122 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=66
-2025-09-26 15:45:47.122 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=808, ciphertextLength=66
-2025-09-26 15:45:47.142 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********f7e
-2025-09-26 15:45:47.142 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
-2025-09-26 15:45:47.146 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
-2025-09-26 15:45:47.149 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
-2025-09-26 15:45:47.151 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
-2025-09-26 15:45:47.181 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
-2025-09-26 15:45:47.181 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1758872724931, status=FULL_ACTIVE, provider=cos
-2025-09-26 15:45:47.182 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
-2025-09-26 15:45:47.284 19218-19429 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-09-26 15:45:47.290 19218-19429 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
-2025-09-26 15:45:47.317 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败后的系统诊断:
-2025-09-26 15:45:47.350 19218-19429 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=5000ms
-2025-09-26 15:45:47.354 19218-19429 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-09-26 15:45:47.360 19218-19429 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
-2025-09-26 15:45:47.361 19218-19429 TapPollingService       org.thoughtcrime.securesms           W  轮询目标已存在: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-09-26 15:45:47.492 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  === TAP系统状态诊断 ===
-                                                                                                    1. TransportManager状态:
-                                                                                                       - 初始化状态: true
-                                                                                                    2. Provider状态:
-                                                                                                       - 可用Provider数: 1
-                                                                                                       - 启用Provider数: 1
-                                                                                                       - 可用: cos (云对象存储 (COS))
-                                                                                                       - 启用: cos (云对象存储 (COS))
-                                                                                                    3. 通道状态:
-                                                                                                       - 活跃通道数: 1
-                                                                                                       - 通道: ch_********-****-****-****-*********461_cos_1758872724931
-                                                                                                         * 状态: FULL_ACTIVE
-                                                                                                         * Provider: cos
-                                                                                                         * recipientId: ********-****-****-****-*********461
-                                                                                                         * 是否活跃: true
-                                                                                                    4. Token状态:
-                                                                                                       - 接收Token数: 3
-                                                                                                       - 共享Token数: 1
-                                                                                                       - 接收Token: cos-signal-cos-signal-v2-1758872730915-8891-1758872730915 (cos)
-                                                                                                       - 共享Token: cos-signal-cos-signal-v2-1758872709916-4992-1758872709916 (cos)
-                                                                                                    5. 轮询状态:
-                                                                                                       - 轮询服务启动结果: true
-                                                                                                       - 轮询目标添加测试: true
-                                                                                                    6. 配置状态:
-                                                                                                       - 已配置Provider: cos
-                                                                                                       - 持久化启用Provider: cos
-                                                                                                       - 应执行初始化: false
-                                                                                                    === 诊断完成 ===
-2025-09-26 15:45:47.492 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           W  TAP路由失败，尝试自动修复...
-2025-09-26 15:45:47.492 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始自动修复TAP系统问题
-2025-09-26 15:45:47.519 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，修复问题数: 0
-2025-09-26 15:45:47.519 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           W  自动修复未能解决问题
-2025-09-26 15:45:47.522 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用providers=1
-2025-09-26 15:45:47.528 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  路由失败后的启用provider: cos - 云对象存储 (COS)
-2025-09-26 15:45:47.535 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败: messageId=********-****-****-****-*********f7e, error=PROVIDER_UNAVAILABLE
-2025-09-26 15:45:47.540 19218-19254 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP传输失败: messageId=808, error=PROVIDER_UNAVAILABLE
-2025-09-26 15:45:47.543 19218-19254 TapMessageSendIntegrato org.thoughtcrime.securesms           E  Tap传输层发送失败: messageId=808, reason=TAP传输失败: 没有可用的传输提供者 (详见日志)
-2025-09-26 15:45:47.547 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           E  Tap传输层集成发送失败: messageId=808, reason=Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
-2025-09-26 15:45:47.552 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           E  Tap传输层集成发送异常: messageId=808
-                                                                                                    java.io.IOException: Tap传输层集成发送失败: Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:510)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31)
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88)
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51)
-2025-09-26 15:45:47.556 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           W  Tap发送异常，v2 mode不回退到Signal Server: messageId=808
-2025-09-26 15:45:47.560 19218-19254 IndividualSendJob       org.thoughtcrime.securesms           W  Tap检查异常，回退到原生发送: messageId=808
-                                                                                                    java.lang.RuntimeException: Tap发送失败，v2 mode不支持回退
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:535)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31)
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88)
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51)
-                                                                                                    Caused by: java.io.IOException: Tap传输层集成发送失败: Tap发送失败: TAP传输失败: 没有可用的传输提供者 (详见日志)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.sendMessageViaTapIntegration(IndividualSendJob.java:510)
-                                                                                                    	at org.thoughtcrime.securesms.jobs.IndividualSendJob.onPushSend(IndividualSendJob.java:192) 
-                                                                                                    	at org.thoughtcrime.securesms.jobs.PushSendJob.onSend(PushSendJob.java:131) 
-                                                                                                    	at org.thoughtcrime.securesms.jobs.SendJob.onRun(SendJob.java:42) 
-                                                                                                    	at org.thoughtcrime.securesms.jobs.BaseJob.run(BaseJob.java:31) 
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:88) 
-                                                                                                    	at org.thoughtcrime.securesms.jobmanager.JobRunner.run(JobRunner.java:51) 
-2025-09-26 15:45:49.096 19218-19370 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
-2025-09-26 15:45:49.372 19218-19370 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-09-26 15:45:54.099 19218-19370 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
-2025-09-26 15:45:55.329 19218-19370 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-09-26 15:45:59.101 19218-19370 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
-2025-09-26 15:45:59.665 19218-19370 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-09-26 18:49:39.996 27554-27587 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-09-26 18:49:40.003 27554-27587 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
+2025-09-26 18:49:40.004 27554-27587 TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
+2025-09-26 18:49:41.094   775-775   SsMediaDataProvider     com.android.systemui                 D  Forwarding Smartspace updates []
+2025-09-26 18:49:41.116   775-775   SsMediaDataProvider     com.android.systemui                 D  Forwarding Smartspace updates []
+2025-09-26 18:49:41.155   775-775   SsMediaDataProvider     com.android.systemui                 D  Forwarding Smartspace updates []
+2025-09-26 18:49:42.191  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=641.9756, y[0]=411.9873, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177939911, downTime=177939911, deviceId=4, source=0x5002, displayId=0, eventId=635540855 }
+2025-09-26 18:49:42.288  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=641.9756, y[0]=411.9873, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177940009, downTime=177939911, deviceId=4, source=0x5002, displayId=0, eventId=536172109 }
+2025-09-26 18:49:42.426   775-796   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@85f3a13 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=770 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=177940146 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@1efb450} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{1e05649 org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[android.os.BinderProxy@b6fbfce] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+2025-09-26 18:49:43.790   556-580   WindowManager           system_server                        V  Sent Transition #678 createdAt=09-26 10:49:42.418 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=770 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=177940146 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{9ebf13 Task{4d6b295 #770 type=standard A=10200:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{f7134da org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[android.os.BinderProxy@3efe349] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+2025-09-26 18:49:45.931  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=439.96973, y[0]=2290.8691, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177943652, downTime=177943652, deviceId=4, source=0x5002, displayId=0, eventId=42934530 }
+2025-09-26 18:49:46.033  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=439.96973, y[0]=2290.8691, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177943752, downTime=177943652, deviceId=4, source=0x5002, displayId=0, eventId=388498914 }
+2025-09-26 18:49:47.506  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1001.9531, y[0]=1437.8906, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177945226, downTime=177945226, deviceId=4, source=0x5002, displayId=0, eventId=809549744 }
+2025-09-26 18:49:47.588  1035-1035  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1001.9531, y[0]=1437.8906, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=177945309, downTime=177945226, deviceId=4, source=0x5002, displayId=0, eventId=558254508 }
+2025-09-26 18:49:48.306 27554-27587 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-09-26 18:49:48.317 27554-27587 TapMessageSendIntegrato org.thoughtcrime.securesms           D  没有活跃的传输通道: recipientId=RecipientId::4
+2025-09-26 18:49:48.320 27554-27587 IndividualSendJob       org.thoughtcrime.securesms           D  未检测到Tap v2通道，使用Signal Server发送: messageId=832

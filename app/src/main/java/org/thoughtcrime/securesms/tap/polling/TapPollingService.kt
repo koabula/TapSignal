@@ -233,12 +233,47 @@ class TapPollingService(private val context: Context) {
             Log.d(TAG, "添加轮询目标: recipient=$recipientId, provider=${metadata.providerType}")
             
             pollingLock.write {
-                if (pollingTasks.containsKey(recipientId)) {
-                    Log.w(TAG, "轮询目标已存在: $recipientId")
-                    return@write false
+                // 检查是否已存在轮询目标
+                val existingTask = pollingTasks[recipientId]
+                if (existingTask != null) {
+                    Log.d(TAG, "检测到已存在的轮询目标: recipient=$recipientId, 现有Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}")
+                    
+                    // 检查Provider类型是否匹配
+                    if (existingTask.metadata.providerType == metadata.providerType) {
+                        // Provider匹配，检查任务状态
+                        val currentStatus = existingTask.status
+                        Log.d(TAG, "Provider匹配，检查任务状态: recipient=$recipientId, status=$currentStatus")
+                        
+                        when (currentStatus) {
+                            PollingTaskStatus.RUNNING, PollingTaskStatus.POLLING -> {
+                                // 状态正常，直接返回成功
+                                Log.i(TAG, "轮询目标已存在且状态正常: recipient=$recipientId, status=$currentStatus")
+                                return@write true
+                            }
+                            PollingTaskStatus.PAUSED -> {
+                                // 暂停状态，重新启动任务
+                                Log.i(TAG, "重新启动暂停的轮询任务: recipient=$recipientId")
+                                existingTask.setStatus(PollingTaskStatus.RUNNING)
+                                val newTask = schedulePollingTask(existingTask)
+                                existingTask.task = newTask
+                                return@write true
+                            }
+                            PollingTaskStatus.ERROR_SUSPENDED, PollingTaskStatus.STOPPED, PollingTaskStatus.CREATED -> {
+                                // 异常状态，需要重新创建
+                                Log.w(TAG, "现有轮询任务状态异常，移除并重新创建: recipient=$recipientId, status=$currentStatus")
+                                existingTask.cleanup()
+                                pollingTasks.remove(recipientId)
+                            }
+                        }
+                    } else {
+                        // Provider不匹配，移除旧任务
+                        Log.w(TAG, "Provider类型不匹配，移除旧任务并创建新任务: recipient=$recipientId, 旧Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}")
+                        existingTask.cleanup()
+                        pollingTasks.remove(recipientId)
+                    }
                 }
                 
-                // 创建轮询任务信息
+                // 创建新的轮询任务信息
                 val taskInfo = PollingTaskInfo.create(recipientId, metadata)
                 
                 // 计算初始轮询间隔
@@ -248,6 +283,11 @@ class TapPollingService(private val context: Context) {
                 
                 // 调度轮询任务
                 val scheduledTask = schedulePollingTask(taskInfo)
+                if (scheduledTask == null) {
+                    Log.e(TAG, "调度轮询任务失败: recipient=$recipientId")
+                    return@write false
+                }
+                
                 taskInfo.task = scheduledTask
                 taskInfo.setStatus(PollingTaskStatus.RUNNING)
                 
@@ -261,6 +301,7 @@ class TapPollingService(private val context: Context) {
             when (e) {
                 is IllegalArgumentException -> Log.e(TAG, "添加轮询目标失败，参数无效: recipient=$recipientId", e)
                 is IllegalStateException -> Log.e(TAG, "添加轮询目标失败，状态异常: recipient=$recipientId", e)
+                is SecurityException -> Log.e(TAG, "添加轮询目标失败，安全权限不足: recipient=$recipientId", e)
                 else -> Log.e(TAG, "添加轮询目标失败: recipient=$recipientId, ${e.javaClass.simpleName}", e)
             }
             false

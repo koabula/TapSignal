@@ -476,6 +476,14 @@ class TransportRoutingManager private constructor(private val context: Context) 
             if (scoredProviders.isNotEmpty() && scoredProviders.first().second <= 0.0) {
                 Log.e(TAG, "所有Provider评分都为0或负数，可能是评分逻辑问题")
             }
+            
+            // Fallback策略：如果智能选择失败，但有可用Provider，使用第一个
+            Log.w(TAG, "启用Fallback策略：选择第一个可用Provider")
+            val fallbackProvider = providers.firstOrNull()
+            if (fallbackProvider != null) {
+                Log.i(TAG, "Fallback选择Provider: ${fallbackProvider.providerType}")
+                return fallbackProvider
+            }
         }
         
         return selectedProvider
@@ -595,7 +603,6 @@ class TransportRoutingManager private constructor(private val context: Context) 
         
         val score = when {
             channel == null -> {
-                Log.w(TAG, "没有找到匹配的活跃通道，评分0.3")
                 // 检查是否有该providerType的通道但不活跃
                 val allChannelsForProvider = allActiveChannels.filter { it.providerType == providerType }
                 if (allChannelsForProvider.isNotEmpty()) {
@@ -603,8 +610,12 @@ class TransportRoutingManager private constructor(private val context: Context) 
                     allChannelsForProvider.forEach { ch ->
                         Log.w(TAG, "  - 通道${ch.channelId}: status=${ch.status}, isActive=${ch.isActive()}")
                     }
+                    // 如果确实有该类型的通道，给予更高的评分，可能是查询问题
+                    0.6
+                } else {
+                    Log.w(TAG, "没有找到匹配的活跃通道，评分0.3")
+                    0.3
                 }
-                0.3
             }
             channel.isActive() -> {
                 Log.d(TAG, "通道活跃，评分0.9")

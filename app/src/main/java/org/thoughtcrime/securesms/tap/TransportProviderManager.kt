@@ -120,7 +120,19 @@ class TransportProviderManager private constructor(private val context: Context)
     fun getProvider(providerType: String): TransportProvider? {
         val normalizedProviderType = providerType.lowercase()
         return providerLock.read {
-            providers[normalizedProviderType]
+            val provider = providers[normalizedProviderType]
+            
+            // 状态检查：记录警告但不阻断获取
+            if (provider != null) {
+                val status = providerStatus[normalizedProviderType]
+                if (status == null || !status.isActive) {
+                    Log.w(TAG, "Provider状态检查警告: $normalizedProviderType, status=${status?.isActive}, 但仍返回实例")
+                }
+            } else {
+                Log.w(TAG, "Provider实例未找到: $normalizedProviderType, 已注册类型: ${providers.keys}")
+            }
+            
+            provider
         }
     }
     
@@ -260,6 +272,23 @@ class TransportProviderManager private constructor(private val context: Context)
             }
             
             true
+        }
+    }
+    
+    /**
+     * 更新Provider健康状态
+     */
+    fun updateProviderHealth(providerType: String, success: Boolean) {
+        providerLock.write {
+            val status = providerStatus[providerType]
+            if (status != null) {
+                val updatedStatus = status.copy(
+                    lastCheckTime = System.currentTimeMillis(),
+                    errorCount = if (success) 0 else status.errorCount + 1
+                )
+                providerStatus[providerType] = updatedStatus
+                Log.d(TAG, "更新Provider健康状态: $providerType, 成功: $success, 错误次数: ${updatedStatus.errorCount}")
+            }
         }
     }
     

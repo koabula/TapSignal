@@ -1721,26 +1721,12 @@ class ConversationFragment :
         try {
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
           
-          // 使用ACI作为键查找活跃通道，而不是RecipientId
-          val recipientAci = recipient.requireAci().toString()
-          val activeChannels = channelManager.getActiveChannels(recipientAci)
-          
-          Log.d(TAG, "查找活跃通道: recipientAci=$recipientAci, 找到${activeChannels.size}个通道")
-          
-          var successCount = 0
-          for (channel in activeChannels) {
-            val success = channelManager.closeChannel(channel.channelId)
-            if (success) {
-              successCount++
-              Log.d(TAG, "成功关闭通道: ${channel.channelId}")
-            } else {
-              Log.w(TAG, "关闭通道失败: ${channel.channelId}")
-            }
-          }
+          // 使用完整的disableV2Mode方法，支持多种ID格式
+          val disableSuccess = channelManager.disableV2Mode(recipient.id.toString())
           
           requireActivity().runOnUiThread {
-            if (successCount > 0) {
-              Toast.makeText(requireContext(), "Tap传输连接已断开", Toast.LENGTH_SHORT).show()
+            if (disableSuccess) {
+              Toast.makeText(requireContext(), "Tap传输连接已完全断开", Toast.LENGTH_SHORT).show()
               // 刷新菜单以更新按钮文本
               requireActivity().invalidateOptionsMenu()
             } else {

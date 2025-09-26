@@ -104,6 +104,13 @@ class TransportManager private constructor(private val context: Context) {
                     tokenPool.value.initialize(config.tokenConfig)
                     routingPolicy = config.routingPolicy
                     
+                    // 初始化路由管理器
+                    val routingInitResult = routingManager.initialize(config.routingPolicy)
+                    if (!routingInitResult) {
+                        Log.e(TAG, "路由管理器初始化失败")
+                        return@withContext false
+                    }
+                    
                     // 初始化Provider管理器（内部注册默认工厂并加载配置）
                     Log.d(TAG, "开始初始化Provider管理器...")
                     val providerInitResult = providerManager.initialize()
@@ -253,12 +260,52 @@ class TransportManager private constructor(private val context: Context) {
         
         // 当未配置任何启用项时，默认启用所有活跃Provider，避免启用态与活跃态脱节
         if (currentConfig.enabledProviders.isEmpty()) {
-            Log.d(TAG, "配置启用列表为空，返回所有活跃Provider: ${active.map { it.providerType }}")
+            Log.d(TAG, "配置启用列表为空，自动启用所有活跃Provider: ${active.map { it.providerType }}")
+            
+            // 自动同步配置状态，避免重复检查
+            if (active.isNotEmpty()) {
+                val activeProviderTypes = active.map { it.providerType }.toSet()
+                currentConfig = currentConfig.copy(enabledProviders = activeProviderTypes)
+                
+                // 持久化到存储
+                try {
+                    val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                    tapValues.setEnabledProviders(activeProviderTypes)
+                    Log.d(TAG, "自动启用Provider配置已持久化: ${activeProviderTypes.joinToString(", ")}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "自动启用Provider配置持久化失败", e)
+                }
+            }
+            
             return active
         }
         
         val filtered = active.filter { provider -> currentConfig.isProviderEnabled(provider.providerType) }
         Log.d(TAG, "根据配置过滤Provider: 结果=${filtered.map { it.providerType }}")
+        
+        // 检查是否存在活跃但未启用的Provider，自动同步
+        val activeProviderTypes = active.map { it.providerType }.toSet()
+        val enabledProviderTypes = currentConfig.enabledProviders
+        val missingEnabledTypes = activeProviderTypes - enabledProviderTypes
+        
+        if (missingEnabledTypes.isNotEmpty()) {
+            Log.w(TAG, "发现活跃但未启用的Provider，自动添加到启用列表: ${missingEnabledTypes.joinToString(", ")}")
+            val updatedEnabledTypes = enabledProviderTypes + missingEnabledTypes
+            currentConfig = currentConfig.copy(enabledProviders = updatedEnabledTypes)
+            
+            // 持久化更新
+            try {
+                val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                tapValues.setEnabledProviders(updatedEnabledTypes)
+                Log.i(TAG, "Provider启用状态已自动同步并持久化: ${updatedEnabledTypes.joinToString(", ")}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Provider启用状态同步持久化失败", e)
+            }
+            
+            // 重新过滤，返回所有活跃Provider
+            return active
+        }
+        
         return filtered
     }
     
@@ -391,6 +438,7 @@ class TransportManager private constructor(private val context: Context) {
                 
                 // 更新路由策略
                 routingPolicy = newConfig.routingPolicy
+                routingManager.updateRoutingPolicy(newConfig.routingPolicy)
                 
                 updateTasks.awaitAll()
                 
@@ -649,6 +697,11 @@ class TransportManager private constructor(private val context: Context) {
                     )
                 }
                 
+                // === selectBestProvider成功，开始后续步骤诊断 ===
+                Log.d(TAG, "=== selectBestProvider成功 ===")
+                Log.d(TAG, "选择的Provider: ${bestProvider.providerType}")
+                Log.d(TAG, "开始创建/获取通道...")
+                
                 // 获取或创建传输通道（使用标准化的recipientId）
                 val channel = channelManager.value.getOrCreateChannel(
                     recipientId = normalizedRecipientId,
@@ -656,7 +709,32 @@ class TransportManager private constructor(private val context: Context) {
                     provider = bestProvider
                 )
                 
+                Log.d(TAG, "=== getOrCreateChannel结果 ===")
+                Log.d(TAG, "channel: ${if (channel != null) channel.channelId else "null"}")
+                
                 if (channel == null) {
+                    Log.e(TAG, "=== 通道创建/获取失败详细诊断 ===")
+                    Log.e(TAG, "bestProvider: ${bestProvider.providerType}")
+                    Log.e(TAG, "normalizedRecipientId: $normalizedRecipientId")
+                    Log.e(TAG, "原始recipientId: $recipientId")
+                    
+                    // 检查是否已有通道但状态不对
+                    val existingChannels = channelManager.value.getActiveChannels(normalizedRecipientId)
+                    Log.e(TAG, "现有活跃通道数: ${existingChannels.size}")
+                    existingChannels.forEach { ch ->
+                        Log.e(TAG, "  - ${ch.channelId}: status=${ch.status}, provider=${ch.providerType}, isActive=${ch.isActive()}")
+                    }
+                    
+                    // 检查所有通道（包括非活跃的）
+                    val allChannels = channelManager.value.getAllActiveChannels()
+                    val relevantChannels = allChannels.filter { 
+                        it.recipientId == normalizedRecipientId || it.recipientId == recipientId 
+                    }
+                    Log.e(TAG, "所有相关通道数: ${relevantChannels.size}")
+                    relevantChannels.forEach { ch ->
+                        Log.e(TAG, "  - 所有通道: ${ch.channelId}, recipientId=${ch.recipientId}, status=${ch.status}")
+                    }
+                    
                     return@withContext TransportResult.failure(
                         TransportError.CHANNEL_ERROR,
                         true,
@@ -665,8 +743,24 @@ class TransportManager private constructor(private val context: Context) {
                 }
                 
                 // 获取传输元数据
+                Log.d(TAG, "=== metadata检查 ===")
+                Log.d(TAG, "通道信息: channelId=${channel.channelId}, status=${channel.status}")
+                
                 val metadata = channel.metadata
+                Log.d(TAG, "metadata != null: ${metadata != null}")
+                
                 if (metadata == null) {
+                    Log.e(TAG, "=== metadata为null的详细分析 ===")
+                    Log.e(TAG, "通道详情:")
+                    Log.e(TAG, "  - channelId: ${channel.channelId}")
+                    Log.e(TAG, "  - status: ${channel.status}")
+                    Log.e(TAG, "  - providerType: ${channel.providerType}")
+                    Log.e(TAG, "  - recipientId: ${channel.recipientId}")
+                    Log.e(TAG, "  - createdAt: ${java.util.Date(channel.createdAt)}")
+                    Log.e(TAG, "  - lastActiveAt: ${java.util.Date(channel.lastActiveAt)}")
+                    Log.e(TAG, "  - isActive(): ${channel.isActive()}")
+                    Log.e(TAG, "  - priority: ${channel.priority}")
+                    
                     return@withContext TransportResult.failure(
                         TransportError.INVALID_METADATA,
                         true,
@@ -675,7 +769,48 @@ class TransportManager private constructor(private val context: Context) {
                 }
                 
                 // 执行消息发送
-                val result = bestProvider.push(message, metadata)
+                Log.d(TAG, "=== 开始provider.push ===")
+                Log.d(TAG, "provider: ${bestProvider.providerType}")
+                Log.d(TAG, "message详情:")
+                Log.d(TAG, "  - messageId: ${message.messageId}")
+                Log.d(TAG, "  - messageType: ${message.messageType}")
+                Log.d(TAG, "  - encryptedContent大小: ${message.encryptedContent.size}")
+                Log.d(TAG, "  - attachments数量: ${message.attachments.size}")
+                Log.d(TAG, "metadata详情:")
+                Log.d(TAG, "  - metadata类型: ${metadata.javaClass.simpleName}")
+                
+                val result = try {
+                    bestProvider.push(message, metadata)
+                } catch (e: Exception) {
+                    Log.e(TAG, "=== provider.push异常详细诊断 ===")
+                    Log.e(TAG, "provider: ${bestProvider.providerType}")
+                    Log.e(TAG, "异常类型: ${e.javaClass.simpleName}")
+                    Log.e(TAG, "异常消息: ${e.message}")
+                    Log.e(TAG, "异常堆栈: ${e.stackTrace.take(5).joinToString("\n") { "  at $it" }}")
+                    
+                    // 检查Provider状态
+                    Log.e(TAG, "Provider状态检查:")
+                    try {
+                        Log.e(TAG, "  - providerType: ${bestProvider.providerType}")
+                        Log.e(TAG, "  - displayName: ${bestProvider.displayName}")
+                        Log.e(TAG, "  - description: ${bestProvider.description}")
+                        Log.e(TAG, "  - supportsAuth: ${bestProvider.supportsAuth}")
+                        Log.e(TAG, "  - maxMessageSize: ${bestProvider.maxMessageSize}")
+                    } catch (configEx: Exception) {
+                        Log.e(TAG, "  - 获取provider信息失败: ${configEx.message}")
+                    }
+                    
+                    throw e
+                }
+                
+                Log.d(TAG, "=== provider.push成功 ===")
+                Log.d(TAG, "result类型: ${result.javaClass.simpleName}")
+                when (result) {
+                    is TransportResult.Success -> Log.d(TAG, "推送成功")
+                    is TransportResult.Failed -> Log.w(TAG, "推送失败: ${result.error}")
+                    is TransportResult.PartialSuccess -> Log.w(TAG, "部分成功")
+                    is TransportResult.RetryScheduled -> Log.w(TAG, "已调度重试")
+                }
                 
                 // 更新通道统计
                 when (result) {
@@ -824,12 +959,16 @@ class TransportManager private constructor(private val context: Context) {
                     
                     if (messages.isNotEmpty()) {
                         channelManager.value.updateChannelSuccess(channel.channelId)
+                        // 更新Provider健康状态
+                        providerManager.updateProviderHealth(channel.providerType, true)
                     }
                     
                     messages
                 }
                 is TransportResult.Failed -> {
                     channelManager.value.updateChannelFailure(channel.channelId, listResult.error)
+                    // 更新Provider健康状态
+                    providerManager.updateProviderHealth(channel.providerType, false)
                     Log.w(TAG, "列出文件失败: ${listResult.error}")
                     emptyList()
                 }

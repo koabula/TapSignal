@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlinx.coroutines.*
+import org.whispersystems.signalservice.api.push.ServiceId.ACI
 
 /**
  * 传输通道管理器
@@ -459,9 +460,17 @@ class TransportChannelManager private constructor(private val context: Context) 
         return withContext(Dispatchers.IO) {
             channelLock.write {
                 try {
-                    val channelIds = recipientChannels[recipientId]
+                    // 统一Recipient ID格式：支持多种输入格式转换为ACI字符串
+                    val normalizedRecipientId = normalizeRecipientId(recipientId)
+                    Log.d(TAG, "禁用v2模式: 原始ID=$recipientId, 标准化ID=$normalizedRecipientId")
+                    
+                    // 尝试多种格式匹配通道
+                    val channelIds = recipientChannels[normalizedRecipientId] 
+                        ?: recipientChannels[recipientId]
+                    
                     if (channelIds.isNullOrEmpty()) {
-                        Log.i(TAG, "没有找到通道需要禁用: recipientId=$recipientId")
+                        Log.i(TAG, "没有找到通道需要禁用: recipientId=$recipientId, normalizedId=$normalizedRecipientId")
+                        Log.d(TAG, "当前已有通道: ${recipientChannels.keys}")
                         return@withContext false
                     }
                     
@@ -485,10 +494,43 @@ class TransportChannelManager private constructor(private val context: Context) 
                         disabledCount++
                         
                         Log.d(TAG, "已关闭通道: ${channel.channelId}, provider=${channel.providerType}")
+                        
+                        // 移除轮询目标
+                        try {
+                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                            // 使用标准化的ID格式匹配轮询任务
+                            val removeResult = pollingService.removePollingTarget(normalizedRecipientId, channel.providerType)
+                            if (removeResult) {
+                                Log.d(TAG, "已移除轮询目标: recipient=$normalizedRecipientId, provider=${channel.providerType}")
+                            } else {
+                                Log.w(TAG, "移除轮询目标失败: recipient=$normalizedRecipientId, provider=${channel.providerType}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "移除轮询目标异常", e)
+                        }
                     }
                     
-                    // 清理索引
+                    // 清理Token池
+                    try {
+                        val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                        val removedTokenCount = tokenPool.removeAllTokensForRecipient(normalizedRecipientId)
+                        Log.d(TAG, "已清理Token: recipientId=$normalizedRecipientId, count=$removedTokenCount")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "清理Token失败", e)
+                    }
+                    
+                    // 发送disable控制消息
+                    if (channelsToClose.isNotEmpty()) {
+                        try {
+                            sendDisableControlMessage(normalizedRecipientId, channelsToClose.first().providerType)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "发送disable控制消息失败", e)
+                        }
+                    }
+                    
+                    // 清理索引：清理所有可能的格式
                     recipientChannels.remove(recipientId)
+                    recipientChannels.remove(normalizedRecipientId)
                     channelsToClose.forEach { channel ->
                         providerChannels[channel.providerType]?.remove(channel.channelId)
                         if (providerChannels[channel.providerType]?.isEmpty() == true) {
@@ -497,11 +539,11 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                     
                     if (disabledCount > 0) {
-                        Log.i(TAG, "v2模式已禁用: recipientId=$recipientId, 关闭了${disabledCount}个通道")
+                        Log.i(TAG, "v2模式已禁用: 原始ID=$recipientId, 标准化ID=$normalizedRecipientId, 关闭了${disabledCount}个通道")
                         
                         // 插入禁用系统消息
                         try {
-                            val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId)
+                            val recipientIdObj = getRecipientIdFromString(recipientId)
                             SignalDatabase.messages.insertTapV2ModeDisabledMessage(recipientIdObj)
                             Log.d(TAG, "已插入v2模式禁用消息: recipientId=$recipientId")
                         } catch (e: Exception) {
@@ -515,6 +557,141 @@ class TransportChannelManager private constructor(private val context: Context) 
                     Log.e(TAG, "禁用v2模式失败: recipientId=$recipientId", e)
                     return@withContext false
                 }
+            }
+        }
+    }
+    
+    /**
+     * 标准化Recipient ID格式
+     * 支持多种输入格式转换为统一的ACI字符串格式
+     */
+    private fun normalizeRecipientId(recipientId: String): String {
+        return try {
+            when {
+                // 处理 "RecipientId::数字" 格式
+                recipientId.startsWith("RecipientId::") -> {
+                    val idNumber = recipientId.removePrefix("RecipientId::")
+                    val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(idNumber.toLong())
+                    val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
+                    recipient.requireAci().toString()
+                }
+                // 处理纯数字格式
+                recipientId.all { it.isDigit() } -> {
+                    val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId.toLong())
+                    val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
+                    recipient.requireAci().toString()
+                }
+                // 已经是ACI格式（UUID样式），直接返回
+                recipientId.contains("-") && recipientId.length >= 32 -> {
+                    recipientId
+                }
+                // 其他情况，尝试作为ACI处理
+                else -> {
+                    recipientId
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Recipient ID格式转换失败: $recipientId", e)
+            recipientId
+        }
+    }
+    
+    /**
+     * 从字符串获取RecipientId对象
+     * 支持多种输入格式
+     */
+    private fun getRecipientIdFromString(recipientId: String): org.thoughtcrime.securesms.recipients.RecipientId {
+        return try {
+            when {
+                // 处理 "RecipientId::数字" 格式
+                recipientId.startsWith("RecipientId::") -> {
+                    val idNumber = recipientId.removePrefix("RecipientId::")
+                    org.thoughtcrime.securesms.recipients.RecipientId.from(idNumber.toLong())
+                }
+                // 处理纯数字格式
+                recipientId.all { it.isDigit() } -> {
+                    org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId.toLong())
+                }
+                // ACI格式，需要通过ACI反查RecipientId
+                recipientId.contains("-") && recipientId.length >= 32 -> {
+                    val aci = ACI.parseOrThrow(recipientId)
+                    org.thoughtcrime.securesms.database.SignalDatabase.recipients.getByAci(aci).orElseThrow {
+                        IllegalArgumentException("无法找到ACI对应的RecipientId: $recipientId")
+                    }
+                }
+                // 其他情况，尝试作为数字处理
+                else -> {
+                    org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId.toLong())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "RecipientId对象获取失败: $recipientId", e)
+            throw IllegalArgumentException("无法解析RecipientId: $recipientId", e)
+        }
+    }
+    
+    /**
+     * 发送disable控制消息
+     */
+    private suspend fun sendDisableControlMessage(recipientId: String, providerType: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val selfAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.aci?.toString()
+                if (selfAci == null) {
+                    Log.w(TAG, "无法获取自己的ACI，跳过发送disable控制消息")
+                    return@withContext
+                }
+                
+                val disableMessage = TapTokenExchangeMessage(
+                    senderAci = selfAci,
+                    providerType = providerType,
+                    tokenData = emptyMap(),
+                    metadata = mapOf("reason" to "user_disabled"),
+                    requestType = TapTokenExchangeMessage.REQUEST_TYPE_DISABLE
+                )
+                
+                val recipientIdObj = try {
+                    getRecipientIdFromString(recipientId)
+                } catch (e: IllegalArgumentException) {
+                    Log.e(TAG, "无法解析RecipientId，跳过发送disable控制消息: $recipientId", e)
+                    return@withContext
+                }
+                
+                val messageBody = TapTokenExchangeMessage.encode(disableMessage)
+                
+                // 通过Signal Server发送控制消息
+                val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
+                val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
+                    recipient,
+                    System.currentTimeMillis(),
+                    0L,
+                    messageBody
+                )
+                
+                val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads
+                    .getOrCreateThreadIdFor(recipient)
+                
+                val messageId = org.thoughtcrime.securesms.database.SignalDatabase.messages
+                    .insertMessageOutbox(outgoingMessage, threadId, false, null)
+                
+                if (messageId > 0) {
+                    Log.i(TAG, "已发送disable控制消息: messageId=$messageId")
+                    
+                    // 添加到发送队列
+                    org.thoughtcrime.securesms.dependencies.AppDependencies
+                        .jobManager
+                        .add(org.thoughtcrime.securesms.jobs.IndividualSendJob.create(
+                            messageId,
+                            recipient,
+                            false,
+                            false
+                        ))
+                } else {
+                    Log.e(TAG, "插入disable控制消息失败")
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "发送disable控制消息异常", e)
             }
         }
     }
@@ -722,12 +899,85 @@ class TransportChannelManager private constructor(private val context: Context) 
             val configManager = TransportProviderConfigManager.getInstance(context)
             val tokenPool = TransportTokenPool.getInstance(context)
             
-            when (providerType) {
+            val metadata = when (providerType) {
                 "cos" -> createCosChannelMetadata(recipientId, provider, configManager, tokenPool)
                 else -> createGenericChannelMetadata(recipientId, providerType, provider, configManager, tokenPool)
             }
+            
+            if (metadata != null) {
+                Log.i(TAG, "通道元数据创建成功: $providerType")
+                metadata
+            } else {
+                Log.w(TAG, "通道元数据创建返回null，尝试创建基础元数据: $providerType")
+                createFallbackMetadata(recipientId, providerType, provider, configManager)
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "创建通道元数据失败: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "创建通道元数据异常: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
+            
+            // 异常时创建最基础的metadata，确保轮询能启动
+            try {
+                val configManager = TransportProviderConfigManager.getInstance(context)
+                val fallbackMetadata = createFallbackMetadata(recipientId, providerType, provider, configManager)
+                if (fallbackMetadata != null) {
+                    Log.w(TAG, "使用fallback元数据: $providerType")
+                }
+                fallbackMetadata
+            } catch (fallbackException: Exception) {
+                Log.e(TAG, "创建fallback元数据也失败: $providerType", fallbackException)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 创建fallback元数据，确保基本功能可用
+     */
+    private fun createFallbackMetadata(
+        recipientId: String,
+        providerType: String,
+        provider: TransportProvider,
+        configManager: TransportProviderConfigManager
+    ): TransportMetadata? {
+        return try {
+            Log.d(TAG, "创建fallback元数据: providerType=$providerType")
+            
+            val providerConfig = configManager.getProviderConfig(providerType)
+            if (providerConfig == null) {
+                Log.w(TAG, "Provider配置不存在，无法创建fallback元数据: $providerType")
+                return null
+            }
+            
+            val address = provider.formatAddress(providerConfig)
+            val sendPath = provider.getSendPath(recipientId)
+            val receivePath = provider.getReceivePath(recipientId)
+            
+            // 获取本端ACI作为myId
+            val myAci = try {
+                org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            } catch (e: Exception) {
+                Log.w(TAG, "无法获取本端ACI，使用默认值", e)
+                "unknown"
+            }
+            
+            // 使用GenericTransportMetadata而不是匿名对象
+            GenericTransportMetadata(
+                recipientId = recipientId,
+                providerType = providerType,
+                sendMetadata = SendMetadata(
+                    address = address,
+                    token = null, // fallback时可能没有token
+                    path = sendPath,
+                    recipientId = recipientId
+                ),
+                receiveMetadata = ReceiveMetadata(
+                    address = address,
+                    token = null, // fallback时可能没有token
+                    path = receivePath,
+                    myId = myAci
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "创建fallback元数据失败: $providerType", e)
             null
         }
     }

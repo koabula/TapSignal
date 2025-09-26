@@ -252,6 +252,30 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     
                     if (channel != null) {
                         Log.i(TAG, "B端成功建立传输通道: channelId=${channel.channelId}, recipientId=${originalMessage.senderAci}")
+                        
+                        // B端通道建立成功后立即启动轮询
+                        try {
+                            Log.d(TAG, "B端通道建立后启动轮询: recipientId=${originalMessage.senderAci}")
+                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                            
+                            if (channel.metadata != null) {
+                                val pollingStarted = pollingService.startPolling()
+                                if (pollingStarted) {
+                                    val targetAdded = pollingService.addPollingTarget(originalMessage.senderAci, channel.metadata!!)
+                                    if (targetAdded) {
+                                        Log.i(TAG, "B端通道建立后轮询启动成功: recipientId=${originalMessage.senderAci}")
+                                    } else {
+                                        Log.w(TAG, "B端通道建立后轮询目标添加失败: recipientId=${originalMessage.senderAci}")
+                                    }
+                                } else {
+                                    Log.w(TAG, "B端通道建立后轮询服务启动失败: recipientId=${originalMessage.senderAci}")
+                                }
+                            } else {
+                                Log.w(TAG, "B端通道建立时metadata为null，暂不启动轮询: recipientId=${originalMessage.senderAci}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "B端通道建立后启动轮询异常: recipientId=${originalMessage.senderAci}", e)
+                        }
                     } else {
                         Log.w(TAG, "B端建立传输通道失败: recipientId=${originalMessage.senderAci}")
                     }

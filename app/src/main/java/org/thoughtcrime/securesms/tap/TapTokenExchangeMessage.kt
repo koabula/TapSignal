@@ -31,6 +31,7 @@ data class TapTokenExchangeMessage(
         const val REQUEST_TYPE_OFFER = "OFFER"
         const val REQUEST_TYPE_ACCEPT = "ACCEPT"
         const val REQUEST_TYPE_CONFIRM = "CONFIRM"
+        const val REQUEST_TYPE_DISABLE = "DISABLE"
         const val TAP_TOKEN_EXCHANGE_PREFIX = "TAP_TOKEN_EXCHANGE:"
         
         /**
