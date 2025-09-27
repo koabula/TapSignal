@@ -162,9 +162,12 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             val envelopeBuilder = Envelope.Builder()
                 .type(Envelope.Type.CIPHERTEXT)  // 假设是密文消息
                 .timestamp(transportMessage.timestamp)
+                .serverTimestamp(transportMessage.timestamp)  // 设置服务器时间戳，避免解密时空指针异常
                 .content(Base64.decode(transportMessage.signalCiphertext).toByteString())
                 .sourceServiceId(sourceServiceId.toString())
                 .sourceDevice(getSourceDeviceId(transportMessage))
+                .urgent(true)  // TAP消息视为紧急消息
+                .story(false)  // TAP传输的是普通消息，非故事消息
             
             // 如果有目标ServiceId，设置它
             val localServiceId = SignalStore.account.requireAci()

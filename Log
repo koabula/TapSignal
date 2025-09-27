@@ -1,79 +1,53 @@
-2025-09-27 12:16:28.867  8557-8589  TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::8
-2025-09-27 12:16:28.867  8557-8589  TapMessageProcessor     org.thoughtcrime.securesms           I  处理v2模式禁用请求: senderId=RecipientId::8, providerType=cos
-2025-09-27 12:16:28.869  8557-8589  TapMessageProcessor     org.thoughtcrime.securesms           I  对方请求禁用v2模式: senderAci=********-****-****-****-*********973, providerType=cos
-2025-09-27 12:16:28.869  8557-8583  TapPollingService       org.thoughtcrime.securesms           D  移除轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-09-27 12:16:28.870  8557-8583  TapPollingService       org.thoughtcrime.securesms           I  轮询目标移除成功: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-27 12:16:28.911  8557-8589  TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1758946577532
-2025-09-27 12:16:28.912  8557-8589  TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-09-27 12:16:38.326  8557-8589  DeadlockDetector        org.thoughtcrime.securesms           W  Found a long block! Blocked for at least 5000 ms.
-                                                                                                    -- [163] DefaultDispatcher-worker-2 | TIMED_WAITING
-                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
-                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransactionUnchecked(SQLiteSession.java:314)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransaction(SQLiteSession.java:302)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransaction(SQLiteDatabase.java:555)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransactionWithListener(SQLiteDatabase.java:519)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$beginTransaction$0(SQLiteDatabase.java:295)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$rYLTDWeVtTxUHcUFh9f2udi_ldo(Unknown Source:0)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda19.run(D8$$SyntheticClass:0)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.trace(SQLiteDatabase.java:76)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.beginTransaction(SQLiteDatabase.java:294)
-                                                                                                    org.thoughtcrime.securesms.database.ThreadTable.getOrCreateThreadIdResultFor(ThreadTable.kt:2706)
-                                                                                                    org.thoughtcrime.securesms.database.ThreadTable.getOrCreateThreadIdResultFor$default(ThreadTable.kt:1443)
-                                                                                                    org.thoughtcrime.securesms.database.MessageTable.insertTapV2ModeDisabledMessage(MessageTable.kt:2940)
-                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager$disableV2Mode$3$1.invokeSuspend(TransportChannelManager.kt:636)
-                                                                                                    kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-                                                                                                    kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-                                                                                                    kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-09-27 12:16:53.429  8557-8589  DeadlockDetector        org.thoughtcrime.securesms           W  org.signal.core.util.concurrent.SignalExecutors$NumberedThreadFactory$1.run(SignalExecutors.java:100)
-                                                                                                    
-                                                                                                    -- [163] DefaultDispatcher-worker-2 | TIMED_WAITING
-                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
-                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransactionUnchecked(SQLiteSession.java:314)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransaction(SQLiteSession.java:302)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransaction(SQLiteDatabase.java:555)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransactionWithListener(SQLiteDatabase.java:519)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$beginTransaction$0(SQLiteDatabase.java:295)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$rYLTDWeVtTxUHcUFh9f2udi_ldo(Unknown Source:0)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda19.run(D8$$SyntheticClass:0)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.trace(SQLiteDatabase.java:76)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.beginTransaction(SQLiteDatabase.java:294)
-                                                                                                    org.thoughtcrime.securesms.database.ThreadTable.getOrCreateThreadIdResultFor(ThreadTable.kt:2706)
-                                                                                                    org.thoughtcrime.securesms.database.ThreadTable.getOrCreateThreadIdResultFor$default(ThreadTable.kt:1443)
-                                                                                                    org.thoughtcrime.securesms.database.MessageTable.insertTapV2ModeDisabledMessage(MessageTable.kt:2940)
-                                                                                                    org.thoughtcrime.securesms.tap.TransportChannelManager$disableV2Mode$3$1.invokeSuspend(TransportChannelManager.kt:636)
-                                                                                                    kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-                                                                                                    kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-                                                                                                    kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-09-27 12:16:58.462  8557-8589  DeadlockDetector        org.thoughtcrime.securesms           W  org.signal.core.util.concurrent.SignalExecutors$NumberedThreadFactory$1.run(SignalExecutors.java:100)
-                                                                                                    
-                                                                                                    -- [163] DefaultDispatcher-worker-2 | TIMED_WAITING
-                                                                                                    jdk.internal.misc.Unsafe.park(Native Method)
-                                                                                                    java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:252)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.waitForConnection(SQLiteConnectionPool.java:682)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteConnectionPool.acquireConnection(SQLiteConnectionPool.java:360)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.acquireConnection(SQLiteSession.java:929)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransactionUnchecked(SQLiteSession.java:314)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteSession.beginTransaction(SQLiteSession.java:302)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransaction(SQLiteDatabase.java:555)
-                                                                                                    net.zetetic.database.sqlcipher.SQLiteDatabase.beginTransactionWithListener(SQLiteDatabase.java:519)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.lambda$beginTransaction$0(SQLiteDatabase.java:295)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase.$r8$lambda$rYLTDWeVtTxUHcUFh9f2udi_ldo(Unknown Source:0)
-                                                                                                    org.thoughtcrime.securesms.database.SQLiteDatabase$$ExternalSyntheticLambda19.run(D8$$SyntheticClass:0)
+2025-09-27 17:28:55.789 14610-14767 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-27 17:28:56.343 14610-14767 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-27 17:28:56.680 14610-14642 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********912, type=MEDIA_MESSAGE
+2025-09-27 17:28:56.681 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********912
+2025-09-27 17:28:56.681 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********912
+2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功: messageId=********-****-****-****-*********912
+2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1758965331432
+2025-09-27 17:28:56.687 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1758965331432
+2025-09-27 17:28:56.687 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1758965331432
+2025-09-27 17:28:56.695 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  MessageContentProcessor处理失败: timestamp=1758965331432
+                                                                                                    java.lang.NullPointerException
+                                                                                                    	at java.util.Objects.requireNonNull(Objects.java:207)
+                                                                                                    	at org.whispersystems.signalservice.api.util.AttachmentPointerUtil.createSignalAttachmentPointer(AttachmentPointerUtil.java:20)
+                                                                                                    	at org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.toSignalServiceAttachmentPointer(SignalServiceProtoUtil.kt:191)
+                                                                                                    	at org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.toPointer(SignalServiceProtoUtil.kt:179)
+                                                                                                    	at org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.toPointer$default(SignalServiceProtoUtil.kt:177)
+                                                                                                    	at org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.toPointersWithinLimit(SignalServiceProtoUtil.kt:174)
+                                                                                                    	at org.thoughtcrime.securesms.messages.DataMessageProcessor.handleMediaMessage(DataMessageProcessor.kt:920)
+                                                                                                    	at org.thoughtcrime.securesms.messages.DataMessageProcessor.process(DataMessageProcessor.kt:170)
+                                                                                                    	at org.thoughtcrime.securesms.messages.MessageContentProcessor.handleMessage(MessageContentProcessor.kt:435)
+                                                                                                    	at org.thoughtcrime.securesms.messages.MessageContentProcessor.process(MessageContentProcessor.kt:329)
+                                                                                                    	at org.thoughtcrime.securesms.messages.MessageContentProcessor.process$default(MessageContentProcessor.kt:325)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processWithMessageContentProcessor(TapEnvelopeAdapter.kt:335)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$processWithMessageContentProcessor(TapEnvelopeAdapter.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:88)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:57)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:138)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:615)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:492)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:447)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-09-27 17:28:56.696 14610-14767 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 206360b0-f508-415f-9187-5ce93ba71912_1758965332889.dat, error=消息内容处理失败
+2025-09-27 17:28:56.696 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  消息内容处理失败: messageId=********-****-****-****-*********912
+2025-09-27 17:28:56.696 14610-14767 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-27 17:28:56.697 14610-14642 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=********-****-****-****-*********912, error=消息内容处理失败
+2025-09-27 17:29:00.797 14610-14764 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=95.24%]
+2025-09-27 17:29:00.798 14610-14764 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-27 17:29:01.397 14610-14764 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973

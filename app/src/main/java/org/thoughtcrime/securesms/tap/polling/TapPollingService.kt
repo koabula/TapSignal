@@ -541,27 +541,45 @@ class TapPollingService(private val context: Context) {
         pollingState: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState?
     ): FilePollingResult {
         return try {
-            // 列举文件
-            val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
-                errorHandler.executeWithRetry({
-                    provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
-                }, ErrorContext(
-                    providerType = taskInfo.metadata.providerType,
-                    operationType = "listFiles",
-                    targetId = taskInfo.recipientId,
-                    channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}"
-                ))
+            // 获取基础路径并构建messages和attachments轮询路径
+            val basePath = taskInfo.metadata.getReceiveMetadata().path
+            val pollingPaths = listOf(
+                "${basePath}messages/",
+                "${basePath}attachments/"
+            )
+            
+            Log.v(TAG, "轮询路径: ${pollingPaths.joinToString(", ")}, recipient: ${taskInfo.recipientId}")
+            
+            val allFiles = mutableListOf<FileInfo>()
+            val processedFiles = pollingState?.processedFiles ?: emptySet()
+            
+            // 轮询所有路径
+            for (path in pollingPaths) {
+                val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
+                    errorHandler.executeWithRetry({
+                        provider.listFiles(path, taskInfo.metadata)
+                    }, ErrorContext(
+                        providerType = taskInfo.metadata.providerType,
+                        operationType = "listFiles",
+                        targetId = taskInfo.recipientId,
+                        channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
+                        metadata = mapOf("pollingPath" to path)
+                    ))
+                }
+                
+                if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
+                    allFiles.addAll(listResult.files)
+                }
             }
             
-            if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
+            if (allFiles.isEmpty()) {
                 Log.d(TAG, "未找到文件: ${taskInfo.recipientId}")
                 return FilePollingResult.success(emptySet(), 0)
             }
             
-            val allFiles = FileInfo.sortByTime(listResult.files, ascending = true)
-            val processedFiles = pollingState?.processedFiles ?: emptySet()
+            val sortedFiles = FileInfo.sortByTime(allFiles, ascending = true)
             
-            val newFiles = allFiles.filter { file ->
+            val newFiles = sortedFiles.filter { file ->
                 !processedFiles.contains(file.name) && 
                 file.lastModified > (pollingState?.lastProcessedTime ?: 0) &&
                 shouldRetryFileProcessing(file.name, taskInfo.recipientId)

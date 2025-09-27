@@ -345,12 +345,13 @@ interface TransportProvider {
      * 
      * 不同Provider可能有不同的路径组织策略
      * 
-     * @param recipientId 接收者ID
+     * @param recipientId 接收者ID（哈希化）
      * @param messageType 消息类型
      * @return 发送路径
      */
     fun getSendPath(recipientId: String, messageType: TransportMessageType = TransportMessageType.TEXT_MESSAGE): String {
-        // 默认实现：/outbox/recipientId/
+        // 默认实现：废弃的旧格式，实际使用v2-channels格式
+        // 具体Provider应该重写此方法使用: /v2-channels/{recipientId}/outbox/{messages|attachments}/
         return "/outbox/$recipientId/"
     }
     
@@ -359,12 +360,13 @@ interface TransportProvider {
      * 
      * 不同Provider可能有不同的路径组织策略
      * 
-     * @param recipientId 发送者ID（从其路径接收消息）
+     * @param recipientId 发送者ID（从其路径接收消息，哈希化）
      * @param messageType 消息类型
      * @return 接收路径
      */
     fun getReceivePath(recipientId: String, messageType: TransportMessageType = TransportMessageType.TEXT_MESSAGE): String {
-        // 默认实现：/outbox/recipientId/（从对方的outbox接收）
+        // 默认实现：废弃的旧格式，实际使用v2-channels格式  
+        // 具体Provider应该重写此方法使用: /v2-channels/{recipientId}/outbox/{messages|attachments}/
         return "/outbox/$recipientId/"
     }
     

@@ -923,67 +923,64 @@ class TransportManager private constructor(private val context: Context) {
             
             Log.d(TAG, "轮询通道消息: ${channel.channelId} (${channel.providerType})")
             
-            // 使用新接口：listFiles + downloadFile
-            val listResult = provider.listFiles(channel.metadata.getReceiveMetadata().path, channel.metadata)
-            when (listResult) {
-                is TransportResult.Success -> {
-                    val fileInfos = listResult.data as? List<*> ?: emptyList<Any>()
-                    val messages = mutableListOf<TransportMessage>()
-                    
-                    Log.d(TAG, "找到文件数量: ${fileInfos.size}")
-                    
-                    // 下载所有文件
-                    for (fileInfo in fileInfos) {
-                        if (fileInfo is FileInfo) {
-                            try {
-                                val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
-                                when (downloadResult) {
-                                    is TransportResult.Success -> {
-                                        downloadResult.message?.let { message ->
-                                            messages.add(message)
-                                            Log.d(TAG, "下载消息成功: ${message.messageId}")
-                                        }
-                                    }
-                                    is TransportResult.Failed -> {
-                                        Log.w(TAG, "下载文件失败: ${fileInfo.name}, 错误: ${downloadResult.error}")
-                                    }
-                                    else -> {
-                                        Log.d(TAG, "下载文件结果: ${downloadResult.javaClass.simpleName}")
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Log.w(TAG, "下载文件异常: ${fileInfo.name}", e)
+            // 使用新接口：listFiles + downloadFile - 轮询messages和attachments目录
+            val basePath = channel.metadata.getReceiveMetadata().path
+            val pollingPaths = listOf("${basePath}messages/", "${basePath}attachments/")
+            
+            val allFileInfos = mutableListOf<Any>()
+            for (path in pollingPaths) {
+                val listResult = provider.listFiles(path, channel.metadata)
+                when (listResult) {
+                    is TransportResult.Success -> {
+                        val fileInfos = listResult.data as? List<*> ?: emptyList<Any?>()
+                        // 过滤掉null元素，只添加非null的FileInfo对象
+                        fileInfos.filterNotNull().forEach { fileInfo ->
+                            if (fileInfo is FileInfo) {
+                                allFileInfos.add(fileInfo)
                             }
                         }
                     }
-                    
-                    if (messages.isNotEmpty()) {
-                        channelManager.value.updateChannelSuccess(channel.channelId)
-                        // 更新Provider健康状态
-                        providerManager.updateProviderHealth(channel.providerType, true)
+                    else -> {
+                        Log.w(TAG, "列举文件失败: path=$path")
                     }
-                    
-                    messages
-                }
-                is TransportResult.Failed -> {
-                    channelManager.value.updateChannelFailure(channel.channelId, listResult.error)
-                    // 更新Provider健康状态
-                    providerManager.updateProviderHealth(channel.providerType, false)
-                    Log.w(TAG, "列出文件失败: ${listResult.error}")
-                    emptyList()
-                }
-                is TransportResult.RetryScheduled -> {
-                    // 轮询重试由轮询服务处理
-                    Log.d(TAG, "列出文件需要重试: ${listResult.retryAfter}ms")
-                    emptyList()
-                }
-                is TransportResult.PartialSuccess -> {
-                    // 处理部分成功的情况
-                    channelManager.value.updateChannelSuccess(channel.channelId)
-                    Log.d(TAG, "列出文件部分成功")
-                    emptyList()
                 }
             }
+            
+            val messages = mutableListOf<TransportMessage>()
+            Log.d(TAG, "找到文件数量: ${allFileInfos.size}")
+            
+            // 下载所有文件
+            for (fileInfo in allFileInfos) {
+                if (fileInfo is FileInfo) {
+                    try {
+                        val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
+                        when (downloadResult) {
+                            is TransportResult.Success -> {
+                                downloadResult.message?.let { message ->
+                                    messages.add(message)
+                                    Log.d(TAG, "下载消息成功: ${message.messageId}")
+                                }
+                            }
+                            is TransportResult.Failed -> {
+                                Log.w(TAG, "下载文件失败: ${fileInfo.name}, 错误: ${downloadResult.error}")
+                            }
+                            else -> {
+                                Log.d(TAG, "下载文件结果: ${downloadResult.javaClass.simpleName}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "下载文件异常: ${fileInfo.name}", e)
+                    }
+                }
+            }
+            
+            if (messages.isNotEmpty()) {
+                channelManager.value.updateChannelSuccess(channel.channelId)
+                // 更新Provider健康状态
+                providerManager.updateProviderHealth(channel.providerType, true)
+            }
+            
+            messages
         } catch (e: Exception) {
             Log.e(TAG, "轮询通道消息失败: ${channel.channelId}", e)
             channelManager.value.updateChannelFailure(

@@ -246,8 +246,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 
                 // 创建一个特殊的AttachmentPointer，标识这是Tap传输的附件
                 org.whispersystems.signalservice.internal.push.AttachmentPointer.Builder()
-                    .contentType(attachment.contentType)
-                    .size(attachmentData.size)
+                    .contentType(attachment.contentType ?: "application/octet-stream")
+                    .size(if (attachmentData.isNotEmpty()) attachmentData.size else (attachment.length ?: 0L).toInt())
                     .fileName(attachment.fileName.orElse(""))
                     // 使用消息相关的ID标识这是Tap传输的附件
                     .cdnKey("tap_attachment:${System.currentTimeMillis()}_${attachmentData.hashCode()}")
@@ -257,7 +257,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             is SignalServiceAttachmentPointer -> {
                 // 指针附件直接转换
                 val builder = org.whispersystems.signalservice.internal.push.AttachmentPointer.Builder()
-                    .contentType(attachment.contentType)
+                    .contentType(attachment.contentType ?: "application/octet-stream")
                     .size(attachment.size.orElse(0))
                     .fileName(attachment.fileName.orElse(""))
                 
@@ -270,17 +270,29 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                         builder.cdnKey(remoteId.cdnKey)
                     }
                     else -> {
-                        // 其他类型的默认处理
+                        // 其他类型或null情况，使用TAP传输特有的标识符
+                        builder.cdnKey("tap_pointer_attachment:${System.currentTimeMillis()}_${attachment.hashCode()}")
                     }
+                }
+                
+                // 添加digest字段以防为空
+                if (attachment.digest.isPresent) {
+                    builder.digest(attachment.digest.get().toByteString())
+                } else {
+                    // 生成一个默认的digest
+                    builder.digest(calculateDigest(ByteArray(0)).toByteString())
                 }
                 
                 builder.build()
             }
             else -> {
-                // 其他类型的默认处理
+                // 其他类型的默认处理 - 确保有必需字段
                 org.whispersystems.signalservice.internal.push.AttachmentPointer.Builder()
-                    .contentType(attachment.contentType)
+                    .contentType(attachment.contentType ?: "application/octet-stream")
                     .fileName("")
+                    .size(0)
+                    .cdnKey("tap_unknown_attachment:${System.currentTimeMillis()}_${attachment.hashCode()}")
+                    .digest(calculateDigest(ByteArray(0)).toByteString())
                     .build()
             }
         }
@@ -400,12 +412,19 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             )
         }
         
+        // 根据消息内容确定消息类型
+        val messageType = if (outgoingMessage.attachments.isNotEmpty()) {
+            org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE
+        } else {
+            org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE
+        }
+        
         return org.thoughtcrime.securesms.tap.TransportMessage(
             messageId = org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId(),
             timestamp = outgoingMessage.sentTimeMillis,
             senderId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString(),
             recipientId = recipient.requireAci().toString(),
-            messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
+            messageType = messageType,
             signalCiphertext = Base64.encodeWithPadding(encryptedData.ciphertext),
             signalCiphertextType = encryptedData.ciphertextType,
             contentMetadata = contentMetadata,

@@ -427,6 +427,26 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     suspend fun upgradeChannelToFullActive(recipientId: String, providerType: String): Boolean {
         return withContext(Dispatchers.IO) {
+            // 预先准备可能需要的metadata更新（在锁外执行）
+            val updatedMetadata = if (providerType == "cos") {
+                try {
+                    val tokenPool = TransportTokenPool.getInstance(context)
+                    val provider = getTransportManager().getProvider(providerType)
+                    val configManager = TransportProviderConfigManager.getInstance(context)
+                    if (provider != null && configManager != null) {
+                        createCosChannelMetadata(recipientId, provider, configManager, tokenPool)
+                    } else {
+                        Log.w(TAG, "无法获取provider或configManager for metadata更新")
+                        null
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "预先构建COS metadata失败: ${e.message}")
+                    null
+                }
+            } else {
+                null // 其他provider暂时不需要metadata更新
+            }
+            
             // 第一步：在锁内完成状态更新和数据库保存
             val upgradedChannel = channelLock.write {
                 val channelIds = recipientChannels[recipientId] ?: run {
@@ -448,10 +468,21 @@ class TransportChannelManager private constructor(private val context: Context) 
                             channel.status == TransportChannelStatus.SEND_READY || 
                             channel.status == TransportChannelStatus.ACTIVE) {
                             
-                            val upgradedChannel = channel.updateStatus(TransportChannelStatus.FULL_ACTIVE)
+                            val upgradedChannel = if (updatedMetadata != null && updatedMetadata !== channel.metadata) {
+                                // 使用预先构建的metadata创建升级的channel
+                                channel.copy(
+                                    status = TransportChannelStatus.FULL_ACTIVE,
+                                    metadata = updatedMetadata,
+                                    lastActiveAt = System.currentTimeMillis()
+                                )
+                            } else {
+                                // 使用原有方式升级（没有metadata更新或更新失败）
+                                channel.updateStatus(TransportChannelStatus.FULL_ACTIVE)
+                            }
+                            
                             channels[channelId] = upgradedChannel
                             
-                            Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}")
+                            Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}, metadataUpdated=${updatedMetadata != null}")
                             return@write upgradedChannel
                         } else {
                             Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, recipientId=$recipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
@@ -1171,8 +1202,8 @@ class TransportChannelManager private constructor(private val context: Context) 
         val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientId)
         
         // 7. 构建路径
-        val mySendPath = provider.getSendPath(peerHashedId)
-        val peerReceivePath = provider.getReceivePath(myHashedId)
+        val mySendPath = provider.getSendPath(peerHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        val peerReceivePath = provider.getReceivePath(myHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
         
         Log.d(TAG, "COS元数据创建: " +
               "myAddress=${LogSanitizer.sanitize(myAddress, "address")}, " +
@@ -1330,8 +1361,9 @@ class TransportChannelManager private constructor(private val context: Context) 
                     // 对COS执行健康检查
                     val cosMetadata = metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
                     if (cosMetadata != null && cosMetadata.peerToken != null) {
-                        // 有对端Token，可以测试双向能力（接收）
-                        val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
+                        // 有对端Token，可以测试双向能力（接收）- 测试messages目录
+                        val testPath = "${metadata.getReceiveMetadata().path}messages/"
+                        val listResult = provider.listFiles(testPath, metadata)
                         when (listResult) {
                             is TransportResult.Success -> true
                             is TransportResult.Failed -> {
@@ -1752,8 +1784,9 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     private suspend fun testBasicOperations(provider: TransportProvider, metadata: TransportMetadata): Boolean {
         return try {
-            // 测试列举文件操作
-            val listResult = provider.listFiles(metadata.getReceiveMetadata().path, metadata)
+            // 测试列举文件操作 - 测试messages目录
+            val testPath = "${metadata.getReceiveMetadata().path}messages/"
+            val listResult = provider.listFiles(testPath, metadata)
             
             // 列举操作应该成功（即使返回空列表）
             listResult is TransportResult.Success
@@ -1771,8 +1804,9 @@ class TransportChannelManager private constructor(private val context: Context) 
         return try {
             val startTime = System.currentTimeMillis()
             
-            // 执行一个轻量级的操作来测量延迟
-            provider.listFiles(metadata.getReceiveMetadata().path, metadata)
+            // 执行一个轻量级的操作来测量延迟 - 测试messages目录
+            val testPath = "${metadata.getReceiveMetadata().path}messages/"
+            provider.listFiles(testPath, metadata)
             
             System.currentTimeMillis() - startTime
             

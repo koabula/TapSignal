@@ -165,25 +165,36 @@ class FilePollingExecutor(
         pollingState: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState?
     ): FilePollingResult {
         return try {
-            // 列举文件
-            val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
-                errorHandler.executeWithRetry({
-                    provider.listFiles(taskInfo.metadata.getReceiveMetadata().path, taskInfo.metadata)
-                }, ErrorContext(
-                    providerType = taskInfo.metadata.providerType,
-                    operationType = "listFiles",
-                    targetId = taskInfo.recipientId,
-                    channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}"
-                ))
+            // 轮询messages和attachments目录
+            val basePath = taskInfo.metadata.getReceiveMetadata().path
+            val pollingPaths = listOf("${basePath}messages/", "${basePath}attachments/")
+            
+            val allFiles = mutableListOf<FileInfo>()
+            for (path in pollingPaths) {
+                val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
+                    errorHandler.executeWithRetry({
+                        provider.listFiles(path, taskInfo.metadata)
+                    }, ErrorContext(
+                        providerType = taskInfo.metadata.providerType,
+                        operationType = "listFiles",
+                        targetId = taskInfo.recipientId,
+                        channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
+                        metadata = mapOf("pollingPath" to path)
+                    ))
+                }
+                
+                if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
+                    allFiles.addAll(listResult.files)
+                }
             }
             
-            if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
+                         if (allFiles.isEmpty()) {
                 Log.d(TAG, "未找到文件: ${taskInfo.recipientId}")
                 return FilePollingResult.success(emptySet(), 0)
             }
             
             // 处理文件列表
-            processFileList(provider, taskInfo, listResult.files, pollingState)
+            processFileList(provider, taskInfo, allFiles, pollingState)
             
         } catch (e: Exception) {
             Log.e(TAG, "文件轮询异常: ${taskInfo.recipientId}", e)

@@ -102,8 +102,16 @@ class CosTransportProvider(
                 val tempFile = createTempFile(messageData)
                 
                 try {
-                    // 使用发送路径：/outbox/<recipientId>/
-                    val remotePath = "${sendMetadata.path}${message.messageId}_${System.currentTimeMillis()}.dat"
+                    // 根据消息类型选择正确的v2-channels子目录
+                    val basePath = sendMetadata.path  // 现在这是 /v2-channels/{hash}/outbox/
+                    val messageTypePath = when (message.messageType) {
+                        org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE -> "attachments"
+                        else -> "messages" // TEXT_MESSAGE, CONTROL_MESSAGE, RATCHET_UPDATE, CALL_MESSAGE
+                    }
+                    val fullPath = "${basePath}${messageTypePath}/"
+                    val remotePath = "${fullPath}${message.messageId}_${System.currentTimeMillis()}.dat"
+                    
+                    Log.d(TAG, "v2-channels路径: messageType=${message.messageType}, path=$fullPath")
                     
                     // 上传文件
                     val uploadSuccess = cosClient.uploadFile(tempFile, remotePath)
@@ -148,14 +156,24 @@ class CosTransportProvider(
             try {
                 Log.d(TAG, "开始拉取消息: recipientId=${metadata.recipientId}")
                 
-                // 使用新的文件操作接口
-                val listResult = listFiles(metadata.getReceiveMetadata().path, metadata)
-                if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
+                // 轮询messages和attachments目录查找最新文件
+                val basePath = metadata.getReceiveMetadata().path
+                val pollingPaths = listOf("${basePath}messages/", "${basePath}attachments/")
+                
+                val allFiles = mutableListOf<FileInfo>()
+                for (path in pollingPaths) {
+                    val listResult = listFiles(path, metadata)
+                    if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
+                        allFiles.addAll(listResult.files)
+                    }
+                }
+                
+                if (allFiles.isEmpty()) {
                     return@withContext TransportResult.Success(null)
                 }
 
                 // 获取最新的文件（保持兼容性）
-                val latestFile = listResult.files.maxByOrNull { it.lastModified }
+                val latestFile = allFiles.maxByOrNull { it.lastModified }
                     ?: return@withContext TransportResult.Success(null)
 
                 // 下载文件
@@ -544,13 +562,10 @@ class CosTransportProvider(
                     // 创建主通道目录
                     cosClient.createDirectory(channelDirectoryPath)
                     
-                    // 创建子目录结构
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/")           // 我发送给对方的消息
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/messages/")  // 消息文件
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/attachments/") // 附件文件
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/metadata/")  // 消息索引
-                    cosClient.createDirectory("${channelDirectoryPath}inbox/")            // 对方发送给我的消息（本地使用）
-                    cosClient.createDirectory("${channelDirectoryPath}metadata/")         // 通道元数据和状态信息
+                    // 创建子目录结构 - 只创建messages和attachments目录，符合设计要求
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/")           // outbox主目录
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/messages/")  // 文本消息目录
+                    cosClient.createDirectory("${channelDirectoryPath}outbox/attachments/") // 附件目录
                     
                     Log.i(TAG, "COS v2通道目录结构创建成功")
                 } catch (e: Exception) {
@@ -835,8 +850,18 @@ class CosTransportProvider(
                 return false
             }
             
-            // 1. 测试允许的路径：应该能访问
-            val allowedPath = "/outbox/${cosToken.recipientId}/"
+            // 1. 测试允许的路径：应该能访问v2-channels结构中的outbox目录
+            // 从Token中提取实际的通道目录名
+            val channelPattern = "signal-v2-"
+            val tokenParts = cosToken.tokenId.split("-")
+            val channelName = if (tokenParts.size >= 4 && tokenParts[1] == "signal") {
+                // 从tokenId重建通道名: signal-v2-{timestamp}-{suffix}
+                tokenParts.drop(1).dropLast(1).joinToString("-")
+            } else {
+                // fallback: 使用recipientId作为通道名（这不是正确的，但用于测试）
+                "test-channel"
+            }
+            val allowedPath = "/v2-channels/$channelName/outbox/"
             val allowedPathTest = testPathAccess(realCosClient, allowedPath, expectSuccess = true)
             
             if (!allowedPathTest) {
@@ -847,8 +872,9 @@ class CosTransportProvider(
             // 2. 测试禁止的路径：应该被拒绝访问
             val forbiddenPaths = listOf(
                 "/", // 根目录
+                "/v2-channels/", // v2-channels根目录（不应该有列举权限）
+                "/outbox/", // 旧格式根目录
                 "/inbox/", // 其他用户目录
-                "/outbox/other_user/", // 其他用户的outbox
                 "/admin/", // 管理目录
                 "/system/" // 系统目录
             )
@@ -1520,30 +1546,16 @@ class CosTransportProvider(
      * COS特定的发送路径策略
      */
     override fun getSendPath(recipientId: String, messageType: TransportMessageType): String {
-        // COS使用层级路径结构: /outbox/recipientId/messageType/
-        val typePrefix = when (messageType) {
-            TransportMessageType.TEXT_MESSAGE -> "text"
-            TransportMessageType.MEDIA_MESSAGE -> "media"
-            TransportMessageType.CONTROL_MESSAGE -> "control"
-            TransportMessageType.RATCHET_UPDATE -> "ratchet"
-            TransportMessageType.CALL_MESSAGE -> "call"
-        }
-        return "/outbox/$recipientId/$typePrefix/"
+        // 返回v2-channels基础路径，具体的messages/attachments目录在使用时添加
+        return "/v2-channels/$recipientId/outbox/"
     }
     
     /**
      * COS特定的接收路径策略
      */
     override fun getReceivePath(recipientId: String, messageType: TransportMessageType): String {
-        // 从对方的outbox接收，使用相同的路径结构
-        val typePrefix = when (messageType) {
-            TransportMessageType.TEXT_MESSAGE -> "text"
-            TransportMessageType.MEDIA_MESSAGE -> "media"
-            TransportMessageType.CONTROL_MESSAGE -> "control"
-            TransportMessageType.RATCHET_UPDATE -> "ratchet"
-            TransportMessageType.CALL_MESSAGE -> "call"
-        }
-        return "/outbox/$recipientId/$typePrefix/"
+        // 返回v2-channels基础路径，具体的messages/attachments目录在使用时添加
+        return "/v2-channels/$recipientId/outbox/"
     }
     
     /**
