@@ -123,14 +123,18 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
                 }
             }
 
+            // 腾讯云COS SDK不接受带前导斜杠的路径
+            val normalizedRemotePath = remotePath.removePrefix("/")
+            
             Log.d(TAG, "调用腾讯云SDK下载:")
             Log.d(TAG, "  - 存储桶: ${config.bucketName}")
-            Log.d(TAG, "  - 远程路径: $remotePath")
+            Log.d(TAG, "  - 原始路径: $remotePath")
+            Log.d(TAG, "  - 标准化路径: $normalizedRemotePath")
             Log.d(TAG, "  - 本地路径: ${localFile.absolutePath}")
 
             // 修复：使用父目录作为下载目录，让SDK自动创建文件
             val downloadDir = localFile.parentFile!!
-            val getObjectRequest = GetObjectRequest(config.bucketName, remotePath, downloadDir.absolutePath)
+            val getObjectRequest = GetObjectRequest(config.bucketName, normalizedRemotePath, downloadDir.absolutePath)
             val getObjectResult = withContext(Dispatchers.IO) {
                 cosXmlService.getObject(getObjectRequest)
             }

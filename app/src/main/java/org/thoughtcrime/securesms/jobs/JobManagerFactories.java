@@ -284,6 +284,7 @@ public final class JobManagerFactories {
 
       // Tap
       put(org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob.KEY, new org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob.Factory());
+      put(org.thoughtcrime.securesms.tap.jobs.TapInsertV2DisabledMessageJob.KEY, new org.thoughtcrime.securesms.tap.jobs.TapInsertV2DisabledMessageJob.Factory());
 
       // Migrations
       put(AccountConsistencyMigrationJob.KEY,             new AccountConsistencyMigrationJob.Factory());

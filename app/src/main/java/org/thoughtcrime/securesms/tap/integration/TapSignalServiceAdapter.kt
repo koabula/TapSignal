@@ -836,7 +836,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 if (channels.isNotEmpty()) {
                     val testChannel = channels.first()
                     if (testChannel.metadata != null) {
-                        val addResult = pollingService.addPollingTarget(recipientAci, testChannel.metadata!!)
+                        val addResult = pollingService.addPollingTarget(recipientAci, testChannel.metadata!!, testChannel)
                         sb.append("   - 轮询目标添加测试: $addResult\n")
                     } else {
                         sb.append("   - 轮询目标添加测试: 失败 (元数据为空)\n")
@@ -922,7 +922,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                     if (startResult) {
                         channels.forEach { channel ->
                             if (channel.metadata != null) {
-                                val addResult = pollingService.addPollingTarget(recipientAci, channel.metadata!!)
+                                val addResult = pollingService.addPollingTarget(recipientAci, channel.metadata!!, channel)
                                 if (addResult) {
                                     Log.i(TAG, "自动修复成功: 已添加轮询目标")
                                     fixedIssues++

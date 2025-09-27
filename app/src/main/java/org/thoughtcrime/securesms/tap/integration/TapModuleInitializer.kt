@@ -179,12 +179,58 @@ class TapModuleInitializer private constructor(private val context: Context) {
     // shouldPerformInitialization方法已移到TapValues中
     
     /**
+     * 初始化TAP独立数据库
+     */
+    private suspend fun initializeTapDatabase() {
+        try {
+            val databaseManager = org.thoughtcrime.securesms.tap.database.TapDatabaseManager.getInstance(context)
+            
+            // 优先确保数据库连接能正常建立（触发onConfigure执行）
+            try {
+                val writeDb = databaseManager.getWritableDatabase()
+                databaseManager.releaseConnection()
+                Log.v(TAG, "TAP数据库写连接验证成功")
+            } catch (e: Exception) {
+                Log.w(TAG, "TAP数据库写连接建立失败", e)
+                // 继续尝试，可能是配置问题但数据库本身可用
+            }
+            
+            // 执行健康检查（如果首次失败则重试一次）
+            var healthCheck = databaseManager.performHealthCheck()
+            if (!healthCheck) {
+                Log.v(TAG, "首次健康检查失败，重试一次")
+                kotlinx.coroutines.delay(200) // 短暂等待
+                healthCheck = databaseManager.performHealthCheck()
+            }
+            
+            if (healthCheck) {
+                Log.d(TAG, "TAP独立数据库初始化成功")
+            } else {
+                Log.w(TAG, "TAP独立数据库健康检查失败")
+            }
+            
+            // 初始化独立数据库表
+            val independentTable = org.thoughtcrime.securesms.tap.database.TapTransportChannelTable.getInstance(context)
+            Log.d(TAG, "TAP独立数据库表初始化完成")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "TAP独立数据库初始化异常", e)
+            // 数据库初始化失败不应阻止模块启动，后续会回退到主数据库
+        }
+    }
+    
+    /**
      * 初始化核心组件
      */
     private suspend fun initializeCoreComponents() {
         Log.d(TAG, "初始化核心组件...")
         
         try {
+            // 0. 初始化独立数据库和监控器（优先初始化以监控后续操作）
+            initializeTapDatabase()
+            TapDatabaseContext.initializeMonitor(context)
+            Log.d(TAG, "数据库和监控器初始化完成")
+            
             // 1. 初始化配置管理器
             val configManager = TransportProviderConfigManager.getInstance(context)
             Log.d(TAG, "配置管理器初始化完成")
@@ -307,6 +353,18 @@ class TapModuleInitializer private constructor(private val context: Context) {
         Log.d(TAG, "启动轮询服务...")
         
         try {
+            // 检查缓冲区状态，如果有待写操作则短暂延迟以改善体验
+            try {
+                val operationBuffer = org.thoughtcrime.securesms.tap.database.TapDatabaseOperationBuffer.getInstance(context)
+                val bufferStatus = operationBuffer.getBufferStatus()
+                if (bufferStatus.pendingOperations > 0) {
+                    Log.d(TAG, "检测到${bufferStatus.pendingOperations}个待写操作，延迟500ms启动轮询以改善体验")
+                    kotlinx.coroutines.delay(500)
+                }
+            } catch (e: Exception) {
+                Log.v(TAG, "缓冲区状态检查异常，继续启动", e)
+            }
+            
             val pollingService = TapPollingService.getInstance(context)
             
             // 1. 检查TokenPool中的活跃联系人
@@ -376,7 +434,7 @@ class TapModuleInitializer private constructor(private val context: Context) {
                             val recipientChannels = channelManager.getActiveChannels(recipientId)
                             if (recipientChannels.isNotEmpty()) {
                                 val channel = recipientChannels.first() // 使用第一个活跃通道
-                                val addResult = pollingService.addPollingTarget(recipientId, channel.metadata)
+                                val addResult = pollingService.addPollingTarget(recipientId, channel.metadata, channel)
                                 Log.d(TAG, "添加轮询目标: recipientId=$recipientId, 结果=$addResult")
                             } else {
                                 Log.w(TAG, "联系人无活跃通道，跳过轮询: recipientId=$recipientId")

@@ -74,8 +74,9 @@ class TransportChannelManager private constructor(private val context: Context) 
     private val recipientChannels = ConcurrentHashMap<String, MutableSet<String>>()
     private val providerChannels = ConcurrentHashMap<String, MutableSet<String>>()
     
-    // 数据库访问
+    // 使用独立数据库访问（逐步迁移）
     private val transportChannelTable = SignalDatabase.transportChannels
+    private val independentChannelTable = org.thoughtcrime.securesms.tap.database.TapTransportChannelTable.getInstance(context)
     
     // 线程安全
     private val channelLock = ReentrantReadWriteLock()
@@ -93,6 +94,9 @@ class TransportChannelManager private constructor(private val context: Context) 
     private val managerScope = CoroutineScope(
         Dispatchers.IO + SupervisorJob() + CoroutineName("ChannelManager")
     )
+    
+    // 使用统一的TAP数据库上下文，确保与其他组件协调
+    private val databaseContext = TapDatabaseContext.databaseDispatcher
     
     /**
      * 初始化通道管理器
@@ -136,7 +140,8 @@ class TransportChannelManager private constructor(private val context: Context) 
         providerType: String,
         metadata: TransportMetadata
     ): TransportChannel? {
-        return withContext(Dispatchers.IO) {
+        var channelToSave: TransportChannel? = null
+        val result = withContext(Dispatchers.IO) {
             channelLock.write {
                 try {
                     if (!isInitialized) {
@@ -168,9 +173,9 @@ class TransportChannelManager private constructor(private val context: Context) 
                         priority = calculateChannelPriority(recipientId, providerType)
                     )
                     
-                    // 存储通道到内存和数据库
+                    // 存储通道到内存，收集用于后续数据库保存
                     channels[channelId] = channel
-                    saveChannelToDatabase(channel)
+                    channelToSave = channel
                     
                     // 更新索引
                     recipientChannels.computeIfAbsent(recipientId) { mutableSetOf() }.add(channelId)
@@ -188,6 +193,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                         channels.remove(channelId)
                         recipientChannels[recipientId]?.remove(channelId)
                         providerChannels[providerType]?.remove(channelId)
+                        channelToSave = null
                         return@withContext null
                     }
                     
@@ -195,10 +201,22 @@ class TransportChannelManager private constructor(private val context: Context) 
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "建立通道失败", e)
+                    channelToSave = null
                     null
                 }
             }
         }
+        
+        // 在锁外异步保存通道到数据库，避免死锁
+        channelToSave?.let { channel ->
+            try {
+                saveChannelToDatabaseAsync(channel)
+            } catch (e: Exception) {
+                Log.e(TAG, "保存新建通道到数据库失败: ${channel.channelId}", e)
+            }
+        }
+        
+        return result
     }
     
     /**
@@ -304,6 +322,7 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 更新通道成功
      */
     suspend fun updateChannelSuccess(channelId: String) {
+        var channelToSave: TransportChannel? = null
         withContext(Dispatchers.IO) {
             channelLock.write {
                 val channel = channels[channelId] ?: return@withContext
@@ -319,9 +338,18 @@ class TransportChannelManager private constructor(private val context: Context) 
                 }
                 
                 channels[channelId] = finalChannel
-                saveChannelToDatabase(finalChannel)
+                channelToSave = finalChannel
                 
                 Log.d(TAG, "通道操作成功: $channelId")
+            }
+        }
+        
+        // 在锁外异步保存通道到数据库，避免死锁
+        channelToSave?.let { channel ->
+            try {
+                saveChannelToDatabaseAsync(channel)
+            } catch (e: Exception) {
+                Log.e(TAG, "保存成功通道状态到数据库失败: ${channel.channelId}", e)
             }
         }
     }
@@ -330,6 +358,7 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 更新通道失败
      */
     suspend fun updateChannelFailure(channelId: String, error: TransportError) {
+        var channelToSave: TransportChannel? = null
         withContext(Dispatchers.IO) {
             channelLock.write {
                 val channel = channels[channelId] ?: return@withContext
@@ -345,9 +374,18 @@ class TransportChannelManager private constructor(private val context: Context) 
                 }
                 
                 channels[channelId] = finalChannel
-                saveChannelToDatabase(finalChannel)
+                channelToSave = finalChannel
                 
                 Log.w(TAG, "通道操作失败: $channelId, 错误: $error, 失败次数: ${finalChannel.failureCount}")
+            }
+        }
+        
+        // 在锁外异步保存通道到数据库，避免死锁
+        channelToSave?.let { channel ->
+            try {
+                saveChannelToDatabaseAsync(channel)
+            } catch (e: Exception) {
+                Log.e(TAG, "保存失败通道状态到数据库失败: ${channel.channelId}", e)
             }
         }
     }
@@ -389,41 +427,32 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     suspend fun upgradeChannelToFullActive(recipientId: String, providerType: String): Boolean {
         return withContext(Dispatchers.IO) {
-            channelLock.write {
+            // 第一步：在锁内完成状态更新和数据库保存
+            val upgradedChannel = channelLock.write {
                 val channelIds = recipientChannels[recipientId] ?: run {
                     Log.w(TAG, "未找到recipientId对应的通道: recipientId=$recipientId, 现有keys=${recipientChannels.keys}")
-                    return@withContext false
+                    return@write null
                 }
                 
                 for (channelId in channelIds) {
                     val channel = channels[channelId]
                     if (channel != null && channel.providerType == providerType) {
-                        // 如果通道已经是FULL_ACTIVE状态，直接返回成功
+                        // 如果通道已经是FULL_ACTIVE状态，直接返回
                         if (channel.status == TransportChannelStatus.FULL_ACTIVE) {
                             Log.i(TAG, "通道已经是FULL_ACTIVE状态: channelId=$channelId, recipientId=$recipientId, providerType=$providerType")
-                            return@withContext true
+                            return@write channel
                         }
                         
-                        // 扩展升级条件：允许从ESTABLISHING、SEND_READY、ACTIVE状态升级到FULL_ACTIVE
+                        // 允许从ESTABLISHING、SEND_READY、ACTIVE状态升级到FULL_ACTIVE
                         if (channel.status == TransportChannelStatus.ESTABLISHING ||
                             channel.status == TransportChannelStatus.SEND_READY || 
                             channel.status == TransportChannelStatus.ACTIVE) {
                             
                             val upgradedChannel = channel.updateStatus(TransportChannelStatus.FULL_ACTIVE)
                             channels[channelId] = upgradedChannel
-                            saveChannelToDatabase(upgradedChannel)
                             
                             Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}")
-                            
-                            // 自动启动轮询任务
-                            try {
-                                startPollingForChannel(recipientId, upgradedChannel)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "启动轮询失败，但通道升级成功: channelId=$channelId", e)
-                                // 不阻断升级成功的返回，轮询启动失败不影响通道状态
-                            }
-                            
-                            return@withContext true
+                            return@write upgradedChannel
                         } else {
                             Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, recipientId=$recipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
                         }
@@ -435,8 +464,6 @@ class TransportChannelManager private constructor(private val context: Context) 
                 }
                 
                 Log.w(TAG, "未找到可升级的通道: recipientId=$recipientId, providerType=$providerType, 检查了${channelIds.size}个通道")
-
-                // 增强调试信息：记录所有通道的详细状态
                 if (channelIds.isNotEmpty()) {
                     val channelDetails = channelIds.mapNotNull { channelId ->
                         channels[channelId]?.let { channel ->
@@ -447,8 +474,33 @@ class TransportChannelManager private constructor(private val context: Context) 
                 } else {
                     Log.d(TAG, "recipientChannels中没有找到对应的通道ID列表")
                 }
-                return@withContext false
+                return@write null
             }
+            
+            // 第二步：在锁外进行数据库保存和轮询启动
+            if (upgradedChannel != null) {
+                try {
+                    // 保存到数据库
+                    saveChannelToDatabaseAsync(upgradedChannel)
+                    Log.d(TAG, "通道数据库保存完成: channelId=${upgradedChannel.channelId}")
+                    
+                    // 启动轮询
+                    try {
+                        startPollingForChannel(recipientId, upgradedChannel)
+                        Log.d(TAG, "通道升级后轮询启动成功: channelId=${upgradedChannel.channelId}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "启动轮询失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
+                        // 轮询启动失败不影响通道升级结果
+                    }
+                    
+                    return@withContext true
+                } catch (e: Exception) {
+                    Log.e(TAG, "通道数据库保存失败: channelId=${upgradedChannel.channelId}", e)
+                    return@withContext false
+                }
+            }
+            
+            return@withContext false
         }
     }
     
@@ -456,8 +508,15 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 禁用指定接收者的v2模式
      * 将所有相关通道关闭并插入禁用消息
      */
-    suspend fun disableV2Mode(recipientId: String): Boolean {
-        return withContext(Dispatchers.IO) {
+    suspend fun disableV2Mode(
+        recipientId: String, 
+        sendControlMessage: Boolean = true, 
+        insertSystemMessage: Boolean = true
+    ): Boolean {
+        val channelsToSave = mutableListOf<TransportChannel>()
+        var disableMessageInfo: Pair<String, String>? = null
+        var systemMessageRecipientId: String? = null
+        val success = withContext(Dispatchers.IO) {
             channelLock.write {
                 try {
                     // 统一Recipient ID格式：支持多种输入格式转换为ACI字符串
@@ -486,11 +545,11 @@ class TransportChannelManager private constructor(private val context: Context) 
                         }
                     }
                     
-                    // 关闭通道并更新状态
+                    // 关闭通道并更新内存状态
                     for (channel in channelsToClose) {
                         val closedChannel = channel.updateStatus(TransportChannelStatus.CLOSED)
                         channels[channel.channelId] = closedChannel
-                        saveChannelToDatabase(closedChannel)
+                        channelsToSave.add(closedChannel)
                         disabledCount++
                         
                         Log.d(TAG, "已关闭通道: ${channel.channelId}, provider=${channel.providerType}")
@@ -519,13 +578,9 @@ class TransportChannelManager private constructor(private val context: Context) 
                         Log.e(TAG, "清理Token失败", e)
                     }
                     
-                    // 发送disable控制消息
-                    if (channelsToClose.isNotEmpty()) {
-                        try {
-                            sendDisableControlMessage(normalizedRecipientId, channelsToClose.first().providerType)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "发送disable控制消息失败", e)
-                        }
+                    // 收集disable控制消息信息，稍后在锁外发送（仅当允许发送时）
+                    if (sendControlMessage && channelsToClose.isNotEmpty()) {
+                        disableMessageInfo = normalizedRecipientId to channelsToClose.first().providerType
                     }
                     
                     // 清理索引：清理所有可能的格式
@@ -541,13 +596,9 @@ class TransportChannelManager private constructor(private val context: Context) 
                     if (disabledCount > 0) {
                         Log.i(TAG, "v2模式已禁用: 原始ID=$recipientId, 标准化ID=$normalizedRecipientId, 关闭了${disabledCount}个通道")
                         
-                        // 插入禁用系统消息
-                        try {
-                            val recipientIdObj = getRecipientIdFromString(recipientId)
-                            SignalDatabase.messages.insertTapV2ModeDisabledMessage(recipientIdObj)
-                            Log.d(TAG, "已插入v2模式禁用消息: recipientId=$recipientId")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "插入v2模式禁用消息失败: recipientId=$recipientId", e)
+                        // 收集系统消息信息，稍后在锁外插入（仅当允许插入时）
+                        if (insertSystemMessage) {
+                            systemMessageRecipientId = recipientId
                         }
                     }
                     
@@ -559,6 +610,48 @@ class TransportChannelManager private constructor(private val context: Context) 
                 }
             }
         }
+        
+        // 在锁外执行所有数据库操作，避免死锁
+        withContext(databaseContext) {
+            try {
+                // 串行保存所有通道状态
+                channelsToSave.forEach { channel ->
+                    try {
+                        saveChannelToDatabaseAsync(channel)
+                        Log.v(TAG, "已保存关闭通道: ${channel.channelId}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "保存关闭通道到数据库失败: ${channel.channelId}", e)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "保存通道状态失败", e)
+            }
+        }
+        
+        // 使用后台作业异步插入系统消息，完全避免数据库连接竞争
+        systemMessageRecipientId?.let { recipientId ->
+            try {
+                val recipientIdObj = getRecipientIdFromString(recipientId)
+                val job = org.thoughtcrime.securesms.tap.jobs.TapInsertV2DisabledMessageJob(recipientIdObj)
+                org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager.add(job)
+                Log.d(TAG, "已排队v2模式禁用消息作业: recipientId=$recipientId")
+            } catch (e: Exception) {
+                Log.e(TAG, "排队v2模式禁用消息作业失败: recipientId=$recipientId", e)
+            }
+        }
+        
+        // 2. 发送disable控制消息（在独立的IO上下文中，避免与数据库操作串行化）
+        disableMessageInfo?.let { (recipientId, providerType) ->
+            withContext(Dispatchers.IO) {
+                try {
+                    sendDisableControlMessage(recipientId, providerType)
+                } catch (e: Exception) {
+                    Log.e(TAG, "发送disable控制消息失败", e)
+                }
+            }
+        }
+        
+        return success
     }
     
     /**
@@ -1466,14 +1559,29 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
-     * 保存通道到数据库
+     * 异步保存通道到数据库（使用独立数据库）
      */
-    private fun saveChannelToDatabase(channel: TransportChannel) {
+    private suspend fun saveChannelToDatabaseAsync(channel: TransportChannel) {
+        // 优先使用独立数据库，避免主数据库连接竞争
         try {
-            transportChannelTable.insertOrUpdateChannel(channel)
-            Log.v(TAG, "保存通道到数据库成功: ${channel.channelId}")
+            independentChannelTable.insertOrUpdateChannel(channel)
+            Log.v(TAG, "保存通道到独立数据库成功: ${channel.channelId}")
         } catch (e: Exception) {
-            Log.e(TAG, "保存通道到数据库失败: ${channel.channelId} - ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.w(TAG, "保存到独立数据库失败，回退到主数据库: ${channel.channelId}", e)
+            
+            // 回退到主数据库（缓冲模式）
+            val bufferSuccess = TapDatabaseContext.withBufferedOperation(
+                operationName = "saveChannel:${channel.channelId}",
+                channel = channel,
+                allowBuffer = true
+            ) {
+                transportChannelTable.insertOrUpdateChannel(channel)
+            }
+            
+            if (!bufferSuccess) {
+                Log.e(TAG, "通道保存完全失败: ${channel.channelId}")
+                throw Exception("通道保存失败")
+            }
         }
     }
     
@@ -1493,21 +1601,37 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 同步内存状态到数据库
      */
     suspend fun syncToDatabase() {
-        withContext(Dispatchers.IO) {
+        val channelsToSync = withContext(Dispatchers.IO) {
             channelLock.read {
+                try {
+                    Log.d(TAG, "开始收集通道状态用于同步...")
+                    // 在锁内快速收集所有通道的副本
+                    channels.values.toList()
+                } catch (e: Exception) {
+                    Log.e(TAG, "收集通道状态失败", e)
+                    emptyList<TransportChannel>()
+                }
+            }
+        }
+        
+        // 在锁外批量同步到数据库，避免长时间持有锁
+        withContext(databaseContext) {
                 try {
                     Log.d(TAG, "开始同步通道状态到数据库...")
                     var syncCount = 0
                     
-                    channels.values.forEach { channel ->
-                        saveChannelToDatabase(channel)
+                channelsToSync.forEach { channel ->
+                    try {
+                        saveChannelToDatabaseAsync(channel)
                         syncCount++
+                    } catch (e: Exception) {
+                        Log.e(TAG, "同步单个通道失败: ${channel.channelId}", e)
+                    }
                     }
                     
                     Log.d(TAG, "通道状态同步完成，同步数量: $syncCount")
                 } catch (e: Exception) {
                     Log.e(TAG, "同步通道状态到数据库失败", e)
-                }
             }
         }
     }
@@ -1608,14 +1732,14 @@ class TransportChannelManager private constructor(private val context: Context) 
     /**
      * 更新通道健康状态
      */
-    private fun updateChannelHealthStatus(channel: TransportChannel, isHealthy: Boolean, latency: Long) {
+    private suspend fun updateChannelHealthStatus(channel: TransportChannel, isHealthy: Boolean, latency: Long) {
         try {
             // 更新通道对象的健康状态字段
             // 这里需要根据实际的TransportChannel类结构来更新
             // 假设通道有相应的状态字段
             
             // 保存到数据库
-            saveChannelToDatabase(channel)
+            saveChannelToDatabaseAsync(channel)
             
             Log.d(TAG, "通道健康状态已更新: ${channel.recipientId}/${channel.providerType}, healthy=$isHealthy, latency=${latency}ms")
         } catch (e: Exception) {
@@ -1897,7 +2021,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                 throw RuntimeException("通道元数据为空")
             }
             
-            val success = pollingService.addPollingTarget(recipientId, metadata)
+            val success = pollingService.addPollingTarget(recipientId, metadata, channel)
             
             if (success) {
                 Log.i(TAG, "轮询任务启动成功: recipientId=$recipientId, providerType=${channel.providerType}, channelId=${channel.channelId}")

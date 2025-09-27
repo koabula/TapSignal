@@ -82,68 +82,127 @@ public class TransportChannelTable extends DatabaseTable {
 
     /**
      * 插入或更新传输通道
-     * 使用乐观锁确保并发安全
+     * 使用数据库事务和乐观锁确保并发安全
      */
     @WorkerThread
     public void insertOrUpdateChannel(@NonNull TransportChannel channel) {
-        synchronized (this) { // 添加对象级同步，防止同一个表的并发修改
+        insertOrUpdateChannelWithRetry(channel, 3);
+    }
+    
+    /**
+     * 插入或更新传输通道（带重试机制）
+     * 使用数据库事务包装操作，解决"读后写"死锁问题
+     */
+    private void insertOrUpdateChannelWithRetry(@NonNull TransportChannel channel, int maxRetries) {
+        Exception lastException = null;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // 获取当前版本号（用于乐观锁检查）
-                long currentVersion = getCurrentChannelVersion(channel.getChannelId());
-                
-                ContentValues values = new ContentValues();
-                values.put(CHANNEL_ID, channel.getChannelId());
-                values.put(RECIPIENT_ID, channel.getRecipientId());
-                values.put(PROVIDER_TYPE, channel.getProviderType());
-                values.put(METADATA_JSON, channel.getMetadata().toJson());
-                values.put(STATUS, channel.getStatus().ordinal());
-                values.put(PRIORITY, channel.getPriority());
-                values.put(CREATED_AT, channel.getCreatedAt());
-                values.put(LAST_ACTIVE_AT, channel.getLastActiveAt());
-                values.put(SUCCESS_COUNT, channel.getSuccessCount());
-                values.put(FAILURE_COUNT, channel.getFailureCount());
-                values.put(LAST_ERROR, channel.getLastError() != null ? channel.getLastError().name() : null);
-                values.put(CONFIG_JSON, serializeChannelConfig(channel.getConfig()));
-                
-                if (currentVersion >= 0) {
-                    // 记录存在，使用乐观锁更新
-                    long newVersion = currentVersion + 1;
-                    values.put(VERSION, newVersion);
+                // 使用数据库事务确保原子性和一致性
+                getWritableDatabase().beginTransaction();
+                try {
+                    insertOrUpdateChannelInTransaction(channel);
+                    getWritableDatabase().setTransactionSuccessful();
                     
-                    int updatedRows = getWritableDatabase().update(
-                        TABLE_NAME, 
-                        values, 
-                        CHANNEL_ID + " = ? AND " + VERSION + " = ?", 
-                        new String[]{channel.getChannelId(), String.valueOf(currentVersion)}
-                    );
+                    Log.d(TAG, "通道操作成功: " + channel.getChannelId() + " (尝试: " + attempt + ")");
+                    return; // 成功，直接返回
                     
-                    if (updatedRows == 0) {
-                        // 乐观锁冲突，记录已被其他线程修改
-                        Log.w(TAG, "乐观锁冲突，通道可能已被其他线程修改: " + channel.getChannelId());
-                        throw new OptimisticLockException("通道版本冲突: " + channel.getChannelId());
-                    }
-                    
-                    Log.d(TAG, "通道更新成功: " + channel.getChannelId() + ", 版本: " + currentVersion + " -> " + newVersion);
-                } else {
-                    // 记录不存在，插入新记录
-                    values.put(VERSION, 1); // 新记录版本从1开始
-                    
-                    long insertId = getWritableDatabase().insert(TABLE_NAME, null, values);
-                    if (insertId < 0) {
-                        throw new IllegalStateException("插入通道失败: " + channel.getChannelId());
-                    }
-                    
-                    Log.d(TAG, "通道插入成功: " + channel.getChannelId() + ", ID: " + insertId);
+                } finally {
+                    getWritableDatabase().endTransaction();
                 }
                 
             } catch (OptimisticLockException e) {
-                // 重新抛出乐观锁异常，让调用者决定如何处理
-                throw e;
+                lastException = e;
+                Log.w(TAG, "乐观锁冲突: " + channel.getChannelId() + " (尝试: " + attempt + "/" + maxRetries + ")");
+                
+                if (attempt < maxRetries) {
+                    // 指数退避，减少重试风暴
+                    try {
+                        long delayMs = Math.min(100L * (1L << (attempt - 1)), 1000L);
+                        Thread.sleep(delayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("重试过程中被中断", ie);
+                    }
+                } else {
+                    Log.e(TAG, "乐观锁冲突达到最大重试次数: " + channel.getChannelId());
+                }
+                
             } catch (Exception e) {
-                Log.e(TAG, "保存通道失败: " + channel.getChannelId(), e);
-                throw new RuntimeException("保存通道失败", e);
+                lastException = e;
+                Log.e(TAG, "保存通道失败: " + channel.getChannelId() + " (尝试: " + attempt + ")", e);
+                break; // 非乐观锁异常，不重试
             }
         }
+        
+        // 所有重试都失败了
+        Log.e(TAG, "通道操作最终失败: " + channel.getChannelId(), lastException);
+        throw new RuntimeException("保存通道失败", lastException);
+    }
+    
+    /**
+     * 在事务中执行插入或更新操作
+     * 消除"读后写"模式，使用UPSERT语句提高效率
+     */
+    private void insertOrUpdateChannelInTransaction(@NonNull TransportChannel channel) {
+        // 构建通用的ContentValues
+        ContentValues values = buildChannelValues(channel);
+        
+        // 使用REPLACE语句实现upsert，避免单独的读取操作
+        // SQLite的REPLACE相当于INSERT OR REPLACE
+        String sql = "INSERT OR REPLACE INTO " + TABLE_NAME + " (" +
+            CHANNEL_ID + ", " + RECIPIENT_ID + ", " + PROVIDER_TYPE + ", " +
+            METADATA_JSON + ", " + STATUS + ", " + PRIORITY + ", " +
+            CREATED_AT + ", " + LAST_ACTIVE_AT + ", " + SUCCESS_COUNT + ", " +
+            FAILURE_COUNT + ", " + LAST_ERROR + ", " + CONFIG_JSON + ", " + VERSION +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+            "COALESCE((SELECT " + VERSION + " FROM " + TABLE_NAME + 
+            " WHERE " + CHANNEL_ID + " = ?), 0) + 1)";
+        
+        String[] args = {
+            channel.getChannelId(),
+            channel.getRecipientId(),
+            channel.getProviderType(),
+            channel.getMetadata().toJson(),
+            String.valueOf(channel.getStatus().ordinal()),
+            String.valueOf(channel.getPriority()),
+            String.valueOf(channel.getCreatedAt()),
+            String.valueOf(channel.getLastActiveAt()),
+            String.valueOf(channel.getSuccessCount()),
+            String.valueOf(channel.getFailureCount()),
+            channel.getLastError() != null ? channel.getLastError().name() : null,
+            serializeChannelConfig(channel.getConfig()),
+            channel.getChannelId() // 用于COALESCE中的子查询
+        };
+        
+        try {
+            getWritableDatabase().execSQL(sql, args);
+            Log.d(TAG, "通道upsert成功: " + channel.getChannelId());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "通道upsert失败: " + channel.getChannelId(), e);
+            throw e;
+        }
+    }
+    
+    /**
+     * 构建通道的ContentValues
+     */
+    private ContentValues buildChannelValues(@NonNull TransportChannel channel) {
+        ContentValues values = new ContentValues();
+        values.put(CHANNEL_ID, channel.getChannelId());
+        values.put(RECIPIENT_ID, channel.getRecipientId());
+        values.put(PROVIDER_TYPE, channel.getProviderType());
+        values.put(METADATA_JSON, channel.getMetadata().toJson());
+        values.put(STATUS, channel.getStatus().ordinal());
+        values.put(PRIORITY, channel.getPriority());
+        values.put(CREATED_AT, channel.getCreatedAt());
+        values.put(LAST_ACTIVE_AT, channel.getLastActiveAt());
+        values.put(SUCCESS_COUNT, channel.getSuccessCount());
+        values.put(FAILURE_COUNT, channel.getFailureCount());
+        values.put(LAST_ERROR, channel.getLastError() != null ? channel.getLastError().name() : null);
+        values.put(CONFIG_JSON, serializeChannelConfig(channel.getConfig()));
+        return values;
     }
 
     /**

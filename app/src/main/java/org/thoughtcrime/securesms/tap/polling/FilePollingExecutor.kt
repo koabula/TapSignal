@@ -316,19 +316,21 @@ class FilePollingExecutor(
      */
     private fun updatePollingState(taskInfo: PollingTaskInfo, result: FilePollingResult) {
         try {
-            if (result.isSuccess) {
+            // 仅在发现新消息时更新数据库，避免不必要的数据库写入
+            if (result.isSuccess && result.messagesFound > 0) {
                 pollingStateTable.recordSuccessfulPoll(
                     taskInfo.recipientId,
                     taskInfo.metadata.providerType,
                     result.processedFiles,
                     result.messagesFound
                 )
+                Log.d(TAG, "发现${result.messagesFound}条新消息，已更新数据库: ${taskInfo.recipientId}")
+            } else if (result.isSuccess) {
+                // 轮询成功但无新消息，仅记录日志，不写数据库
+                Log.v(TAG, "轮询成功，无新消息: ${taskInfo.recipientId}")
             } else {
-                pollingStateTable.recordFailedPoll(
-                    taskInfo.recipientId,
-                    taskInfo.metadata.providerType,
-                    result.error
-                )
+                // 轮询失败，记录日志但不写数据库
+                Log.w(TAG, "轮询失败: ${taskInfo.recipientId}, error=${result.error}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "更新轮询状态失败: ${taskInfo.recipientId}", e)

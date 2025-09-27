@@ -224,8 +224,8 @@ class CosTransportProvider(
                 // 转换为FileInfo列表
                 val fileInfos = cosFiles.map { cosFile ->
                     FileInfo(
-                        name = cosFile.name,
-                        path = "${path.trimEnd('/')}/${cosFile.name}",
+                        name = cosFile.name.substringAfterLast('/'), // 只取文件名部分
+                        path = cosFile.name, // cosFile.name已经是完整的对象key路径，无需拼接
                         size = cosFile.size,
                         lastModified = cosFile.lastModified,
                         etag = null, // CosFileInfo中暂无etag字段，保持null
@@ -259,12 +259,12 @@ class CosTransportProvider(
                         "元数据不是COS类型"
                     )
 
-                // 创建COS客户端
-                val cosClient = createCosClient(cosMetadata)
+                // 创建COS客户端（使用对端配置进行接收）
+                val cosClient = createCosClientForReceive(cosMetadata)
                     ?: return@withContext TransportResult.failure(
                         TransportError.PROVIDER_UNAVAILABLE,
                         true,
-                        "无法创建COS客户端"
+                        "无法创建接收COS客户端"
                     )
 
                 // 下载文件

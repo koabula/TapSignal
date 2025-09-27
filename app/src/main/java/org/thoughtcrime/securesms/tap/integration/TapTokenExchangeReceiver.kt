@@ -261,7 +261,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                             if (channel.metadata != null) {
                                 val pollingStarted = pollingService.startPolling()
                                 if (pollingStarted) {
-                                    val targetAdded = pollingService.addPollingTarget(originalMessage.senderAci, channel.metadata!!)
+                                    val targetAdded = pollingService.addPollingTarget(originalMessage.senderAci, channel.metadata!!, channel)
                                     if (targetAdded) {
                                         Log.i(TAG, "B端通道建立后轮询启动成功: recipientId=${originalMessage.senderAci}")
                                     } else {

@@ -223,7 +223,7 @@ class TapPollingService(private val context: Context) {
     /**
      * 添加轮询目标
      */
-    fun addPollingTarget(recipientId: String, metadata: TransportMetadata): Boolean {
+    fun addPollingTarget(recipientId: String, metadata: TransportMetadata, channel: TransportChannel? = null): Boolean {
         if (!isRunning.get()) {
             Log.w(TAG, "轮询服务未运行，无法添加轮询目标")
             return false
@@ -231,6 +231,9 @@ class TapPollingService(private val context: Context) {
         
         return try {
             Log.d(TAG, "添加轮询目标: recipient=$recipientId, provider=${metadata.providerType}")
+            
+            // 在锁外获取通道信息，避免死锁
+            val channelForCalculation = channel ?: channelManager.getActiveChannel(recipientId, metadata.providerType)
             
             pollingLock.write {
                 // 检查是否已存在轮询目标
@@ -276,9 +279,8 @@ class TapPollingService(private val context: Context) {
                 // 创建新的轮询任务信息
                 val taskInfo = PollingTaskInfo.create(recipientId, metadata)
                 
-                // 计算初始轮询间隔
-                val channel = channelManager.getActiveChannel(recipientId, metadata.providerType)
-                val initialInterval = calculatePollingInterval(metadata, channel)
+                // 使用预先获取的通道信息计算初始轮询间隔
+                val initialInterval = calculatePollingInterval(metadata, channelForCalculation)
                 taskInfo.setCurrentInterval(initialInterval)
                 
                 // 调度轮询任务
@@ -481,20 +483,21 @@ class TapPollingService(private val context: Context) {
             
             val responseTime = System.currentTimeMillis() - startTime
             
-            // 更新轮询状态
-            if (pollingResult.isSuccess) {
+            // 仅在发现新消息时更新数据库，避免不必要的数据库写入
+            if (pollingResult.isSuccess && pollingResult.messagesFound > 0) {
                 pollingStateTable.recordSuccessfulPoll(
                     taskInfo.recipientId,
                     taskInfo.metadata.providerType,
                     pollingResult.processedFiles,
                     pollingResult.messagesFound
                 )
+                Log.d(TAG, "发现${pollingResult.messagesFound}条新消息，已更新数据库: ${taskInfo.recipientId}")
+            } else if (pollingResult.isSuccess) {
+                // 轮询成功但无新消息，仅记录日志，不写数据库
+                Log.v(TAG, "轮询成功，无新消息: ${taskInfo.recipientId}")
             } else {
-                pollingStateTable.recordFailedPoll(
-                    taskInfo.recipientId,
-                    taskInfo.metadata.providerType,
-                    pollingResult.error
-                )
+                // 轮询失败，记录日志但不写数据库（除非是严重错误）
+                Log.w(TAG, "轮询失败: ${taskInfo.recipientId}, error=${pollingResult.error}")
             }
             
             PollingExecutionResult(
@@ -931,6 +934,17 @@ class TapPollingService(private val context: Context) {
      * 全局轮询调整
      */
     fun adjustGlobalPolling(changeType: IntervalChangeType) {
+        // 在锁外预取通道信息
+        val channelCache = if (changeType == IntervalChangeType.REEVALUATE) {
+            pollingLock.read {
+                pollingTasks.mapValues { (recipientId, taskInfo) ->
+                    channelManager.getActiveChannel(recipientId, taskInfo.metadata.providerType)
+                }
+            }
+        } else {
+            emptyMap()
+        }
+        
         pollingLock.write {
             try {
                 Log.d(TAG, "全局轮询调整: changeType=$changeType, 影响任务数=${pollingTasks.size}")
@@ -939,8 +953,8 @@ class TapPollingService(private val context: Context) {
                     val currentInterval = taskInfo.getCurrentInterval()
                     val newInterval = when (changeType) {
                         IntervalChangeType.REEVALUATE -> {
-                            // 重新评估时，使用智能策略为每个任务单独计算
-                            val channel = channelManager.getActiveChannel(taskInfo.recipientId, taskInfo.metadata.providerType)
+                            // 使用预取的通道信息计算间隔
+                            val channel = channelCache[taskInfo.recipientId]
                             calculatePollingInterval(taskInfo.metadata, channel)
                         }
                         IntervalChangeType.RESET -> {
