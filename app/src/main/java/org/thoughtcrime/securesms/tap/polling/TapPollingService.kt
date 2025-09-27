@@ -58,6 +58,9 @@ class TapPollingService(private val context: Context) {
     // 数据库访问
     private val pollingStateTable = SignalDatabase.transportPollingStates
     
+    // 轮询状态缓存，避免每次读数据库
+    private val pollingStateCache = ConcurrentHashMap<String, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState>()
+    
     // 轮询任务管理
     private val pollingTasks = ConcurrentHashMap<String, PollingTaskInfo>()
     private val pollingLock = ReentrantReadWriteLock()
@@ -332,6 +335,10 @@ class TapPollingService(private val context: Context) {
                 taskInfo.cleanup()
                 pollingTasks.remove(recipientId)
                 
+                // 清理对应的缓存条目
+                val cacheKey = "${recipientId}_${providerType}"
+                pollingStateCache.remove(cacheKey)
+                
                 Log.i(TAG, "轮询目标移除成功: $recipientId")
                 true
                 
@@ -472,11 +479,14 @@ class TapPollingService(private val context: Context) {
                 return PollingExecutionResult.failure("Provider不可用", responseTime)
             }
             
-            // 获取轮询状态
-            val pollingState = pollingStateTable.getPollingState(
-                taskInfo.recipientId, 
-                taskInfo.metadata.providerType
-            )
+            // 获取轮询状态（优先使用缓存）
+            val cacheKey = "${taskInfo.recipientId}_${taskInfo.metadata.providerType}"
+            val pollingState = pollingStateCache[cacheKey] ?: run {
+                // 缓存未命中时读数据库，并缓存结果
+                val state = pollingStateTable.getPollingState(taskInfo.recipientId, taskInfo.metadata.providerType)
+                state?.let { pollingStateCache[cacheKey] = it }
+                state
+            }
             
             // 执行新的文件操作轮询
             val pollingResult = performFileBasedPolling(provider, taskInfo, pollingState)
@@ -491,6 +501,8 @@ class TapPollingService(private val context: Context) {
                     pollingResult.processedFiles,
                     pollingResult.messagesFound
                 )
+                // 清除缓存，下次轮询时获取最新状态
+                pollingStateCache.remove(cacheKey)
                 Log.d(TAG, "发现${pollingResult.messagesFound}条新消息，已更新数据库: ${taskInfo.recipientId}")
             } else if (pollingResult.isSuccess) {
                 // 轮询成功但无新消息，仅记录日志，不写数据库
@@ -668,8 +680,13 @@ class TapPollingService(private val context: Context) {
      */
     private fun getProcessedFilesFromDatabase(recipientId: String, providerType: String): Set<String> {
         return try {
-            // 使用专门的轮询状态表获取已处理文件列表
-            val pollingState = pollingStateTable.getPollingState(recipientId, providerType)
+            // 优先使用缓存获取已处理文件列表
+            val cacheKey = "${recipientId}_${providerType}"
+            val pollingState = pollingStateCache[cacheKey] ?: run {
+                val state = pollingStateTable.getPollingState(recipientId, providerType)
+                state?.let { pollingStateCache[cacheKey] = it }
+                state
+            }
             pollingState?.processedFiles ?: emptySet()
         } catch (e: Exception) {
             Log.e(TAG, "获取已处理文件列表失败: recipientId=$recipientId", e)
