@@ -1,14 +1,21 @@
-2025-09-27 17:28:55.789 14610-14767 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-27 17:28:56.343 14610-14767 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-27 17:28:56.680 14610-14642 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********912, type=MEDIA_MESSAGE
-2025-09-27 17:28:56.681 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********912
-2025-09-27 17:28:56.681 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********912
-2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
-2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功: messageId=********-****-****-****-*********912
-2025-09-27 17:28:56.683 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1758965331432
-2025-09-27 17:28:56.687 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1758965331432
-2025-09-27 17:28:56.687 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1758965331432
-2025-09-27 17:28:56.695 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  MessageContentProcessor处理失败: timestamp=1758965331432
+2025-09-28 08:21:05.108 22780-22933 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
+2025-09-28 08:21:05.111 22780-22933 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:05.662 22780-22933 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:05.662 22780-22933 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:10.110 22780-22900 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=80.00%]
+2025-09-28 08:21:10.111 22780-22900 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:10.788 22780-22900 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:11.075 22780-22814 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********bb1, type=MEDIA_MESSAGE
+2025-09-28 08:21:11.076 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********bb1
+2025-09-28 08:21:11.078 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********bb1
+2025-09-28 08:21:11.080 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-09-28 08:21:11.082 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功: messageId=********-****-****-****-*********bb1
+2025-09-28 08:21:11.083 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1759018868033
+2025-09-28 08:21:11.086 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1759018868033
+2025-09-28 08:21:11.087 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1759018868033
+2025-09-28 08:21:11.094 22780-22900 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1f9423a9-a9d6-4672-b490-a0a144d0dbb1_1759018869572.dat, error=消息内容处理失败
+2025-09-28 08:21:11.094 22780-22900 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:11.096 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  MessageContentProcessor处理失败: timestamp=1759018868033
                                                                                                     java.lang.NullPointerException
                                                                                                     	at java.util.Objects.requireNonNull(Objects.java:207)
                                                                                                     	at org.whispersystems.signalservice.api.util.AttachmentPointerUtil.createSignalAttachmentPointer(AttachmentPointerUtil.java:20)
@@ -44,10 +51,5 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-09-27 17:28:56.696 14610-14767 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 206360b0-f508-415f-9187-5ce93ba71912_1758965332889.dat, error=消息内容处理失败
-2025-09-27 17:28:56.696 14610-14642 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  消息内容处理失败: messageId=********-****-****-****-*********912
-2025-09-27 17:28:56.696 14610-14767 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-27 17:28:56.697 14610-14642 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=********-****-****-****-*********912, error=消息内容处理失败
-2025-09-27 17:29:00.797 14610-14764 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=95.24%]
-2025-09-27 17:29:00.798 14610-14764 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/messages/, /v2-channels/053abb43f297ee1d/outbox/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-09-27 17:29:01.397 14610-14764 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-09-28 08:21:11.100 22780-22814 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  消息内容处理失败: messageId=********-****-****-****-*********bb1
+2025-09-28 08:21:11.101 22780-22814 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=********-****-****-****-*********bb1, error=消息内容处理失败

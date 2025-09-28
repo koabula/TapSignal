@@ -610,32 +610,39 @@ class TapPollingService(private val context: Context) {
                     }
                     
                     if (downloadResult is TransportResult.Success && downloadResult.data != null) {
-                        val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
-                        if (message != null) {
-                            val processResult = messageProcessor.processTapTransportMessage(message)
-                            if (processResult is TapProcessResult.Success) {
-                                messagesProcessed++
-                                // 仅在成功处理消息后标记文件已处理
-                                newProcessedFiles.add(file.name)
-                                // 清除失败记录（如果存在）
-                                clearFileProcessingFailure(file.name, taskInfo.recipientId)
-                                Log.d(TAG, "消息处理成功: ${file.name}")
-                            } else {
-                                // 消息处理失败，记录失败并判断是否可重试
-                                val error = (processResult as? TapProcessResult.Failed)?.error ?: "Unknown processing error"
-                                val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, error)
-                                if (!shouldRetry) {
-                                    // 超过重试次数，标记为已处理避免无限重试
+                        // 基于路径区分文件类型，只解析消息文件
+                        if (file.isInMessagesDirectory()) {
+                            val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
+                            if (message != null) {
+                                val processResult = messageProcessor.processTapTransportMessage(message)
+                                if (processResult is TapProcessResult.Success) {
+                                    messagesProcessed++
+                                    // 仅在成功处理消息后标记文件已处理
                                     newProcessedFiles.add(file.name)
-                                    Log.w(TAG, "消息处理失败超过重试次数，跳过: ${file.name}")
+                                    // 清除失败记录（如果存在）
+                                    clearFileProcessingFailure(file.name, taskInfo.recipientId)
+                                    Log.d(TAG, "消息处理成功: ${file.name}")
                                 } else {
-                                    Log.w(TAG, "消息处理失败，将重试: ${file.name}, error=$error")
+                                    // 消息处理失败，记录失败并判断是否可重试
+                                    val error = (processResult as? TapProcessResult.Failed)?.error ?: "Unknown processing error"
+                                    val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, error)
+                                    if (!shouldRetry) {
+                                        // 超过重试次数，标记为已处理避免无限重试
+                                        newProcessedFiles.add(file.name)
+                                        Log.w(TAG, "消息处理失败超过重试次数，跳过: ${file.name}")
+                                    } else {
+                                        Log.w(TAG, "消息处理失败，将重试: ${file.name}, error=$error")
+                                    }
                                 }
+                            } else {
+                                // 消息文件解析失败，记录失败信息
+                                newProcessedFiles.add(file.name)
+                                Log.w(TAG, "消息文件解析失败: ${file.name}")
                             }
                         } else {
-                            // 文件解析失败，可能不是消息文件，标记已处理避免重复尝试
+                            // 附件文件，直接标记为已处理
                             newProcessedFiles.add(file.name)
-                            Log.d(TAG, "文件解析失败，可能不是消息文件: ${file.name}")
+                            Log.v(TAG, "附件文件已发现，无需解析: ${file.name}")
                         }
                     } else {
                         // 下载失败，不标记已处理，下次继续尝试

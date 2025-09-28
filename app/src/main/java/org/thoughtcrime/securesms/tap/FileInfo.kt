@@ -58,6 +58,14 @@ data class FileInfo(
     }
     
     /**
+     * 基于路径判断是否为消息文件
+     * 用于轮询服务区分消息文件和附件文件
+     */
+    fun isInMessagesDirectory(): Boolean {
+        return path.contains("/messages/")
+    }
+    
+    /**
      * 判断文件是否为消息文件
      * 
      * 基于文件内容结构判断，而非依赖文件名

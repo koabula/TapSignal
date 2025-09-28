@@ -20,8 +20,16 @@ import org.thoughtcrime.securesms.messages.MessageContentProcessor
 import org.thoughtcrime.securesms.util.RemoteConfig
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
+import org.thoughtcrime.securesms.tap.TransportChannelManager
+import org.thoughtcrime.securesms.tap.TransportManager
+import org.thoughtcrime.securesms.tap.TransportResult
+import org.thoughtcrime.securesms.tap.FileInfo
+import org.thoughtcrime.securesms.attachments.AttachmentId
+import org.thoughtcrime.securesms.database.AttachmentTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okio.ByteString
+import java.util.UUID
 
 /**
  * Tap Envelope适配器
@@ -45,6 +53,8 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
     }
     
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
+    private val transportManager = TransportManager.getInstance(context)
+    private val channelManager = TransportChannelManager.getInstance(context)
     
     /**
      * 处理加密的传输消息
@@ -84,10 +94,18 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                     return@withContext TapEnvelopeProcessResult.Failed("消息解密失败")
                 }
                 
-                // 4. 使用Signal标准消息处理流程
+                // 4. TAP附件修复：在消息处理前修复AttachmentPointer
+                val fixedCipherResult = if (transportMessage.attachments.isNotEmpty()) {
+                    Log.d(TAG, "检测到TAP附件，修复AttachmentPointer: messageId=${transportMessage.messageId}, 附件数=${transportMessage.attachments.size}")
+                    fixTapAttachmentPointers(envelope, decryptionResult, transportMessage)
+                } else {
+                    decryptionResult
+                }
+                
+                // 5. 使用Signal标准消息处理流程
                 val processSuccess = processWithMessageContentProcessor(
                     envelope = envelope,
-                    cipherResult = decryptionResult
+                    cipherResult = fixedCipherResult
                 )
                 
                 if (processSuccess) {
@@ -395,5 +413,418 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             Log.e(TAG, "验证Envelope失败", e)
             false
         }
+    }
+
+    /**
+     * 修复TAP附件的AttachmentPointer字段
+     * 解决Signal解密后AttachmentPointer字段缺失的问题
+     */
+    private suspend fun fixTapAttachmentPointers(
+        envelope: Envelope,
+        cipherResult: SignalServiceCipherResult,
+        transportMessage: TransportMessage
+    ): SignalServiceCipherResult {
+        return try {
+            val content = cipherResult.content
+            
+            // 检查是否有DataMessage和附件
+            val dataMessage = content.dataMessage
+            if (dataMessage == null || dataMessage.attachments.isEmpty()) {
+                Log.d(TAG, "消息无需修复附件指针: messageId=${transportMessage.messageId}")
+                return cipherResult
+            }
+            
+            Log.d(TAG, "开始修复AttachmentPointer: messageId=${transportMessage.messageId}")
+            
+            // 先立即下载TAP附件数据
+            if (transportMessage.attachments.isNotEmpty()) {
+                Log.d(TAG, "立即下载TAP附件数据: messageId=${transportMessage.messageId}, 附件数=${transportMessage.attachments.size}")
+                downloadTapAttachmentsImmediately(transportMessage, envelope.timestamp ?: System.currentTimeMillis(), envelope)
+            }
+            
+            // 获取原始附件列表并修复
+            val originalAttachments = dataMessage.attachments
+            val fixedAttachments = mutableListOf<org.whispersystems.signalservice.internal.push.AttachmentPointer>()
+            
+            for (i in originalAttachments.indices) {
+                val originalPointer = originalAttachments[i]
+                val tapAttachment = if (i < transportMessage.attachments.size) {
+                    transportMessage.attachments[i]
+                } else {
+                    Log.w(TAG, "TAP附件索引超出范围: $i >= ${transportMessage.attachments.size}")
+                    null
+                }
+                
+                val fixedPointer = repairAttachmentPointer(originalPointer, tapAttachment)
+                fixedAttachments.add(fixedPointer)
+                
+                Log.d(TAG, "修复附件指针 #${i}: cdnNumber=${fixedPointer.cdnNumber}, " +
+                          "key长度=${fixedPointer.key?.size ?: 0}")
+            }
+            
+            // 重建DataMessage - 只设置必要的字段
+            val dataMessageBuilder = org.whispersystems.signalservice.internal.push.DataMessage.Builder()
+            
+            // 复制基本字段
+            dataMessage.body?.let { dataMessageBuilder.body = it }
+            dataMessage.timestamp?.let { dataMessageBuilder.timestamp = it }
+            dataMessage.expireTimer?.let { dataMessageBuilder.expireTimer = it }
+            dataMessage.flags?.let { dataMessageBuilder.flags = it }
+            
+            // 设置修复后的附件
+            dataMessageBuilder.attachments = fixedAttachments
+            
+            val fixedDataMessage = dataMessageBuilder.build()
+            
+            // 重建Content - 只设置DataMessage
+            val contentBuilder = org.whispersystems.signalservice.internal.push.Content.Builder()
+            contentBuilder.dataMessage = fixedDataMessage
+            
+            // 复制其他消息类型（如果存在）
+            content.syncMessage?.let { contentBuilder.syncMessage = it }
+            content.callMessage?.let { contentBuilder.callMessage = it }
+            content.receiptMessage?.let { contentBuilder.receiptMessage = it }
+            content.typingMessage?.let { contentBuilder.typingMessage = it }
+            
+            val fixedContent = contentBuilder.build()
+            
+            Log.i(TAG, "TAP附件修复完成: messageId=${transportMessage.messageId}, 修复附件数=${fixedAttachments.size}")
+            
+            // 返回新的CipherResult
+            SignalServiceCipherResult(fixedContent, cipherResult.metadata)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "修复TAP附件指针异常: messageId=${transportMessage.messageId}", e)
+            // 修复失败时返回原始结果
+            cipherResult
+        }
+    }
+    
+    /**
+     * 修复单个AttachmentPointer的关键字段
+     */
+    private fun repairAttachmentPointer(
+        originalPointer: org.whispersystems.signalservice.internal.push.AttachmentPointer,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment?
+    ): org.whispersystems.signalservice.internal.push.AttachmentPointer {
+        
+        // 创建新的AttachmentPointer，修复关键字段
+        val builder = org.whispersystems.signalservice.internal.push.AttachmentPointer.Builder()
+        
+        // 复制基本字段
+        originalPointer.contentType?.let { builder.contentType = it }
+        originalPointer.size?.let { builder.size = it }
+        originalPointer.fileName?.let { builder.fileName = it }
+        originalPointer.flags?.let { builder.flags = it }
+        originalPointer.width?.let { builder.width = it }
+        originalPointer.height?.let { builder.height = it }
+        originalPointer.caption?.let { builder.caption = it }
+        originalPointer.blurHash?.let { builder.blurHash = it }
+        
+        // 修复关键字段 - 这些是导致空指针异常的根源
+        builder.cdnNumber = 999  // 设置TAP专用CDN号码
+        
+        if (tapAttachment != null) {
+            // 确保文件名不为空
+            val fileName = if (tapAttachment.fileName.isNotBlank()) {
+                tapAttachment.fileName
+            } else {
+                "attachment_${tapAttachment.attachmentId}"
+            }
+            
+            // 修复contentType - 确保图片类型正确识别
+            val contentType = determineContentType(tapAttachment.mimeType, fileName)
+            
+            // 设置attachment_identifier - 必需字段
+            val cdnKey = "tap_${tapAttachment.attachmentId}_$fileName"
+            builder.cdnKey = cdnKey
+            
+            // 设置clientUuid - 确保唯一性
+            val clientUuid = UUID.randomUUID().toString()
+            builder.clientUuid = ByteString.of(*clientUuid.toByteArray(Charsets.UTF_8))
+            
+            // 设置加密密钥 - 直接使用原始字节数据
+            val transportPath = tapAttachment.transportPath ?: "attachments/${tapAttachment.attachmentId}/$fileName"
+            val keyContent = "TAP:$transportPath"
+            builder.key = ByteString.of(*keyContent.toByteArray(Charsets.UTF_8))
+            
+            // 设置基本字段
+            builder.fileName = fileName
+            builder.size = tapAttachment.size.toInt()
+            builder.contentType = contentType
+            builder.uploadTimestamp = System.currentTimeMillis()
+            
+            // 为图片类型设置默认尺寸（如果原始pointer中没有）
+            if (isImageContentType(contentType) && 
+                (originalPointer.width == null || originalPointer.height == null)) {
+                builder.width = 1024   // 默认宽度
+                builder.height = 768   // 默认高度
+            }
+            
+            Log.d(TAG, "修复TAP附件指针: fileName=$fileName, contentType=$contentType, size=${tapAttachment.size}, cdnKey=$cdnKey")
+            
+            // 设置digest（如果有哈希）
+            if (tapAttachment.fileHash != null) {
+                try {
+                    val hashBytes = java.util.Base64.getDecoder().decode(tapAttachment.fileHash)
+                    builder.digest = ByteString.of(*hashBytes)
+                } catch (e: Exception) {
+                    Log.w(TAG, "解析TAP附件哈希失败: ${tapAttachment.fileHash}", e)
+                    // 生成默认digest以避免空值
+                    builder.digest = ByteString.of(*"tap_attachment_default".toByteArray(Charsets.UTF_8))
+                }
+            } else {
+                // 生成默认digest以避免空值
+                builder.digest = ByteString.of(*"tap_attachment_default".toByteArray(Charsets.UTF_8))
+            }
+        } else {
+            // 没有TAP附件信息时，设置默认值
+            builder.cdnKey = "tap_unknown_attachment"
+            builder.clientUuid = ByteString.of(*UUID.randomUUID().toString().toByteArray(Charsets.UTF_8))
+            
+            val defaultKeyContent = "TAP:attachments/unknown/data"
+            builder.key = ByteString.of(*defaultKeyContent.toByteArray(Charsets.UTF_8))
+            builder.digest = ByteString.of(*"tap_attachment_default".toByteArray(Charsets.UTF_8))
+            builder.uploadTimestamp = System.currentTimeMillis()
+        }
+        
+        return builder.build()
+    }
+    
+    /**
+     * 立即下载TAP附件数据
+     * 在消息处理阶段直接下载附件，避免后续查看时的延迟
+     */
+    private suspend fun downloadTapAttachmentsImmediately(
+        transportMessage: TransportMessage,
+        messageTimestamp: Long,
+        envelope: Envelope
+    ) {
+        try {
+            // 获取发送者的活跃通道
+            val senderId = transportMessage.senderId
+            val activeChannels = channelManager.getActiveChannels(senderId)
+            if (activeChannels.isEmpty()) {
+                Log.w(TAG, "无活跃传输通道，跳过立即下载: senderId=${LogSanitizer.sanitize(senderId)}")
+                return
+            }
+            
+            val channel = activeChannels.first()
+            val provider = transportManager.getProvider(channel.providerType)
+            if (provider == null) {
+                Log.w(TAG, "无法获取传输提供者: providerType=${channel.providerType}")
+                return
+            }
+            
+            Log.d(TAG, "开始立即下载${transportMessage.attachments.size}个附件")
+            
+            // 逐个下载附件
+            for ((index, tapAttachment) in transportMessage.attachments.withIndex()) {
+                try {
+                    downloadSingleTapAttachment(provider, channel, tapAttachment, transportMessage.messageId, messageTimestamp, index, envelope)
+                } catch (e: Exception) {
+                    Log.w(TAG, "下载附件失败，继续处理其他附件: attachmentId=${tapAttachment.attachmentId}", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "立即下载TAP附件过程中发生异常: messageId=${transportMessage.messageId}", e)
+        }
+    }
+    
+    /**
+     * 下载单个TAP附件
+     */
+    private suspend fun downloadSingleTapAttachment(
+        provider: org.thoughtcrime.securesms.tap.TransportProvider,
+        channel: org.thoughtcrime.securesms.tap.TransportChannel,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        messageId: String,
+        messageTimestamp: Long,
+        attachmentIndex: Int,
+        envelope: Envelope
+    ) {
+        try {
+            // 直接使用TransportAttachment中记录的完整TAP通道路径
+            val fullTapPath = tapAttachment.transportPath
+            if (fullTapPath.isNullOrBlank()) {
+                Log.w(TAG, "TransportAttachment中没有有效的传输路径: ${tapAttachment.fileName}")
+                return
+            }
+            
+            // 构建FileInfo - 使用完整的TAP通道路径
+            val fileInfo = FileInfo(
+                name = tapAttachment.fileName,
+                path = fullTapPath,
+                size = tapAttachment.size,
+                lastModified = messageTimestamp,
+                etag = tapAttachment.fileHash,
+                mimeType = tapAttachment.mimeType,
+                metadata = mapOf(
+                    "attachmentId" to tapAttachment.attachmentId,
+                    "messageId" to messageId,
+                    "attachmentIndex" to attachmentIndex.toString()
+                )
+            )
+            
+            Log.d(TAG, "下载附件: ${tapAttachment.fileName}, path=$fullTapPath")
+            
+            // 通过Provider下载文件数据
+            val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
+            
+            when (downloadResult) {
+                is TransportResult.Success -> {
+                    val fileData = downloadResult.data
+                    if (fileData != null && fileData.isNotEmpty()) {
+                        Log.d(TAG, "附件下载成功: ${tapAttachment.fileName}, dataSize=${fileData.size}")
+                        
+                        // 尝试直接保存到Signal存储或保存到临时文件
+                        saveTapAttachmentData(
+                            attachmentData = fileData,
+                            tapAttachment = tapAttachment,
+                            messageTimestamp = messageTimestamp,
+                            envelope = envelope
+                        )
+                        
+                        Log.i(TAG, "TAP附件立即下载并保存成功: ${tapAttachment.fileName}")
+                    } else {
+                        Log.w(TAG, "下载的附件数据为空: ${tapAttachment.fileName}")
+                    }
+                }
+                is TransportResult.Failed -> {
+                    Log.e(TAG, "附件下载失败: ${tapAttachment.fileName}, error=${downloadResult.error}")
+                }
+                else -> {
+                    Log.w(TAG, "未知的下载结果类型: ${downloadResult::class.java.simpleName}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "下载单个TAP附件异常: ${tapAttachment.fileName}", e)
+        }
+    }
+    
+    /**
+     * 保存TAP附件数据
+     * 优先尝试直接保存到Signal存储，失败则保存到临时文件
+     */
+    private suspend fun saveTapAttachmentData(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        messageTimestamp: Long,
+        envelope: Envelope
+    ) {
+        try {
+            Log.d(TAG, "保存TAP附件: ${tapAttachment.fileName}, size=${attachmentData.size}")
+            
+            // 验证数据完整性
+            if (attachmentData.isEmpty()) {
+                throw IllegalArgumentException("附件数据为空")
+            }
+            
+            if (attachmentData.size > 100 * 1024 * 1024) {
+                throw IllegalArgumentException("附件数据过大: ${attachmentData.size} bytes")
+            }
+            
+            // 尝试直接保存到Signal存储
+            val directSaveSuccess = tryDirectSaveToSignal(attachmentData, tapAttachment, envelope)
+            
+            if (directSaveSuccess) {
+                Log.i(TAG, "TAP附件直接保存到Signal存储成功: ${tapAttachment.fileName}")
+            } else {
+                // Fallback: 保存到临时文件，由TapAttachmentDownloadInterceptor后续处理
+                Log.d(TAG, "无法直接保存，使用临时文件机制: ${tapAttachment.fileName}")
+                saveToTemporaryFile(attachmentData, tapAttachment)
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "保存TAP附件数据异常: ${tapAttachment.fileName}", e)
+            throw e
+        }
+    }
+    
+    /**
+     * 尝试直接保存到Signal存储
+     * 通过临时文件机制与AttachmentDownloadJob集成
+     */
+    private suspend fun tryDirectSaveToSignal(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        envelope: Envelope
+    ): Boolean {
+        try {
+            // 使用临时文件机制，确保与TapAttachmentDownloadInterceptor完全兼容
+            saveToTemporaryFile(attachmentData, tapAttachment)
+            Log.d(TAG, "TAP附件已保存到临时文件，等待Signal系统处理: ${tapAttachment.fileName}")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "保存附件到临时文件失败: ${tapAttachment.fileName}", e)
+            return false
+        }
+    }
+    
+    /**
+     * 保存到临时文件
+     * 确保与TapAttachmentDownloadInterceptor的查找逻辑完全匹配
+     */
+    private fun saveToTemporaryFile(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment
+    ) {
+        val tempDir = java.io.File(context.cacheDir, "tap_attachments")
+        if (!tempDir.exists()) {
+            tempDir.mkdirs()
+        }
+        
+        val fullTapPath = tapAttachment.transportPath ?: ""
+        val pathHash = fullTapPath.hashCode().toString()
+        // 确保文件名与TapAttachmentDownloadInterceptor的解析逻辑一致
+        val fileName = if (fullTapPath.isNotBlank()) {
+            fullTapPath.substringAfterLast("/")
+        } else {
+            tapAttachment.fileName
+        }
+        val tempFileKey = "${pathHash}_${fileName}"
+        val tempFile = java.io.File(tempDir, tempFileKey)
+        
+        tempFile.writeBytes(attachmentData)
+        Log.i(TAG, "TAP附件数据已保存到临时文件: ${tempFile.absolutePath}")
+    }
+    
+    /**
+     * 根据MIME类型和文件名确定正确的内容类型
+     * 确保图片类型能被正确识别
+     */
+    private fun determineContentType(mimeType: String?, fileName: String): String {
+        // 如果mimeType有效且是图片类型，直接使用
+        if (!mimeType.isNullOrBlank() && isImageContentType(mimeType)) {
+            return mimeType
+        }
+        
+        // 如果mimeType无效或不是图片类型，根据文件扩展名推断
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        return when (extension) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "bmp" -> "image/bmp"
+            "tiff", "tif" -> "image/tiff"
+            "mp4" -> "video/mp4"
+            "mov" -> "video/quicktime"
+            "avi" -> "video/x-msvideo"
+            "pdf" -> "application/pdf"
+            "doc" -> "application/msword"
+            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            else -> mimeType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        }
+    }
+    
+    /**
+     * 检查内容类型是否为图片类型
+     */
+    private fun isImageContentType(contentType: String?): Boolean {
+        if (contentType.isNullOrBlank()) return false
+        return contentType.startsWith("image/") && contentType != "image/svg+xml"
     }
 } 
