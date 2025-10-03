@@ -1,8 +1,10 @@
 name: Reproducible Build Check
 
 on:
-  schedule:
-    - cron: '0 5 * * *'
+  # 定时任务已禁用 - 如需使用请手动触发
+  # schedule:
+  #   - cron: '0 5 * * *'
+  workflow_dispatch:  # 允许手动触发
 
 permissions:
   contents: read # to fetch code (actions/checkout)
