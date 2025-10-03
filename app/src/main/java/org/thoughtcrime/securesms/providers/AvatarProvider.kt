@@ -86,10 +86,11 @@ class AvatarProvider : BaseContentProvider() {
     }
 
     // 挂接 TaP 模块初始化（传输管理与轮询服务）
+    // 使用同步初始化确保数据恢复完成
     try {
-      org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(application).initialize(false)
+      org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(application).initializeSync(false)
     } catch (e: Exception) {
-      Log.w(TAG, "TapModuleInitializer initialization failed", e)
+      Log.w(TAG, "TapModuleInitializer synchronous initialization failed", e)
     }
 
     return application

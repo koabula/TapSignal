@@ -19,8 +19,9 @@ class TapStartupInitializer : ContentProvider() {
     override fun onCreate(): Boolean {
         return try {
             context?.let { ctx ->
-                TapModuleInitializer.getInstance(ctx).initialize(false)
-                Log.i(TAG, "TapStartupInitializer initialized")
+                // 使用同步初始化确保数据完全恢复后再启动轮询服务
+                TapModuleInitializer.getInstance(ctx).initializeSync(false)
+                Log.i(TAG, "TapStartupInitializer synchronized initialization completed")
             }
             true
         } catch (e: Exception) {

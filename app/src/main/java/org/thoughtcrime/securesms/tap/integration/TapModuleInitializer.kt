@@ -50,43 +50,41 @@ class TapModuleInitializer private constructor(private val context: Context) {
     @Volatile
     private var reinitializationAttempts = 0
     private val maxReinitializationAttempts = 3
+    
+    // 轮询启动重试计数器
+    @Volatile
+    private var pollingRetryAttempts = 0
+    private val maxPollingRetryAttempts = 3
 
     /**
-     * 初始化TaP模块
+     * 初始化TaP模块（异步版本）
      * 
      * @param forceReinit 是否强制重新初始化
      */
     fun initialize(forceReinit: Boolean = false) {
-        if (isInitialized && !forceReinit) {
-            Log.d(TAG, "TaP模块已初始化，跳过")
-            return
-        }
-        
-        Log.i(TAG, "开始初始化TaP模块...")
+        Log.i(TAG, "开始初始化TaP模块（异步）...")
         
         initScope.launch {
             try {
-                // 1. 检查是否需要执行初始化
-                if (!tapValues.shouldPerformInitialization() && !forceReinit) {
-                    Log.d(TAG, "TaP模块已完成初始化")
-                    isInitialized = true
-                    return@launch
-                }
-                
-                // 2. 初始化核心组件
+                // 始终执行核心组件初始化以恢复数据
+                // 与同步版本保持一致的行为
                 initializeCoreComponents()
                 
-                // 3. 启动轮询服务
+                // 启动轮询服务
                 startPollingService()
                 
-                // 5. 标记初始化完成
-                tapValues.markInitializationComplete()
+                // 标记初始化完成
+                try {
+                    tapValues.markInitializationComplete()
+                } catch (e: Exception) {
+                    Log.w(TAG, "标记初始化完成失败（SignalStore可能未就绪）", e)
+                }
                 
                 isInitialized = true
-                Log.i(TAG, "TaP模块初始化完成")
+                Log.i(TAG, "TaP模块初始化完成（异步）")
                 
             } catch (e: Exception) {
-                Log.e(TAG, "TaP模块初始化失败: ${LogSanitizer.sanitizeThrowable(e)}")
+                Log.e(TAG, "TaP模块初始化失败（异步）: ${LogSanitizer.sanitizeThrowable(e)}")
                 // 初始化失败不应该影响应用启动
             }
         }
@@ -96,53 +94,17 @@ class TapModuleInitializer private constructor(private val context: Context) {
      * 同步初始化方法（阻塞直到初始化完成）
      */
     fun initializeSync(forceReinit: Boolean = false) {
-        // 即使isInitialized=true，也要验证核心组件是否真正可用
-        if (isInitialized && !forceReinit) {
-            try {
-                // 验证TransportManager是否真正可用
-                val transportManager = TransportManager.getInstance(context)
-                
-                // 首先检查TransportManager本身是否初始化
-                if (!transportManager.isInitialized()) {
-                    Log.w(TAG, "TaP模块状态异常：TransportManager未初始化，强制重新初始化")
-                } else {
-                    val availableProviders = transportManager.getAvailableProviders()
-                    
-                    if (availableProviders.isNotEmpty()) {
-                        Log.d(TAG, "TaP模块已正确初始化，Provider数量: ${availableProviders.size}")
-                        availableProviders.forEach { provider ->
-                            Log.d(TAG, "验证已注册Provider: ${provider.providerType} - ${provider.displayName}")
-                        }
-                        // 重置重新初始化计数器
-                        reinitializationAttempts = 0
-                        return
-                    } else {
-                        // 检查是否有已配置的Provider，如果没有配置则不需要重新初始化
-                        val configManager = TransportProviderConfigManager.getInstance(context)
-                        val configuredProviders = configManager.getConfiguredProviders()
-                        
-                        if (configuredProviders.isEmpty()) {
-                            Log.d(TAG, "TaP模块无已配置Provider，跳过重新初始化")
-                            return
-                        } else if (reinitializationAttempts >= maxReinitializationAttempts) {
-                            Log.w(TAG, "TaP模块重新初始化次数已达上限(${maxReinitializationAttempts}次)，停止重试")
-                            return
-                        } else {
-                            reinitializationAttempts++
-                            Log.w(TAG, "TaP模块状态异常：Provider列表为空，强制重新初始化 (第${reinitializationAttempts}次)")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "TaP模块状态验证异常，强制重新初始化", e)
-            }
+        // 防御性措施：重置标志确保数据恢复执行
+        if (!forceReinit && isInitialized) {
+            Log.d(TAG, "TaP模块已初始化，重置标志以确保数据恢复")
         }
+        isInitialized = false
         
         Log.i(TAG, "开始同步初始化TaP模块...")
         
         runBlocking {
             try {
-                // 重新初始化核心组件
+                // 始终执行核心组件初始化以恢复数据
                 initializeCoreComponents()
                 
                 // 验证初始化结果
@@ -161,12 +123,16 @@ class TapModuleInitializer private constructor(private val context: Context) {
                 startPollingService()
                 
                 // 标记初始化完成
-                val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
-                tapValues.markInitializationComplete()
+                try {
+                    val tapValues = org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+                    tapValues.markInitializationComplete()
+                } catch (e: Exception) {
+                    Log.w(TAG, "标记初始化完成失败（SignalStore可能未就绪）", e)
+                }
                 
                 isInitialized = true
                 reinitializationAttempts = 0
-                Log.d(TAG, "TaP模块已完成初始化")
+                Log.i(TAG, "TaP模块初始化完成")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "TaP模块同步初始化失败: ${LogSanitizer.sanitizeThrowable(e)}")
@@ -223,28 +189,28 @@ class TapModuleInitializer private constructor(private val context: Context) {
      * 初始化核心组件
      */
     private suspend fun initializeCoreComponents() {
-        Log.d(TAG, "初始化核心组件...")
+        Log.i(TAG, "开始初始化核心组件...")
         
         try {
             // 0. 初始化独立数据库和监控器（优先初始化以监控后续操作）
             initializeTapDatabase()
             TapDatabaseContext.initializeMonitor(context)
-            Log.d(TAG, "数据库和监控器初始化完成")
+            Log.i(TAG, "数据库和监控器初始化完成")
             
             // 1. 初始化配置管理器
             val configManager = TransportProviderConfigManager.getInstance(context)
-            Log.d(TAG, "配置管理器初始化完成")
+            Log.i(TAG, "配置管理器就绪")
             
-            // 2. 初始化Token池
+            // 2. 初始化Token池（数据恢复）
             val tokenPool = TransportTokenPool.getInstance(context)
             val tokenPoolInitialized = tokenPool.initialize(TransportTokenConfig())
             if (!tokenPoolInitialized) {
                 Log.e(TAG, "Token池初始化失败")
                 throw RuntimeException("TokenPool初始化失败")
             }
-            Log.d(TAG, "Token池初始化完成")
+            Log.i(TAG, "Token池初始化完成")
             
-            // 3. 注册传输Provider（在TransportManager初始化前）
+            // 3. 注册传输Provider（仅在首次或Provider缺失时）
             registerTransportProviders()
             
             // 4. 初始化传输管理器
@@ -257,19 +223,35 @@ class TapModuleInitializer private constructor(private val context: Context) {
             
             // 验证Provider是否正确注册
             val availableProviders = transportManager.getAvailableProviders()
-            Log.d(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}")
+            Log.i(TAG, "传输管理器初始化完成，可用Provider数量: ${availableProviders.size}")
             availableProviders.forEach { provider ->
-                Log.d(TAG, "已注册Provider: ${provider.providerType} - ${provider.displayName}")
+                Log.i(TAG, "已注册Provider: ${provider.providerType} - ${provider.displayName}")
             }
             
-            // 5. 初始化通道管理器
+            // 5. 初始化通道管理器（数据恢复）
             val channelManager = TransportChannelManager.getInstance(context)
             val channelManagerInitialized = channelManager.initialize(TransportChannelConfig())
             if (!channelManagerInitialized) {
                 Log.e(TAG, "通道管理器初始化失败")
                 throw RuntimeException("ChannelManager初始化失败")
             }
-            Log.d(TAG, "通道管理器初始化完成")
+            Log.i(TAG, "通道管理器初始化完成")
+            
+            // 6. 检查恢复的数据状态
+            val totalTokens = tokenPool.getTotalReceivedTokensCount() + tokenPool.getTotalSharedTokensCount()
+            val activeChannels = channelManager.getAllActiveChannels()
+            
+            Log.i(TAG, "数据恢复状态检查:")
+            Log.i(TAG, "  - Token总数: $totalTokens (接收=${tokenPool.getTotalReceivedTokensCount()}, 共享=${tokenPool.getTotalSharedTokensCount()})")
+            Log.i(TAG, "  - 活跃通道数: ${activeChannels.size}")
+            
+            if (totalTokens == 0 && activeChannels.isEmpty()) {
+                Log.w(TAG, "未恢复任何v2 mode数据，可能是首次启动或数据已清空")
+            } else if (totalTokens == 0) {
+                Log.w(TAG, "Token为空但有活跃通道，可能SignalStore延迟初始化，将触发Token重试")
+            } else {
+                Log.i(TAG, "成功恢复v2 mode数据")
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "核心组件初始化失败: ${LogSanitizer.sanitizeThrowable(e)}")
@@ -443,11 +425,16 @@ class TapModuleInitializer private constructor(private val context: Context) {
                             Log.e(TAG, "添加轮询目标失败: recipientId=$recipientId", addTargetEx)
                         }
                     }
+                    
+                    // 轮询启动成功，重置重试计数
+                    pollingRetryAttempts = 0
                 } else {
                     Log.w(TAG, "轮询服务启动失败")
                 }
             } else {
-                Log.d(TAG, "无活跃联系人，轮询服务未启动")
+                Log.w(TAG, "无活跃联系人，轮询服务未启动")
+                // 延迟重试启动轮询服务
+                schedulePollingRetry()
             }
             
         } catch (e: Exception) {
@@ -468,14 +455,18 @@ class TapModuleInitializer private constructor(private val context: Context) {
             
             // 获取所有有效的接收Token
             val validReceivedTokens = tokenPool.getAllValidReceivedTokens()
-            validReceivedTokens.forEach { (recipientId, _) ->
+            validReceivedTokens.forEach { (recipientId, token) ->
                 activeRecipients.add(recipientId)
+                // 诊断日志：记录recipientId格式
+                Log.d(TAG, "接收Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")}, 数字格式: ${recipientId.all { it.isDigit() || it == ':' }})")
             }
             
             // 获取所有有效的共享Token
             val validSharedTokens = tokenPool.getAllValidSharedTokens()
-            validSharedTokens.forEach { (recipientId, _) ->
+            validSharedTokens.forEach { (recipientId, token) ->
                 activeRecipients.add(recipientId)
+                // 诊断日志：记录recipientId格式
+                Log.d(TAG, "共享Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")}, 数字格式: ${recipientId.all { it.isDigit() || it == ':' }})")
             }
             
             Log.d(TAG, "找到活跃接收者数量: ${activeRecipients.size}")
@@ -487,7 +478,93 @@ class TapModuleInitializer private constructor(private val context: Context) {
         }
     }
     
+    /**
+     * 延迟重试启动轮询服务
+     */
+    private fun schedulePollingRetry() {
+        if (pollingRetryAttempts >= maxPollingRetryAttempts) {
+            Log.w(TAG, "轮询服务启动重试已达上限(${maxPollingRetryAttempts}次)，停止重试")
+            return
+        }
+        
+        pollingRetryAttempts++
+        val delayMs = 3000L * pollingRetryAttempts // 3秒、6秒、9秒递增延迟
+        
+        Log.i(TAG, "计划${delayMs}ms后重试启动轮询服务 (第${pollingRetryAttempts}次)")
+        
+        initScope.launch {
+            try {
+                kotlinx.coroutines.delay(delayMs)
+                
+                Log.d(TAG, "执行轮询服务启动重试")
+                retryStartPollingService()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "轮询服务重试启动失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            }
+        }
+    }
+    
+    /**
+     * 重试启动轮询服务
+     */
+    private suspend fun retryStartPollingService() {
+        try {
+            val pollingService = TapPollingService.getInstance(context)
+            val tokenPool = TransportTokenPool.getInstance(context)
+            val channelManager = TransportChannelManager.getInstance(context)
+            
+            // 重新检查活跃联系人
+            val activeRecipientsFromTokens = getActiveRecipientsFromTokenPool(tokenPool)
+            val allActiveChannels = channelManager.getAllActiveChannels()
+            val activeRecipientsFromChannels = allActiveChannels.map { it.recipientId }.toSet()
+            val allActiveRecipients = activeRecipientsFromTokens + activeRecipientsFromChannels
+            
+            if (allActiveRecipients.isEmpty()) {
+                Log.d(TAG, "重试时仍无活跃联系人")
+                schedulePollingRetry() // 继续重试
+                return
+            }
+            
+            Log.i(TAG, "重试启动轮询服务，发现${allActiveRecipients.size}个活跃联系人")
+            
+            val startResult = pollingService.startPolling()
+            if (startResult) {
+                // 为每个活跃联系人添加轮询目标
+                allActiveRecipients.forEach { recipientId ->
+                    try {
+                        val recipientChannels = channelManager.getActiveChannels(recipientId)
+                        if (recipientChannels.isNotEmpty()) {
+                            val channel = recipientChannels.first()
+                            pollingService.addPollingTarget(recipientId, channel.metadata, channel)
+                            Log.d(TAG, "重试添加轮询目标成功: recipientId=$recipientId")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "重试添加轮询目标失败: recipientId=$recipientId", e)
+                    }
+                }
+                
+                Log.i(TAG, "轮询服务重试启动成功")
+                pollingRetryAttempts = 0 // 成功后重置计数
+            } else {
+                Log.w(TAG, "轮询服务重试启动失败")
+                schedulePollingRetry() // 继续重试
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "重试启动轮询服务异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            schedulePollingRetry() // 继续重试
+        }
+    }
+    
     // markInitializationComplete方法已移到TapValues中
+    
+    /**
+     * 检查初始化是否完成
+     */
+    fun isInitializationComplete(): Boolean {
+        return isInitialized
+    }
     
     /**
      * 获取初始化状态
@@ -500,6 +577,65 @@ class TapModuleInitializer private constructor(private val context: Context) {
             initTimestamp = tapValues.getInitTimestamp(),
             currentVersion = tapValues.getCurrentInitVersion()
         )
+    }
+    
+    /**
+     * 在Token加载完成后重新检查并启动轮询服务
+     * 由TransportTokenPool在延迟加载Token成功后调用
+     */
+    suspend fun retryPollingServiceIfNeeded() {
+        if (!isInitialized) {
+            Log.w(TAG, "TaP模块未初始化，无法重试轮询服务")
+            return
+        }
+        
+        Log.i(TAG, "Token加载完成，重新检查轮询服务状态")
+        
+        try {
+            val pollingService = TapPollingService.getInstance(context)
+            val tokenPool = TransportTokenPool.getInstance(context)
+            val channelManager = TransportChannelManager.getInstance(context)
+            
+            // 检查活跃联系人
+            val activeRecipientsFromTokens = getActiveRecipientsFromTokenPool(tokenPool)
+            val allActiveChannels = channelManager.getAllActiveChannels()
+            val activeRecipientsFromChannels = allActiveChannels.map { it.recipientId }.toSet()
+            val allActiveRecipients = activeRecipientsFromTokens + activeRecipientsFromChannels
+            
+            if (allActiveRecipients.isEmpty()) {
+                Log.d(TAG, "Token加载后仍无活跃联系人")
+                return
+            }
+            
+            Log.i(TAG, "Token加载后发现${allActiveRecipients.size}个活跃联系人，启动轮询服务")
+            
+            // 启动轮询服务
+            val startResult = pollingService.startPolling()
+            if (startResult) {
+                // 为每个活跃联系人添加轮询目标
+                allActiveRecipients.forEach { recipientId ->
+                    try {
+                        val recipientChannels = channelManager.getActiveChannels(recipientId)
+                        if (recipientChannels.isNotEmpty()) {
+                            val channel = recipientChannels.first()
+                            val addResult = pollingService.addPollingTarget(recipientId, channel.metadata, channel)
+                            if (addResult) {
+                                Log.d(TAG, "Token加载后成功添加轮询目标: recipientId=$recipientId")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Token加载后添加轮询目标失败: recipientId=$recipientId", e)
+                    }
+                }
+                
+                Log.i(TAG, "Token加载后轮询服务启动成功")
+            } else {
+                Log.w(TAG, "Token加载后轮询服务启动失败")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Token加载后重试轮询服务异常: ${LogSanitizer.sanitizeThrowable(e)}")
+        }
     }
     
     /**

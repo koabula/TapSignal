@@ -78,8 +78,14 @@ class TransportTokenPool private constructor(private val context: Context) {
     private val configLock = ReentrantReadWriteLock()
     
     // 安全持久化存储（迁移到SignalStore.tap）
-    private val tapValues by lazy { 
-        org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+    // 使用getter方法而非lazy初始化，避免启动时序问题
+    private fun getTapValues(): org.thoughtcrime.securesms.keyvalue.TapValues? {
+        return try {
+            org.thoughtcrime.securesms.keyvalue.SignalStore.tap
+        } catch (e: Exception) {
+            Log.w(TAG, "SignalStore.tap尚未初始化: ${e.message}")
+            null
+        }
     }
     
 
@@ -122,6 +128,12 @@ class TransportTokenPool private constructor(private val context: Context) {
                     // 从持久化存储加载Token
                     loadTokensFromStorage()
                     
+                    // 如果加载失败（SignalStore未初始化），安排重试
+                    if (getTotalReceivedTokens() == 0 && getTotalSharedTokens() == 0) {
+                        Log.w(TAG, "Token加载结果为空，可能SignalStore未就绪，安排延迟重试")
+                        scheduleTokenLoadRetry()
+                    }
+                    
                     // 启动定时任务
                     startCleanupTask()
                     if (config.autoRefresh) {
@@ -137,6 +149,76 @@ class TransportTokenPool private constructor(private val context: Context) {
                     false
                 }
             }
+        }
+    }
+    
+    /**
+     * 安排Token加载重试
+     */
+    private fun scheduleTokenLoadRetry() {
+        poolScope.launch {
+            var retryCount = 0
+            val maxRetries = 3
+            
+            while (retryCount < maxRetries) {
+                retryCount++
+                val delayMs = 1000L * retryCount // 1秒、2秒、3秒递增延迟
+                
+                Log.d(TAG, "计划${delayMs}ms后重试加载Token (第${retryCount}次)")
+                kotlinx.coroutines.delay(delayMs)
+                
+                try {
+                    tokenLock.write {
+                        Log.d(TAG, "执行Token加载重试")
+                        loadTokensFromStorage()
+                        
+                        val totalTokens = getTotalReceivedTokens() + getTotalSharedTokens()
+                        if (totalTokens > 0) {
+                            Log.i(TAG, "Token重试加载成功: 接收=${getTotalReceivedTokens()}, 共享=${getTotalSharedTokens()}")
+                            
+                            // 通知TapModuleInitializer重新检查并启动轮询
+                            notifyTokensLoaded()
+                            return@launch
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Token加载重试失败 (第${retryCount}次)", e)
+                }
+            }
+            
+            Log.w(TAG, "Token加载重试已达上限，可能需要重新建立v2 mode")
+        }
+    }
+    
+    /**
+     * 通知Token已加载，触发轮询服务检查
+     */
+    private fun notifyTokensLoaded() {
+        try {
+            Log.d(TAG, "准备通知TapModuleInitializer: Token已加载")
+            
+            // 通知TapModuleInitializer重新检查轮询服务
+            val initializer = org.thoughtcrime.securesms.tap.integration.TapModuleInitializer.getInstance(context)
+            
+            // 确保在初始化完成后才通知
+            poolScope.launch {
+                // 等待TapModuleInitializer初始化完成
+                var waitCount = 0
+                while (!initializer.isInitializationComplete() && waitCount < 10) {
+                    waitCount++
+                    Log.d(TAG, "等待TapModuleInitializer初始化完成 (${waitCount}/10)")
+                    kotlinx.coroutines.delay(500)
+                }
+                
+                if (initializer.isInitializationComplete()) {
+                    Log.i(TAG, "TapModuleInitializer已就绪，触发轮询服务重试")
+                    initializer.retryPollingServiceIfNeeded()
+                } else {
+                    Log.w(TAG, "TapModuleInitializer初始化超时，无法触发轮询重试")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "通知Token加载完成失败", e)
         }
     }
     
@@ -886,6 +968,20 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
+     * 获取接收Token总数（公开方法）
+     */
+    fun getTotalReceivedTokensCount(): Int {
+        return getTotalReceivedTokens()
+    }
+    
+    /**
+     * 获取共享Token总数（公开方法）
+     */
+    fun getTotalSharedTokensCount(): Int {
+        return getTotalSharedTokens()
+    }
+    
+    /**
      * 清理过期的接收Token
      */
     private fun cleanExpiredReceivedTokens(): Int {
@@ -972,6 +1068,13 @@ class TransportTokenPool private constructor(private val context: Context) {
     private fun loadTokensFromStorage() {
         try {
             Log.d(TAG, "开始加载持久化的Token数据")
+            
+            // 安全获取tapValues，如果SignalStore未初始化则跳过
+            val tapValues = getTapValues()
+            if (tapValues == null) {
+                Log.w(TAG, "SignalStore尚未初始化，跳过Token加载，将在后续重试")
+                return
+            }
             
             // 尝试从SignalStore.tap加载
             val receivedTokensJson = tapValues.getReceivedTokens()
@@ -1068,6 +1171,13 @@ class TransportTokenPool private constructor(private val context: Context) {
     private fun saveTokensToStorage() {
         try {
             Log.d(TAG, "开始持久化Token数据")
+            
+            // 安全获取tapValues
+            val tapValues = getTapValues()
+            if (tapValues == null) {
+                Log.w(TAG, "SignalStore尚未初始化，无法保存Token")
+                return
+            }
             
             // 保存接收Token
             val receivedTokensData = receivedTokens.mapValues { (_, providerTokens) ->
@@ -1316,6 +1426,8 @@ class TransportTokenPool private constructor(private val context: Context) {
      * 如果需要则执行清理
      */
     private fun performCleanupIfNeeded() {
+        val tapValues = getTapValues() ?: return
+        
         val lastCleanupTime = tapValues.getLastCleanupTime()
         val currentTime = System.currentTimeMillis()
         
@@ -1324,7 +1436,7 @@ class TransportTokenPool private constructor(private val context: Context) {
             poolScope.launch {
                 cleanExpiredTokens()
                 // 更新最后清理时间
-                tapValues.setLastCleanupTime(currentTime)
+                getTapValues()?.setLastCleanupTime(currentTime)
             }
         }
     }

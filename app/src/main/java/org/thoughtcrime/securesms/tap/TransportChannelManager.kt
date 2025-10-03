@@ -517,10 +517,10 @@ class TransportChannelManager private constructor(private val context: Context) 
                     
                     // 启动轮询
                     try {
-                        startPollingForChannel(recipientId, upgradedChannel)
-                        Log.d(TAG, "通道升级后轮询启动成功: channelId=${upgradedChannel.channelId}")
+                        ensurePollingServiceRunning(recipientId, upgradedChannel)
+                        Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}")
                     } catch (e: Exception) {
-                        Log.e(TAG, "启动轮询失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
+                        Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
                         // 轮询启动失败不影响通道升级结果
                     }
                     
@@ -1551,8 +1551,8 @@ class TransportChannelManager private constructor(private val context: Context) 
             try {
                 Log.d(TAG, "开始从数据库恢复通道状态...")
                 
-                // 从数据库获取所有活跃通道
-                val activeChannels = transportChannelTable.getAllActiveChannels()
+                // 从独立数据库获取所有活跃通道（与保存逻辑一致）
+                val activeChannels = independentChannelTable.getActiveChannels()
                 
                 channelLock.write {
                     // 清空当前内存缓存
@@ -1574,7 +1574,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                 }
                 
-                Log.i(TAG, "通道状态恢复完成，恢复 ${activeChannels.size} 个活跃通道")
+                Log.i(TAG, "通道状态恢复完成，从独立数据库恢复 ${activeChannels.size} 个活跃通道")
                 activeChannels.forEach { channel ->
                     Log.d(TAG, "恢复通道: ${channel.channelId}, recipient=${channel.recipientId}, provider=${channel.providerType}, status=${channel.status}")
                 }
@@ -2065,6 +2065,45 @@ class TransportChannelManager private constructor(private val context: Context) 
         } catch (e: Exception) {
             Log.e(TAG, "启动轮询任务异常: recipientId=$recipientId, channelId=${channel.channelId}", e)
             throw e
+        }
+    }
+    
+    /**
+     * 确保轮询服务正在为指定通道运行
+     * 如果轮询服务未启动或该通道未添加轮询目标，则启动/添加
+     */
+    private fun ensurePollingServiceRunning(recipientId: String, channel: TransportChannel) {
+        try {
+            Log.d(TAG, "确保轮询服务运行: recipientId=$recipientId, channelId=${channel.channelId}")
+            
+            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+            
+            // 尝试启动轮询服务（如果已启动则返回true）
+            val serviceStarted = pollingService.startPolling()
+            if (!serviceStarted) {
+                Log.w(TAG, "轮询服务启动失败，尝试重新添加轮询目标")
+                // 即使服务启动失败，也尝试添加轮询目标，可能服务已在运行
+            }
+            
+            // 检查元数据
+            val metadata = channel.metadata
+            if (metadata == null) {
+                Log.e(TAG, "通道元数据为空，无法添加轮询目标: channelId=${channel.channelId}")
+                return
+            }
+            
+            // 添加或更新轮询目标
+            val targetAdded = pollingService.addPollingTarget(recipientId, metadata, channel)
+            
+            if (targetAdded) {
+                Log.i(TAG, "轮询目标已确保运行: recipientId=$recipientId, provider=${channel.providerType}")
+            } else {
+                Log.w(TAG, "添加轮询目标失败，可能已存在: recipientId=$recipientId, provider=${channel.providerType}")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "确保轮询服务运行时异常: recipientId=$recipientId", e)
+            // 不抛出异常，避免影响通道升级
         }
     }
 }
