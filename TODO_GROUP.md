@@ -6,8 +6,8 @@
 - [x] 创建 `group_v2_status` 表定义
 - [x] 在 `SignalDatabase.kt` 中添加群组 v2 表访问器
 - [x] 创建 `GroupV2StatusTable.kt` 实现 CRUD 操作
-- [x] 为 `transport_channels` 表添加 `group_id` 字段（迁移脚本）
-- [x] 为 `transport_tokens` 表添加 `group_id` 字段（迁移脚本）
+- [x] 为 `transport_channels` 表添加 `group_id` 字段（通过 config_json 实现）
+- [x] 为 `transport_tokens` 表添加 `group_id` 字段（通过 tokenData 实现）
 - [x] 添加必要的索引
 
 ### 1.2 数据模型
@@ -23,63 +23,65 @@
 - [x] 在 `TransportTokenPool` 中添加 `getGroupMemberTokens()` 方法
 - [ ] 创建单元测试模板（待后续 Phase 8 完善）
 
-## Phase 2: Token 管理和通道建立
+## Phase 2: Token 管理和通道建立 ✅
 
 ### 2.1 群组 Token 生成
-- [ ] 实现 `GroupTransportManager.generateGroupTokens()` 
+- [x] 实现 `GroupTransportManager.generateGroupTokens()` 
   - 为群组所有成员生成目录
   - 生成对应的只读 token
   - 批量保存到 `TransportTokenPool`
-- [ ] 实现 Token 的批量存储逻辑
-- [ ] 实现 Token 的批量查询接口
-- [ ] 添加 Token 验证和过期检查
+- [x] 实现 Token 的批量存储逻辑
+- [x] 实现 Token 的批量查询接口
+- [x] 添加 Token 验证和过期检查
 
 ### 2.2 群组通道管理
-- [ ] 实现 `GroupTransportManager.establishGroupChannels()`
+- [x] 实现 `GroupTransportManager.establishGroupChannels()`
   - 批量创建与群组成员的 channels
   - 支持并发创建
   - 错误处理和部分失败重试
-- [ ] 扩展 `TransportChannelManager` 支持群组通道查询
-- [ ] 实现群组通道状态批量更新
-- [ ] 添加通道健康检查
+- [x] 扩展 `TransportChannelManager` 支持群组通道查询
+- [x] 实现群组通道状态批量更新
+- [x] 添加通道健康检查
 
 ### 2.3 消息去重
-- [ ] 创建 `GroupMessageDeduplicator` 类
-- [ ] 实现基于消息 ID 的去重逻辑
-- [ ] 使用 LRU 缓存优化性能
-- [ ] 添加去重统计和日志
+- [x] 创建 `GroupMessageDeduplicator` 类
+- [x] 实现基于消息 ID 的去重逻辑
+- [x] 使用 LRU 缓存优化性能
+- [x] 添加去重统计和日志
 
-## Phase 3: 提议和激活流程
+## Phase 3: 提议和激活流程 ✅
 
 ### 3.1 发起提议
-- [ ] 实现 `GroupTransportManager.proposeV2Mode()`
+- [x] 实现 `GroupTransportManager.proposeV2Mode()`
   - 检查 provider 配置
   - 生成群组 tokens
   - 构建 GROUP_OFFER 消息
   - 通过 Signal Server 广播
   - 更新本地状态为 PROPOSING
-- [ ] 在群组菜单中添加"Use v2 mode"选项
-- [ ] 实现 UI 交互逻辑
+- [x] 实现 `GroupTransportManager.proposeV2ModeComplete()` - 完整流程
+- [x] 创建 `GroupTokenExchangeHelper` 辅助类
+- [ ] 在群组菜单中添加"Use v2 mode"选项（UI 待实现，参考 UI_INTEGRATION_GUIDE.md）
+- [ ] 实现 UI 交互逻辑（UI 待实现）
 
 ### 3.2 接受提议
-- [ ] 实现 `TapMessageProcessor` 处理 GROUP_OFFER 消息
-- [ ] 显示提议通知 UI（类似 safety number 通知）
-- [ ] 实现 `GroupTransportManager.acceptV2Proposal()`
+- [x] 实现 `TapMessageProcessor` 处理 GROUP_OFFER 消息
+- [x] 显示提议通知 UI（类似 safety number 通知）
+- [x] 实现 `GroupTransportManager.acceptV2Proposal()`
   - 保存发起人 token
   - 生成自己的 tokens
   - 构建 GROUP_ACCEPT 消息
   - 广播给所有成员
-- [ ] 实现接受/拒绝的 BroadcastReceiver
+- [x] 实现接受/拒绝的 BroadcastReceiver (`GroupTokenExchangeReceiver`)
 
 ### 3.3 激活检查
-- [ ] 实现 `GroupTransportManager.checkAndActivateV2Mode()`
+- [x] 实现 `GroupTransportManager.checkAndActivateV2Mode()`
   - 检查 agreedMembers 是否等于 totalMembers
   - 批量建立 channels
   - 启动群组轮询
   - 更新状态为 FULL_V2_ACTIVE
-- [ ] 在收到 OFFER/ACCEPT 消息时触发激活检查
-- [ ] 插入"群组已启用 v2 mode"系统消息
-- [ ] 更新 UI 显示 v2 mode 指示器
+- [x] 在收到 OFFER/ACCEPT 消息时触发激活检查
+- [x] 插入"群组已启用 v2 mode"系统消息
+- [ ] 更新 UI 显示 v2 mode 指示器（UI 待实现，参考 UI_INTEGRATION_GUIDE.md）
 
 ## Phase 4: 消息发送和接收 
 

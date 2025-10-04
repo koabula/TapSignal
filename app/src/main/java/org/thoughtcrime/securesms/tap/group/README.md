@@ -1,153 +1,246 @@
-# 群组 V2 Mode 模块
+# 群组 V2 Mode 实现文档索引
 
-## 概述
+## 📚 文档列表
 
-本模块实现了 Signal tap 层的群组 V2 模式功能，支持群组成员之间通过 tap 层传输消息密文。
+### 1. 设计和规划文档
 
-## 架构设计
+#### [PLAN_GROUP.md](../../../../PLAN_GROUP.md)
+**群组 V2 Mode 实现计划**
+- 完整的架构设计
+- 数据结构定义
+- 核心流程说明
+- 风险评估和注意事项
 
-### 核心组件
+#### [TODO_GROUP.md](../../../../TODO_GROUP.md)
+**群组 V2 Mode 实现任务清单**
+- Phase 1-9 的详细任务列表
+- 里程碑和时间规划
+- 风险项跟踪
+- 资源需求
 
-#### 1. 数据模型 (`GroupV2Status.kt`, `GroupV2State.kt`, `GroupSendResult.kt`)
+### 2. Phase 实现总结
 
-- **GroupV2Status**: 群组状态枚举
-  - `NATIVE`: 原生群聊，消息通过 Signal Server
-  - `PROPOSING`: 提议阶段，部分成员同意
-  - `FULL_V2_ACTIVE`: 全员激活，消息通过 tap 层
+#### [PHASE1_SUMMARY.md](PHASE1_SUMMARY.md)
+**Phase 1: 数据结构和基础组件**
+- 数据库表设计和实现
+- 数据模型定义
+- 核心管理器框架
 
-- **GroupV2State**: 群组状态数据类
-  - 包含群组 ID、状态、发起人、成员列表等信息
-  - 提供状态验证和转换方法
+#### [PHASE2_SUMMARY.md](PHASE2_SUMMARY.md)
+**Phase 2: Token 管理和通道建立**
+- 群组 Token 生成逻辑
+- 群组通道管理
+- 消息去重机制
 
-- **GroupSendResult**: 消息发送结果密封类
-  - `Success`: 全部成功
-  - `PartialSuccess`: 部分成功
-  - `Failed`: 完全失败
+#### [PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)
+**Phase 3: 提议和激活流程**
+- 提议流程实现
+- 接受流程实现
+- 激活检查和轮询启动
+- 数据流程图
 
-#### 2. 数据库层 (`database/GroupV2StatusTable.kt`)
+### 3. 实施状态和问题跟踪
 
-- 持久化存储群组 V2 状态
-- 支持 CRUD 操作和状态查询
-- 自动索引优化查询性能
+#### [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
+**实施状态报告**
+- 已完成功能清单
+- 待完成事项
+- 代码统计
+- 已知问题和限制
+- 下一步计划
 
-#### 3. 管理器层 (`GroupTransportManager.kt`)
+#### [BUGFIX_SUMMARY.md](BUGFIX_SUMMARY.md)
+**编译错误修复总结**
+- 原始错误列表
+- 修复方法详解
+- API 使用正确方式
+- 待完善部分
 
-核心功能：
-- `proposeV2Mode()`: 发起 V2 模式提议
-- `acceptV2Proposal()`: 接受提议
-- `checkAndActivateV2Mode()`: 检查并激活
-- `sendGroupMessage()`: 发送群组消息（待实现）
-- `disableV2Mode()`: 禁用 V2 模式
+#### [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md)
+**功能增强实现总结**
+- GroupId 转换多格式支持
+- 系统消息样式优化
+- API 使用示例
+- 设计决策说明
 
-### 消息类型扩展
+### 4. 开发指南
 
-在 `TapTokenExchangeMessage` 中添加了群组相关的消息类型：
+#### [UI_INTEGRATION_GUIDE.md](UI_INTEGRATION_GUIDE.md)
+**UI 集成指南**
+- 群组菜单集成
+- 状态指示器实现
+- BroadcastReceiver 注册
+- 完整代码示例
 
-- `REQUEST_TYPE_GROUP_OFFER`: 群组提议
-- `REQUEST_TYPE_GROUP_ACCEPT`: 接受提议
-- `REQUEST_TYPE_GROUP_ACTIVATE`: 全员激活通知
-- `REQUEST_TYPE_GROUP_DISABLE`: 禁用 v2 mode
+## 🎯 快速导航
 
-## 状态流转
+### 我想了解...
+
+**整体设计**
+→ 阅读 [PLAN_GROUP.md](../../../../PLAN_GROUP.md)
+
+**开发进度**
+→ 查看 [TODO_GROUP.md](../../../../TODO_GROUP.md) 和 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
+
+**某个 Phase 的实现**
+→ 查看对应的 PHASE*_SUMMARY.md
+
+**如何集成 UI**
+→ 阅读 [UI_INTEGRATION_GUIDE.md](UI_INTEGRATION_GUIDE.md)
+
+**遇到编译错误**
+→ 参考 [BUGFIX_SUMMARY.md](BUGFIX_SUMMARY.md)
+
+**功能增强细节**
+→ 查看 [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md)
+
+## 📊 实施进度
+
+### 已完成 (95%)
+
+- ✅ Phase 1: 数据结构和基础组件
+- ✅ Phase 2: Token 管理和通道建立
+- ✅ Phase 3: 提议和激活流程（核心功能）
+  - ✅ GroupId 转换增强
+  - ✅ 系统消息样式优化
+
+### 进行中
+
+- ⏳ Phase 3: UI 集成（待实现）
+
+### 待开始
+
+- ⏳ Phase 4: 消息发送和接收
+- ⏳ Phase 5: 成员变动处理
+- ⏳ Phase 6: 禁用和降级
+- ⏳ Phase 7: UI 和用户体验
+- ⏳ Phase 8: 测试和优化
+- ⏳ Phase 9: 文档和发布准备
+
+## 🗂️ 代码结构
 
 ```
-NATIVE ----[propose]----> PROPOSING ----[all accept]----> FULL_V2_ACTIVE
-  ^                           |                                  |
-  |                      [member change]                   [disable]
-  +<--------------------------+-----------------------------------+
+app/src/main/java/org/thoughtcrime/securesms/tap/group/
+├── 核心组件
+│   ├── GroupTransportManager.kt          # 群组传输管理器
+│   ├── GroupTokenExchangeHelper.kt       # Token 交换辅助类
+│   ├── GroupTokenExchangeReceiver.kt     # 用户操作接收器
+│   └── GroupMessageDeduplicator.kt       # 消息去重器
+│
+├── 数据模型
+│   ├── GroupV2Status.kt                  # 状态枚举
+│   ├── GroupV2State.kt                   # 状态数据类
+│   └── GroupSendResult.kt                # 发送结果类型
+│
+├── 数据库
+│   └── database/
+│       └── GroupV2StatusTable.kt         # 群组状态表
+│
+└── 文档
+    ├── README.md                         # 本文档
+    ├── PHASE1_SUMMARY.md
+    ├── PHASE2_SUMMARY.md
+    ├── PHASE3_SUMMARY.md
+    ├── IMPLEMENTATION_STATUS.md
+    ├── BUGFIX_SUMMARY.md
+    ├── ENHANCEMENT_SUMMARY.md
+    └── UI_INTEGRATION_GUIDE.md
 ```
 
-## 使用示例
+## 🔧 关键 API
+
+### GroupTransportManager
+```kotlin
+// 发起提议
+suspend fun proposeV2ModeComplete(
+    groupId: String,
+    memberRecipientIds: List<RecipientId>,
+    providerType: String
+): Boolean
+
+// 接受提议
+suspend fun acceptV2Proposal(groupId: String, memberAci: String): Boolean
+
+// 检查并激活
+suspend fun checkAndActivateV2Mode(groupId: String): Boolean
+```
+
+### GroupTokenExchangeHelper
+```kotlin
+// 发送提议消息
+suspend fun sendGroupOfferMessage(...)
+
+// 插入系统消息
+suspend fun insertSystemMessage(recipientId: RecipientId, messageBody: String, isEnabled: Boolean = true)
+
+// 插入自定义消息
+suspend fun insertCustomSystemMessage(recipientId: RecipientId, messageBody: String)
+```
+
+### GroupTokenExchangeReceiver
+```kotlin
+// 处理用户接受操作
+private fun handleGroupTokenAcceptance(context: Context, senderId: String, groupId: String, ...)
+
+// GroupId 转换（支持多种格式）
+private fun getGroupRecipientId(context: Context, groupId: String): RecipientId?
+```
+
+## 📝 使用示例
+
+### 发起群组 V2 提议
 
 ```kotlin
 val groupManager = GroupTransportManager.getInstance(context)
-
-// 发起提议
-groupManager.proposeV2Mode(
-    groupId = "group123",
-    proposerAci = "aci:alice",
-    memberAcis = setOf("aci:alice", "aci:bob", "aci:charlie"),
+val success = groupManager.proposeV2ModeComplete(
+    groupId = groupId,
+    memberRecipientIds = memberRecipientIds,
     providerType = "cos"
 )
-
-// 接受提议
-groupManager.acceptV2Proposal(
-    groupId = "group123",
-    memberAci = "aci:bob"
-)
-
-// 检查并激活
-if (groupManager.checkAndActivateV2Mode("group123")) {
-    // 群组已激活 V2 模式
-}
-
-// 获取状态
-val status = groupManager.getGroupStatus("group123")
 ```
 
-## 数据库结构
+### 接受群组 V2 提议
 
-### group_v2_status 表
+```kotlin
+// 用户点击通知中的"同意"按钮后自动处理
+// 由 GroupTokenExchangeReceiver 处理
+```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| _id | INTEGER | 主键 |
-| group_id | TEXT | 群组 ID（唯一） |
-| status | TEXT | 当前状态 |
-| proposer_aci | TEXT | 发起人 ACI |
-| agreed_members | TEXT | 已同意成员（JSON） |
-| total_members | TEXT | 全部成员（JSON） |
-| provider_type | TEXT | Provider 类型 |
-| created_at | INTEGER | 创建时间 |
-| updated_at | INTEGER | 更新时间 |
+### 插入系统消息
 
-### 索引
+```kotlin
+val helper = GroupTokenExchangeHelper.getInstance(context)
 
-- `group_id`: 主要查询索引
-- `status`: 按状态查询
-- `proposer_aci`: 按发起人查询
+// 启用 v2 mode 消息（灰色居中）
+helper.insertSystemMessage(recipientId, "", isEnabled = true)
 
-## 扩展的功能
+// 自定义文本消息
+helper.insertCustomSystemMessage(recipientId, "v2 mode 提议已发起")
+```
 
-### TransportChannelManager
+## 🧪 测试
 
-- `getGroupChannels(groupId)`: 获取群组所有通道
+目前暂无自动化测试，建议手动测试：
 
-### TransportTokenPool
+1. 3人小群组完整流程
+2. 部分成员接受场景
+3. 网络异常场景
+4. 成员加入/离开场景
 
-- `getGroupMemberTokens(groupId)`: 获取群组成员 Token 映射
+详见 [TODO_GROUP.md](../../../../TODO_GROUP.md) Phase 8
 
-## Phase 1 完成情况
+## 🚀 下一步
 
-✅ 数据库设计和表创建
-✅ 数据模型定义
-✅ 消息类型扩展
-✅ 核心管理器框架
-✅ 基础 CRUD 操作
-✅ 状态管理和转换逻辑
+1. **立即**: 实现 UI 集成（参考 [UI_INTEGRATION_GUIDE.md](UI_INTEGRATION_GUIDE.md)）
+2. **短期**: 进行 3人小群组的集成测试
+3. **中期**: 实施 Phase 4（消息发送和接收）
 
-## 后续 Phases
+## 📞 联系
 
-- **Phase 2**: Token 管理和通道建立
-- **Phase 3**: 提议和激活流程
-- **Phase 4**: 消息发送和接收
-- **Phase 5**: 成员变动处理
-- **Phase 6**: 禁用和降级
-- **Phase 7**: UI 和用户体验
-- **Phase 8**: 测试和优化
-- **Phase 9**: 文档和发布准备
+有问题或建议？请查看相应的文档或提交 Issue。
 
-## 注意事项
+---
 
-1. 所有状态转换都需要验证合法性
-2. 数据库操作使用事务保证一致性
-3. 群组状态变更需要同步所有成员
-4. Token 管理遵循安全最佳实践
-5. 遵循 tap 模块的抽象层设计原则
-
-## 相关文档
-
-- [PLAN_GROUP.md](../../../../PLAN_GROUP.md): 完整实现计划
-- [TODO_GROUP.md](../../../../TODO_GROUP.md): 任务清单
-- [../ARCHITECTURE_OVERVIEW.md](../ARCHITECTURE_OVERVIEW.md): Tap 模块架构概述
-
+**最后更新**: 2025-10-04  
+**版本**: 1.0  
+**维护者**: AI Assistant

@@ -1530,6 +1530,264 @@ class TransportTokenPool private constructor(private val context: Context) {
             return groupTokens
         }
     }
+    
+    /**
+     * 批量添加群组接收 Token
+     * 
+     * @param groupId 群组 ID
+     * @param tokens 成员 ACI -> Token 的映射
+     * @return 成功添加的数量
+     */
+    suspend fun addGroupReceivedTokens(
+        groupId: String,
+        tokens: Map<String, TransportToken>
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    var successCount = 0
+                    
+                    for ((memberAci, token) in tokens) {
+                        try {
+                            // 验证 Token
+                            if (!token.validate()) {
+                                Log.w(TAG, "群组接收Token无效: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}")
+                                continue
+                            }
+                            
+                            // 添加到接收 Token
+                            val providerTokens = receivedTokens.computeIfAbsent(memberAci) { mutableMapOf() }
+                            providerTokens[token.providerType] = token
+                            
+                            // 记录元数据
+                            val metadata = TokenMetadata(
+                                tokenId = token.tokenId,
+                                recipientId = memberAci,
+                                providerType = token.providerType,
+                                tokenType = TokenType.RECEIVED,
+                                addedAt = System.currentTimeMillis(),
+                                lastAccessedAt = System.currentTimeMillis()
+                            )
+                            tokenMetadata[token.tokenId] = metadata
+                            
+                            successCount++
+                            Log.d(TAG, "群组接收Token添加成功: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}")
+                            
+                        } catch (e: Exception) {
+                            Log.e(TAG, "添加群组接收Token失败: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                        }
+                    }
+                    
+                    // 持久化存储
+                    if (successCount > 0) {
+                        try {
+                            saveTokensToStorage()
+                            Log.d(TAG, "群组接收Token持久化成功: groupId=$groupId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "群组接收Token持久化失败: groupId=$groupId", e)
+                        }
+                    }
+                    
+                    Log.i(TAG, "批量添加群组接收Token: groupId=$groupId, 成功=$successCount/${tokens.size}")
+                    successCount
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "批量添加群组接收Token异常: groupId=$groupId", e)
+                    0
+                }
+            }
+        }
+    }
+    
+    /**
+     * 批量添加群组共享 Token
+     * 
+     * @param groupId 群组 ID
+     * @param tokens 成员 ACI -> Token 的映射
+     * @return 成功添加的数量
+     */
+    suspend fun addGroupSharedTokens(
+        groupId: String,
+        tokens: Map<String, TransportToken>
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    var successCount = 0
+                    
+                    for ((memberAci, token) in tokens) {
+                        try {
+                            // 验证 Token
+                            if (!token.validate()) {
+                                Log.w(TAG, "群组共享Token无效: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}")
+                                continue
+                            }
+                            
+                            // 添加到共享 Token
+                            val providerTokens = sharedTokens.computeIfAbsent(memberAci) { mutableMapOf() }
+                            providerTokens[token.providerType] = token
+                            
+                            // 记录元数据
+                            val metadata = TokenMetadata(
+                                tokenId = token.tokenId,
+                                recipientId = memberAci,
+                                providerType = token.providerType,
+                                tokenType = TokenType.SHARED,
+                                addedAt = System.currentTimeMillis(),
+                                lastAccessedAt = System.currentTimeMillis()
+                            )
+                            tokenMetadata[token.tokenId] = metadata
+                            
+                            successCount++
+                            Log.d(TAG, "群组共享Token添加成功: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}")
+                            
+                        } catch (e: Exception) {
+                            Log.e(TAG, "添加群组共享Token失败: groupId=$groupId, memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                        }
+                    }
+                    
+                    // 持久化存储
+                    if (successCount > 0) {
+                        try {
+                            saveTokensToStorage()
+                            Log.d(TAG, "群组共享Token持久化成功: groupId=$groupId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "群组共享Token持久化失败: groupId=$groupId", e)
+                        }
+                    }
+                    
+                    Log.i(TAG, "批量添加群组共享Token: groupId=$groupId, 成功=$successCount/${tokens.size}")
+                    successCount
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "批量添加群组共享Token异常: groupId=$groupId", e)
+                    0
+                }
+            }
+        }
+    }
+    
+    /**
+     * 移除群组的所有 Token
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 移除的数量
+     */
+    suspend fun removeGroupTokens(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    var removedCount = 0
+                    
+                    for (memberAci in memberAcis) {
+                        // 移除接收 Token
+                        receivedTokens[memberAci]?.get(providerType)?.let { token ->
+                            receivedTokens[memberAci]?.remove(providerType)
+                            tokenMetadata.remove(token.tokenId)
+                            removedCount++
+                        }
+                        
+                        // 移除共享 Token
+                        sharedTokens[memberAci]?.get(providerType)?.let { token ->
+                            sharedTokens[memberAci]?.remove(providerType)
+                            tokenMetadata.remove(token.tokenId)
+                            removedCount++
+                        }
+                    }
+                    
+                    // 清理空的映射
+                    cleanupEmptyMaps()
+                    
+                    // 持久化存储
+                    if (removedCount > 0) {
+                        saveTokensToStorage()
+                    }
+                    
+                    Log.i(TAG, "移除群组Token: groupId=$groupId, 移除=$removedCount")
+                    removedCount
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "移除群组Token失败: groupId=$groupId", e)
+                    0
+                }
+            }
+        }
+    }
+    
+    /**
+     * 验证群组 Token 有效性
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 有效的成员 ACI 集合
+     */
+    fun validateGroupTokens(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Set<String> {
+        return tokenLock.read {
+            val validMembers = mutableSetOf<String>()
+            
+            for (memberAci in memberAcis) {
+                // 检查接收 Token
+                val receivedToken = receivedTokens[memberAci]?.get(providerType)
+                if (receivedToken != null && !receivedToken.isExpired && receivedToken.validate()) {
+                    validMembers.add(memberAci)
+                }
+            }
+            
+            Log.d(TAG, "验证群组Token: groupId=$groupId, 有效=${validMembers.size}/${memberAcis.size}")
+            validMembers
+        }
+    }
+    
+    /**
+     * 刷新群组 Token
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 刷新成功的数量
+     */
+    suspend fun refreshGroupTokens(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            var refreshedCount = 0
+            
+            for (memberAci in memberAcis) {
+                try {
+                    // 获取现有 Token
+                    val existingToken = tokenLock.read {
+                        receivedTokens[memberAci]?.get(providerType)
+                            ?: sharedTokens[memberAci]?.get(providerType)
+                    }
+                    
+                    if (existingToken != null && existingToken.isNearExpiry) {
+                        val success = refreshToken(existingToken.tokenId)
+                        if (success) {
+                            refreshedCount++
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "刷新群组Token失败: memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                }
+            }
+            
+            Log.i(TAG, "刷新群组Token: groupId=$groupId, 成功=$refreshedCount/${memberAcis.size}")
+            refreshedCount
+        }
+    }
 }
 
 /**

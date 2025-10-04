@@ -326,6 +326,230 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
+     * 批量建立群组通道
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 建立结果 (成功数, 失败的成员列表)
+     */
+    suspend fun establishGroupChannelsBatch(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Pair<Int, List<String>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "批量建立群组通道: groupId=$groupId, members=${memberAcis.size}, provider=$providerType")
+                
+                // 获取 Provider
+                val transportManager = getTransportManager()
+                val provider = transportManager.getProvider(providerType)
+                if (provider == null) {
+                    Log.e(TAG, "Provider 不存在: $providerType")
+                    return@withContext Pair(0, memberAcis.toList())
+                }
+                
+                var successCount = 0
+                val failedMembers = mutableListOf<String>()
+                
+                // 并发为每个成员建立通道
+                supervisorScope {
+                    val jobs = memberAcis.map { memberAci ->
+                        async(Dispatchers.IO) {
+                            try {
+                                // 获取或创建通道
+                                val channel = getOrCreateChannel(memberAci, providerType, provider)
+                                
+                                if (channel != null) {
+                                    // 在通道配置中标记群组 ID
+                                    val groupConfig = channel.config.toMutableMap()
+                                    groupConfig["groupId"] = groupId
+                                    
+                                    val updatedChannel = channel.copy(config = groupConfig)
+                                    
+                                    // 更新内存缓存
+                                    channelLock.write {
+                                        channels[updatedChannel.channelId] = updatedChannel
+                                    }
+                                    
+                                    // 异步保存到数据库
+                                    saveChannelToDatabaseAsync(updatedChannel)
+                                    
+                                    Log.d(TAG, "群组成员通道建立成功: memberAci=${LogSanitizer.sanitize(memberAci)}")
+                                    true
+                                } else {
+                                    Log.w(TAG, "群组成员通道建立失败: memberAci=${LogSanitizer.sanitize(memberAci)}")
+                                    false
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "建立群组成员通道时异常: memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                                false
+                            }
+                        }
+                    }
+                    
+                    // 等待所有任务完成并统计结果
+                    jobs.forEachIndexed { index, deferred ->
+                        val memberAci = memberAcis.elementAt(index)
+                        val success = deferred.await()
+                        if (success) {
+                            successCount++
+                        } else {
+                            failedMembers.add(memberAci)
+                        }
+                    }
+                }
+                
+                Log.i(TAG, "批量建立群组通道完成: groupId=$groupId, 成功=$successCount/${memberAcis.size}")
+                Pair(successCount, failedMembers)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "批量建立群组通道失败: groupId=$groupId", e)
+                Pair(0, memberAcis.toList())
+            }
+        }
+    }
+    
+    /**
+     * 获取群组的活跃通道
+     * 
+     * @param groupId 群组 ID
+     * @return 群组活跃通道列表
+     */
+    fun getGroupActiveChannels(groupId: String): List<TransportChannel> {
+        channelLock.read {
+            return channels.values.filter { channel ->
+                channel.config["groupId"] == groupId && channel.isActive()
+            }.sortedByDescending { it.priority }
+        }
+    }
+    
+    /**
+     * 关闭群组的所有通道
+     * 
+     * @param groupId 群组 ID
+     * @return 关闭的通道数量
+     */
+    suspend fun closeGroupChannels(groupId: String): Int {
+        return withContext(Dispatchers.IO) {
+            val groupChannels = channelLock.read {
+                channels.values.filter { channel ->
+                    channel.config["groupId"] == groupId
+                }.map { it.channelId }
+            }
+            
+            var closedCount = 0
+            for (channelId in groupChannels) {
+                val success = closeChannel(channelId)
+                if (success) {
+                    closedCount++
+                }
+            }
+            
+            Log.i(TAG, "关闭群组通道: groupId=$groupId, 关闭=$closedCount/${groupChannels.size}")
+            closedCount
+        }
+    }
+    
+    /**
+     * 批量升级群组通道为 FULL_ACTIVE
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 升级成功的数量
+     */
+    suspend fun upgradeGroupChannelsToFullActive(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            var successCount = 0
+            
+            for (memberAci in memberAcis) {
+                try {
+                    val success = upgradeChannelToFullActive(memberAci, providerType)
+                    if (success) {
+                        successCount++
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "升级群组成员通道失败: memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                }
+            }
+            
+            Log.i(TAG, "批量升级群组通道: groupId=$groupId, 成功=$successCount/${memberAcis.size}")
+            successCount
+        }
+    }
+    
+    /**
+     * 获取群组通道统计信息
+     * 
+     * @param groupId 群组 ID
+     * @return 群组通道统计
+     */
+    fun getGroupChannelStatistics(groupId: String): GroupChannelStatistics {
+        channelLock.read {
+            val groupChannels = channels.values.filter { channel ->
+                channel.config["groupId"] == groupId
+            }
+            
+            val totalChannels = groupChannels.size
+            val activeChannels = groupChannels.count { it.isActive() }
+            val failedChannels = groupChannels.count { it.isFailed() }
+            val statusDistribution = groupChannels.groupBy { it.status }
+                .mapValues { it.value.size }
+            
+            return GroupChannelStatistics(
+                groupId = groupId,
+                totalChannels = totalChannels,
+                activeChannels = activeChannels,
+                failedChannels = failedChannels,
+                statusDistribution = statusDistribution,
+                averageSuccessRate = if (groupChannels.isNotEmpty()) {
+                    groupChannels.map { it.getSuccessRate() }.average()
+                } else {
+                    0.0
+                }
+            )
+        }
+    }
+    
+    /**
+     * 批量健康检查群组通道
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 集合
+     * @param providerType Provider 类型
+     * @return 健康的成员 ACI 集合
+     */
+    suspend fun validateGroupChannelsHealth(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Set<String> {
+        return withContext(Dispatchers.IO) {
+            val healthyMembers = mutableSetOf<String>()
+            
+            for (memberAci in memberAcis) {
+                try {
+                    val isHealthy = validateChannelHealth(memberAci, providerType)
+                    if (isHealthy) {
+                        healthyMembers.add(memberAci)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "群组通道健康检查失败: memberAci=${LogSanitizer.sanitize(memberAci)}", e)
+                }
+            }
+            
+            Log.i(TAG, "群组通道健康检查: groupId=$groupId, 健康=${healthyMembers.size}/${memberAcis.size}")
+            healthyMembers
+        }
+    }
+    
+    /**
      * 获取通道
      */
     fun getChannel(channelId: String): TransportChannel? {
@@ -2174,4 +2398,57 @@ data class TokenInfo(
     val providerType: String,
     val tokenId: String,
     val tokenData: Map<String, Any>
-) 
+)
+
+/**
+ * 群组通道统计信息
+ */
+data class GroupChannelStatistics(
+    /** 群组 ID */
+    val groupId: String,
+    
+    /** 总通道数 */
+    val totalChannels: Int,
+    
+    /** 活跃通道数 */
+    val activeChannels: Int,
+    
+    /** 失败通道数 */
+    val failedChannels: Int,
+    
+    /** 状态分布 */
+    val statusDistribution: Map<TransportChannelStatus, Int>,
+    
+    /** 平均成功率 */
+    val averageSuccessRate: Double
+) {
+    /**
+     * 获取活跃率
+     */
+    fun getActiveRate(): Double {
+        return if (totalChannels > 0) {
+            activeChannels.toDouble() / totalChannels
+        } else {
+            0.0
+        }
+    }
+    
+    /**
+     * 获取失败率
+     */
+    fun getFailureRate(): Double {
+        return if (totalChannels > 0) {
+            failedChannels.toDouble() / totalChannels
+        } else {
+            0.0
+        }
+    }
+    
+    /**
+     * 判断群组通道是否健康
+     */
+    fun isHealthy(): Boolean {
+        // 至少80%的通道活跃，且平均成功率>50%
+        return getActiveRate() >= 0.8 && averageSuccessRate > 0.5
+    }
+} 

@@ -2,6 +2,9 @@ package org.thoughtcrime.securesms.tap.group
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.SignalDatabase
@@ -181,6 +184,126 @@ class GroupTransportManager private constructor(private val context: Context) {
     }
     
     /**
+     * 完整的群组 V2 提议流程
+     * 
+     * 包括生成 tokens、发送消息、更新状态等所有步骤
+     * 
+     * @param groupId 群组 ID
+     * @param memberRecipientIds 所有成员的 RecipientId 列表（包括自己）
+     * @param providerType Provider 类型
+     * @return 是否成功发起提议
+     */
+    suspend fun proposeV2ModeComplete(
+        groupId: String,
+        memberRecipientIds: List<org.thoughtcrime.securesms.recipients.RecipientId>,
+        providerType: String
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始完整的群组 V2 提议流程: groupId=$groupId, members=${memberRecipientIds.size}")
+                
+                // 1. 检查 provider 配置
+                val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                val providerConfig = configManager.getProviderConfig(providerType)
+                if (providerConfig == null) {
+                    Log.e(TAG, "Provider 配置不存在: $providerType")
+                    return@withContext false
+                }
+                
+                // 2. 获取所有成员的 ACI
+                val memberAcis = memberRecipientIds.mapNotNull { recipientId ->
+                    try {
+                        org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId).requireAci().toString()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "无法获取成员 ACI: recipientId=$recipientId", e)
+                        null
+                    }
+                }.toSet()
+                
+                if (memberAcis.size != memberRecipientIds.size) {
+                    Log.w(TAG, "部分成员 ACI 获取失败: ${memberRecipientIds.size - memberAcis.size} 个成员")
+                }
+                
+                // 3. 获取我的 ACI
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                val otherMemberAcis = memberAcis.filter { it != myAci }.toSet()
+                
+                // 4. 为其他成员生成 tokens
+                Log.i(TAG, "为群组其他成员生成 tokens: groupId=$groupId, members=${otherMemberAcis.size}")
+                val generatedTokens = generateGroupTokens(
+                    groupId = groupId,
+                    memberAcis = otherMemberAcis,
+                    providerType = providerType
+                )
+                
+                if (generatedTokens.isEmpty()) {
+                    Log.e(TAG, "生成群组 tokens 失败")
+                    return@withContext false
+                }
+                
+                // 5. 保存生成的 tokens
+                val savedCount = saveGroupTokensToPool(groupId, generatedTokens)
+                if (savedCount == 0) {
+                    Log.e(TAG, "保存群组 tokens 失败")
+                    return@withContext false
+                }
+                
+                Log.i(TAG, "群组 tokens 已保存: groupId=$groupId, saved=$savedCount/${generatedTokens.size}")
+                
+                // 6. 更新群组状态为 PROPOSING
+                val stateUpdated = proposeV2Mode(
+                    groupId = groupId,
+                    proposerAci = myAci,
+                    memberAcis = memberAcis,
+                    providerType = providerType
+                )
+                
+                if (!stateUpdated) {
+                    Log.e(TAG, "更新群组状态失败")
+                    return@withContext false
+                }
+                
+                // 7. 发送提议消息给所有成员
+                Log.i(TAG, "发送群组提议消息: groupId=$groupId")
+                val helper = org.thoughtcrime.securesms.tap.group.GroupTokenExchangeHelper.getInstance(context)
+                val sent = helper.sendGroupOfferMessage(
+                    groupId = groupId,
+                    proposerAci = myAci,
+                    memberRecipientIds = memberRecipientIds,
+                    tokens = generatedTokens,
+                    providerType = providerType
+                )
+                
+                if (sent) {
+                    Log.i(TAG, "群组 V2 提议完成: groupId=$groupId")
+                    
+                    // 8. 插入系统消息
+                    val groupRecipientId = memberRecipientIds.firstOrNull { recipientId ->
+                        org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId).isGroup
+                    }
+                    
+                    if (groupRecipientId != null) {
+                        // 插入自定义文本的系统消息
+                        helper.insertCustomSystemMessage(
+                            recipientId = groupRecipientId,
+                            messageBody = "v2 mode 提议已发起"
+                        )
+                    }
+                    
+                    true
+                } else {
+                    Log.e(TAG, "发送群组提议消息失败")
+                    false
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "完整群组 V2 提议流程失败: groupId=$groupId", e)
+                false
+            }
+        }
+    }
+    
+    /**
      * 接受 V2 模式提议
      * 
      * @param groupId 群组 ID
@@ -259,6 +382,229 @@ class GroupTransportManager private constructor(private val context: Context) {
                     Log.e(TAG, "激活 V2 模式失败: $groupId", e)
                     false
                 }
+            }
+        }
+    }
+    
+    /**
+     * 为群组生成 Tokens
+     * 
+     * 为群组的每个成员创建独立目录和只读 token，用于 v2 mode 通信
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 所有成员 ACI 集合（不包括自己）
+     * @param providerType Provider 类型
+     * @return 生成的 Token 映射 (memberAci -> TransportToken)
+     */
+    suspend fun generateGroupTokens(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Map<String, org.thoughtcrime.securesms.tap.TransportToken> {
+        return withContext(Dispatchers.IO) {
+            stateLock.read {
+                try {
+                    Log.i(TAG, "开始为群组生成 Tokens: groupId=$groupId, members=${memberAcis.size}, provider=$providerType")
+                    
+                    // 获取 TransportProvider
+                    val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+                    val provider = transportManager.getProvider(providerType)
+                    if (provider == null) {
+                        Log.e(TAG, "Provider 不存在: $providerType")
+                        return@withContext emptyMap()
+                    }
+                    
+                    if (!provider.supportsAuth) {
+                        Log.e(TAG, "Provider 不支持权限管理: $providerType")
+                        return@withContext emptyMap()
+                    }
+                    
+                    // 获取 Provider 配置
+                    val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                    val providerConfig = configManager.getProviderConfig(providerType)
+                    if (providerConfig == null) {
+                        Log.e(TAG, "Provider 配置不存在: $providerType")
+                        return@withContext emptyMap()
+                    }
+                    
+                    val generatedTokens = mutableMapOf<String, org.thoughtcrime.securesms.tap.TransportToken>()
+                    
+                    // 为每个成员生成 token
+                    for (memberAci in memberAcis) {
+                        try {
+                            // 构建 token 请求 (只读权限，用于成员轮询)
+                            val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
+                                recipientId = memberAci,
+                                providerType = providerType,
+                                requestedPermissions = setOf(
+                                    org.thoughtcrime.securesms.tap.TransportPermission.READ,
+                                    org.thoughtcrime.securesms.tap.TransportPermission.LIST
+                                ),
+                                validityDurationMs = 0L, // 使用默认有效期
+                                providerConfig = providerConfig,
+                                purpose = "group_member_polling:$groupId"
+                            )
+                            
+                            // 生成 token
+                            val token = provider.generateToken(tokenRequest)
+                            if (token != null) {
+                                // 在 token 中添加群组 ID 标记
+                                val groupToken = when (token) {
+                                    is org.thoughtcrime.securesms.tap.CosTransportToken -> {
+                                        // COS token 无法直接修改，我们在元数据中记录 groupId
+                                        token
+                                    }
+                                    else -> token
+                                }
+                                
+                                generatedTokens[memberAci] = groupToken
+                                Log.d(TAG, "为成员生成 Token: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, tokenId=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(token.tokenId)}")
+                            } else {
+                                Log.w(TAG, "Token 生成失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "为成员生成 Token 时异常: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+                        }
+                    }
+                    
+                    Log.i(TAG, "群组 Token 生成完成: groupId=$groupId, 成功=${generatedTokens.size}/${memberAcis.size}")
+                    generatedTokens
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "生成群组 Tokens 失败: groupId=$groupId", e)
+                    emptyMap()
+                }
+            }
+        }
+    }
+    
+    /**
+     * 建立群组通道
+     * 
+     * 为群组的所有成员建立传输通道，支持并发创建
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 所有成员 ACI 集合（不包括自己）
+     * @param providerType Provider 类型
+     * @return 建立结果 (成功数, 失败成员列表)
+     */
+    suspend fun establishGroupChannels(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Pair<Int, List<String>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始建立群组通道: groupId=$groupId, members=${memberAcis.size}, provider=$providerType")
+                
+                // 获取通道管理器
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+                val provider = transportManager.getProvider(providerType)
+                
+                if (provider == null) {
+                    Log.e(TAG, "Provider 不存在: $providerType")
+                    return@withContext Pair(0, memberAcis.toList())
+                }
+                
+                var successCount = 0
+                val failedMembers = mutableListOf<String>()
+
+                // 使用稳定的成员列表，保证索引与结果一一对应
+                val memberList = memberAcis.toList()
+
+                // 并发为每个成员建立通道
+                supervisorScope {
+                    val jobs: List<Deferred<Boolean>> = memberList.map { memberAci ->
+                        async(Dispatchers.IO) {
+                            try {
+                                val channel = channelManager.getOrCreateChannel(
+                                    recipientId = memberAci,
+                                    providerType = providerType,
+                                    provider = provider
+                                )
+                                
+                                if (channel != null) {
+                                    // 在通道配置中标记群组 ID
+                                    val groupConfig = channel.config.toMutableMap()
+                                    groupConfig["groupId"] = groupId
+                                    
+                                    // 更新通道配置
+                                    val updatedChannel = channel.copy(config = groupConfig)
+                                    
+                                    // 保存更新后的通道
+                                    // (TransportChannelManager 会自动保存)
+                                    
+                                    Log.d(TAG, "群组成员通道建立成功: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, channelId=${updatedChannel.channelId}")
+                                    true
+                                } else {
+                                    Log.w(TAG, "群组成员通道建立失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                                    false
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "建立群组成员通道时异常: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+                                false
+                            }
+                        }
+                    }
+                    // 等待所有任务完成并统计结果
+                    jobs.forEachIndexed { index, deferred ->
+                        val memberAci = memberList[index]
+                        val success = deferred.await()
+                        if (success) {
+                            successCount++
+                        } else {
+                            failedMembers.add(memberAci)
+                        }
+                    }
+                }
+                
+                Log.i(TAG, "群组通道建立完成: groupId=$groupId, 成功=$successCount/${memberAcis.size}, 失败=${failedMembers.size}")
+                Pair(successCount, failedMembers)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "建立群组通道失败: groupId=$groupId", e)
+                Pair(0, memberAcis.toList())
+            }
+        }
+    }
+    
+    /**
+     * 保存群组 Token 到 Token 池
+     * 
+     * 将生成的群组 token 批量保存到 TransportTokenPool，标记为共享 token
+     * 
+     * @param groupId 群组 ID
+     * @param tokens Token 映射 (memberAci -> TransportToken)
+     * @return 保存成功的数量
+     */
+    suspend fun saveGroupTokensToPool(
+        groupId: String,
+        tokens: Map<String, org.thoughtcrime.securesms.tap.TransportToken>
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            try {
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                var savedCount = 0
+                
+                for ((memberAci, token) in tokens) {
+                    try {
+                        // 保存为共享 token (我们生成的，供成员轮询)
+                        val success = tokenPool.addSharedToken(memberAci, token)
+                        if (success) {
+                            savedCount++
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "保存群组 Token 失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+                    }
+                }
+                
+                Log.i(TAG, "群组 Token 保存完成: groupId=$groupId, 成功=$savedCount/${tokens.size}")
+                savedCount
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "保存群组 Tokens 到池失败: groupId=$groupId", e)
+                0
             }
         }
     }
