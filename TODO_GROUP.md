@@ -1,27 +1,27 @@
 # 群组 V2 Mode 实现任务清单
 
-## Phase 1: 数据结构和基础组件 
+## Phase 1: 数据结构和基础组件 ✅
 
 ### 1.1 数据库设计
-- [ ] 创建 `group_v2_status` 表定义
-- [ ] 在 `SignalDatabase.kt` 中添加群组 v2 表访问器
-- [ ] 创建 `GroupV2StatusTable.kt` 实现 CRUD 操作
-- [ ] 为 `transport_channels` 表添加 `group_id` 字段（迁移脚本）
-- [ ] 为 `transport_tokens` 表添加 `group_id` 字段（迁移脚本）
-- [ ] 添加必要的索引
+- [x] 创建 `group_v2_status` 表定义
+- [x] 在 `SignalDatabase.kt` 中添加群组 v2 表访问器
+- [x] 创建 `GroupV2StatusTable.kt` 实现 CRUD 操作
+- [x] 为 `transport_channels` 表添加 `group_id` 字段（迁移脚本）
+- [x] 为 `transport_tokens` 表添加 `group_id` 字段（迁移脚本）
+- [x] 添加必要的索引
 
 ### 1.2 数据模型
-- [ ] 创建 `GroupV2Status` 枚举类
-- [ ] 创建 `GroupV2State` 数据类（包含状态、成员列表等）
-- [ ] 创建 `GroupSendResult` 密封类（Success/PartialSuccess/Failed）
-- [ ] 扩展 `TapTokenExchangeMessage` 添加群组相关的 REQUEST_TYPE
+- [x] 创建 `GroupV2Status` 枚举类
+- [x] 创建 `GroupV2State` 数据类（包含状态、成员列表等）
+- [x] 创建 `GroupSendResult` 密封类（Success/PartialSuccess/Failed）
+- [x] 扩展 `TapTokenExchangeMessage` 添加群组相关的 REQUEST_TYPE
 
 ### 1.3 核心管理器框架
-- [ ] 创建 `GroupTransportManager` 类框架
-- [ ] 实现 `getGroupStatus()` 和 `updateGroupStatus()` 方法
-- [ ] 在 `TransportChannelManager` 中添加 `getGroupChannels()` 方法
-- [ ] 在 `TransportTokenPool` 中添加 `getGroupMemberTokens()` 方法
-- [ ] 创建单元测试模板
+- [x] 创建 `GroupTransportManager` 类框架
+- [x] 实现 `getGroupStatus()` 和 `updateGroupStatus()` 方法
+- [x] 在 `TransportChannelManager` 中添加 `getGroupChannels()` 方法
+- [x] 在 `TransportTokenPool` 中添加 `getGroupMemberTokens()` 方法
+- [ ] 创建单元测试模板（待后续 Phase 8 完善）
 
 ## Phase 2: Token 管理和通道建立
 

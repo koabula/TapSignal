@@ -32,6 +32,13 @@ data class TapTokenExchangeMessage(
         const val REQUEST_TYPE_ACCEPT = "ACCEPT"
         const val REQUEST_TYPE_CONFIRM = "CONFIRM"
         const val REQUEST_TYPE_DISABLE = "DISABLE"
+        
+        // 群组相关消息类型
+        const val REQUEST_TYPE_GROUP_OFFER = "GROUP_OFFER"      // 群组提议
+        const val REQUEST_TYPE_GROUP_ACCEPT = "GROUP_ACCEPT"    // 接受提议
+        const val REQUEST_TYPE_GROUP_ACTIVATE = "GROUP_ACTIVATE" // 全员激活通知
+        const val REQUEST_TYPE_GROUP_DISABLE = "GROUP_DISABLE"  // 禁用v2 mode
+        
         const val TAP_TOKEN_EXCHANGE_PREFIX = "TAP_TOKEN_EXCHANGE:"
         
         /**

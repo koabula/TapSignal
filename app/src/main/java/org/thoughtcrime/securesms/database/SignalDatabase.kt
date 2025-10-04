@@ -83,6 +83,7 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
   val transportChannelTable: org.thoughtcrime.securesms.tap.database.TransportChannelTable = org.thoughtcrime.securesms.tap.database.TransportChannelTable(context, this)
   val transportPollingStateTable: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable = org.thoughtcrime.securesms.tap.database.TransportPollingStateTable(context, this)
   val transportTokenTable: org.thoughtcrime.securesms.tap.database.TransportTokenTable = org.thoughtcrime.securesms.tap.database.TransportTokenTable(context, this)
+  val groupV2StatusTable: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable = org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, this)
 
   override fun onOpen(db: net.zetetic.database.sqlcipher.SQLiteDatabase) {
     db.setForeignKeyConstraintsEnabled(true)
@@ -157,6 +158,7 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     db.execSQL(org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_TABLE)
     db.execSQL(org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_PROCESSED_MESSAGES_TABLE)
     db.execSQL(org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_TABLE)
+    db.execSQL(org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable.CREATE_TABLE)
 
     executeStatements(db, RecipientTable.CREATE_INDEXS)
     executeStatements(db, MessageTable.CREATE_INDEXS)
@@ -186,6 +188,7 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportChannelTable.CREATE_INDEXES)
     executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_INDEXES)
     executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_INDEXES)
+    executeStatements(db, org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable.CREATE_INDEXES)
 
     executeStatements(db, MessageSendLogTables.CREATE_TRIGGERS)
 
@@ -611,5 +614,10 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     @get:JvmName("transportTokens")
     val transportTokens: org.thoughtcrime.securesms.tap.database.TransportTokenTable
       get() = instance!!.transportTokenTable
+
+    @get:JvmStatic
+    @get:JvmName("groupV2Status")
+    val groupV2Status: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable
+      get() = instance!!.groupV2StatusTable
   }
 }

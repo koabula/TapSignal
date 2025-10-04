@@ -1502,6 +1502,34 @@ class TransportTokenPool private constructor(private val context: Context) {
             return validTokens
         }
     }
+    
+    /**
+     * 获取群组成员的 Token 映射
+     * 
+     * @param groupId 群组 ID
+     * @return 成员 ACI -> Token 的映射
+     */
+    fun getGroupMemberTokens(groupId: String): Map<String, TransportToken> {
+        tokenLock.read {
+            val groupTokens = mutableMapOf<String, TransportToken>()
+            
+            // 遍历所有接收 Token，找出属于该群组的
+            receivedTokens.forEach { (recipientId, providerTokens) ->
+                providerTokens.values.forEach { token ->
+                    // 通过 token 的元数据判断是否属于该群组
+                    // 群组 token 会在 tokenData 中包含 groupId 字段
+                    val tokenGroupId = (token.toMap()["groupId"] as? String)
+                    if (tokenGroupId == groupId && !token.isExpired && token.validate()) {
+                        groupTokens[recipientId] = token
+                        updateTokenAccessTime(token.tokenId)
+                    }
+                }
+            }
+            
+            Log.d(TAG, "获取群组成员Token: groupId=$groupId, count=${groupTokens.size}")
+            return groupTokens
+        }
+    }
 }
 
 /**

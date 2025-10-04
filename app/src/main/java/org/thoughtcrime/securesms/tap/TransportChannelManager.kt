@@ -310,6 +310,22 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
+     * 获取群组的所有通道
+     * 
+     * @param groupId 群组 ID
+     * @return 群组所有成员的通道列表
+     */
+    fun getGroupChannels(groupId: String): List<TransportChannel> {
+        channelLock.read {
+            // 过滤出属于指定群组的所有通道
+            // 群组通道可以通过 channel.config 中的 groupId 字段识别
+            return channels.values.filter { channel ->
+                channel.config["groupId"] == groupId
+            }.sortedByDescending { it.priority }
+        }
+    }
+    
+    /**
      * 获取通道
      */
     fun getChannel(channelId: String): TransportChannel? {
