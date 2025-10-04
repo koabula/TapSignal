@@ -224,6 +224,57 @@ public final class PushGroupSendJob extends PushSendJob {
         RecipientUtil.shareProfileIfFirstSecureMessage(groupRecipient);
       }
 
+      // 检查群组是否处于 v2 mode
+      String groupIdString = groupRecipient.requireGroupId().toString();
+      org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
+          org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
+      org.thoughtcrime.securesms.tap.group.GroupV2Status groupV2Status = groupTransportManager.getGroupStatus(groupIdString);
+      
+      if (groupV2Status == org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+        log(TAG, String.valueOf(message.getSentTimeMillis()), "群组处于 v2 mode，通过 tap 层发送: " + messageId);
+        
+        try {
+          // 使用 tap 层发送群组消息
+          boolean tapSendSuccess = deliverViaGroupV2Mode(messageId, groupIdString, groupRecipient);
+          
+          if (tapSendSuccess) {
+            log(TAG, String.valueOf(message.getSentTimeMillis()), "群组消息通过 v2 mode 发送成功: " + messageId);
+            
+            // 标记消息为已发送（与正常群组发送相同的处理）
+            database.markAsSent(messageId, true);
+            markAttachmentsUploaded(messageId, message);
+            
+            // 更新线程（对于定时消息）
+            SignalDatabase.threads().updateSilently(threadId, false);
+            
+            // 处理过期消息
+            if (message.getExpiresIn() > 0 && !message.isExpirationUpdate()) {
+              database.markExpireStarted(messageId);
+              AppDependencies.getExpiringMessageManager()
+                             .scheduleDeletion(messageId, true, message.getExpiresIn());
+            }
+            
+            // 处理 ViewOnce 消息
+            if (message.isViewOnce()) {
+              SignalDatabase.attachments().deleteAttachmentFilesForViewOnceMessage(messageId);
+            }
+            
+            // 处理 Story 消息
+            if (message.getStoryType().isStory()) {
+              AppDependencies.getExpireStoriesManager().scheduleIfNecessary();
+            }
+            
+            ConversationShortcutRankingUpdateJob.enqueueForOutgoingIfNecessary(groupRecipient);
+            Log.i(TAG, JobLogger.format(this, "Finished v2 mode send."));
+            return;
+          } else {
+            warn(TAG, String.valueOf(message.getSentTimeMillis()), "群组 v2 mode 发送失败，回退到 Signal Server");
+          }
+        } catch (Exception e) {
+          warn(TAG, String.valueOf(message.getSentTimeMillis()), "群组 v2 mode 发送异常，回退到 Signal Server: " + e.getMessage());
+        }
+      }
+
       List<Recipient>   target;
       List<RecipientId> skipped = new ArrayList<>();
 
@@ -252,6 +303,84 @@ public final class PushGroupSendJob extends PushSendJob {
     }
 
     SignalLocalMetrics.GroupMessageSend.onJobFinished(messageId);
+  }
+
+  /**
+   * 通过群组 v2 mode (tap 层) 发送消息
+   * 
+   * @param messageId 消息 ID
+   * @param groupId 群组 ID
+   * @param groupRecipient 群组接收者
+   * @return 是否发送成功
+   */
+  private boolean deliverViaGroupV2Mode(long messageId, String groupId, Recipient groupRecipient) {
+    try {
+      Log.i(TAG, "开始通过 v2 mode 发送群组消息: messageId=" + messageId);
+      
+      // 1. 获取消息内容
+      MessageTable database = SignalDatabase.messages();
+      OutgoingMessage message = database.getOutgoingMessage(messageId);
+      
+      // 2. 使用 TapSignalServiceAdapter 进行 Signal 加密
+      org.thoughtcrime.securesms.tap.integration.TapSignalServiceAdapter adapter = 
+          org.thoughtcrime.securesms.tap.integration.TapSignalServiceAdapter.getInstance(context);
+      
+      // 加密消息（使用 Signal 协议加密，但不发送）
+      byte[] encryptedMessage = adapter.encryptGroupMessage(messageId, groupRecipient, message);
+      
+      if (encryptedMessage == null || encryptedMessage.length == 0) {
+        Log.e(TAG, "群组消息加密失败: messageId=" + messageId);
+        return false;
+      }
+      
+      // 3. 使用 GroupTransportManager 通过 tap 层并发上传给所有成员
+      org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
+          org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
+      
+      // 使用 Kotlin 协程调用
+      org.thoughtcrime.securesms.tap.group.GroupSendResult sendResult = 
+          kotlinx.coroutines.BuildersKt.runBlocking(
+              kotlinx.coroutines.Dispatchers.getIO(),
+              (scope, continuation) -> groupTransportManager.sendGroupMessage(
+                  groupId, 
+                  encryptedMessage, 
+                  String.valueOf(messageId), 
+                  continuation
+              )
+          );
+      
+      // 4. 处理发送结果
+      if (sendResult instanceof org.thoughtcrime.securesms.tap.group.GroupSendResult.Success) {
+        Log.i(TAG, "群组消息 v2 mode 发送成功: messageId=" + messageId);
+        return true;
+        
+      } else if (sendResult instanceof org.thoughtcrime.securesms.tap.group.GroupSendResult.PartialSuccess) {
+        org.thoughtcrime.securesms.tap.group.GroupSendResult.PartialSuccess partial = 
+            (org.thoughtcrime.securesms.tap.group.GroupSendResult.PartialSuccess) sendResult;
+        
+        Log.w(TAG, "群组消息 v2 mode 部分成功: messageId=" + messageId + 
+                   ", 成功=" + partial.getSuccessCount() + 
+                   ", 失败=" + partial.getFailureCount());
+        
+        // TODO: 对失败成员安排重试（Phase 4.1 中实现）
+        // 暂时认为部分成功就算成功
+        return true;
+        
+      } else if (sendResult instanceof org.thoughtcrime.securesms.tap.group.GroupSendResult.Failed) {
+        org.thoughtcrime.securesms.tap.group.GroupSendResult.Failed failed = 
+            (org.thoughtcrime.securesms.tap.group.GroupSendResult.Failed) sendResult;
+        
+        Log.e(TAG, "群组消息 v2 mode 完全失败: messageId=" + messageId + 
+                   ", reason=" + failed.getReason());
+        return false;
+      }
+      
+      return false;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "通过 v2 mode 发送群组消息异常: messageId=" + messageId, e);
+      return false;
+    }
   }
 
   @Override

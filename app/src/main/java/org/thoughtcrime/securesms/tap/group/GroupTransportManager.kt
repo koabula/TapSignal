@@ -612,20 +612,240 @@ class GroupTransportManager private constructor(private val context: Context) {
     /**
      * 发送群组消息（V2 模式下）
      * 
-     * TODO: 在 Phase 4 中实现完整功能
+     * 为群组的所有成员并发上传消息，支持部分失败处理
      * 
      * @param groupId 群组 ID
-     * @param message 消息内容
+     * @param encryptedMessage 加密后的消息内容（Signal 协议已加密）
+     * @param messageId 消息 ID
      * @return 发送结果
      */
-    suspend fun sendGroupMessage(groupId: String, message: ByteArray): GroupSendResult {
-        // 占位实现，Phase 4 中完善
-        return GroupSendResult.Failed(
-            groupId = groupId,
-            messageId = "",
-            reason = "Not implemented yet",
-            memberCount = 0
-        )
+    suspend fun sendGroupMessage(
+        groupId: String,
+        encryptedMessage: ByteArray,
+        messageId: String
+    ): GroupSendResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始群组消息发送: groupId=$groupId, messageId=$messageId, size=${encryptedMessage.size}")
+                
+                // 1. 检查群组状态
+                val groupState = getGroupState(groupId)
+                if (groupState == null) {
+                    Log.e(TAG, "群组状态不存在: $groupId")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "群组状态不存在",
+                        memberCount = 0
+                    )
+                }
+                
+                if (groupState.status != GroupV2Status.FULL_V2_ACTIVE) {
+                    Log.e(TAG, "群组未处于 FULL_V2_ACTIVE 状态: $groupId, status=${groupState.status}")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "群组未激活 V2 模式",
+                        memberCount = groupState.totalMembers.size
+                    )
+                }
+                
+                // 2. 获取我的 ACI
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                
+                // 3. 获取其他成员（不包括自己）
+                val otherMembers = groupState.totalMembers.filter { it != myAci }
+                if (otherMembers.isEmpty()) {
+                    Log.w(TAG, "群组中没有其他成员: $groupId")
+                    return@withContext GroupSendResult.Success(
+                        groupId = groupId,
+                        messageId = messageId,
+                        memberCount = 0
+                    )
+                }
+                
+                // 4. 获取所有成员的通道
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val memberChannels = mutableMapOf<String, org.thoughtcrime.securesms.tap.TransportChannel>()
+                
+                for (memberAci in otherMembers) {
+                    val channel = channelManager.getActiveChannel(memberAci, groupState.providerType)
+                    if (channel != null) {
+                        memberChannels[memberAci] = channel
+                    } else {
+                        Log.w(TAG, "成员没有活跃通道: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                    }
+                }
+                
+                if (memberChannels.isEmpty()) {
+                    Log.e(TAG, "没有成员有可用的通道: $groupId")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "没有可用的成员通道",
+                        memberCount = otherMembers.size
+                    )
+                }
+                
+                // 5. 获取 Provider
+                val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+                val provider = transportManager.getProvider(groupState.providerType)
+                if (provider == null) {
+                    Log.e(TAG, "Provider 不存在: ${groupState.providerType}")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "Provider 不可用",
+                        memberCount = otherMembers.size
+                    )
+                }
+                
+                // 6. 并发为每个成员上传消息
+                val uploadResults = performConcurrentUpload(
+                    groupId = groupId,
+                    messageId = messageId,
+                    encryptedMessage = encryptedMessage,
+                    memberChannels = memberChannels,
+                    provider = provider
+                )
+                
+                // 7. 统计结果
+                val successMembers = uploadResults.filter { (_, result) -> 
+                    result is org.thoughtcrime.securesms.tap.TransportResult.Success 
+                }.keys
+                val failedMembers = uploadResults.filter { (_, result) -> 
+                    result !is org.thoughtcrime.securesms.tap.TransportResult.Success 
+                }.mapValues { (_, result) ->
+                    when (result) {
+                        is org.thoughtcrime.securesms.tap.TransportResult.Failed -> result.errorMessage ?: "未知错误"
+                        else -> "未知错误"
+                    }
+                }
+                
+                Log.i(TAG, "群组消息发送完成: groupId=$groupId, 成功=${successMembers.size}/${memberChannels.size}")
+                
+                // 8. 返回结果
+                when {
+                    successMembers.size == memberChannels.size -> {
+                        GroupSendResult.Success(
+                            groupId = groupId,
+                            messageId = messageId,
+                            memberCount = successMembers.size
+                        )
+                    }
+                    successMembers.isNotEmpty() -> {
+                        GroupSendResult.PartialSuccess(
+                            groupId = groupId,
+                            messageId = messageId,
+                            successMembers = successMembers,
+                            failedMembers = failedMembers
+                        )
+                    }
+                    else -> {
+                        GroupSendResult.Failed(
+                            groupId = groupId,
+                            messageId = messageId,
+                            reason = "所有成员发送失败",
+                            memberCount = memberChannels.size
+                        )
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "群组消息发送异常: groupId=$groupId", e)
+                GroupSendResult.Failed(
+                    groupId = groupId,
+                    messageId = messageId,
+                    reason = "发送异常: ${e.message}",
+                    memberCount = 0
+                )
+            }
+        }
+    }
+    
+    /**
+     * 并发上传消息到所有成员
+     */
+    private suspend fun performConcurrentUpload(
+        groupId: String,
+        messageId: String,
+        encryptedMessage: ByteArray,
+        memberChannels: Map<String, org.thoughtcrime.securesms.tap.TransportChannel>,
+        provider: org.thoughtcrime.securesms.tap.TransportProvider
+    ): Map<String, org.thoughtcrime.securesms.tap.TransportResult> {
+        return supervisorScope {
+            // 为每个成员创建上传任务
+            val uploadTasks: List<Pair<String, Deferred<org.thoughtcrime.securesms.tap.TransportResult>>> = 
+                memberChannels.map { (memberAci, channel) ->
+                    val uploadTask = async(Dispatchers.IO) {
+                        uploadMessageToMember(
+                            memberAci = memberAci,
+                            groupId = groupId,
+                            messageId = messageId,
+                            encryptedMessage = encryptedMessage,
+                            channel = channel,
+                            provider = provider
+                        )
+                    }
+                    memberAci to uploadTask
+                }
+            
+            // 等待所有上传完成
+            uploadTasks.associate { (memberAci, task) ->
+                memberAci to task.await()
+            }
+        }
+    }
+    
+    /**
+     * 上传消息到单个成员
+     */
+    private suspend fun uploadMessageToMember(
+        memberAci: String,
+        groupId: String,
+        messageId: String,
+        encryptedMessage: ByteArray,
+        channel: org.thoughtcrime.securesms.tap.TransportChannel,
+        provider: org.thoughtcrime.securesms.tap.TransportProvider
+    ): org.thoughtcrime.securesms.tap.TransportResult {
+        return try {
+            // 构建 TransportMessage
+            // 使用特殊的 messageId 格式来标识群组消息：group_{groupId}_{originalMessageId}
+            val groupMessageId = "group_${groupId}_${messageId}"
+            
+            val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
+                messageId = groupMessageId,
+                timestamp = System.currentTimeMillis(),
+                senderId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString(),
+                recipientId = memberAci,
+                messageType = org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE,  // 群组消息作为媒体消息类型
+                signalCiphertext = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage),
+                contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
+                    originalSize = encryptedMessage.size.toLong()
+                )
+            )
+            
+            Log.d(TAG, "上传消息到成员: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+            
+            // 上传消息
+            val result = provider.push(transportMessage, channel.metadata)
+            
+            if (result is org.thoughtcrime.securesms.tap.TransportResult.Success) {
+                Log.i(TAG, "成员消息上传成功: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+            } else {
+                Log.w(TAG, "成员消息上传失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, result=$result")
+            }
+            
+            result
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "上传消息到成员时异常: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+            org.thoughtcrime.securesms.tap.TransportResult.Failed(
+                error = org.thoughtcrime.securesms.tap.TransportError.NETWORK_ERROR,
+                errorMessage = "上传异常: ${e.message}",
+                retryable = true
+            )
+        }
     }
     
     /**

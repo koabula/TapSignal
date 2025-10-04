@@ -47,6 +47,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         @Volatile
         private var INSTANCE: TapSignalServiceAdapter? = null
         
+        @JvmStatic
         fun getInstance(context: Context): TapSignalServiceAdapter {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TapSignalServiceAdapter(context.applicationContext).also { INSTANCE = it }
@@ -100,6 +101,138 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         globalMessageId = null
         globalTimestamp = null
         attachmentPaths.clear()
+    }
+    
+    /**
+     * 为群组消息进行 Signal 加密（不发送）
+     * 
+     * 该方法用于群组 v2 mode，只负责加密消息，不执行发送
+     * 
+     * @param messageId 消息 ID
+     * @param groupRecipient 群组接收者
+     * @param outgoingMessage 待发送的群组消息
+     * @return 加密后的消息字节数组，失败时返回 null
+     */
+    fun encryptGroupMessage(
+        messageId: Long,
+        groupRecipient: Recipient,
+        outgoingMessage: OutgoingMessage
+    ): ByteArray? {
+        return try {
+            Log.i(TAG, "开始群组消息加密: messageId=$messageId, groupId=${groupRecipient.requireGroupId()}")
+            
+            if (!groupRecipient.isGroup) {
+                Log.e(TAG, "接收者不是群组: messageId=$messageId")
+                return null
+            }
+            
+            // 设置当前发送上下文
+            setCurrentSendingRecipient(groupRecipient)
+            
+            // 1. 构建 Signal 数据消息（使用协程调用）
+            val signalDataMessage = kotlinx.coroutines.runBlocking {
+                buildSignalDataMessage(outgoingMessage)
+            }
+            
+            // 2. 序列化消息内容
+            // 对于群组消息，我们使用 Signal 的标准序列化
+            // 实际的 Sender Key 加密由 Signal 自动处理
+            val messageBytes = serializeGroupMessage(signalDataMessage, groupRecipient)
+            
+            if (messageBytes == null) {
+                Log.e(TAG, "群组消息序列化失败: messageId=$messageId")
+                clearSendingContext()
+                return null
+            }
+            
+            Log.i(TAG, "群组消息加密成功: messageId=$messageId, size=${messageBytes.size}")
+            
+            clearSendingContext()
+            messageBytes
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "群组消息加密异常: messageId=$messageId", e)
+            clearSendingContext()
+            null
+        }
+    }
+    
+    /**
+     * 序列化群组消息
+     * 
+     * 对于群组消息，我们序列化 Signal 数据消息，包含群组上下文
+     */
+    private fun serializeGroupMessage(
+        message: SignalServiceDataMessage,
+        groupRecipient: Recipient
+    ): ByteArray? {
+        return try {
+            // 构建 protobuf Content
+            val content = Content.Builder()
+            val dataMessage = DataMessage.Builder()
+            
+            // 设置消息内容
+            message.body.ifPresent { body ->
+                dataMessage.body = body
+            }
+            
+            // 设置时间戳
+            dataMessage.timestamp = message.timestamp
+            
+            // 设置过期时间
+            if (message.expiresInSeconds > 0) {
+                dataMessage.expireTimer = message.expiresInSeconds
+            }
+            
+            // 设置群组上下文（群组 V2）
+            if (message.groupContext.isPresent) {
+                val groupContext = message.groupContext.get()
+                val groupContextV2 = org.whispersystems.signalservice.internal.push.GroupContextV2.Builder()
+                groupContextV2.masterKey = okio.ByteString.of(*groupContext.masterKey.serialize())
+                groupContextV2.revision = groupContext.revision
+                dataMessage.groupV2 = groupContextV2.build()
+            }
+            
+            // 设置附件（如果有）
+            if (message.attachments.isPresent) {
+                val attachments = message.attachments.get()
+                val attachmentPointers = attachments.map { attachment ->
+                    convertToAttachmentPointer(attachment)
+                }
+                dataMessage.attachments = attachmentPointers
+            }
+            
+            // 设置预览（如果有）
+            if (message.previews.isPresent) {
+                val previews = message.previews.get()
+                val previewList = previews.map { preview ->
+                    val previewBuilder = org.whispersystems.signalservice.internal.push.Preview.Builder()
+                    
+                    // url, title, description 都是普通 String 类型
+                    previewBuilder.url = preview.url
+                    previewBuilder.title = preview.title
+                    previewBuilder.description = preview.description
+                    
+                    // 只有 image 是 Optional<SignalServiceAttachment>
+                    if (preview.image.isPresent) {
+                        previewBuilder.image = convertToAttachmentPointer(preview.image.get())
+                    }
+                    
+                    previewBuilder.build()
+                }
+                dataMessage.preview = previewList
+            }
+            
+            content.dataMessage = dataMessage.build()
+            
+            val encoded = content.build().encode()
+            Log.d(TAG, "群组消息序列化完成: size=${encoded.size}")
+            encoded
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "群组消息序列化失败", e)
+            null
+        }
     }
     
     /**

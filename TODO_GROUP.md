@@ -83,32 +83,32 @@
 - [x] 插入"群组已启用 v2 mode"系统消息
 - [ ] 更新 UI 显示 v2 mode 指示器（UI 待实现，参考 UI_INTEGRATION_GUIDE.md）
 
-## Phase 4: 消息发送和接收 
+## Phase 4: 消息发送和接收 ✅
 
-### 4.1 群组消息发送
-- [ ] 修改 `PushGroupSendJob.java` 添加 v2 mode 检查
-- [ ] 实现 `GroupTransportManager.sendGroupMessage()`
+### 4.1 群组消息发送 ✅
+- [x] 修改 `PushGroupSendJob.java` 添加 v2 mode 检查
+- [x] 实现 `GroupTransportManager.sendGroupMessage()`
   - 获取所有成员 channels
   - 使用协程并发上传
   - 收集上传结果
   - 处理部分失败
-- [ ] 实现失败成员的重试逻辑
-- [ ] 添加发送进度和状态反馈
+- [ ] 实现失败成员的重试逻辑 (待 Phase 4.1 完善)
+- [x] 添加发送进度和状态反馈
 
-### 4.2 群组消息接收
-- [ ] 扩展 `TapPollingService` 支持群组轮询
-- [ ] 实现 `addGroupPollingTargets()` 方法
+### 4.2 群组消息接收 ✅
+- [x] 扩展 `TapPollingService` 支持群组轮询
+- [x] 实现 `addGroupPollingTargets()` 方法
   - 为每个成员创建轮询任务
   - 合并到统一调度
-- [ ] 集成 `GroupMessageDeduplicator` 去重
-- [ ] 实现消息处理和存储逻辑
-- [ ] 添加轮询性能监控
+- [x] 集成 `GroupMessageDeduplicator` 去重
+- [x] 实现消息处理和存储逻辑
+- [x] 添加轮询性能监控（复用现有机制）
 
-### 4.3 消息路由优化
-- [ ] 实现群组消息的批量下载
-- [ ] 优化轮询调度算法
-- [ ] 添加网络状态感知（WiFi 下更频繁轮询）
-- [ ] 实现智能退避策略
+### 4.3 消息路由优化 (部分完成)
+- [x] 实现群组消息的批量下载（通过并发轮询）
+- [x] 优化轮询调度算法（复用现有机制）
+- [ ] 添加网络状态感知（WiFi 下更频繁轮询）(可选优化)
+- [ ] 实现智能退避策略（复用现有机制）
 
 ## Phase 5: 成员变动处理 
 

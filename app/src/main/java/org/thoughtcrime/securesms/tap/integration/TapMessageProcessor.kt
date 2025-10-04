@@ -133,6 +133,36 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 return TapProcessResult.Failed("消息验证失败")
             }
             
+            // 检查是否为群组消息（通过 messageId 前缀识别：group_{groupId}_{originalMessageId}）
+            val isGroupMessage = transportMessage.messageId.startsWith("group_")
+            
+            if (isGroupMessage) {
+                // 从 messageId 中提取 groupId
+                val parts = transportMessage.messageId.split("_")
+                if (parts.size >= 3) {
+                    val groupId = parts[1]
+                    val senderAci = transportMessage.senderId
+                    val timestamp = transportMessage.timestamp
+                    
+                    // 使用群组消息去重器检查重复
+                    val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
+                    val isDuplicate = deduplicator.isDuplicate(
+                        messageId = transportMessage.messageId,
+                        senderAci = senderAci,
+                        groupId = groupId,
+                        timestamp = timestamp
+                    )
+                    
+                    if (isDuplicate) {
+                        Log.d(TAG, "群组消息重复，跳过处理: messageId=${transportMessage.messageId}, groupId=$groupId")
+                        return TapProcessResult.Success("群组消息重复，已忽略")
+                    }
+                    
+                    // 标记为已处理（在解密成功后再标记）
+                    // deduplicator.markAsProcessed() 将在消息成功处理后调用
+                }
+            }
+            
             // 将加密消息交给TapEnvelopeAdapter处理Signal相关逻辑
             val envelopeAdapter = TapEnvelopeAdapter.getInstance(context)
             val adapterResult = envelopeAdapter.processEncryptedMessage(transportMessage)
@@ -140,6 +170,26 @@ class TapMessageProcessor private constructor(private val context: Context) {
             when (adapterResult) {
                 is TapEnvelopeProcessResult.Success -> {
                     Log.i(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
+                    
+                    // 如果是群组消息，标记为已处理
+                    if (isGroupMessage) {
+                        // 从 messageId 中提取 groupId
+                        val parts = transportMessage.messageId.split("_")
+                        if (parts.size >= 3) {
+                            val groupId = parts[1]
+                            val senderAci = transportMessage.senderId
+                            
+                            val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
+                            deduplicator.markAsProcessed(
+                                messageId = transportMessage.messageId,
+                                senderAci = senderAci,
+                                groupId = groupId,
+                                timestamp = transportMessage.timestamp,
+                                pollingMemberAci = transportMessage.recipientId  // 接收者 ID 即为轮询成员
+                            )
+                        }
+                    }
+                    
                     TapProcessResult.Success("消息处理成功")
                 }
                 is TapEnvelopeProcessResult.Failed -> {

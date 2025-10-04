@@ -224,6 +224,95 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
+     * 为群组添加轮询目标
+     * 
+     * 为群组的所有其他成员创建轮询任务，支持批量添加
+     * 
+     * @param groupId 群组 ID
+     * @param memberMetadatas 成员 metadata 映射 (memberAci -> TransportMetadata)
+     * @return 成功添加的成员数量
+     */
+    fun addGroupPollingTargets(
+        groupId: String,
+        memberMetadatas: Map<String, TransportMetadata>
+    ): Int {
+        if (!isRunning.get()) {
+            Log.w(TAG, "轮询服务未运行，无法添加群组轮询目标")
+            return 0
+        }
+        
+        if (memberMetadatas.isEmpty()) {
+            Log.w(TAG, "群组成员列表为空: groupId=$groupId")
+            return 0
+        }
+        
+        return try {
+            Log.i(TAG, "为群组添加轮询目标: groupId=$groupId, members=${memberMetadatas.size}")
+            
+            var successCount = 0
+            
+            // 为每个成员添加轮询目标
+            for ((memberAci, metadata) in memberMetadatas) {
+                try {
+                    // 直接使用原有 metadata，群组信息已在 token 交换时包含
+                    // metadata 本身已经包含了必要的群组标识信息
+                    val added = addPollingTarget(memberAci, metadata, null)
+                    if (added) {
+                        successCount++
+                        Log.d(TAG, "群组成员轮询目标添加成功: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                    } else {
+                        Log.w(TAG, "群组成员轮询目标添加失败: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                    }
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "添加群组成员轮询目标时异常: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+                }
+            }
+            
+            Log.i(TAG, "群组轮询目标添加完成: groupId=$groupId, 成功=$successCount/${memberMetadatas.size}")
+            successCount
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "添加群组轮询目标失败: groupId=$groupId", e)
+            0
+        }
+    }
+    
+    /**
+     * 移除群组的所有轮询目标
+     * 
+     * @param groupId 群组 ID
+     * @param memberAcis 成员 ACI 列表
+     * @param providerType Provider 类型
+     * @return 成功移除的成员数量
+     */
+    fun removeGroupPollingTargets(
+        groupId: String,
+        memberAcis: Set<String>,
+        providerType: String
+    ): Int {
+        return try {
+            Log.i(TAG, "移除群组轮询目标: groupId=$groupId, members=${memberAcis.size}")
+            
+            var successCount = 0
+            
+            for (memberAci in memberAcis) {
+                val removed = removePollingTarget(memberAci, providerType)
+                if (removed) {
+                    successCount++
+                }
+            }
+            
+            Log.i(TAG, "群组轮询目标移除完成: groupId=$groupId, 成功=$successCount/${memberAcis.size}")
+            successCount
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "移除群组轮询目标失败: groupId=$groupId", e)
+            0
+        }
+    }
+    
+    /**
      * 添加轮询目标
      */
     fun addPollingTarget(recipientId: String, metadata: TransportMetadata, channel: TransportChannel? = null): Boolean {
