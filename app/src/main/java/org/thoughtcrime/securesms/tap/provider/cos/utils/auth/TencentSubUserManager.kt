@@ -6,10 +6,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentSigner
+import org.thoughtcrime.securesms.tap.utils.RetryHelper
+import org.thoughtcrime.securesms.tap.utils.RetryPolicy
 import org.json.JSONObject
 import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 /**
  * 腾讯云CAM子用户管理器
@@ -20,7 +23,23 @@ class TencentSubUserManager(
     private val context: Context
 ) : CosSubUserManager {
     private val TAG = Log.tag(TencentSubUserManager::class.java)
-    private val okHttpClient = OkHttpClient()
+    
+    // 增强的OkHttpClient配置：支持连接超时、读写超时、连接池管理
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)      // 连接超时30秒
+        .readTimeout(60, TimeUnit.SECONDS)         // 读取超时60秒
+        .writeTimeout(60, TimeUnit.SECONDS)        // 写入超时60秒
+        .retryOnConnectionFailure(true)            // OkHttp内置连接失败重试
+        .connectionPool(ConnectionPool(            // 连接池配置
+            maxIdleConnections = 5,
+            keepAliveDuration = 5,
+            TimeUnit.MINUTES
+        ))
+        .build()
+    
+    // 云API专用重试策略
+    private val cloudApiRetryPolicy = RetryPolicy.forCloudApiOperation()
+    
     private val service = "cam"
     private val host = "cam.tencentcloudapi.com"
     private val version = "2019-01-16"
@@ -106,46 +125,52 @@ class TencentSubUserManager(
 
     /**
      * 使用用户UIN创建访问密钥
+     * 使用重试机制处理网络错误
      */
     private fun createAccessKey(userUin: Long): CosAccessKey {
-        val timestamp = System.currentTimeMillis() / 1000
-        val action = "CreateAccessKey"
+        return RetryHelper.executeWithRetryBlocking(
+            policy = cloudApiRetryPolicy,
+            operationName = "创建访问密钥(UIN:$userUin)"
+        ) {
+            val timestamp = System.currentTimeMillis() / 1000
+            val action = "CreateAccessKey"
 
-        val requestBody = JSONObject().apply {
-            put("TargetUin", userUin) // 使用Long类型的UIN
-        }.toString()
+            val requestBody = JSONObject().apply {
+                put("TargetUin", userUin) // 使用Long类型的UIN
+            }.toString()
 
-        val authorization = TencentSigner.buildTC3AuthorizationHeader(
-            secretId = config.secretId,
-            secretKey = config.secretKey,
-            service = service,
-            region = config.region,
-            action = action,
-            timestamp = timestamp,
-            payload = requestBody,
-            host = host
-        )
+            val authorization = TencentSigner.buildTC3AuthorizationHeader(
+                secretId = config.secretId,
+                secretKey = config.secretKey,
+                service = service,
+                region = config.region,
+                action = action,
+                timestamp = timestamp,
+                payload = requestBody,
+                host = host
+            )
 
-        val request = Request.Builder()
-            .url("https://$host/")
-            .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
-            .header("Host", host)
-            .header("Authorization", authorization)
-            .header("X-TC-Action", action)
-            .header("X-TC-Version", version)
-            .header("X-TC-Region", config.region)
-            .header("X-TC-Timestamp", timestamp.toString())
-            .header("Content-Type", "application/json; charset=utf-8")
-            .build()
+            val request = Request.Builder()
+                .url("https://$host/")
+                .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                .header("Host", host)
+                .header("Authorization", authorization)
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", version)
+                .header("X-TC-Region", config.region)
+                .header("X-TC-Timestamp", timestamp.toString())
+                .header("Content-Type", "application/json; charset=utf-8")
+                .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                val errorBody = resp.body?.string() ?: "No error body"
-                throw CosSubUserException("创建访问密钥失败: ${resp.code} - $errorBody")
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    val errorBody = resp.body?.string() ?: "No error body"
+                    throw CosSubUserException("创建访问密钥失败: ${resp.code} - $errorBody")
+                }
+
+                val responseBody = resp.body?.string() ?: throw CosSubUserException("空的CAM响应")
+                parseCreateAccessKeyResponse(responseBody)
             }
-
-            val responseBody = resp.body?.string() ?: throw CosSubUserException("空的CAM响应")
-            return parseCreateAccessKeyResponse(responseBody)
         }
     }
     
@@ -352,51 +377,57 @@ class TencentSubUserManager(
 
     /**
      * 创建CAM用户并返回用户UIN
+     * 使用重试机制处理网络错误
      */
     private fun createCamUser(userName: String): Long {
-        val timestamp = System.currentTimeMillis() / 1000
-        val action = "AddUser"
+        return RetryHelper.executeWithRetryBlocking(
+            policy = cloudApiRetryPolicy,
+            operationName = "创建CAM用户($userName)"
+        ) {
+            val timestamp = System.currentTimeMillis() / 1000
+            val action = "AddUser"
 
-        val requestBody = JSONObject().apply {
-            put("Name", userName)
-            put("Remark", "Signal COS子用户 - ${System.currentTimeMillis()}")
-            put("ConsoleLogin", 0) // 不允许控制台登录
-            put("UseApi", 1) // 允许API访问
-            put("Password", "") // 不设置密码
-            put("NeedResetPassword", 0) // 不需要重置密码
-        }.toString()
+            val requestBody = JSONObject().apply {
+                put("Name", userName)
+                put("Remark", "Signal COS子用户 - ${System.currentTimeMillis()}")
+                put("ConsoleLogin", 0) // 不允许控制台登录
+                put("UseApi", 1) // 允许API访问
+                put("Password", "") // 不设置密码
+                put("NeedResetPassword", 0) // 不需要重置密码
+            }.toString()
 
-        val authorization = TencentSigner.buildTC3AuthorizationHeader(
-            secretId = config.secretId,
-            secretKey = config.secretKey,
-            service = service,
-            region = config.region,
-            action = action,
-            timestamp = timestamp,
-            payload = requestBody,
-            host = host
-        )
+            val authorization = TencentSigner.buildTC3AuthorizationHeader(
+                secretId = config.secretId,
+                secretKey = config.secretKey,
+                service = service,
+                region = config.region,
+                action = action,
+                timestamp = timestamp,
+                payload = requestBody,
+                host = host
+            )
 
-        val request = Request.Builder()
-            .url("https://$host/")
-            .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
-            .header("Host", host)
-            .header("Authorization", authorization)
-            .header("X-TC-Action", action)
-            .header("X-TC-Version", version)
-            .header("X-TC-Region", config.region)
-            .header("X-TC-Timestamp", timestamp.toString())
-            .header("Content-Type", "application/json; charset=utf-8")
-            .build()
+            val request = Request.Builder()
+                .url("https://$host/")
+                .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                .header("Host", host)
+                .header("Authorization", authorization)
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", version)
+                .header("X-TC-Region", config.region)
+                .header("X-TC-Timestamp", timestamp.toString())
+                .header("Content-Type", "application/json; charset=utf-8")
+                .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                val errorBody = resp.body?.string() ?: "No error body"
-                throw CosSubUserException("创建CAM用户失败: ${resp.code} - $errorBody")
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    val errorBody = resp.body?.string() ?: "No error body"
+                    throw CosSubUserException("创建CAM用户失败: ${resp.code} - $errorBody")
+                }
+
+                val responseBody = resp.body?.string() ?: throw CosSubUserException("空的CAM响应")
+                parseAddUserResponse(responseBody)
             }
-
-            val responseBody = resp.body?.string() ?: throw CosSubUserException("空的CAM响应")
-            return parseAddUserResponse(responseBody)
         }
     }
 
@@ -530,54 +561,60 @@ class TencentSubUserManager(
 
     /**
      * 创建自定义策略并返回策略ID
+     * 使用重试机制处理网络错误
      */
     private fun createCustomPolicyAndGetId(policyName: String, policyDocument: String): Long {
         Log.i(TAG, "创建CAM策略: $policyName")
 
-        val timestamp = System.currentTimeMillis() / 1000
-        val action = "CreatePolicy"
+        return RetryHelper.executeWithRetryBlocking(
+            policy = cloudApiRetryPolicy,
+            operationName = "创建CAM策略($policyName)"
+        ) {
+            val timestamp = System.currentTimeMillis() / 1000
+            val action = "CreatePolicy"
 
-        val requestBody = JSONObject().apply {
-            put("PolicyName", policyName)
-            put("PolicyDocument", policyDocument)
-            put("Description", "Signal COS access policy - Standard Tencent CAM format")
-        }.toString()
+            val requestBody = JSONObject().apply {
+                put("PolicyName", policyName)
+                put("PolicyDocument", policyDocument)
+                put("Description", "Signal COS access policy - Standard Tencent CAM format")
+            }.toString()
 
-        val authorization = TencentSigner.buildTC3AuthorizationHeader(
-            secretId = config.secretId,
-            secretKey = config.secretKey,
-            service = service,
-            region = config.region,
-            action = action,
-            timestamp = timestamp,
-            payload = requestBody,
-            host = host
-        )
+            val authorization = TencentSigner.buildTC3AuthorizationHeader(
+                secretId = config.secretId,
+                secretKey = config.secretKey,
+                service = service,
+                region = config.region,
+                action = action,
+                timestamp = timestamp,
+                payload = requestBody,
+                host = host
+            )
 
-        val request = Request.Builder()
-            .url("https://$host/")
-            .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
-            .header("Host", host)
-            .header("Authorization", authorization)
-            .header("X-TC-Action", action)
-            .header("X-TC-Version", version)
-            .header("X-TC-Region", config.region)
-            .header("X-TC-Timestamp", timestamp.toString())
-            .header("Content-Type", "application/json; charset=utf-8")
-            .build()
+            val request = Request.Builder()
+                .url("https://$host/")
+                .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                .header("Host", host)
+                .header("Authorization", authorization)
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", version)
+                .header("X-TC-Region", config.region)
+                .header("X-TC-Timestamp", timestamp.toString())
+                .header("Content-Type", "application/json; charset=utf-8")
+                .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
-            val responseBody = resp.body?.string() ?: "No response body"
+            okHttpClient.newCall(request).execute().use { resp ->
+                val responseBody = resp.body?.string() ?: "No response body"
 
-            if (!resp.isSuccessful) {
-                Log.e(TAG, "创建CAM策略失败: ${resp.code} - $responseBody")
-                throw CosSubUserException("创建自定义策略失败: ${resp.code} - $responseBody")
+                if (!resp.isSuccessful) {
+                    Log.e(TAG, "创建CAM策略失败: ${resp.code} - $responseBody")
+                    throw CosSubUserException("创建自定义策略失败: ${resp.code} - $responseBody")
+                }
+
+                // 解析响应获取策略ID
+                val policyId = parseCreatePolicyResponse(responseBody)
+                Log.i(TAG, "CAM策略创建成功: $policyName (ID:$policyId)")
+                policyId
             }
-
-            // 解析响应获取策略ID
-            val policyId = parseCreatePolicyResponse(responseBody)
-            Log.i(TAG, "CAM策略创建成功: $policyName (ID:$policyId)")
-            return policyId
         }
     }
 
@@ -612,49 +649,66 @@ class TencentSubUserManager(
 
     /**
      * 附加策略到用户
+     * 使用重试机制处理网络错误（较少重试次数，因为这是操作后期步骤）
      */
     private fun attachPolicyToUser(userUin: Long, policyId: Long) {
         Log.i(TAG, "附加CAM策略到用户: userUin=$userUin, policyId=$policyId")
 
-        val timestamp = System.currentTimeMillis() / 1000
-        val action = "AttachUserPolicy"
-
-        val requestBody = JSONObject().apply {
-            put("AttachUin", userUin)
-            put("PolicyId", policyId)
-        }.toString()
-
-        val authorization = TencentSigner.buildTC3AuthorizationHeader(
-            secretId = config.secretId,
-            secretKey = config.secretKey,
-            service = service,
-            region = config.region,
-            action = action,
-            timestamp = timestamp,
-            payload = requestBody,
-            host = host
-        )
-
-        val request = Request.Builder()
-            .url("https://$host/")
-            .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
-            .header("Host", host)
-            .header("Authorization", authorization)
-            .header("X-TC-Action", action)
-            .header("X-TC-Version", version)
-            .header("X-TC-Region", config.region)
-            .header("X-TC-Timestamp", timestamp.toString())
-            .header("Content-Type", "application/json; charset=utf-8")
+        // 使用较少重试次数的策略
+        val attachPolicy = RetryHelper.customPolicy()
+            .maxRetries(2)
+            .initialDelay(1000L)
+            .backoffStrategy(RetryPolicy.BackoffStrategy.EXPONENTIAL)
+            .maxDelay(8000L)
+            .retryableChecker { throwable ->
+                cloudApiRetryPolicy.isRetryable(throwable)
+            }
             .build()
 
-        okHttpClient.newCall(request).execute().use { resp ->
-            val responseBody = resp.body?.string() ?: "No response body"
+        RetryHelper.executeWithRetryBlocking(
+            policy = attachPolicy,
+            operationName = "附加CAM策略(UIN:$userUin, PolicyId:$policyId)"
+        ) {
+            val timestamp = System.currentTimeMillis() / 1000
+            val action = "AttachUserPolicy"
 
-            if (!resp.isSuccessful) {
-                Log.e(TAG, "附加CAM策略到用户失败: ${resp.code} - $responseBody")
-                throw CosSubUserException("附加策略到用户失败: ${resp.code} - $responseBody")
+            val requestBody = JSONObject().apply {
+                put("AttachUin", userUin)
+                put("PolicyId", policyId)
+            }.toString()
+
+            val authorization = TencentSigner.buildTC3AuthorizationHeader(
+                secretId = config.secretId,
+                secretKey = config.secretKey,
+                service = service,
+                region = config.region,
+                action = action,
+                timestamp = timestamp,
+                payload = requestBody,
+                host = host
+            )
+
+            val request = Request.Builder()
+                .url("https://$host/")
+                .post(RequestBody.create("application/json; charset=utf-8".toMediaType(), requestBody))
+                .header("Host", host)
+                .header("Authorization", authorization)
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", version)
+                .header("X-TC-Region", config.region)
+                .header("X-TC-Timestamp", timestamp.toString())
+                .header("Content-Type", "application/json; charset=utf-8")
+                .build()
+
+            okHttpClient.newCall(request).execute().use { resp ->
+                val responseBody = resp.body?.string() ?: "No response body"
+
+                if (!resp.isSuccessful) {
+                    Log.e(TAG, "附加CAM策略到用户失败: ${resp.code} - $responseBody")
+                    throw CosSubUserException("附加策略到用户失败: ${resp.code} - $responseBody")
+                }
+                Log.i(TAG, "CAM策略附加到用户成功: PolicyId:$policyId -> UIN:$userUin")
             }
-            Log.i(TAG, "CAM策略附加到用户成功: PolicyId:$policyId -> UIN:$userUin")
         }
     }
 
