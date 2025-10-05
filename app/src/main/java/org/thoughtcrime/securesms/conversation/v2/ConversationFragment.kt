@@ -1443,6 +1443,98 @@ class ConversationFragment :
   }
 
   /**
+   * 显示群组 v2 mode 启用确认对话框
+   */
+  private fun showGroupV2ModeEnableDialog(recipient: Recipient, groupIdString: String) {
+    MaterialAlertDialogBuilder(requireContext())
+      .setTitle(R.string.conversation__enable_group_v2_mode)
+      .setMessage(R.string.conversation__enable_group_v2_mode_message)
+      .setPositiveButton(R.string.conversation__send) { _, _ ->
+        enableGroupV2Mode(recipient, groupIdString)
+      }
+      .setNegativeButton(R.string.conversation__cancel, null)
+      .show()
+  }
+  
+  /**
+   * 显示群组 v2 mode 禁用确认对话框
+   */
+  private fun showGroupV2ModeDisableDialog(recipient: Recipient, groupIdString: String) {
+    MaterialAlertDialogBuilder(requireContext())
+      .setTitle(R.string.conversation__disable_group_v2_mode)
+      .setMessage(R.string.conversation__disable_group_v2_mode_message)
+      .setPositiveButton(R.string.conversation__disable) { _, _ ->
+        disableGroupV2Mode(recipient, groupIdString)
+      }
+      .setNegativeButton(R.string.conversation__cancel, null)
+      .show()
+  }
+  
+  /**
+   * 启用群组 v2 mode
+   */
+  private fun enableGroupV2Mode(recipient: Recipient, groupIdString: String) {
+    lifecycleScope.launch(Dispatchers.IO) {
+      try {
+        val memberRecipientIds = recipient.participantIds
+        val providerType = "cos" // 使用默认 provider
+        
+        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
+        val result = groupManager.proposeV2ModeComplete(
+          groupId = groupIdString,
+          memberRecipientIds = memberRecipientIds,
+          providerType = providerType
+        )
+        
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+          if (result) {
+            Toast.makeText(requireContext(), R.string.conversation__group_v2_proposal_sent, Toast.LENGTH_SHORT).show()
+            // 刷新菜单
+            invalidateOptionsMenu()
+          } else {
+            Toast.makeText(requireContext(), R.string.conversation__group_v2_proposal_failed, Toast.LENGTH_SHORT).show()
+          }
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "启用群组 v2 mode 失败", e)
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+          Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
+  
+  /**
+   * 禁用群组 v2 mode
+   */
+  private fun disableGroupV2Mode(recipient: Recipient, groupIdString: String) {
+    lifecycleScope.launch(Dispatchers.IO) {
+      try {
+        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
+        val result = groupManager.disableV2ModeComplete(groupIdString)
+        
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+          when (result) {
+            is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success -> {
+              Toast.makeText(requireContext(), R.string.conversation__group_v2_disabled, Toast.LENGTH_SHORT).show()
+              // 刷新菜单
+              invalidateOptionsMenu()
+            }
+            is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Failed -> {
+              Toast.makeText(requireContext(), R.string.conversation__group_v2_disable_failed, Toast.LENGTH_SHORT).show()
+            }
+          }
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "禁用群组 v2 mode 失败", e)
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+          Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
+  
+  /**
    * 发送Tap v2模式请求
    */
   private fun sendTapV2ModeRequest(recipient: Recipient) {
@@ -1812,6 +1904,85 @@ class ConversationFragment :
         startActivity(Intent(Intent.ACTION_VIEW, recipient.contactUri))
         return@setOnLongClickListener true
       }
+    }
+
+    // 更新 v2 mode 指示器
+    updateV2ModeIndicator(recipient)
+  }
+
+  /**
+   * 更新 v2 mode 状态指示器
+   */
+  private fun updateV2ModeIndicator(recipient: Recipient) {
+    val v2Indicator = binding.conversationTitleView.root.findViewById<org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator>(R.id.tap_v2_mode_indicator)
+    
+    if (v2Indicator != null) {
+      if (recipient.isGroup) {
+        // 群组：检查群组 v2 mode 状态
+        updateGroupV2ModeIndicator(recipient, v2Indicator)
+      } else if (!recipient.isSelf && !recipient.isReleaseNotes) {
+        // 私聊：检查 Tap 通道状态
+        v2Indicator.updateStatus(recipient)
+      } else {
+        // 其他类型：隐藏指示器
+        v2Indicator.visibility = View.GONE
+      }
+    }
+  }
+
+  /**
+   * 更新群组 v2 mode 指示器
+   */
+  private fun updateGroupV2ModeIndicator(recipient: Recipient, indicator: org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator) {
+    try {
+      val groupId = recipient.groupId.orElse(null)
+      if (groupId == null) {
+        indicator.visibility = View.GONE
+        return
+      }
+      
+      val groupIdString = android.util.Base64.encodeToString(
+        groupId.getDecodedId(),
+        android.util.Base64.NO_WRAP
+      )
+      
+      lifecycleScope.launch(Dispatchers.IO) {
+        try {
+          val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
+          val groupStatusResult = groupManager.getGroupStatus(groupIdString)
+          
+          kotlinx.coroutines.withContext(Dispatchers.Main) {
+            if (groupStatusResult is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success) {
+              val groupStatus = groupStatusResult.data
+              when (groupStatus) {
+                org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE -> {
+                  indicator.visibility = View.GONE
+                }
+                org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING -> {
+                  indicator.visibility = View.VISIBLE
+                  indicator.setText("v2?")
+                  indicator.setTextColor(R.color.signal_colorSecondary)
+                }
+                org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE -> {
+                  indicator.visibility = View.VISIBLE
+                  indicator.setText("v2")
+                  indicator.setTextColor(R.color.signal_colorPrimary)
+                }
+              }
+            } else {
+              indicator.visibility = View.GONE
+            }
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "更新群组 v2 mode 指示器失败", e)
+          kotlinx.coroutines.withContext(Dispatchers.Main) {
+            indicator.visibility = View.GONE
+          }
+        }
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "更新群组 v2 mode 指示器失败", e)
+      indicator.visibility = View.GONE
     }
   }
 
@@ -3998,20 +4169,85 @@ class ConversationFragment :
     override fun handleCosV2ModeRequest() {
       val recipient = viewModel.recipientSnapshot ?: return
 
-      // 只支持个人对话，不支持群组
-      if (recipient.isGroup) {
-        Toast.makeText(requireContext(), "COS v2 mode is not supported for group conversations", Toast.LENGTH_SHORT).show()
-        return
-      }
-
       // 检查是否已经处于消息请求状态
       if (viewModel.hasMessageRequestState && !recipient.isBlocked) {
-        Toast.makeText(requireContext(), "Please accept the message request first", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), R.string.conversation__accept_message_request_first, Toast.LENGTH_SHORT).show()
         return
       }
 
+      // 处理群组 v2 mode
+      if (recipient.isGroup) {
+        handleGroupV2ModeRequest(recipient)
+        return
+      }
+
+      // 处理私聊 v2 mode
+      handleIndividualV2ModeRequest(recipient)
+    }
+    
+  /**
+   * 处理群组 v2 mode 请求
+   */
+  private fun handleGroupV2ModeRequest(recipient: Recipient) {
+    try {
+      val groupId = recipient.groupId.orElse(null)
+      if (groupId == null) {
+        Toast.makeText(requireContext(), R.string.conversation__invalid_group, Toast.LENGTH_SHORT).show()
+        return
+      }
+      
+      val groupIdString = android.util.Base64.encodeToString(
+        groupId.getDecodedId(),
+        android.util.Base64.NO_WRAP
+      )
+        
+        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
+        
+        lifecycleScope.launch {
+          try {
+            val groupStatusResult = groupManager.getGroupStatus(groupIdString)
+            if (groupStatusResult !is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success) {
+              Toast.makeText(requireContext(), R.string.conversation__failed_to_get_group_status, Toast.LENGTH_SHORT).show()
+              return@launch
+            }
+            
+            val groupStatus = groupStatusResult.data
+            when (groupStatus) {
+              org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE -> {
+                // 显示启用确认对话框
+                showGroupV2ModeEnableDialog(recipient, groupIdString)
+              }
+              org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING -> {
+                // 已经在提议中，不需要额外操作
+                val groupState = groupManager.getGroupStateSync(groupIdString)
+                val message = if (groupState != null) {
+                  getString(R.string.conversation__group_v2_proposing_status, groupState.agreedMembers.size, groupState.totalMembers.size)
+                } else {
+                  getString(R.string.conversation__group_v2_proposing)
+                }
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+              }
+              org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE -> {
+                // 显示禁用确认对话框
+                showGroupV2ModeDisableDialog(recipient, groupIdString)
+              }
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "处理群组 v2 mode 请求失败", e)
+            Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+          }
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "处理群组 v2 mode 请求失败", e)
+        Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+      }
+    }
+    
+    /**
+     * 处理私聊 v2 mode 请求
+     */
+    private fun handleIndividualV2ModeRequest(recipient: Recipient) {
       // 检查当前Tap v2模式状态
-            // 检查当前Tap v2模式状态
       val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
       
       // 修复：使用ACI字符串查询通道状态，与通道管理保持一致
@@ -4046,7 +4282,7 @@ class ConversationFragment :
         Log.e(TAG, "调试Tap通道信息时出错", e)
       }
 
-        if (hasActiveChannel) {
+      if (hasActiveChannel) {
         // 当前已启用v2模式，显示断开确认对话框
         showCosV2ModeDisconnectDialog(recipient)
       } else {

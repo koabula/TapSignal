@@ -4483,6 +4483,34 @@
     <string name="conversation__menu_create_bubble">Create bubble</string>
     <!-- Overflow menu option that allows formatting of text -->
     <string name="conversation__menu_format_text">Format text</string>
+    
+    <!-- 群组 v2 mode 相关（私聊 v2 mode 资源在 cos_strings.xml 中） -->
+    <string name="conversation__menu_use_group_v2_mode">Use v2 mode</string>
+    <string name="conversation__menu_disable_group_v2_mode">Disable v2 mode</string>
+    <string name="conversation__menu_group_v2_proposing">v2 mode proposing</string>
+    
+    <!-- 群组 v2 mode 对话框和提示 -->
+    <string name="conversation__enable_group_v2_mode">Enable Group v2 Mode</string>
+    <string name="conversation__enable_group_v2_mode_message">Do you want to upgrade this group to v2 mode? This will require all members to agree.</string>
+    <string name="conversation__disable_group_v2_mode">Disable Group v2 Mode</string>
+    <string name="conversation__disable_group_v2_mode_message">Do you want to disable v2 mode for this group? Messages will be sent via Signal Server.</string>
+    <string name="conversation__send">Send</string>
+    <string name="conversation__cancel">Cancel</string>
+    <string name="conversation__disable">Disable</string>
+    
+    <!-- 群组 v2 mode 状态提示 -->
+    <string name="conversation__group_v2_proposal_sent">v2 mode proposal sent</string>
+    <string name="conversation__group_v2_proposal_failed">Failed to send proposal</string>
+    <string name="conversation__group_v2_disabled">v2 mode disabled</string>
+    <string name="conversation__group_v2_disable_failed">Failed to disable v2 mode</string>
+    <string name="conversation__group_v2_proposing">v2 mode proposal in progress</string>
+    <string name="conversation__group_v2_proposing_status">v2 mode: %1$d/%2$d agreed</string>
+    
+    <!-- 群组 v2 mode 错误提示 -->
+    <string name="conversation__invalid_group">Invalid group</string>
+    <string name="conversation__failed_to_get_group_status">Failed to get group status</string>
+    <string name="conversation__operation_failed">Operation failed</string>
+    <string name="conversation__accept_message_request_first">Please accept the message request first</string>
 
     <!-- conversation_popup -->
 

@@ -245,13 +245,13 @@ internal object ConversationOptionsMenu {
     }
 
     /**
-     * 动态更新COS v2模式菜单项
+     * 动态更新COS v2模式菜单项（支持私聊和群组）
      */
     private fun updateCosV2MenuItem(menu: Menu, recipient: Recipient) {
       val cosMenuItem = menu.findItem(R.id.menu_cos_v2_mode)
       if (cosMenuItem != null) {
-        // 只对个人对话显示COS v2菜单项
-        if (recipient.isGroup || recipient.isSelf || recipient.isReleaseNotes) {
+        // 排除不支持的recipient类型
+        if (recipient.isSelf || recipient.isReleaseNotes) {
           cosMenuItem.isVisible = false
           return
         }
@@ -264,7 +264,58 @@ internal object ConversationOptionsMenu {
 
         try {
           val context = callback.getContext()
-          // 检查是否有活跃的Tap通道
+          
+          // 处理群组的 v2 mode 状态
+          if (recipient.isGroup) {
+            try {
+              val groupId = recipient.groupId.orElse(null)
+              if (groupId == null) {
+                cosMenuItem.isVisible = false
+                return
+              }
+              
+              val groupIdString = android.util.Base64.encodeToString(
+                groupId.getDecodedId(),
+                android.util.Base64.NO_WRAP
+              )
+              
+              val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+              val groupStatusResult = kotlinx.coroutines.runBlocking {
+                groupManager.getGroupStatus(groupIdString)
+              }
+              
+              if (groupStatusResult is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success) {
+                val groupStatus = groupStatusResult.data
+                cosMenuItem.isVisible = true
+                when (groupStatus) {
+                  org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE -> {
+                    cosMenuItem.setTitle(R.string.conversation__menu_use_group_v2_mode)
+                  }
+                  org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING -> {
+                    val groupState = groupManager.getGroupStateSync(groupIdString)
+                    val progress = if (groupState != null) {
+                      " (${groupState.agreedMembers.size}/${groupState.totalMembers.size})"
+                    } else {
+                      ""
+                    }
+                    cosMenuItem.setTitle(context.getString(R.string.conversation__menu_group_v2_proposing) + progress)
+                    cosMenuItem.isEnabled = false
+                  }
+                  org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE -> {
+                    cosMenuItem.setTitle(R.string.conversation__menu_disable_group_v2_mode)
+                  }
+                }
+              } else {
+                cosMenuItem.isVisible = false
+              }
+            } catch (e: Exception) {
+              Log.e(TAG, "获取群组 v2 状态失败", e)
+              cosMenuItem.isVisible = false
+            }
+            return
+          }
+          
+          // 处理私聊的 v2 mode 状态
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
           
           // 修复：使用ACI字符串查询通道状态，与通道管理保持一致
@@ -272,7 +323,7 @@ internal object ConversationOptionsMenu {
               val recipientAci = recipient.requireAci().toString()
               channelManager.hasActiveChannel(recipientAci)
           } catch (e: Exception) {
-              Log.w("ConversationOptionsMenu", "无法获取recipient ACI进行Tap通道查询: ${e.message}")
+              Log.w(TAG, "无法获取recipient ACI进行Tap通道查询: ${e.message}")
               false
           }
 
@@ -286,6 +337,7 @@ internal object ConversationOptionsMenu {
           // 如果出错，使用默认标题但保持可见
           cosMenuItem.isVisible = true
           cosMenuItem.setTitle(R.string.conversation__menu_use_v2_mode)
+          Log.e(TAG, "更新 v2 mode 菜单项失败", e)
         }
       }
     }

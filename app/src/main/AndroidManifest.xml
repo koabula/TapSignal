@@ -1393,6 +1393,15 @@
         </intent-filter>
     </receiver>
 
+    <receiver android:name=".tap.group.GroupTokenExchangeReceiver"
+              android:enabled="true"
+              android:exported="false">
+        <intent-filter>
+            <action android:name="ACCEPT_GROUP_TOKEN_EXCHANGE"/>
+            <action android:name="REJECT_GROUP_TOKEN_EXCHANGE"/>
+        </intent-filter>
+    </receiver>
+
     <receiver
         android:name=".service.PanicResponderListener"
         android:exported="true">

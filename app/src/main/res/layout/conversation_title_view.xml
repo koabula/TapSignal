@@ -116,6 +116,15 @@
             android:textDirection="ltr"
             tools:text="(123) 123-1234" />
 
+        <org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator
+            android:id="@+id/tap_v2_mode_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="4dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
         </LinearLayout>
 
 </org.thoughtcrime.securesms.conversation.ConversationTitleView>
