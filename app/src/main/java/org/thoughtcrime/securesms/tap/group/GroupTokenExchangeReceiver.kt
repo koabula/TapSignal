@@ -240,7 +240,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
             if (activated) {
                 Log.i(TAG, "群组 V2 mode 已激活: groupId=$groupId")
                 
-                val groupState = groupManager.getGroupState(groupId)
+                val groupState = groupManager.getGroupStateSync(groupId)
                 if (groupState != null) {
                     // 建立通道和启动轮询
                     val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
@@ -271,7 +271,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     }
                 }
             } else {
-                val groupState = groupManager.getGroupState(groupId)
+                val groupState = groupManager.getGroupStateSync(groupId)
                 if (groupState != null) {
                     Log.d(TAG, "群组尚未全员同意: groupId=$groupId, agreed=${groupState.agreedMembers.size}/${groupState.totalMembers.size}")
                 }
@@ -311,53 +311,23 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
     /**
      * 获取群组的 RecipientId
      * 
-     * 支持多种 groupId 格式：
-     * 1. RecipientId 序列化数字字符串
-     * 2. GroupId 编码字符串（如 "__signal_group__v2__!xxxx"）
-     * 3. Base64 编码的群组 ID 字节数组
+     * 使用 GroupIdConverter 统一处理不同格式的 groupId
      */
     private fun getGroupRecipientId(context: Context, groupId: String): RecipientId? {
         return try {
-            // 方法1：尝试作为 RecipientId 数字解析
-            try {
-                val recipientId = RecipientId.from(groupId.toLong())
-                Log.d(TAG, "成功从数字解析 RecipientId: $groupId")
-                return recipientId
-            } catch (e: NumberFormatException) {
-                // 不是数字，继续尝试其他方法
-            }
-            
-            // 方法2：尝试作为 GroupId 编码字符串解析
-            try {
-                val parsedGroupId = org.thoughtcrime.securesms.groups.GroupId.parse(groupId)
-                val recipientIdOptional = org.thoughtcrime.securesms.database.SignalDatabase.recipients.getByGroupId(parsedGroupId)
-                if (recipientIdOptional.isPresent) {
-                    Log.d(TAG, "成功从 GroupId 编码解析 RecipientId: $groupId")
-                    return recipientIdOptional.get()
+            val result = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.convert(groupId, context)
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                    Log.d(TAG, "成功转换 groupId: $groupId -> ${result.recipientId}")
+                    result.recipientId
                 }
-            } catch (e: org.thoughtcrime.securesms.groups.BadGroupIdException) {
-                // 不是有效的 GroupId 编码，继续尝试其他方法
-                Log.d(TAG, "不是有效的 GroupId 编码: $groupId")
-            }
-            
-            // 方法3：尝试作为 Base64 编码的字节数组解析
-            try {
-                val groupIdBytes = android.util.Base64.decode(groupId, android.util.Base64.DEFAULT)
-                val pushGroupId = org.thoughtcrime.securesms.groups.GroupId.push(groupIdBytes)
-                val recipientIdOptional = org.thoughtcrime.securesms.database.SignalDatabase.recipients.getByGroupId(pushGroupId)
-                if (recipientIdOptional.isPresent) {
-                    Log.d(TAG, "成功从 Base64 解析 RecipientId: $groupId")
-                    return recipientIdOptional.get()
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                    Log.w(TAG, "转换 groupId 失败: $groupId, 原因: ${result.reason}")
+                    null
                 }
-            } catch (e: Exception) {
-                Log.d(TAG, "无法从 Base64 解析 GroupId: $groupId", e)
             }
-            
-            // 所有方法都失败
-            Log.w(TAG, "无法从 groupId 获取 RecipientId: $groupId")
-            null
         } catch (e: Exception) {
-            Log.e(TAG, "获取群组 RecipientId 失败: groupId=$groupId", e)
+            Log.e(TAG, "获取群组 RecipientId 异常: groupId=$groupId", e)
             null
         }
     }

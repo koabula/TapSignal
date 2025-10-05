@@ -110,31 +110,34 @@
 - [ ] 添加网络状态感知（WiFi 下更频繁轮询）(可选优化)
 - [ ] 实现智能退避策略（复用现有机制）
 
-## Phase 5: 成员变动处理 
+## Phase 5: 成员变动处理 ✅
 
-### 5.1 新成员加入
-- [ ] 在 PROPOSING 阶段加入 → 回退到 NATIVE
+### 5.1 新成员加入 ✅
+- [x] 在 PROPOSING 阶段加入 → 回退到 NATIVE
   - 实现回退逻辑
   - 清理 agreedMembers
   - 插入系统消息
-- [ ] 在 FULL_V2_ACTIVE 阶段加入
+- [x] 在 FULL_V2_ACTIVE 阶段加入
   - 检测新成员并显示提示
   - 实现新成员的 token 生成和交换
   - 老成员为新成员生成 token
   - 新成员建立 channels 和启动轮询
+- [x] 实现 `requestJoinV2Mode()` - 新成员主动加入
+- [x] 实现 `respondToNewMemberJoin()` - 老成员响应
 
-### 5.2 成员离开
-- [ ] 实现 `GroupTransportManager.handleMemberLeave()`
+### 5.2 成员离开 ✅
+- [x] 实现 `GroupTransportManager.handleMemberLeave()`
   - 删除离开成员的 token
   - 关闭相关 channel
   - 移除轮询目标
-- [ ] 集成到 Signal 群组成员变更流程
-- [ ] 添加清理确认日志
+- [ ] 集成到 Signal 群组成员变更流程 (待 Phase 7 UI 集成时完成)
+- [x] 添加清理确认日志
 
-### 5.3 状态同步
-- [ ] 实现成员状态不一致检测
-- [ ] 添加状态同步机制（定期检查）
-- [ ] 实现强制重新同步功能
+### 5.3 状态同步 ✅
+- [x] 实现成员状态不一致检测
+- [x] 添加状态同步机制（定期检查）
+- [x] 实现强制重新同步功能
+- [x] 创建 `GroupMembershipSynchronizer` 类
 
 ## Phase 6: 禁用和降级 
 

@@ -228,7 +228,7 @@ public final class PushGroupSendJob extends PushSendJob {
       String groupIdString = groupRecipient.requireGroupId().toString();
       org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
           org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
-      org.thoughtcrime.securesms.tap.group.GroupV2Status groupV2Status = groupTransportManager.getGroupStatus(groupIdString);
+      org.thoughtcrime.securesms.tap.group.GroupV2Status groupV2Status = groupTransportManager.getGroupStatusSync(groupIdString);
       
       if (groupV2Status == org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
         log(TAG, String.valueOf(message.getSentTimeMillis()), "群组处于 v2 mode，通过 tap 层发送: " + messageId);

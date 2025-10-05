@@ -149,7 +149,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     val isDuplicate = deduplicator.isDuplicate(
                         messageId = transportMessage.messageId,
                         senderAci = senderAci,
-                        groupId = groupId,
+                        rawGroupId = groupId,
                         timestamp = timestamp
                     )
                     
@@ -183,7 +183,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                             deduplicator.markAsProcessed(
                                 messageId = transportMessage.messageId,
                                 senderAci = senderAci,
-                                groupId = groupId,
+                                rawGroupId = groupId,
                                 timestamp = transportMessage.timestamp,
                                 pollingMemberAci = transportMessage.recipientId  // 接收者 ID 即为轮询成员
                             )
@@ -1293,7 +1293,7 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                 Log.i(TAG, "群组 V2 模式已激活: groupId=$groupId")
                 
                 // 获取群组状态
-                val groupState = groupManager.getGroupState(groupId)
+                val groupState = groupManager.getGroupStateSync(groupId)
                 if (groupState != null) {
                     // 建立通道并启动轮询
                     activateGroupChannelsAndPolling(groupState)

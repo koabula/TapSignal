@@ -28,7 +28,10 @@ data class GroupV2State(
     val createdAt: Long,
     
     /** 最后更新时间 */
-    val updatedAt: Long
+    val updatedAt: Long,
+    
+    /** 版本号（用于乐观锁） */
+    val version: Long = 0
 ) {
     /**
      * 检查是否全员同意

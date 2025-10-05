@@ -72,21 +72,23 @@ class GroupMessageDeduplicator private constructor(private val context: Context)
      * 使用消息的唯一标识进行去重：
      * - messageId: 消息唯一标识
      * - senderAci: 发送者 ACI
-     * - groupId: 群组 ID
+     * - groupId: 群组 ID（会被标准化为统一格式）
      * - timestamp: 消息时间戳
      * 
      * @param messageId 消息 ID
      * @param senderAci 发送者 ACI
-     * @param groupId 群组 ID
+     * @param rawGroupId 群组 ID（支持多种格式）
      * @param timestamp 消息时间戳
      * @return true 如果是重复消息，false 如果是新消息
      */
     fun isDuplicate(
         messageId: String,
         senderAci: String,
-        groupId: String,
+        rawGroupId: String,
         timestamp: Long
     ): Boolean {
+        // 统一转换 groupId 格式，避免因格式不同导致去重失败
+        val groupId = normalizeGroupId(rawGroupId)
         val duplicationKey = generateDuplicationKey(messageId, senderAci, groupId, timestamp)
         
         return cacheLock.read {
@@ -129,17 +131,19 @@ class GroupMessageDeduplicator private constructor(private val context: Context)
      * 
      * @param messageId 消息 ID
      * @param senderAci 发送者 ACI
-     * @param groupId 群组 ID
+     * @param rawGroupId 群组 ID（支持多种格式）
      * @param timestamp 消息时间戳
      * @param pollingMemberAci 轮询获取该消息的成员 ACI（用于追踪）
      */
     fun markAsProcessed(
         messageId: String,
         senderAci: String,
-        groupId: String,
+        rawGroupId: String,
         timestamp: Long,
         pollingMemberAci: String? = null
     ) {
+        // 统一转换 groupId 格式
+        val groupId = normalizeGroupId(rawGroupId)
         val duplicationKey = generateDuplicationKey(messageId, senderAci, groupId, timestamp)
         
         cacheLock.write {
@@ -162,10 +166,44 @@ class GroupMessageDeduplicator private constructor(private val context: Context)
     }
     
     /**
+     * 标准化群组 ID 格式
+     * 
+     * 将任意格式的 groupId（RecipientId、Base64、GroupId编码）
+     * 统一转换为 GroupId 编码字符串格式
+     * 
+     * @param rawGroupId 原始 groupId（任意格式）
+     * @return 标准化后的 groupId
+     */
+    private fun normalizeGroupId(rawGroupId: String): String {
+        return try {
+            val converter = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter
+            val result = converter.convert(rawGroupId, context)
+            
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                    // 转换成功，使用标准格式
+                    result.groupIdString
+                }
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                    // 转换失败，降级使用原始值，但记录警告
+                    Log.w(TAG, "GroupId 格式转换失败，使用原始值: ${result.reason}")
+                    rawGroupId
+                }
+            }
+        } catch (e: Exception) {
+            // 异常情况，使用原始值，保证系统继续运行
+            Log.e(TAG, "GroupId 格式标准化异常，使用原始值: $rawGroupId", e)
+            rawGroupId
+        }
+    }
+    
+    /**
      * 生成去重键
      * 
      * 格式: groupId:messageId:senderAci:timestamp
      * 这样可以唯一标识一条群组消息
+     * 
+     * 注意：此方法假设 groupId 已经过标准化处理
      */
     private fun generateDuplicationKey(
         messageId: String,

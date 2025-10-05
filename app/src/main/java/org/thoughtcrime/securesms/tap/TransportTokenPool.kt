@@ -224,8 +224,17 @@ class TransportTokenPool private constructor(private val context: Context) {
     
     /**
      * 添加接收到的Token
+     * 
+     * @param recipientId 接收者ID
+     * @param token 传输Token
+     * @param groupId 可选的群组 ID，用于标记群组 Token
+     * @return 是否成功添加
      */
-    suspend fun addReceivedToken(recipientId: String, token: TransportToken): Boolean {
+    suspend fun addReceivedToken(
+        recipientId: String, 
+        token: TransportToken,
+        groupId: String? = null
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             tokenLock.write {
                 try {
@@ -288,7 +297,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                         providerType = token.providerType,
                         tokenType = TokenType.RECEIVED,
                         addedAt = System.currentTimeMillis(),
-                        lastAccessedAt = System.currentTimeMillis()
+                        lastAccessedAt = System.currentTimeMillis(),
+                        groupId = groupId  // 记录群组 ID
                     )
                     tokenMetadata[token.tokenId] = metadata
                     
@@ -301,7 +311,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                         // 持久化失败不影响内存操作的成功
                     }
                     
-                    Log.i(TAG, "添加接收Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
+                    val groupInfo = if (groupId != null) ", groupId=${LogSanitizer.sanitize(groupId)}" else ""
+                    Log.i(TAG, "添加接收Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}$groupInfo")
                     true
                     
                 } catch (e: Exception) {
@@ -314,8 +325,17 @@ class TransportTokenPool private constructor(private val context: Context) {
     
     /**
      * 添加共享的Token
+     * 
+     * @param recipientId 接收者ID
+     * @param token 传输Token
+     * @param groupId 可选的群组 ID，用于标记群组 Token
+     * @return 是否成功添加
      */
-    suspend fun addSharedToken(recipientId: String, token: TransportToken): Boolean {
+    suspend fun addSharedToken(
+        recipientId: String, 
+        token: TransportToken,
+        groupId: String? = null
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             tokenLock.write {
                 try {
@@ -378,7 +398,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                         providerType = token.providerType,
                         tokenType = TokenType.SHARED,
                         addedAt = System.currentTimeMillis(),
-                        lastAccessedAt = System.currentTimeMillis()
+                        lastAccessedAt = System.currentTimeMillis(),
+                        groupId = groupId  // 记录群组 ID
                     )
                     tokenMetadata[token.tokenId] = metadata
                     
@@ -391,7 +412,8 @@ class TransportTokenPool private constructor(private val context: Context) {
                         // 持久化失败不影响内存操作的成功
                     }
                     
-                    Log.i(TAG, "添加共享Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}")
+                    val groupInfo = if (groupId != null) ", groupId=${LogSanitizer.sanitize(groupId)}" else ""
+                    Log.i(TAG, "添加共享Token成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(recipientId)}, providerType=${token.providerType}$groupInfo")
                     true
                     
                 } catch (e: Exception) {
@@ -399,6 +421,37 @@ class TransportTokenPool private constructor(private val context: Context) {
                     false
                 }
             }
+        }
+    }
+    
+    /**
+     * 获取群组的所有 Token
+     * 
+     * @param groupId 群组 ID
+     * @return 群组相关的 Token 列表（包括接收和共享的）
+     */
+    fun getGroupTokens(groupId: String): List<Pair<String, TransportToken>> {
+        return tokenLock.read {
+            val result = mutableListOf<Pair<String, TransportToken>>()
+            
+            // 查找所有与该群组相关的 Token
+            tokenMetadata.values
+                .filter { it.groupId == groupId }
+                .forEach { metadata ->
+                    // 根据类型从对应的存储中获取 Token
+                    val token = when (metadata.tokenType) {
+                        TokenType.RECEIVED -> receivedTokens[metadata.recipientId]?.get(metadata.providerType)
+                        TokenType.SHARED -> sharedTokens[metadata.recipientId]?.get(metadata.providerType)
+                    }
+                    
+                    if (token != null) {
+                        result.add(metadata.recipientId to token)
+                        Log.v(TAG, "找到群组Token: groupId=$groupId, recipientId=${LogSanitizer.sanitize(metadata.recipientId)}, type=${metadata.tokenType}")
+                    }
+                }
+            
+            Log.d(TAG, "查询群组Token: groupId=$groupId, 找到${result.size}个")
+            result
         }
     }
     
@@ -1807,10 +1860,11 @@ data class TokenMetadata(
     val providerType: String,
     val tokenType: TokenType,
     val addedAt: Long,
-    val lastAccessedAt: Long
+    val lastAccessedAt: Long,
+    val groupId: String? = null  // 群组 ID，用于区分群组和一对一 Token
 ) {
     fun toMap(): Map<String, Any> {
-        return mapOf(
+        val map = mutableMapOf(
             "tokenId" to tokenId,
             "recipientId" to recipientId,
             "providerType" to providerType,
@@ -1818,6 +1872,8 @@ data class TokenMetadata(
             "addedAt" to addedAt,
             "lastAccessedAt" to lastAccessedAt
         )
+        groupId?.let { map["groupId"] = it }
+        return map
     }
 
     companion object {
@@ -1828,7 +1884,8 @@ data class TokenMetadata(
                 providerType = map["providerType"] as String,
                 tokenType = TokenType.valueOf(map["tokenType"] as String),
                 addedAt = map["addedAt"] as Long,
-                lastAccessedAt = map["lastAccessedAt"] as Long
+                lastAccessedAt = map["lastAccessedAt"] as Long,
+                groupId = map["groupId"] as? String  // 兼容旧数据，groupId 可能不存在
             )
         }
     }

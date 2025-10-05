@@ -36,6 +36,7 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
         private const val PROVIDER_TYPE = "provider_type"
         private const val CREATED_AT = "created_at"
         private const val UPDATED_AT = "updated_at"
+        private const val VERSION = "version"
 
         const val CREATE_TABLE = 
             "CREATE TABLE $TABLE_NAME(" +
@@ -47,7 +48,8 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
                 "$TOTAL_MEMBERS TEXT NOT NULL, " +
                 "$PROVIDER_TYPE TEXT NOT NULL, " +
                 "$CREATED_AT INTEGER NOT NULL, " +
-                "$UPDATED_AT INTEGER NOT NULL" +
+                "$UPDATED_AT INTEGER NOT NULL, " +
+                "$VERSION INTEGER NOT NULL DEFAULT 0" +
             ")"
 
         val CREATE_INDEXES = arrayOf(
@@ -59,24 +61,44 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
 
     /**
      * 插入或更新群组状态
+     * 
+     * @throws OptimisticLockException 当版本冲突时抛出
      */
     @WorkerThread
     fun insertOrUpdateGroupState(@NonNull state: GroupV2State) {
         try {
             writableDatabase.beginTransaction()
             try {
-                val values = buildContentValues(state)
-                
                 val existingState = getGroupState(state.groupId)
+                
                 if (existingState != null) {
+                    // 更新：使用乐观锁
+                    if (state.version != existingState.version) {
+                        throw OptimisticLockException(
+                            "版本冲突: expected=${existingState.version}, actual=${state.version}, groupId=${state.groupId}"
+                        )
+                    }
+                    
+                    val newVersion = state.version + 1
+                    val values = buildContentValues(state.copy(version = newVersion))
+                    
                     val updated = writableDatabase.update(
                         TABLE_NAME,
                         values,
-                        "$GROUP_ID = ?",
-                        arrayOf(state.groupId)
+                        "$GROUP_ID = ? AND $VERSION = ?",
+                        arrayOf(state.groupId, state.version.toString())
                     )
-                    Log.d(TAG, "更新群组状态: ${state.groupId}, updated=$updated")
+                    
+                    if (updated == 0) {
+                        throw OptimisticLockException(
+                            "并发更新冲突: groupId=${state.groupId}, version=${state.version}"
+                        )
+                    }
+                    
+                    Log.d(TAG, "更新群组状态: ${state.groupId}, version: ${state.version} -> $newVersion")
                 } else {
+                    // 插入：版本号从 0 开始
+                    val values = buildContentValues(state.copy(version = 0))
                     val id = writableDatabase.insert(TABLE_NAME, null, values)
                     Log.d(TAG, "插入群组状态: ${state.groupId}, id=$id")
                 }
@@ -85,10 +107,19 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             } finally {
                 writableDatabase.endTransaction()
             }
+        } catch (e: OptimisticLockException) {
+            Log.w(TAG, "乐观锁冲突: ${state.groupId}", e)
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "插入或更新群组状态失败: ${state.groupId}", e)
+            throw e
         }
     }
+    
+    /**
+     * 乐观锁异常
+     */
+    class OptimisticLockException(message: String) : Exception(message)
 
     /**
      * 获取群组状态
@@ -207,24 +238,48 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
     }
 
     /**
-     * 添加同意成员
+     * 添加同意成员（带重试的乐观锁）
+     * 
+     * @param maxRetries 最大重试次数
      */
     @WorkerThread
-    fun addAgreedMember(@NonNull groupId: String, @NonNull memberAci: String): Boolean {
-        return try {
-            val state = getGroupState(groupId)
-            if (state != null) {
+    fun addAgreedMember(
+        @NonNull groupId: String, 
+        @NonNull memberAci: String,
+        maxRetries: Int = 3
+    ): Boolean {
+        var attempt = 0
+        while (attempt < maxRetries) {
+            try {
+                val state = getGroupState(groupId)
+                if (state == null) {
+                    Log.w(TAG, "群组状态不存在: $groupId")
+                    return false
+                }
+                
+                if (memberAci in state.agreedMembers) {
+                    Log.d(TAG, "成员已在同意列表中: $groupId, $memberAci")
+                    return true
+                }
+                
                 val newState = state.withAgreedMember(memberAci)
                 insertOrUpdateGroupState(newState)
-                true
-            } else {
-                Log.w(TAG, "群组状态不存在: $groupId")
-                false
+                return true
+                
+            } catch (e: OptimisticLockException) {
+                attempt++
+                Log.w(TAG, "添加同意成员乐观锁冲突，重试 $attempt/$maxRetries: $groupId, $memberAci")
+                if (attempt >= maxRetries) {
+                    Log.e(TAG, "添加同意成员失败，超过最大重试次数: $groupId, $memberAci")
+                    return false
+                }
+                Thread.sleep(50L * attempt)
+            } catch (e: Exception) {
+                Log.e(TAG, "添加同意成员失败: $groupId, $memberAci", e)
+                return false
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "添加同意成员失败: $groupId, $memberAci", e)
-            false
         }
+        return false
     }
 
     /**
@@ -240,6 +295,7 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             put(PROVIDER_TYPE, state.providerType)
             put(CREATED_AT, state.createdAt)
             put(UPDATED_AT, state.updatedAt)
+            put(VERSION, state.version)
         }
     }
 
@@ -257,6 +313,7 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             val providerType = cursor.getString(cursor.getColumnIndexOrThrow(PROVIDER_TYPE))
             val createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(CREATED_AT))
             val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(UPDATED_AT))
+            val version = cursor.getLong(cursor.getColumnIndexOrThrow(VERSION))
 
             val status = try {
                 GroupV2Status.valueOf(statusString)
@@ -273,7 +330,8 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
                 totalMembers = deserializeStringSet(totalMembersJson),
                 providerType = providerType,
                 createdAt = createdAt,
-                updatedAt = updatedAt
+                updatedAt = updatedAt,
+                version = version
             )
         } catch (e: Exception) {
             Log.e(TAG, "读取群组状态失败", e)
@@ -283,25 +341,34 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
 
     /**
      * 序列化字符串集合为 JSON
+     * 
+     * @throws IOException 当序列化失败时
      */
     private fun serializeStringSet(set: Set<String>): String {
         return try {
             JsonUtils.toJson(set.toList())
         } catch (e: IOException) {
-            Log.e(TAG, "序列化字符串集合失败", e)
-            "[]"
+            Log.e(TAG, "序列化字符串集合失败: size=${set.size}", e)
+            throw IOException("序列化字符串集合失败: ${e.message}", e)
         }
     }
-
+    
     /**
      * 从 JSON 反序列化字符串集合
+     * 
+     * 对于反序列化失败的情况，返回空集合是安全的选择
+     * 因为读取操作不应该因为数据格式问题而完全失败
      */
     private fun deserializeStringSet(json: String): Set<String> {
         return try {
-            val list = JsonUtils.fromJsonArray(json, String::class.java)
-            list.toSet()
-        } catch (e: IOException) {
-            Log.w(TAG, "反序列化字符串集合失败", e)
+            if (json.isBlank() || json == "null") {
+                emptySet()
+            } else {
+                val list = JsonUtils.fromJsonArray(json, String::class.java)
+                list.toSet()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "反序列化字符串集合失败，返回空集合: json=$json", e)
             emptySet()
         }
     }

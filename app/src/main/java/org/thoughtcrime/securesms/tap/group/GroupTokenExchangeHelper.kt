@@ -413,6 +413,122 @@ class GroupTokenExchangeHelper(private val context: Context) {
     }
     
     /**
+     * 发送新成员加入消息
+     * 
+     * 当新成员主动请求加入 v2 mode 时发送此消息
+     * 
+     * @param groupId 群组 ID
+     * @param newMemberAci 新成员 ACI
+     * @param memberRecipientIds 所有成员的 RecipientId 列表
+     * @param tokens 为每个成员生成的 token 映射
+     * @param providerType Provider 类型
+     * @return 发送是否成功
+     */
+    suspend fun sendNewMemberJoinMessage(
+        groupId: String,
+        newMemberAci: String,
+        memberRecipientIds: List<RecipientId>,
+        tokens: Map<String, TransportToken>,
+        providerType: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Log.i(TAG, "发送新成员加入消息: groupId=$groupId, newMember=$newMemberAci")
+            
+            // 使用 GROUP_ACCEPT 类型，但在 metadata 中标记为新成员加入
+            val joinMessage = TapTokenExchangeMessage(
+                senderAci = newMemberAci,
+                providerType = providerType,
+                tokenData = emptyMap(),
+                metadata = mapOf(
+                    "groupId" to groupId,
+                    "accepterAci" to newMemberAci,
+                    "tokens" to tokens.mapValues { (_, token) -> token.toMap() },
+                    "isNewMember" to true,  // 标记为新成员加入
+                    "timestamp" to System.currentTimeMillis()
+                ),
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACCEPT,
+                version = 1
+            )
+            
+            val messageBody = TapTokenExchangeMessage.encode(joinMessage)
+            
+            // 向群组所有成员发送（除了自己）
+            val otherMembers = memberRecipientIds.filter { recipientId ->
+                val recipient = Recipient.resolved(recipientId)
+                recipient.requireAci().toString() != newMemberAci
+            }
+            
+            var successCount = 0
+            for (recipientId in otherMembers) {
+                val sent = sendDataMessageToRecipient(recipientId, messageBody, groupId)
+                if (sent) {
+                    successCount++
+                }
+            }
+            
+            Log.i(TAG, "新成员加入消息发送完成: 成功=$successCount/${otherMembers.size}")
+            successCount == otherMembers.size
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "发送新成员加入消息失败: groupId=$groupId", e)
+            false
+        }
+    }
+    
+    /**
+     * 发送新成员响应消息
+     * 
+     * 老成员响应新成员加入请求，向新成员发送自己的 token
+     * 
+     * @param groupId 群组 ID
+     * @param senderAci 发送者 ACI（老成员）
+     * @param newMemberRecipientId 新成员的 RecipientId
+     * @param token 为新成员生成的 token
+     * @param providerType Provider 类型
+     * @return 发送是否成功
+     */
+    suspend fun sendNewMemberResponseMessage(
+        groupId: String,
+        senderAci: String,
+        newMemberRecipientId: RecipientId,
+        token: TransportToken,
+        providerType: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Log.i(TAG, "发送新成员响应消息: groupId=$groupId, sender=$senderAci")
+            
+            val responseMessage = TapTokenExchangeMessage(
+                senderAci = senderAci,
+                providerType = providerType,
+                tokenData = token.toMap(),  // 直接使用单个 token
+                metadata = mapOf(
+                    "groupId" to groupId,
+                    "isNewMemberResponse" to true,  // 标记为新成员响应
+                    "timestamp" to System.currentTimeMillis()
+                ),
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACCEPT,
+                version = 1
+            )
+            
+            val messageBody = TapTokenExchangeMessage.encode(responseMessage)
+            
+            val sent = sendDataMessageToRecipient(newMemberRecipientId, messageBody, groupId)
+            
+            if (sent) {
+                Log.i(TAG, "新成员响应消息已发送: groupId=$groupId")
+            } else {
+                Log.w(TAG, "新成员响应消息发送失败: groupId=$groupId")
+            }
+            
+            sent
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "发送新成员响应消息失败: groupId=$groupId", e)
+            false
+        }
+    }
+    
+    /**
      * 从 token 映射中提取指定成员的 token
      */
     fun extractTokenForMember(
