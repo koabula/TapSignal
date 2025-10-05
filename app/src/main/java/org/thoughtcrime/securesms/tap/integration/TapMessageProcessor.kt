@@ -1256,20 +1256,25 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                 return TapProcessResult.Failed("缺少 groupId")
             }
             
-            // 禁用群组 V2 模式
-            val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
-            val disabled = groupManager.disableV2Mode(groupId)
+            val senderAci = tokenExchangeMessage.senderAci
             
-            if (disabled) {
-                Log.i(TAG, "群组 V2 模式已禁用: groupId=$groupId")
-                
-                // 插入系统消息
-                // TODO: 获取群组 RecipientId 并插入系统消息
-                
-                TapProcessResult.Success("群组 V2 禁用处理完成")
-            } else {
-                Log.w(TAG, "群组 V2 模式禁用失败: groupId=$groupId")
-                TapProcessResult.Failed("群组 V2 模式禁用失败")
+            // 使用完整的禁用处理流程
+            val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+            val result = groupManager.handleDisableV2ModeRequest(groupId, senderAci)
+            
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success -> {
+                    Log.i(TAG, "群组 V2 模式已禁用: groupId=$groupId")
+                    TapProcessResult.Success("群组 V2 禁用处理完成")
+                }
+                is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Failed -> {
+                    Log.w(TAG, "群组 V2 模式禁用失败: groupId=$groupId, error=${result.message}")
+                    TapProcessResult.Failed("群组 V2 模式禁用失败: ${result.message}")
+                }
+                else -> {
+                    Log.w(TAG, "群组 V2 模式禁用结果未知: groupId=$groupId")
+                    TapProcessResult.Failed("禁用结果未知")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "处理群组 V2 禁用失败", e)

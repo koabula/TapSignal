@@ -1378,7 +1378,9 @@ class GroupTransportManager private constructor(private val context: Context) {
     }
     
     /**
-     * 禁用 V2 模式
+     * 禁用 V2 模式（简单版，仅重置状态）
+     * 
+     * 用于内部调用或被动禁用场景（如收到禁用消息）
      * 
      * @param groupId 群组 ID
      * @return 是否成功禁用
@@ -1404,6 +1406,367 @@ class GroupTransportManager private constructor(private val context: Context) {
                     false
                 }
             }
+        }
+    }
+    
+    /**
+     * 完整禁用 V2 模式流程
+     * 
+     * 主动禁用场景，包括：
+     * 1. 清理所有通道和 tokens
+     * 2. 停止轮询
+     * 3. 发送禁用消息给所有成员
+     * 4. 插入系统消息
+     * 5. 重置群组状态
+     * 
+     * @param groupId 群组 ID
+     * @param sendControlMessage 是否发送禁用控制消息（默认 true）
+     * @param insertSystemMessage 是否插入系统消息（默认 true）
+     * @param reason 禁用原因（可选，用于日志和调试）
+     * @return 是否成功禁用
+     */
+    suspend fun disableV2ModeComplete(
+        groupId: String,
+        sendControlMessage: Boolean = true,
+        insertSystemMessage: Boolean = true,
+        reason: String? = null
+    ): GroupOperationResult<Unit> {
+        return withContext(Dispatchers.IO) {
+            stateLock.write {
+                try {
+                    Log.i(TAG, "开始完整禁用群组 V2 模式: groupId=$groupId, reason=${reason ?: "用户主动禁用"}")
+                    
+                    // 1. 获取群组状态
+                    val currentState = groupV2StatusTable.getGroupState(groupId)
+                    if (currentState == null) {
+                        Log.w(TAG, "群组状态不存在: $groupId")
+                        return@withContext GroupOperationResult.Failed(
+                            error = GroupOperationError.GROUP_NOT_FOUND,
+                            message = "群组状态不存在"
+                        )
+                    }
+                    
+                    if (currentState.status == GroupV2Status.NATIVE) {
+                        Log.d(TAG, "群组已经是原生状态，无需禁用: $groupId")
+                        return@withContext GroupOperationResult.Success(Unit)
+                    }
+                    
+                    // 2. 获取我的 ACI 和其他成员
+                    val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                    val otherMembers = currentState.totalMembers.filter { it != myAci }
+                    
+                    // 3. 清理所有资源
+                    cleanupGroupResources(groupId, currentState)
+                    
+                    // 4. 发送禁用消息（如果需要）
+                    if (sendControlMessage && otherMembers.isNotEmpty()) {
+                        try {
+                            val memberRecipientIds = getMemberRecipientIds(groupId)
+                            if (memberRecipientIds.isNotEmpty()) {
+                                val helper = GroupTokenExchangeHelper.getInstance(context)
+                                val sent = helper.sendGroupDisableMessage(
+                                    groupId = groupId,
+                                    senderAci = myAci,
+                                    memberRecipientIds = memberRecipientIds,
+                                    providerType = currentState.providerType
+                                )
+                                
+                                if (sent) {
+                                    Log.i(TAG, "群组禁用消息已发送: groupId=$groupId")
+                                } else {
+                                    Log.w(TAG, "群组禁用消息发送失败，但继续禁用流程: groupId=$groupId")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "发送群组禁用消息异常: groupId=$groupId", e)
+                            // 即使发送失败也继续禁用流程
+                        }
+                    }
+                    
+                    // 5. 重置群组状态
+                    val resetState = currentState.reset()
+                    groupV2StatusTable.insertOrUpdateGroupState(resetState)
+                    
+                    // 6. 插入系统消息（如果需要）
+                    if (insertSystemMessage) {
+                        try {
+                            val groupRecipientId = getGroupRecipientId(groupId)
+                            if (groupRecipientId != null) {
+                                val helper = GroupTokenExchangeHelper.getInstance(context)
+                                helper.insertSystemMessage(
+                                    recipientId = groupRecipientId,
+                                    messageBody = "v2 mode 已禁用",
+                                    isEnabled = false
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "插入系统消息失败: groupId=$groupId", e)
+                        }
+                    }
+                    
+                    Log.i(TAG, "群组 V2 模式完整禁用成功: groupId=$groupId")
+                    GroupOperationResult.Success(Unit)
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "完整禁用 V2 模式失败: $groupId", e)
+                    GroupOperationResult.Failed(
+                        error = GroupOperationError.OPERATION_FAILED,
+                        message = "禁用失败: ${e.message}",
+                        cause = e
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * 清理群组资源
+     * 
+     * 包括关闭通道、停止轮询、清理 tokens
+     * 
+     * @param groupId 群组 ID
+     * @param groupState 群组状态
+     */
+    private suspend fun cleanupGroupResources(groupId: String, groupState: GroupV2State) {
+        try {
+            Log.i(TAG, "清理群组资源: groupId=$groupId")
+            
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            val otherMembers = groupState.totalMembers.filter { it != myAci }
+            
+            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+            
+            var pollingRemoved = 0
+            var channelsClosed = 0
+            var tokensRemoved = 0
+            
+            for (memberAci in otherMembers) {
+                try {
+                    // 移除轮询目标
+                    val removed = pollingService.removePollingTarget(memberAci, groupState.providerType)
+                    if (removed) {
+                        pollingRemoved++
+                    }
+                    
+                    // 关闭通道
+                    val channel = channelManager.getActiveChannel(memberAci, groupState.providerType)
+                    if (channel != null) {
+                        val closed = channelManager.closeChannel(channel.channelId)
+                        if (closed) {
+                            channelsClosed++
+                        }
+                    }
+                    
+                    // 移除 token（包括 receivedToken 和 sharedToken）
+                    val tokenRemoved = tokenPool.removeToken(memberAci, groupState.providerType)
+                    if (tokenRemoved) {
+                        tokensRemoved++
+                    }
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "清理成员资源失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
+                }
+            }
+            
+            Log.i(TAG, "群组资源清理完成: groupId=$groupId, " +
+                "轮询移除=$pollingRemoved/${otherMembers.size}, " +
+                "通道关闭=$channelsClosed/${otherMembers.size}, " +
+                "Token移除=$tokensRemoved/${otherMembers.size}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "清理群组资源异常: groupId=$groupId", e)
+            // 不抛出异常，尽可能完成清理
+        }
+    }
+    
+    /**
+     * 处理接收到的禁用消息
+     * 
+     * 当收到其他成员发送的禁用消息时调用
+     * 
+     * @param groupId 群组 ID
+     * @param senderAci 发送者 ACI
+     * @return 是否成功处理
+     */
+    suspend fun handleDisableV2ModeRequest(
+        groupId: String,
+        senderAci: String
+    ): GroupOperationResult<Unit> {
+        return withContext(Dispatchers.IO) {
+            stateLock.write {
+                try {
+                    Log.i(TAG, "处理群组禁用请求: groupId=$groupId, sender=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(senderAci)}")
+                    
+                    // 1. 获取群组状态
+                    val currentState = groupV2StatusTable.getGroupState(groupId)
+                    if (currentState == null) {
+                        Log.w(TAG, "群组状态不存在: $groupId")
+                        return@withContext GroupOperationResult.Failed(
+                            error = GroupOperationError.GROUP_NOT_FOUND,
+                            message = "群组状态不存在"
+                        )
+                    }
+                    
+                    if (currentState.status == GroupV2Status.NATIVE) {
+                        Log.d(TAG, "群组已经是原生状态: $groupId")
+                        return@withContext GroupOperationResult.Success(Unit)
+                    }
+                    
+                    // 2. 验证发送者是否为群组成员
+                    if (senderAci !in currentState.totalMembers) {
+                        Log.w(TAG, "禁用请求来自非群组成员: sender=$senderAci, groupId=$groupId")
+                        return@withContext GroupOperationResult.Failed(
+                            error = GroupOperationError.INVALID_MEMBER,
+                            message = "发送者不是群组成员"
+                        )
+                    }
+                    
+                    // 3. 清理资源（不发送控制消息，避免回声）
+                    cleanupGroupResources(groupId, currentState)
+                    
+                    // 4. 重置状态
+                    val resetState = currentState.reset()
+                    groupV2StatusTable.insertOrUpdateGroupState(resetState)
+                    
+                    // 5. 插入系统消息
+                    try {
+                        val groupRecipientId = getGroupRecipientId(groupId)
+                        if (groupRecipientId != null) {
+                            val helper = GroupTokenExchangeHelper.getInstance(context)
+                            helper.insertSystemMessage(
+                                recipientId = groupRecipientId,
+                                messageBody = "v2 mode 已禁用",
+                                isEnabled = false
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "插入系统消息失败: groupId=$groupId", e)
+                    }
+                    
+                    Log.i(TAG, "群组禁用请求处理完成: groupId=$groupId")
+                    GroupOperationResult.Success(Unit)
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理禁用请求失败: groupId=$groupId", e)
+                    GroupOperationResult.Failed(
+                        error = GroupOperationError.OPERATION_FAILED,
+                        message = "处理失败: ${e.message}",
+                        cause = e
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * 异常降级处理
+     * 
+     * 当检测到异常情况时（如轮询连续失败、token 过期等），自动降级到原生模式
+     * 
+     * @param groupId 群组 ID
+     * @param reason 降级原因
+     * @return 是否成功降级
+     */
+    suspend fun degradeV2ModeOnError(
+        groupId: String,
+        reason: String
+    ): GroupOperationResult<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.w(TAG, "群组 V2 模式异常降级: groupId=$groupId, reason=$reason")
+                
+                // 不发送控制消息（避免在网络异常时堆积失败的消息）
+                // 但插入系统消息通知用户
+                val result = disableV2ModeComplete(
+                    groupId = groupId,
+                    sendControlMessage = false,
+                    insertSystemMessage = true,
+                    reason = "异常降级: $reason"
+                )
+                
+                when (result) {
+                    is GroupOperationResult.Success -> {
+                        Log.i(TAG, "群组异常降级成功: groupId=$groupId")
+                        
+                        // 插入额外的提示消息说明降级原因
+                        try {
+                            val groupRecipientId = getGroupRecipientId(groupId)
+                            if (groupRecipientId != null) {
+                                val helper = GroupTokenExchangeHelper.getInstance(context)
+                                helper.insertCustomSystemMessage(
+                                    recipientId = groupRecipientId,
+                                    messageBody = "v2 mode 因异常自动禁用: $reason"
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "插入降级原因消息失败: groupId=$groupId", e)
+                        }
+                        
+                        GroupOperationResult.Success(Unit)
+                    }
+                    is GroupOperationResult.Failed -> {
+                        Log.e(TAG, "群组异常降级失败: groupId=$groupId, error=${result.message}")
+                        result
+                    }
+                    else -> {
+                        GroupOperationResult.Failed(
+                            error = GroupOperationError.OPERATION_FAILED,
+                            message = "降级失败"
+                        )
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "异常降级处理失败: groupId=$groupId", e)
+                GroupOperationResult.Failed(
+                    error = GroupOperationError.OPERATION_FAILED,
+                    message = "降级失败: ${e.message}",
+                    cause = e
+                )
+            }
+        }
+    }
+    
+    /**
+     * 获取群组成员的 RecipientId 列表
+     */
+    private fun getMemberRecipientIds(groupId: String): List<org.thoughtcrime.securesms.recipients.RecipientId> {
+        return try {
+            val decodedGroupId = org.thoughtcrime.securesms.groups.GroupId.parseOrThrow(groupId)
+            val groupRecipient = org.thoughtcrime.securesms.recipients.Recipient
+                .externalGroupExact(decodedGroupId)
+            
+            if (groupRecipient.isGroup) {
+                groupRecipient.participantIds
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取群组成员 RecipientId 列表失败: groupId=$groupId", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * 获取群组的 RecipientId
+     */
+    private fun getGroupRecipientId(groupId: String): org.thoughtcrime.securesms.recipients.RecipientId? {
+        return try {
+            val result = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.convert(groupId, context)
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                    result.recipientId
+                }
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                    Log.w(TAG, "转换 groupId 失败: $groupId, 原因: ${result.reason}")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取群组 RecipientId 异常: groupId=$groupId", e)
+            null
         }
     }
     

@@ -139,22 +139,27 @@
 - [x] 实现强制重新同步功能
 - [x] 创建 `GroupMembershipSynchronizer` 类
 
-## Phase 6: 禁用和降级 
+## Phase 6: 禁用和降级 ✅
 
-### 6.1 主动禁用
-- [ ] 在群组菜单中添加"Disable v2 mode"选项
-- [ ] 实现 `GroupTransportManager.disableV2Mode()`
+### 6.1 主动禁用 ✅
+- [ ] 在群组菜单中添加"Disable v2 mode"选项（UI 待实现，参考 UI_INTEGRATION_GUIDE.md）
+- [x] 实现 `GroupTransportManager.disableV2ModeComplete()`
   - 发送 GROUP_DISABLE 消息
   - 关闭所有 channels
   - 清理 tokens
   - 状态回退到 NATIVE
-- [ ] 处理 GROUP_DISABLE 消息接收
-- [ ] 插入禁用系统消息
+- [x] 实现 `GroupTransportManager.handleDisableV2ModeRequest()` - 处理接收到的禁用消息
+- [x] 更新 `TapMessageProcessor.processGroupDisable()` - 使用完整的禁用处理流程
+- [x] 实现资源清理方法 `cleanupGroupResources()`
+- [x] 插入禁用系统消息
 
-### 6.2 异常降级
-- [ ] 实现轮询连续失败后的降级逻辑
-- [ ] Token 过期后的处理流程
-- [ ] 提示用户重新建立 v2 mode
+### 6.2 异常降级 ✅
+- [x] 实现 `GroupTransportManager.degradeV2ModeOnError()` - 异常降级处理
+- [x] 创建 `GroupV2HealthMonitor` - 健康监控器
+- [x] 实现轮询连续失败监控和自动降级
+- [x] 实现通道失败监控和自动降级
+- [x] 实现 Token 过期检测
+- [x] 插入降级原因的系统消息
 
 ## Phase 7: UI 和用户体验 
 
