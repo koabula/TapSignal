@@ -296,7 +296,12 @@ final class GroupManagerV2 {
         groupCandidates = GroupCandidate.withoutExpiringProfileKeyCredentials(groupCandidates);
       }
 
-      return commitChangeWithConflictResolution(selfAci, groupOperations.createModifyGroupMembershipChange(groupCandidates, bannedMembers, selfAci));
+      GroupManager.GroupActionResult result = commitChangeWithConflictResolution(selfAci, groupOperations.createModifyGroupMembershipChange(groupCandidates, bannedMembers, selfAci));
+      
+      // 集成 Tap 群组成员变动处理：通知 tap 模块有新成员加入
+      handleTapGroupMemberAddition(newMembers);
+      
+      return result;
     }
 
     @WorkerThread
@@ -432,13 +437,18 @@ final class GroupManagerV2 {
     @NonNull GroupManager.GroupActionResult ejectMember(@NonNull ACI aci, boolean allowWhenBlocked, boolean ban, boolean sendToMembers)
         throws GroupChangeFailedException, GroupInsufficientRightsException, IOException, GroupNotAMemberException
     {
-      return commitChangeWithConflictResolution(selfAci,
+      GroupManager.GroupActionResult result = commitChangeWithConflictResolution(selfAci,
                                                 groupOperations.createRemoveMembersChange(Collections.singleton(aci),
                                                                                           ban,
                                                                                           ban ? v2GroupProperties.getDecryptedGroup().bannedMembers
                                                                                               : Collections.emptyList()),
                                                 allowWhenBlocked,
                                                 sendToMembers);
+      
+      // 集成 Tap 群组成员变动处理：通知 tap 模块有成员离开
+      handleTapGroupMemberRemoval(aci);
+      
+      return result;
     }
 
     @WorkerThread
@@ -722,6 +732,95 @@ final class GroupManagerV2 {
       } catch (VerificationFailedException e) {
         Log.w(TAG, e);
         throw new GroupChangeFailedException(e);
+      }
+    }
+
+    /**
+     * 处理 Tap 群组成员添加
+     * 在 Signal 成功添加成员后，异步通知 tap 模块
+     */
+    private void handleTapGroupMemberAddition(@NonNull Collection<RecipientId> newMembers) {
+      if (newMembers.isEmpty()) {
+        return;
+      }
+
+      try {
+        String groupIdString = android.util.Base64.encodeToString(groupId.getDecodedId(), android.util.Base64.NO_WRAP);
+        
+        // 获取当前群组所有成员的 ACI
+        DecryptedGroup decryptedGroup = v2GroupProperties.getDecryptedGroup();
+        Set<String> allMemberAcis = new HashSet<>();
+        for (DecryptedMember member : decryptedGroup.members) {
+          try {
+            UUID memberUuid = org.whispersystems.signalservice.api.util.UuidUtil.fromByteString(member.aciBytes);
+            allMemberAcis.add(ACI.from(memberUuid).toString());
+          } catch (Exception e) {
+            Log.w(TAG, "Failed to parse member ACI", e);
+          }
+        }
+
+        // 异步处理每个新成员
+        for (RecipientId newMemberId : newMembers) {
+          try {
+            Recipient newMember = Recipient.resolved(newMemberId);
+            String newMemberAci = newMember.requireServiceId().toString();
+            
+            // 在后台线程异步调用 tap 处理，避免阻塞主流程
+            final String groupIdFinal = groupIdString;
+            final String newMemberAciFinal = newMemberAci;
+            final Set<String> allMemberAcisFinal = new HashSet<>(allMemberAcis);
+            
+            org.signal.core.util.concurrent.SignalExecutors.BOUNDED.execute(() -> {
+              try {
+                org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
+                    org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
+                
+                kotlinx.coroutines.BuildersKt.runBlocking(
+                    kotlinx.coroutines.Dispatchers.getIO(),
+                    (scope, continuation) -> groupTransportManager.handleMemberJoin(groupIdFinal, newMemberAciFinal, allMemberAcisFinal, continuation)
+                );
+                
+                Log.i(TAG, "Tap group member join handled successfully");
+              } catch (Exception e) {
+                Log.w(TAG, "Failed to handle tap group member join, but Signal operation succeeded", e);
+              }
+            });
+          } catch (Exception e) {
+            Log.w(TAG, "Failed to process new member for tap handling", e);
+          }
+        }
+      } catch (Exception e) {
+        Log.w(TAG, "Failed to handle tap group member addition, but Signal operation succeeded", e);
+      }
+    }
+
+    /**
+     * 处理 Tap 群组成员移除
+     * 在 Signal 成功移除成员后，异步通知 tap 模块
+     */
+    private void handleTapGroupMemberRemoval(@NonNull ACI aci) {
+      try {
+        String groupIdString = android.util.Base64.encodeToString(groupId.getDecodedId(), android.util.Base64.NO_WRAP);
+        String memberAci = aci.toString();
+        
+        // 在后台线程异步调用 tap 处理，避免阻塞主流程
+        org.signal.core.util.concurrent.SignalExecutors.BOUNDED.execute(() -> {
+          try {
+            org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
+                org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
+            
+            kotlinx.coroutines.BuildersKt.runBlocking(
+                kotlinx.coroutines.Dispatchers.getIO(),
+                (scope, continuation) -> groupTransportManager.handleMemberLeave(groupIdString, memberAci, continuation)
+            );
+            
+            Log.i(TAG, "Tap group member leave handled successfully");
+          } catch (Exception e) {
+            Log.w(TAG, "Failed to handle tap group member leave, but Signal operation succeeded", e);
+          }
+        });
+      } catch (Exception e) {
+        Log.w(TAG, "Failed to handle tap group member removal, but Signal operation succeeded", e);
       }
     }
   }

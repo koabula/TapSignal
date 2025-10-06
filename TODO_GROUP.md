@@ -124,13 +124,14 @@
   - 新成员建立 channels 和启动轮询
 - [x] 实现 `requestJoinV2Mode()` - 新成员主动加入
 - [x] 实现 `respondToNewMemberJoin()` - 老成员响应
+- [x] 集成到 Signal 群组成员变更流程 (已完成)
 
 ### 5.2 成员离开 ✅
 - [x] 实现 `GroupTransportManager.handleMemberLeave()`
   - 删除离开成员的 token
   - 关闭相关 channel
   - 移除轮询目标
-- [ ] 集成到 Signal 群组成员变更流程 (待 Phase 7 UI 集成时完成)
+- [x] 集成到 Signal 群组成员变更流程 (已完成)
 - [x] 添加清理确认日志
 
 ### 5.3 状态同步 ✅
@@ -263,7 +264,7 @@
 ## 风险项
 
 🔴 **高风险**
-- [ ] 群组状态一致性保证机制
+- [x] 群组状态一致性保证机制 (已通过成员变动集成实现)
 - [ ] 并发上传的稳定性和性能
 - [ ] 复杂场景下的错误处理
 
