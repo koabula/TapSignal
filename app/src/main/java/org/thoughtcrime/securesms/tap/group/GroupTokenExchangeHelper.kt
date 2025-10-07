@@ -68,23 +68,22 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(offerMessage)
             
-            // 向群组所有成员发送（除了自己）
-            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-            val otherMembers = memberRecipientIds.filter { recipientId ->
-                val recipient = Recipient.resolved(recipientId)
-                recipient.requireAci().toString() != myAci
+            // 获取群组的 RecipientId
+            val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+            if (groupRecipientId == null) {
+                Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                return@withContext false
             }
             
-            var successCount = 0
-            for (recipientId in otherMembers) {
-                val sent = sendDataMessageToRecipient(recipientId, messageBody, groupId)
-                if (sent) {
-                    successCount++
-                }
-            }
+            // 发送一条群组消息（Signal 会自动广播给所有成员）
+            val sent = sendDataMessageToRecipient(
+                recipientId = groupRecipientId,
+                messageBody = messageBody,
+                groupId = groupId
+            )
             
-            Log.i(TAG, "群组提议消息发送完成: 成功=$successCount/${otherMembers.size}")
-            successCount == otherMembers.size
+            Log.i(TAG, "群组提议消息发送完成: success=$sent")
+            sent
             
         } catch (e: Exception) {
             Log.e(TAG, "发送群组提议消息失败: groupId=$groupId", e)
@@ -125,22 +124,22 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(acceptMessage)
             
-            // 向群组所有成员发送（除了自己）
-            val otherMembers = memberRecipientIds.filter { recipientId ->
-                val recipient = Recipient.resolved(recipientId)
-                recipient.requireAci().toString() != accepterAci
+            // 获取群组的 RecipientId
+            val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+            if (groupRecipientId == null) {
+                Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                return@withContext false
             }
             
-            var successCount = 0
-            for (recipientId in otherMembers) {
-                val sent = sendDataMessageToRecipient(recipientId, messageBody, groupId)
-                if (sent) {
-                    successCount++
-                }
-            }
+            // 发送一条群组消息（Signal 会自动广播给所有成员）
+            val sent = sendDataMessageToRecipient(
+                recipientId = groupRecipientId,
+                messageBody = messageBody,
+                groupId = groupId
+            )
             
-            Log.i(TAG, "群组接受消息发送完成: 成功=$successCount/${otherMembers.size}")
-            successCount == otherMembers.size
+            Log.i(TAG, "群组接受消息发送完成: success=$sent")
+            sent
             
         } catch (e: Exception) {
             Log.e(TAG, "发送群组接受消息失败: groupId=$groupId", e)
@@ -180,18 +179,22 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(activateMessage)
             
-            // 向群组所有成员发送（除了自己）
-            val otherMembers = memberRecipientIds.filter { recipientId ->
-                val recipient = Recipient.resolved(recipientId)
-                recipient.requireAci().toString() != senderAci
+            // 获取群组的 RecipientId
+            val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+            if (groupRecipientId == null) {
+                Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                return@withContext false
             }
             
-            for (recipientId in otherMembers) {
-                sendDataMessageToRecipient(recipientId, messageBody, groupId)
-            }
+            // 发送一条群组消息
+            val sent = sendDataMessageToRecipient(
+                recipientId = groupRecipientId,
+                messageBody = messageBody,
+                groupId = groupId
+            )
             
-            Log.i(TAG, "群组激活消息已发送")
-            true
+            Log.i(TAG, "群组激活消息已发送: success=$sent")
+            sent
             
         } catch (e: Exception) {
             Log.e(TAG, "发送群组激活消息失败: groupId=$groupId", e)
@@ -231,18 +234,22 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(disableMessage)
             
-            // 向群组所有成员发送（除了自己）
-            val otherMembers = memberRecipientIds.filter { recipientId ->
-                val recipient = Recipient.resolved(recipientId)
-                recipient.requireAci().toString() != senderAci
+            // 获取群组的 RecipientId
+            val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+            if (groupRecipientId == null) {
+                Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                return@withContext false
             }
             
-            for (recipientId in otherMembers) {
-                sendDataMessageToRecipient(recipientId, messageBody, groupId)
-            }
+            // 发送一条群组消息
+            val sent = sendDataMessageToRecipient(
+                recipientId = groupRecipientId,
+                messageBody = messageBody,
+                groupId = groupId
+            )
             
-            Log.i(TAG, "群组禁用消息已发送")
-            true
+            Log.i(TAG, "群组禁用消息已发送: success=$sent")
+            sent
             
         } catch (e: Exception) {
             Log.e(TAG, "发送群组禁用消息失败: groupId=$groupId", e)
@@ -292,6 +299,11 @@ class GroupTokenExchangeHelper(private val context: Context) {
      * 发送数据消息给指定接收者
      * 
      * 使用 Signal 的消息发送机制
+     * 
+     * @param recipientId 接收者 ID（可以是个人或群组）
+     * @param messageBody 消息内容
+     * @param groupId 群组 ID（如果是群组消息则提供）
+     * @return 发送是否成功
      */
     private suspend fun sendDataMessageToRecipient(
         recipientId: RecipientId,
@@ -299,19 +311,39 @@ class GroupTokenExchangeHelper(private val context: Context) {
         groupId: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val recipient = Recipient.resolved(recipientId)
+            // 确定目标 recipient 和 threadId
+            val (targetRecipient, threadId) = if (groupId != null) {
+                // 群组消息：使用群组的 recipient
+                val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+                if (groupRecipientId == null) {
+                    Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                    return@withContext false
+                }
+                
+                val groupRecipient = Recipient.resolved(groupRecipientId)
+                val groupThreadId = SignalDatabase.threads.getOrCreateThreadIdFor(groupRecipient)
+                
+                Log.d(TAG, "发送群组消息: groupId=$groupId, groupRecipientId=$groupRecipientId, threadId=$groupThreadId")
+                Pair(groupRecipient, groupThreadId)
+            } else {
+                // 私聊消息：使用个人 recipient
+                val recipient = Recipient.resolved(recipientId)
+                val recipientThreadId = SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+                
+                Log.d(TAG, "发送私聊消息: recipientId=$recipientId, threadId=$recipientThreadId")
+                Pair(recipient, recipientThreadId)
+            }
             
             // 创建外发消息
             val outgoingMessage = OutgoingMessage(
-                threadRecipient = recipient,
+                threadRecipient = targetRecipient,
                 sentTimeMillis = System.currentTimeMillis(),
                 body = messageBody,
-                expiresIn = recipient.expiresInSeconds.toLong() * 1000,
+                expiresIn = targetRecipient.expiresInSeconds.toLong() * 1000,
                 isSecure = true
             )
             
             // 将消息插入数据库
-            val threadId = SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
             val messageId = SignalDatabase.messages.insertMessageOutbox(
                 message = outgoingMessage,
                 threadId = threadId,
@@ -319,23 +351,61 @@ class GroupTokenExchangeHelper(private val context: Context) {
                 insertListener = null
             )
             
-            // 创建发送任务
-            val sendJob = IndividualSendJob.create(
-                messageId,
-                recipient,
-                false,  // hasMedia
-                false   // isScheduledSend
-            )
+            // 根据是否是群组消息选择发送Job
+            if (groupId != null) {
+                // 群组消息：使用 PushGroupSendJob
+                Log.d(TAG, "使用 PushGroupSendJob 发送群组消息: messageId=$messageId")
+                org.thoughtcrime.securesms.jobs.PushGroupSendJob.enqueue(
+                    context,
+                    AppDependencies.jobManager,
+                    messageId,
+                    targetRecipient.id,
+                    emptySet(),  // filterRecipients：不过滤，发送给所有成员
+                    false  // isScheduledSend
+                )
+            } else {
+                // 私聊消息：使用 IndividualSendJob
+                Log.d(TAG, "使用 IndividualSendJob 发送私聊消息: messageId=$messageId")
+                val sendJob = IndividualSendJob.create(
+                    messageId,
+                    targetRecipient,
+                    false,  // hasMedia
+                    false   // isScheduledSend
+                )
+                AppDependencies.jobManager.add(sendJob)
+            }
             
-            // 提交任务
-            AppDependencies.jobManager.add(sendJob)
-            
-            Log.d(TAG, "数据消息已加入发送队列: recipientId=$recipientId, messageId=$messageId")
+            Log.d(TAG, "数据消息已加入发送队列: recipientId=$recipientId, messageId=$messageId, groupId=$groupId")
             true
             
         } catch (e: Exception) {
-            Log.e(TAG, "发送数据消息失败: recipientId=$recipientId", e)
+            Log.e(TAG, "发送数据消息失败: recipientId=$recipientId, groupId=$groupId", e)
             false
+        }
+    }
+    
+    /**
+     * 从 groupId 字符串获取群组的 RecipientId
+     * 
+     * @param groupIdString 群组 ID 字符串（base64 编码）
+     * @return 群组的 RecipientId，失败返回 null
+     */
+    private fun getGroupRecipientIdFromGroupId(groupIdString: String): RecipientId? {
+        return try {
+            val result = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.convert(groupIdString, context)
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                    Log.d(TAG, "成功转换 groupId 到 RecipientId: $groupIdString -> ${result.recipientId}")
+                    result.recipientId
+                }
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                    Log.w(TAG, "转换 groupId 失败: $groupIdString, 原因: ${result.reason}")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取群组 RecipientId 异常: groupId=$groupIdString", e)
+            null
         }
     }
     
@@ -452,22 +522,22 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(joinMessage)
             
-            // 向群组所有成员发送（除了自己）
-            val otherMembers = memberRecipientIds.filter { recipientId ->
-                val recipient = Recipient.resolved(recipientId)
-                recipient.requireAci().toString() != newMemberAci
+            // 获取群组的 RecipientId
+            val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+            if (groupRecipientId == null) {
+                Log.w(TAG, "无法获取群组 RecipientId: groupId=$groupId")
+                return@withContext false
             }
             
-            var successCount = 0
-            for (recipientId in otherMembers) {
-                val sent = sendDataMessageToRecipient(recipientId, messageBody, groupId)
-                if (sent) {
-                    successCount++
-                }
-            }
+            // 发送一条群组消息
+            val sent = sendDataMessageToRecipient(
+                recipientId = groupRecipientId,
+                messageBody = messageBody,
+                groupId = groupId
+            )
             
-            Log.i(TAG, "新成员加入消息发送完成: 成功=$successCount/${otherMembers.size}")
-            successCount == otherMembers.size
+            Log.i(TAG, "新成员加入消息发送完成: success=$sent")
+            sent
             
         } catch (e: Exception) {
             Log.e(TAG, "发送新成员加入消息失败: groupId=$groupId", e)
@@ -479,8 +549,9 @@ class GroupTokenExchangeHelper(private val context: Context) {
      * 发送新成员响应消息
      * 
      * 老成员响应新成员加入请求，向新成员发送自己的 token
+     * 注意：这是点对点消息，使用私聊发送，不是群组消息
      * 
-     * @param groupId 群组 ID
+     * @param groupId 群组 ID（仅用于日志）
      * @param senderAci 发送者 ACI（老成员）
      * @param newMemberRecipientId 新成员的 RecipientId
      * @param token 为新成员生成的 token
@@ -495,7 +566,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
         providerType: String
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "发送新成员响应消息: groupId=$groupId, sender=$senderAci")
+            Log.i(TAG, "发送新成员响应消息（点对点）: groupId=$groupId, sender=$senderAci, newMember=$newMemberRecipientId")
             
             val responseMessage = TapTokenExchangeMessage(
                 senderAci = senderAci,
@@ -512,10 +583,15 @@ class GroupTokenExchangeHelper(private val context: Context) {
             
             val messageBody = TapTokenExchangeMessage.encode(responseMessage)
             
-            val sent = sendDataMessageToRecipient(newMemberRecipientId, messageBody, groupId)
+            // 使用私聊发送（不带 groupId 参数），这样消息会显示在私聊界面
+            val sent = sendDataMessageToRecipient(
+                recipientId = newMemberRecipientId,
+                messageBody = messageBody,
+                groupId = null  // 明确指定为 null，使用私聊发送
+            )
             
             if (sent) {
-                Log.i(TAG, "新成员响应消息已发送: groupId=$groupId")
+                Log.i(TAG, "新成员响应消息已发送（点对点）: groupId=$groupId")
             } else {
                 Log.w(TAG, "新成员响应消息发送失败: groupId=$groupId")
             }

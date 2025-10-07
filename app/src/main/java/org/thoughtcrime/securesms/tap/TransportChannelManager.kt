@@ -95,9 +95,6 @@ class TransportChannelManager private constructor(private val context: Context) 
         Dispatchers.IO + SupervisorJob() + CoroutineName("ChannelManager")
     )
     
-    // 使用统一的TAP数据库上下文，确保与其他组件协调
-    private val databaseContext = TapDatabaseContext.databaseDispatcher
-    
     /**
      * 初始化通道管理器
      */
@@ -883,20 +880,19 @@ class TransportChannelManager private constructor(private val context: Context) 
         }
         
         // 在锁外执行所有数据库操作，避免死锁
-        withContext(databaseContext) {
-            try {
-                // 串行保存所有通道状态
-                channelsToSave.forEach { channel ->
-                    try {
-                        saveChannelToDatabaseAsync(channel)
-                        Log.v(TAG, "已保存关闭通道: ${channel.channelId}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "保存关闭通道到数据库失败: ${channel.channelId}", e)
-                    }
+        // 使用 Dispatchers.IO 提供足够的并发性，由 SQLite 内置锁机制处理并发控制
+        try {
+            // 保存所有通道状态
+            channelsToSave.forEach { channel ->
+                try {
+                    saveChannelToDatabaseAsync(channel)
+                    Log.v(TAG, "已保存关闭通道: ${channel.channelId}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "保存关闭通道到数据库失败: ${channel.channelId}", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "保存通道状态失败", e)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "保存通道状态失败", e)
         }
         
         // 使用后台作业异步插入系统消息，完全避免数据库连接竞争
@@ -1887,24 +1883,23 @@ class TransportChannelManager private constructor(private val context: Context) 
         }
         
         // 在锁外批量同步到数据库，避免长时间持有锁
-        withContext(databaseContext) {
+        // 使用 Dispatchers.IO 提供足够的并发性，由 SQLite 内置锁机制处理并发控制
+        try {
+            Log.d(TAG, "开始同步通道状态到数据库...")
+            var syncCount = 0
+            
+            channelsToSync.forEach { channel ->
                 try {
-                    Log.d(TAG, "开始同步通道状态到数据库...")
-                    var syncCount = 0
-                    
-                channelsToSync.forEach { channel ->
-                    try {
-                        saveChannelToDatabaseAsync(channel)
-                        syncCount++
-                    } catch (e: Exception) {
-                        Log.e(TAG, "同步单个通道失败: ${channel.channelId}", e)
-                    }
-                    }
-                    
-                    Log.d(TAG, "通道状态同步完成，同步数量: $syncCount")
+                    saveChannelToDatabaseAsync(channel)
+                    syncCount++
                 } catch (e: Exception) {
-                    Log.e(TAG, "同步通道状态到数据库失败", e)
+                    Log.e(TAG, "同步单个通道失败: ${channel.channelId}", e)
+                }
             }
+            
+            Log.d(TAG, "通道状态同步完成，同步数量: $syncCount")
+        } catch (e: Exception) {
+            Log.e(TAG, "同步通道状态到数据库失败", e)
         }
     }
 

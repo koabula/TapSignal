@@ -62,45 +62,44 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
     /**
      * 插入或更新群组状态
      * 
+     * @param state 群组状态
+     * @param expectedVersion 期望的版本号（用于乐观锁）。如果为 null，将尝试 INSERT OR REPLACE
      * @throws OptimisticLockException 当版本冲突时抛出
      */
     @WorkerThread
-    fun insertOrUpdateGroupState(@NonNull state: GroupV2State) {
+    fun insertOrUpdateGroupState(@NonNull state: GroupV2State, expectedVersion: Long? = null) {
         try {
             writableDatabase.beginTransaction()
             try {
-                val existingState = getGroupState(state.groupId)
-                
-                if (existingState != null) {
-                    // 更新：使用乐观锁
-                    if (state.version != existingState.version) {
-                        throw OptimisticLockException(
-                            "版本冲突: expected=${existingState.version}, actual=${state.version}, groupId=${state.groupId}"
-                        )
-                    }
-                    
-                    val newVersion = state.version + 1
+                if (expectedVersion != null) {
+                    // 有期望版本号：使用乐观锁更新（不在事务内查询，避免连接池死锁）
+                    val newVersion = expectedVersion + 1
                     val values = buildContentValues(state.copy(version = newVersion))
                     
                     val updated = writableDatabase.update(
                         TABLE_NAME,
                         values,
                         "$GROUP_ID = ? AND $VERSION = ?",
-                        arrayOf(state.groupId, state.version.toString())
+                        arrayOf(state.groupId, expectedVersion.toString())
                     )
                     
                     if (updated == 0) {
                         throw OptimisticLockException(
-                            "并发更新冲突: groupId=${state.groupId}, version=${state.version}"
+                            "并发更新冲突: groupId=${state.groupId}, expectedVersion=$expectedVersion"
                         )
                     }
                     
-                    Log.d(TAG, "更新群组状态: ${state.groupId}, version: ${state.version} -> $newVersion")
+                    Log.d(TAG, "更新群组状态: ${state.groupId}, version: $expectedVersion -> $newVersion")
                 } else {
-                    // 插入：版本号从 0 开始
-                    val values = buildContentValues(state.copy(version = 0))
-                    val id = writableDatabase.insert(TABLE_NAME, null, values)
-                    Log.d(TAG, "插入群组状态: ${state.groupId}, id=$id")
+                    // 没有期望版本号：尝试插入，如果已存在则替换（用于新建或强制更新）
+                    val values = buildContentValues(state.copy(version = 0L))
+                    writableDatabase.insertWithOnConflict(
+                        TABLE_NAME,
+                        null,
+                        values,
+                        android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE
+                    )
+                    Log.d(TAG, "插入或替换群组状态: ${state.groupId}")
                 }
                 
                 writableDatabase.setTransactionSuccessful()
@@ -240,6 +239,8 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
     /**
      * 添加同意成员（带重试的乐观锁）
      * 
+     * 使用单一事务完成查询和更新，避免嵌套连接请求导致的死锁
+     * 
      * @param maxRetries 最大重试次数
      */
     @WorkerThread
@@ -251,20 +252,48 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
         var attempt = 0
         while (attempt < maxRetries) {
             try {
-                val state = getGroupState(groupId)
-                if (state == null) {
-                    Log.w(TAG, "群组状态不存在: $groupId")
-                    return false
-                }
-                
-                if (memberAci in state.agreedMembers) {
-                    Log.d(TAG, "成员已在同意列表中: $groupId, $memberAci")
+                // 整个操作在一个事务内完成，使用同一个数据库连接
+                writableDatabase.beginTransaction()
+                try {
+                    // 在事务内查询（使用 writableDatabase 而不是 readableDatabase）
+                    val state = getGroupStateInTransaction(groupId)
+                    if (state == null) {
+                        Log.w(TAG, "群组状态不存在: $groupId")
+                        writableDatabase.setTransactionSuccessful()
+                        return false
+                    }
+                    
+                    if (memberAci in state.agreedMembers) {
+                        Log.d(TAG, "成员已在同意列表中: $groupId, $memberAci")
+                        writableDatabase.setTransactionSuccessful()
+                        return true
+                    }
+                    
+                    // 在事务内更新（使用乐观锁）
+                    val newState = state.withAgreedMember(memberAci)
+                    val newVersion = state.version + 1
+                    val values = buildContentValues(newState.copy(version = newVersion))
+                    
+                    val updated = writableDatabase.update(
+                        TABLE_NAME,
+                        values,
+                        "$GROUP_ID = ? AND $VERSION = ?",
+                        arrayOf(state.groupId, state.version.toString())
+                    )
+                    
+                    if (updated == 0) {
+                        throw OptimisticLockException(
+                            "并发更新冲突: groupId=$groupId, expectedVersion=${state.version}"
+                        )
+                    }
+                    
+                    Log.d(TAG, "成功添加同意成员: $groupId, $memberAci, version: ${state.version} -> $newVersion")
+                    writableDatabase.setTransactionSuccessful()
                     return true
+                    
+                } finally {
+                    writableDatabase.endTransaction()
                 }
-                
-                val newState = state.withAgreedMember(memberAci)
-                insertOrUpdateGroupState(newState)
-                return true
                 
             } catch (e: OptimisticLockException) {
                 attempt++
@@ -273,6 +302,7 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
                     Log.e(TAG, "添加同意成员失败，超过最大重试次数: $groupId, $memberAci")
                     return false
                 }
+                // 指数退避
                 Thread.sleep(50L * attempt)
             } catch (e: Exception) {
                 Log.e(TAG, "添加同意成员失败: $groupId, $memberAci", e)
@@ -280,6 +310,36 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             }
         }
         return false
+    }
+    
+    /**
+     * 在现有事务内查询群组状态
+     * 
+     * 注意：此方法必须在事务内调用，使用 writableDatabase 确保使用同一连接
+     */
+    @WorkerThread
+    @Nullable
+    private fun getGroupStateInTransaction(@NonNull groupId: String): GroupV2State? {
+        return try {
+            writableDatabase.query(
+                TABLE_NAME,
+                null,
+                "$GROUP_ID = ?",
+                arrayOf(groupId),
+                null,
+                null,
+                null
+            ).use { cursor ->
+                if (cursor != null && cursor.moveToFirst()) {
+                    readGroupState(cursor)
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "在事务内查询群组状态失败: $groupId", e)
+            null
+        }
     }
 
     /**

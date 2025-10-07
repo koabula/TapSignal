@@ -66,6 +66,12 @@ class TapV2ModeIndicator @JvmOverloads constructor(
      * @param recipient 接收方
      */
     fun updateStatus(recipient: Recipient) {
+        // Groups should not call this method, they use separate group indicator logic
+        if (recipient.isGroup) {
+            visibility = GONE
+            return
+        }
+        
         // 取消之前的更新任务，避免重复操作
         currentUpdateJob?.cancel()
         
@@ -74,8 +80,8 @@ class TapV2ModeIndicator @JvmOverloads constructor(
                 // 获取recipient ACI（在主线程安全操作）
                 val recipientAci = try {
                     recipient.requireAci().toString()
-                } catch (e: Exception) {
-                    Log.w(TAG, "无法获取recipient ACI，跳过Tap v2指示器更新: ${e.message}")
+                } catch (e: Throwable) {
+                    Log.w(TAG, "无法获取recipient ACI（可能是群组或其他原因），跳过Tap v2指示器更新: ${e.message}")
                     visibility = GONE
                     return@launch
                 }
