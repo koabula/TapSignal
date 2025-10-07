@@ -56,12 +56,24 @@ class GroupTokenExchangeHelper(private val context: Context) {
         try {
             Log.i(TAG, "发送群组 V2 提议消息: groupId=$groupId, members=${memberRecipientIds.size}")
             
+            // 提取所有成员的 ACI
+            val totalMembers = memberRecipientIds.mapNotNull { recipientId ->
+                try {
+                    Recipient.resolved(recipientId).requireAci().toString()
+                } catch (e: Exception) {
+                    Log.w(TAG, "无法获取成员 ACI: recipientId=$recipientId", e)
+                    null
+                }
+            }.toSet()
+            
+            Log.d(TAG, "群组成员 ACIs: totalMembers=${totalMembers.size}")
+            
             // 构建群组提议消息
             val offerMessage = TapTokenExchangeMessage(
                 senderAci = proposerAci,
                 providerType = providerType,
                 tokenData = emptyMap(), // 群组消息中不包含单个 token，而是在 metadata 中
-                metadata = buildGroupOfferMetadata(groupId, proposerAci, tokens),
+                metadata = buildGroupOfferMetadata(groupId, proposerAci, tokens, totalMembers),
                 requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_OFFER,
                 version = 1
             )
@@ -263,7 +275,8 @@ class GroupTokenExchangeHelper(private val context: Context) {
     private fun buildGroupOfferMetadata(
         groupId: String,
         proposerAci: String,
-        tokens: Map<String, TransportToken>
+        tokens: Map<String, TransportToken>,
+        totalMembers: Set<String>
     ): Map<String, Any> {
         val tokensData = tokens.mapValues { (_, token) -> token.toMap() }
         
@@ -271,6 +284,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
             "groupId" to groupId,
             "proposerAci" to proposerAci,
             "tokens" to tokensData,
+            "totalMembers" to totalMembers.toList(),
             "timestamp" to System.currentTimeMillis()
         )
     }

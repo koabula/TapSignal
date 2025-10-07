@@ -225,7 +225,10 @@ public final class PushGroupSendJob extends PushSendJob {
       }
 
       // 检查群组是否处于 v2 mode
-      String groupIdString = groupRecipient.requireGroupId().toString();
+      String groupIdString = android.util.Base64.encodeToString(
+          groupRecipient.requireGroupId().getDecodedId(),
+          android.util.Base64.NO_WRAP
+      );
       org.thoughtcrime.securesms.tap.group.GroupTransportManager groupTransportManager = 
           org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
       org.thoughtcrime.securesms.tap.group.GroupV2Status groupV2Status = groupTransportManager.getGroupStatusSync(groupIdString);

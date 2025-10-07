@@ -199,6 +199,39 @@ class GroupTransportManager private constructor(private val context: Context) {
     }
     
     /**
+     * 创建或更新群组状态（用于接收者初始化）
+     * 
+     * 当接收者收到 GROUP_OFFER 消息时，需要在本地数据库创建群组状态记录。
+     * 如果状态已存在，则跳过创建，避免覆盖已有数据。
+     * 
+     * Note: Caller should ensure this is called from Dispatchers.IO context
+     * 
+     * @param groupId 群组 ID
+     * @param initialState 初始状态
+     * @return 是否成功创建或更新
+     */
+    suspend fun createOrUpdateGroupState(groupId: String, initialState: GroupV2State): Boolean {
+        return try {
+            val existing = groupV2StatusTable.getGroupState(groupId)
+            if (existing == null) {
+                // 创建新状态
+                groupV2StatusTable.insertOrUpdateGroupState(initialState, expectedVersion = null)
+                Log.i(TAG, "接收者创建群组状态: groupId=$groupId, status=${initialState.status}, " +
+                    "proposer=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(initialState.proposerAci ?: "null")}, " +
+                    "totalMembers=${initialState.totalMembers.size}, agreedMembers=${initialState.agreedMembers.size}")
+                true
+            } else {
+                // 状态已存在，可能已经由本地提议创建，或者是重复消息
+                Log.d(TAG, "群组状态已存在，跳过创建: groupId=$groupId, existingStatus=${existing.status}")
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "创建群组状态失败: groupId=$groupId", e)
+            false
+        }
+    }
+    
+    /**
      * 提议群组使用 V2 模式
      * 
      * @param groupId 群组 ID

@@ -113,9 +113,13 @@ import java.util.Optional
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 object DataMessageProcessor {
 
+  private val TAG = Log.tag(DataMessageProcessor::class.java)
   private const val BODY_RANGE_PROCESSING_LIMIT = 250
 
   fun process(
@@ -1003,16 +1007,20 @@ object DataMessageProcessor {
     // 检查是否为Tap传输层控制消息（请求/响应/撤销）
     val tapMessageProcessor = org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.getInstance(context)
     if (tapMessageProcessor.isTapMessage(body)) {
-      log(envelope.timestamp!!, "🎛️ 检测到Tap传输层控制消息，特殊处理: bodyLength=${body.length}")
+      log(envelope.timestamp!!, "Tap control message detected, processing asynchronously: bodyLength=${body.length}")
 
-      // 处理Tap传输层控制消息（请求/响应/撤销）
-      val result = kotlinx.coroutines.runBlocking { 
-        tapMessageProcessor.processTapMessage(senderRecipient.id, body)
+      // 异步处理Tap传输层控制消息，避免阻塞当前线程和死锁
+      GlobalScope.launch(Dispatchers.IO) {
+        try {
+          tapMessageProcessor.processTapMessage(senderRecipient.id, body)
+          Log.i(TAG, "Tap control message processed successfully: timestamp=${envelope.timestamp}")
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to process Tap control message: timestamp=${envelope.timestamp}", e)
+        }
       }
-      log(envelope.timestamp!!, "🎛️ Tap传输层控制消息处理完成，不插入消息数据库")
+      log(envelope.timestamp!!, "Tap control message queued for async processing, not inserting into message database")
 
-      // Tap传输层控制消息不插入普通消息数据库，而是显示为特殊UI
-      // 这里我们返回null，表示不需要插入普通消息
+      // Tap传输层控制消息不插入普通消息数据库
       return null
     }
 

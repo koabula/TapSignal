@@ -1198,45 +1198,109 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                 return TapProcessResult.Failed("缺少 proposerAci")
             }
             
-            Log.d(TAG, "群组提议消息: groupId=$groupId, proposer=$proposerAci, senderPersonalId=$senderId")
+            // 提取成员列表
+            val totalMembersList = tokenExchangeMessage.metadata["totalMembers"] as? List<*>
+            val totalMembers = totalMembersList?.mapNotNull { it as? String }?.toSet() ?: emptySet()
             
-            // 异步处理通知显示，不阻塞消息处理流程
-            // 所有数据库操作在 IO 线程执行，避免死锁
-            processorScope.launch(Dispatchers.IO) {
-                try {
-                    // 添加超时保护，避免长时间等待
-                    withTimeout(3000L) {
-                        Log.d(TAG, "异步获取群组 RecipientId: groupId=$groupId")
-                        
-                        // 在 IO 线程获取 RecipientId（数据库操作）
-                        val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
-                        
-                        if (groupRecipientId != null) {
-                            Log.d(TAG, "群组提议消息路由成功: groupId=$groupId, groupRecipientId=$groupRecipientId")
-                            
-                            // 切换到主线程显示通知（Android 要求）
-                            withContext(Dispatchers.Main) {
-                                showGroupTokenExchangeNotification(
-                                    groupRecipientId = groupRecipientId,
-                                    groupId = groupId,
-                                    tokenExchangeMessage = tokenExchangeMessage,
-                                    isProposer = true
-                                )
-                            }
-                            Log.i(TAG, "群组 V2 提议通知已显示: groupId=$groupId")
-                        } else {
-                            Log.w(TAG, "无法获取群组 RecipientId，跳过通知显示: groupId=$groupId")
-                        }
-                    }
-                } catch (e: TimeoutCancellationException) {
-                    Log.w(TAG, "获取群组信息超时，跳过通知显示: groupId=$groupId", e)
-                } catch (e: Exception) {
-                    Log.e(TAG, "异步显示群组提议通知失败: groupId=$groupId", e)
-                }
+            if (totalMembers.isEmpty()) {
+                Log.w(TAG, "群组提议消息缺少 totalMembers")
+                return TapProcessResult.Failed("缺少 totalMembers")
             }
             
-            // 立即返回成功，不等待通知显示完成
-            TapProcessResult.Success("群组 V2 提议处理完成，通知将异步显示")
+            Log.d(TAG, "群组提议消息: groupId=$groupId, proposer=$proposerAci, senderPersonalId=$senderId, totalMembers=${totalMembers.size}")
+            
+            // 同步创建群组状态和保存token（必须完成才能继续）
+            // 数据库操作在 IO 线程执行，添加超时保护避免死锁
+            return withContext(Dispatchers.IO) {
+                try {
+                    withTimeout(10000L) {  // 10秒超时保护
+                        Log.d(TAG, "同步处理群组提议: groupId=$groupId")
+                        
+                        // 1. 在本地数据库创建群组状态（同步执行，必须成功）
+                        val initialState = org.thoughtcrime.securesms.tap.group.GroupV2State(
+                            groupId = groupId,
+                            status = org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING,
+                            proposerAci = proposerAci,
+                            agreedMembers = setOf(proposerAci),  // 提议者已同意
+                            totalMembers = totalMembers,
+                            providerType = tokenExchangeMessage.providerType,
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis(),
+                            version = 0
+                        )
+                        
+                        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+                        val stateCreated = groupManager.createOrUpdateGroupState(groupId, initialState)
+                        
+                        if (!stateCreated) {
+                            Log.e(TAG, "创建群组状态失败: groupId=$groupId")
+                            return@withTimeout TapProcessResult.Failed("创建群组状态失败")
+                        }
+                        
+                        Log.i(TAG, "群组状态创建成功: groupId=$groupId, status=PROPOSING")
+                        
+                        // 2. 同步保存提议者的 token（必须成功）
+                        val tokensData = tokenExchangeMessage.metadata["tokens"] as? Map<String, Any>
+                        if (tokensData != null) {
+                            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                            val helper = org.thoughtcrime.securesms.tap.group.GroupTokenExchangeHelper.getInstance(context)
+                            val myToken = helper.extractTokenForMember(tokensData, myAci)
+                            
+                            if (myToken != null) {
+                                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                                val saved = tokenPool.addReceivedToken(proposerAci, myToken)
+                                if (saved) {
+                                    Log.i(TAG, "已保存提议者的 token: proposer=$proposerAci, groupId=$groupId")
+                                } else {
+                                    Log.w(TAG, "保存提议者 token 失败: proposer=$proposerAci, groupId=$groupId")
+                                }
+                            } else {
+                                Log.w(TAG, "未找到本用户的 token: myAci=$myAci, groupId=$groupId")
+                            }
+                        }
+                        
+                        // 3. 异步显示通知（不阻塞主流程）
+                        processorScope.launch {
+                            try {
+                                withTimeout(5000L) {  // 5秒超时
+                                    Log.d(TAG, "异步获取群组 RecipientId 并显示通知: groupId=$groupId")
+                                    val groupRecipientId = getGroupRecipientIdFromGroupId(groupId)
+                                    
+                                    if (groupRecipientId != null) {
+                                        Log.d(TAG, "群组提议消息路由成功: groupId=$groupId, groupRecipientId=$groupRecipientId")
+                                        
+                                        // 切换到主线程显示通知（Android 要求）
+                                        withContext(Dispatchers.Main) {
+                                            showGroupTokenExchangeNotification(
+                                                groupRecipientId = groupRecipientId,
+                                                groupId = groupId,
+                                                tokenExchangeMessage = tokenExchangeMessage,
+                                                isProposer = true
+                                            )
+                                        }
+                                        Log.i(TAG, "群组 V2 提议通知已显示: groupId=$groupId")
+                                    } else {
+                                        Log.w(TAG, "无法获取群组 RecipientId，跳过通知显示: groupId=$groupId")
+                                    }
+                                }
+                            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                                Log.w(TAG, "显示通知超时: groupId=$groupId")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "异步显示群组提议通知失败: groupId=$groupId", e)
+                            }
+                        }
+                        
+                        // 状态和token已创建成功，返回成功
+                        TapProcessResult.Success("群组状态创建成功")
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    Log.e(TAG, "处理群组提议超时: groupId=$groupId")
+                    TapProcessResult.Failed("处理超时")
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理群组提议失败: groupId=$groupId", e)
+                    TapProcessResult.Failed("处理失败: ${e.message}")
+                }
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "处理群组 V2 提议失败: senderId=$senderId", e)
@@ -1589,6 +1653,7 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             // 创建确认按钮的Intent
             val acceptIntent = android.content.Intent(context, org.thoughtcrime.securesms.tap.group.GroupTokenExchangeReceiver::class.java).apply {
                 action = "ACCEPT_GROUP_TOKEN_EXCHANGE"
+                putExtra("senderId", tokenExchangeMessage.senderAci)
                 putExtra("groupRecipientId", groupRecipientId.toString())
                 putExtra("groupId", groupId)
                 putExtra("tokenExchangeMessage", org.thoughtcrime.securesms.util.JsonUtils.toJson(tokenExchangeMessage))
@@ -1604,6 +1669,7 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             // 创建拒绝按钮的Intent
             val rejectIntent = android.content.Intent(context, org.thoughtcrime.securesms.tap.group.GroupTokenExchangeReceiver::class.java).apply {
                 action = "REJECT_GROUP_TOKEN_EXCHANGE"
+                putExtra("senderId", tokenExchangeMessage.senderAci)
                 putExtra("groupRecipientId", groupRecipientId.toString())
                 putExtra("groupId", groupId)
             }

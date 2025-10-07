@@ -1,0 +1,164 @@
+2025-10-07 17:04:19.019 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  下载文件: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat, size=290
+2025-10-07 17:04:19.031 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 远程路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:19.038 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 原始路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:19.039 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 标准化路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:19.283 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 预期文件: /data/user/0/org.thoughtcrime.securesms/cache/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:19.294 16340-16454 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:19.326 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D  下载文件成功: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat -> /data/user/0/org.thoughtcrime.securesms/cache/cos_download_5835178454449281812.dat, 大小: 290 bytes
+2025-10-07 17:04:19.326 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  文件下载成功: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:23.964 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  下载文件: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat, size=290
+2025-10-07 17:04:23.972 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 远程路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:23.980 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 原始路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:23.981 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 标准化路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:24.276 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 预期文件: /data/user/0/org.thoughtcrime.securesms/cache/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:24.279 16340-16455 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:24.290 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D  下载文件成功: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat -> /data/user/0/org.thoughtcrime.securesms/cache/cos_download_3681723241535470715.dat, 大小: 290 bytes
+2025-10-07 17:04:24.291 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  文件下载成功: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:26.974  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.975  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.977  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.980  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.980  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.980  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.980  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.980  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.981  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.982  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.982  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.982  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.983  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.984  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.984  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.986  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.986  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.987  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.987  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.988  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.990  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.990  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.991  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.994  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.995  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.995  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:26.995  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.006  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.006  9087-16663 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.007  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups text_classifier
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.010  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.011  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.012  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.012  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.012  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups spam_verdict_enforcement_policy_config
+2025-10-07 17:04:27.012  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups birthday_grammars
+2025-10-07 17:04:27.015  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.018  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.030  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups animated_emoji
+2025-10-07 17:04:27.032  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups text_classifier
+2025-10-07 17:04:27.033  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups spam_verdict_enforcement_policy_config
+2025-10-07 17:04:27.051  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups birthday_grammars
+2025-10-07 17:04:27.129  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups animated_emoji
+2025-10-07 17:04:27.528  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.528  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.528  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.529  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.529  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.531  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.531  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.540  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.540  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.540  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.540  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.541  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.541  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.541  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.541  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.562  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.570  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.570  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.570  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.570  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.570  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.571  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.571  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.571  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.590  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.590  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.590  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.606  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.615  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.618  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups text_classifier
+2025-10-07 17:04:27.619  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups spam_verdict_enforcement_policy_config
+2025-10-07 17:04:27.620  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups birthday_grammars
+2025-10-07 17:04:27.629  9087-16667 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups animated_emoji
+2025-10-07 17:04:27.783  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.783  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.783  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.784  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.785  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.785  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.786  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.787  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.788  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.792  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.795  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.804  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.806  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    E  Failed to add file group 
+2025-10-07 17:04:27.808  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups text_classifier
+2025-10-07 17:04:27.808  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups spam_verdict_enforcement_policy_config
+2025-10-07 17:04:27.818  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups birthday_grammars
+2025-10-07 17:04:27.841  9087-16664 PhFileGroupPop          com.google.android.apps.messaging    D  Added file groups animated_emoji
+2025-10-07 17:04:28.980 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  下载文件: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat, size=290
+2025-10-07 17:04:28.984 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 远程路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:29.013 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 原始路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:29.014 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 标准化路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:29.310 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 预期文件: /data/user/0/org.thoughtcrime.securesms/cache/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:29.314 16340-16454 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:29.339 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D  下载文件成功: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat -> /data/user/0/org.thoughtcrime.securesms/cache/cos_download_2231181048718355057.dat, 大小: 290 bytes
+2025-10-07 17:04:29.340 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  文件下载成功: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.069 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  下载文件: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat, size=290
+2025-10-07 17:04:34.078 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 远程路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.093 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 原始路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.094 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 标准化路径: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.352 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D    - 预期文件: /data/user/0/org.thoughtcrime.securesms/cache/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.360 16340-16367 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
+2025-10-07 17:04:34.382 16340-16375 TencentCosClient        org.thoughtcrime.securesms           D  下载文件成功: v2-channels/053abb43f297ee1d/outbox/attachments/group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat -> /data/user/0/org.thoughtcrime.securesms/cache/cos_download_3371285365687202392.dat, 大小: 290 bytes
+2025-10-07 17:04:34.384 16340-16375 CosTransportProvider    org.thoughtcrime.securesms           D  文件下载成功: group_raqd+4Q0YB8vu4eFkbQklVwhyjlZT0wByBoyLvRGLgE=_1269_1759827855440.dat
