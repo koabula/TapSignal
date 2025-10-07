@@ -1457,6 +1457,30 @@ class ConversationFragment :
   }
   
   /**
+   * 显示取消群组 v2 mode 提议确认对话框
+   */
+  private fun showGroupV2ModeCancelProposalDialog(
+    recipient: Recipient, 
+    groupIdString: String,
+    groupState: org.thoughtcrime.securesms.tap.group.GroupV2State
+  ) {
+    MaterialAlertDialogBuilder(requireContext())
+      .setTitle(R.string.conversation__cancel_group_v2_proposal)
+      .setMessage(
+        getString(
+          R.string.conversation__cancel_group_v2_proposal_message,
+          groupState.agreedMembers.size,
+          groupState.totalMembers.size
+        )
+      )
+      .setPositiveButton(R.string.conversation__cancel_proposal) { _, _ ->
+        disableGroupV2Mode(recipient, groupIdString)
+      }
+      .setNegativeButton(R.string.conversation__keep_waiting, null)
+      .show()
+  }
+  
+  /**
    * 显示群组 v2 mode 禁用确认对话框
    */
   private fun showGroupV2ModeDisableDialog(recipient: Recipient, groupIdString: String) {
@@ -1506,22 +1530,70 @@ class ConversationFragment :
   
   /**
    * 禁用群组 v2 mode
+   * 
+   * 根据当前状态选择不同的处理方式：
+   * - PROPOSING: 提议者调用 cancelV2Proposal()
+   * - FULL_V2_ACTIVE: 调用 disableV2ModeComplete()
    */
   private fun disableGroupV2Mode(recipient: Recipient, groupIdString: String) {
     lifecycleScope.launch(Dispatchers.IO) {
       try {
         val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
-        val result = groupManager.disableV2ModeComplete(groupIdString)
+        
+        // 检查当前状态
+        val statusResult = groupManager.getGroupStatus(groupIdString)
+        if (statusResult !is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success) {
+          kotlinx.coroutines.withContext(Dispatchers.Main) {
+            Toast.makeText(requireContext(), R.string.conversation__failed_to_get_group_status, Toast.LENGTH_SHORT).show()
+          }
+          return@launch
+        }
+        
+        // 根据状态选择不同的处理方式
+        if (statusResult.data == org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE) {
+          // NATIVE 状态不需要禁用
+          kotlinx.coroutines.withContext(Dispatchers.Main) {
+            Toast.makeText(requireContext(), R.string.conversation__group_v2_not_active, Toast.LENGTH_SHORT).show()
+          }
+          return@launch
+        }
+        
+        val result = when (statusResult.data) {
+          org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING -> {
+            // 在提议阶段，调用 cancelV2Proposal
+            Log.d(TAG, "取消 v2 mode 提议: groupId=$groupIdString")
+            groupManager.cancelV2Proposal(groupIdString)
+          }
+          org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE -> {
+            // 在激活阶段，调用完整的禁用流程
+            Log.d(TAG, "禁用 v2 mode: groupId=$groupIdString")
+            groupManager.disableV2ModeComplete(groupIdString)
+          }
+          else -> {
+            // 理论上不应该到这里
+            Log.w(TAG, "未知的群组状态: ${statusResult.data}")
+            return@launch
+          }
+        }
         
         kotlinx.coroutines.withContext(Dispatchers.Main) {
           when (result) {
             is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success -> {
-              Toast.makeText(requireContext(), R.string.conversation__group_v2_disabled, Toast.LENGTH_SHORT).show()
+              val messageResId = if (statusResult.data == org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING) {
+                R.string.conversation__group_v2_proposal_cancelled
+              } else {
+                R.string.conversation__group_v2_disabled
+              }
+              Toast.makeText(requireContext(), messageResId, Toast.LENGTH_SHORT).show()
               // 刷新菜单
               invalidateOptionsMenu()
             }
             is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Failed -> {
-              Toast.makeText(requireContext(), R.string.conversation__group_v2_disable_failed, Toast.LENGTH_SHORT).show()
+              val errorMessage = result.message ?: getString(R.string.conversation__group_v2_disable_failed)
+              Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show()
+            }
+            else -> {
+              // 不应该到这里
             }
           }
         }
@@ -4218,14 +4290,23 @@ class ConversationFragment :
                 showGroupV2ModeEnableDialog(recipient, groupIdString)
               }
               org.thoughtcrime.securesms.tap.group.GroupV2Status.PROPOSING -> {
-                // 已经在提议中，不需要额外操作
+                // 在提议阶段，显示禁用/取消提议的对话框
                 val groupState = groupManager.getGroupStateSync(groupIdString)
-                val message = if (groupState != null) {
-                  getString(R.string.conversation__group_v2_proposing_status, groupState.agreedMembers.size, groupState.totalMembers.size)
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                
+                // 检查是否为提议者
+                if (groupState?.proposerAci == myAci) {
+                  // 提议者可以取消提议
+                  showGroupV2ModeCancelProposalDialog(recipient, groupIdString, groupState)
                 } else {
-                  getString(R.string.conversation__group_v2_proposing)
+                  // 非提议者只能查看状态
+                  val message = if (groupState != null) {
+                    getString(R.string.conversation__group_v2_proposing_status, groupState.agreedMembers.size, groupState.totalMembers.size)
+                  } else {
+                    getString(R.string.conversation__group_v2_proposing)
+                  }
+                  Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
                 }
-                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
               }
               org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE -> {
                 // 显示禁用确认对话框

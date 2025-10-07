@@ -377,6 +377,8 @@ class GroupTransportManager private constructor(private val context: Context) {
     suspend fun acceptV2Proposal(groupId: String, memberAci: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "开始接受 V2 提议: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                
                 // 直接调用数据库操作，不持有应用层锁
                 // addAgreedMember 已优化：在单个事务内完成查询和更新，避免死锁
                 // 内部实现了乐观锁机制和重试，可以安全处理并发
@@ -388,26 +390,39 @@ class GroupTransportManager private constructor(private val context: Context) {
                     return@withContext false
                 }
                 
+                Log.d(TAG, "当前群组状态: groupId=$groupId, status=${currentState.status}, " +
+                        "agreedMembers=${currentState.agreedMembers.size}/${currentState.totalMembers.size}, " +
+                        "proposer=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(currentState.proposerAci ?: "null")}")
+                
                 if (currentState.status != GroupV2Status.PROPOSING) {
                     Log.w(TAG, "群组不在提议状态: $groupId, status=${currentState.status}")
                     return@withContext false
                 }
                 
                 if (memberAci in currentState.agreedMembers) {
-                    Log.d(TAG, "成员已经同意: $groupId, member=$memberAci")
+                    Log.d(TAG, "成员已经同意: $groupId, member=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
                     return@withContext true
                 }
+                
+                Log.d(TAG, "添加前 agreedMembers: ${currentState.agreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
                 
                 // 执行原子更新操作（单一事务，避免死锁）
                 val success = groupV2StatusTable.addAgreedMember(groupId, memberAci)
                 if (success) {
-                    Log.i(TAG, "成员接受 V2 提议: $groupId, member=$memberAci")
+                    Log.i(TAG, "成员接受 V2 提议成功: $groupId, member=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                    
+                    // 重新读取状态验证
+                    val updatedState = groupV2StatusTable.getGroupState(groupId)
+                    if (updatedState != null) {
+                        Log.d(TAG, "更新后 agreedMembers: ${updatedState.agreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                        Log.d(TAG, "是否全员同意: ${updatedState.isFullyAgreed()}")
+                    }
                 } else {
-                    Log.w(TAG, "成员接受 V2 提议失败（可能由于并发冲突）: $groupId, member=$memberAci")
+                    Log.w(TAG, "成员接受 V2 提议失败（可能由于并发冲突）: $groupId, member=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
                 }
                 success
             } catch (e: Exception) {
-                Log.e(TAG, "接受 V2 提议失败: $groupId, $memberAci", e)
+                Log.e(TAG, "接受 V2 提议失败: $groupId, ${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
                 false
             }
         }
@@ -424,6 +439,8 @@ class GroupTransportManager private constructor(private val context: Context) {
     suspend fun checkAndActivateV2Mode(groupId: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "检查是否可激活 V2 模式: groupId=$groupId")
+                
                 // 直接调用数据库操作，不持有应用层锁
                 // 避免"应用层锁 → 数据库事务"的嵌套导致死锁
                 val currentState = groupV2StatusTable.getGroupState(groupId)
@@ -432,20 +449,33 @@ class GroupTransportManager private constructor(private val context: Context) {
                     return@withContext false
                 }
                 
+                Log.d(TAG, "群组状态检查: groupId=$groupId, status=${currentState.status}, " +
+                        "agreedMembers=${currentState.agreedMembers.size}/${currentState.totalMembers.size}")
+                Log.d(TAG, "同意成员列表: ${currentState.agreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                Log.d(TAG, "全部成员列表: ${currentState.totalMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                
                 if (currentState.status != GroupV2Status.PROPOSING) {
-                    Log.d(TAG, "群组不在提议状态: $groupId, status=${currentState.status}")
+                    Log.d(TAG, "群组不在提议状态，无法激活: $groupId, status=${currentState.status}")
                     return@withContext false
                 }
                 
-                if (!currentState.isFullyAgreed()) {
-                    Log.d(TAG, "群组尚未全员同意: $groupId, agreed=${currentState.agreedMembers.size}, total=${currentState.totalMembers.size}")
+                val isFullyAgreed = currentState.isFullyAgreed()
+                Log.d(TAG, "全员同意检查结果: $isFullyAgreed (agreed=${currentState.agreedMembers.size}, total=${currentState.totalMembers.size})")
+                
+                if (!isFullyAgreed) {
+                    val notAgreedMembers = currentState.totalMembers - currentState.agreedMembers
+                    Log.d(TAG, "群组尚未全员同意: $groupId, 未同意成员: ${notAgreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
                     return@withContext false
                 }
+                
+                Log.i(TAG, "所有成员已同意，开始激活 V2 模式: $groupId")
                 
                 // 升级为 FULL_V2_ACTIVE（数据库内部有事务保证原子性）
                 val success = groupV2StatusTable.updateGroupStatus(groupId, GroupV2Status.FULL_V2_ACTIVE)
                 if (success) {
                     Log.i(TAG, "群组 V2 模式激活成功: $groupId")
+                } else {
+                    Log.e(TAG, "群组 V2 模式激活失败（数据库更新失败）: $groupId")
                 }
                 success
             } catch (e: Exception) {
@@ -1032,16 +1062,16 @@ class GroupTransportManager private constructor(private val context: Context) {
             Log.i(TAG, "群组已回退到原生状态: $groupId")
             
             // 3. 插入系统消息通知用户
-            val decodedGroupId = org.thoughtcrime.securesms.groups.GroupId.parseOrThrow(groupId)
-            val groupRecipientId = org.thoughtcrime.securesms.recipients.Recipient
-                .externalGroupExact(decodedGroupId)
-                .id
-            
-            val helper = GroupTokenExchangeHelper.getInstance(context)
-            helper.insertCustomSystemMessage(
-                recipientId = groupRecipientId,
-                messageBody = "群组成员变动，v2 mode 提议已取消"
-            )
+            val groupRecipientId = getGroupRecipientId(groupId)
+            if (groupRecipientId != null) {
+                val helper = GroupTokenExchangeHelper.getInstance(context)
+                helper.insertCustomSystemMessage(
+                    recipientId = groupRecipientId,
+                    messageBody = "群组成员变动，v2 mode 提议已取消"
+                )
+            } else {
+                Log.w(TAG, "无法获取群组 RecipientId，跳过系统消息插入: $groupId")
+            }
             
             true
             
@@ -1378,6 +1408,106 @@ class GroupTransportManager private constructor(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(TAG, "响应新成员加入失败: groupId=$groupId", e)
                 false
+            }
+        }
+    }
+    
+    /**
+     * 取消 V2 模式提议
+     * 
+     * 允许提议者在 PROPOSING 阶段主动取消提议
+     * 
+     * @param groupId 群组 ID
+     * @return 操作结果
+     */
+    suspend fun cancelV2Proposal(groupId: String): GroupOperationResult<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "尝试取消 V2 模式提议: groupId=$groupId")
+                
+                // 1. 获取群组状态
+                val currentState = groupV2StatusTable.getGroupState(groupId)
+                if (currentState == null) {
+                    Log.w(TAG, "群组状态不存在: $groupId")
+                    return@withContext GroupOperationResult.Failed(
+                        error = GroupOperationError.GROUP_NOT_FOUND,
+                        message = "群组状态不存在"
+                    )
+                }
+                
+                // 2. 检查当前状态是否为 PROPOSING
+                if (currentState.status != GroupV2Status.PROPOSING) {
+                    Log.w(TAG, "群组不在提议状态: $groupId, status=${currentState.status}")
+                    return@withContext GroupOperationResult.Failed(
+                        error = GroupOperationError.INVALID_STATE,
+                        message = "只能在提议阶段取消"
+                    )
+                }
+                
+                // 3. 验证调用者是否为提议者
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                if (currentState.proposerAci != myAci) {
+                    Log.w(TAG, "非提议者无法取消提议: groupId=$groupId, proposer=${currentState.proposerAci}, myAci=$myAci")
+                    return@withContext GroupOperationResult.Failed(
+                        error = GroupOperationError.PERMISSION_DENIED,
+                        message = "只有提议者可以取消提议"
+                    )
+                }
+                
+                Log.i(TAG, "提议者取消 V2 模式提议: groupId=$groupId")
+                
+                // 4. 清理资源
+                cleanupGroupResources(groupId, currentState)
+                
+                // 5. 重置状态为 NATIVE
+                val resetState = currentState.reset()
+                groupV2StatusTable.insertOrUpdateGroupState(resetState, expectedVersion = currentState.version)
+                
+                // 6. 插入系统消息
+                try {
+                    val groupRecipientId = getGroupRecipientId(groupId)
+                    if (groupRecipientId != null) {
+                        val helper = GroupTokenExchangeHelper.getInstance(context)
+                        helper.insertCustomSystemMessage(
+                            recipientId = groupRecipientId,
+                            messageBody = "v2 mode 提议已取消"
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "插入取消提议系统消息失败: groupId=$groupId", e)
+                }
+                
+                // 7. 发送取消通知给其他成员（可选）
+                try {
+                    val otherMembers = currentState.totalMembers.filter { it != myAci }
+                    if (otherMembers.isNotEmpty()) {
+                        val memberRecipientIds = getMemberRecipientIds(groupId)
+                        if (memberRecipientIds.isNotEmpty()) {
+                            val helper = GroupTokenExchangeHelper.getInstance(context)
+                            helper.sendGroupDisableMessage(
+                                groupId = groupId,
+                                senderAci = myAci,
+                                memberRecipientIds = memberRecipientIds,
+                                providerType = currentState.providerType
+                            )
+                            Log.d(TAG, "取消提议通知已发送: groupId=$groupId")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "发送取消提议通知失败: groupId=$groupId", e)
+                    // 即使通知发送失败也继续，本地状态已经重置
+                }
+                
+                Log.i(TAG, "V2 模式提议取消成功: groupId=$groupId")
+                GroupOperationResult.Success(Unit)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "取消 V2 模式提议失败: $groupId", e)
+                GroupOperationResult.Failed(
+                    error = GroupOperationError.OPERATION_FAILED,
+                    message = "取消失败: ${e.message}",
+                    cause = e
+                )
             }
         }
     }
@@ -1739,14 +1869,21 @@ class GroupTransportManager private constructor(private val context: Context) {
      */
     private fun getMemberRecipientIds(groupId: String): List<org.thoughtcrime.securesms.recipients.RecipientId> {
         return try {
-            val decodedGroupId = org.thoughtcrime.securesms.groups.GroupId.parseOrThrow(groupId)
-            val groupRecipient = org.thoughtcrime.securesms.recipients.Recipient
-                .externalGroupExact(decodedGroupId)
-            
-            if (groupRecipient.isGroup) {
-                groupRecipient.participantIds
-            } else {
-                emptyList()
+            // 使用 GroupIdConverter 支持多种格式（Base64, encoded GroupId 等）
+            val result = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.convert(groupId, context)
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                    val groupRecipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(result.recipientId)
+                    if (groupRecipient.isGroup) {
+                        groupRecipient.participantIds
+                    } else {
+                        emptyList()
+                    }
+                }
+                is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                    Log.e(TAG, "转换 groupId 失败: ${result.reason}")
+                    emptyList()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "获取群组成员 RecipientId 列表失败: groupId=$groupId", e)

@@ -120,25 +120,17 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 val savedCount = groupManager.saveGroupTokensToPool(groupId, generatedTokens)
                 Log.i(TAG, "群组 tokens 已保存: groupId=$groupId, saved=$savedCount/${generatedTokens.size}")
                 
-                // 7. 更新群组状态 - 标记自己为 PROPOSING 状态并记录同意
-                if (isProposer) {
-                    // 如果是接受提议者的消息，需要初始化群组状态
-                    val initialized = groupManager.proposeV2Mode(
-                        groupId = groupId,
-                        proposerAci = proposerAci,
-                        memberAcis = memberAcis,
-                        providerType = originalMessage.providerType
-                    )
-                    if (!initialized) {
-                        Log.e(TAG, "初始化群组状态失败")
-                        return@launch
-                    }
-                }
-                
+                // 7. 标记自己为已同意
+                // 注意: 群组状态已经由提议者创建，这里不需要调用 proposeV2Mode()
+                // 直接调用 acceptV2Proposal 将自己加入 agreedMembers
+                Log.d(TAG, "标记自己为已同意: groupId=$groupId, myAci=$myAci")
                 val accepted = groupManager.acceptV2Proposal(groupId, myAci)
                 if (!accepted) {
-                    Log.w(TAG, "标记自己为已同意失败")
+                    Log.e(TAG, "标记自己为已同意失败: groupId=$groupId")
+                    return@launch
                 }
+                
+                Log.i(TAG, "成功标记为已同意: groupId=$groupId, myAci=$myAci")
                 
                 // 8. 发送接受消息给所有成员
                 Log.i(TAG, "发送群组接受消息: groupId=$groupId")

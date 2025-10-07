@@ -225,16 +225,18 @@ class GroupMembershipSynchronizer private constructor(private val context: Conte
     private suspend fun getCurrentGroupMembers(groupId: String): Set<String>? {
         return withContext(Dispatchers.IO) {
             try {
-                // 解析群组 ID
-                val decodedGroupId = try {
-                    GroupId.parseOrThrow(groupId)
-                } catch (e: Exception) {
-                    Log.e(TAG, "无效的群组 ID: $groupId", e)
-                    return@withContext null
+                // 使用 GroupIdConverter 解析群组 ID（支持多种格式）
+                val result = org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.convert(groupId, context)
+                val (decodedGroupId, groupRecipient) = when (result) {
+                    is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Success -> {
+                        result.groupId to Recipient.resolved(result.recipientId)
+                    }
+                    is org.thoughtcrime.securesms.tap.group.utils.GroupIdConverter.ConversionResult.Failed -> {
+                        Log.e(TAG, "转换群组 ID 失败: $groupId, 原因: ${result.reason}")
+                        return@withContext null
+                    }
                 }
                 
-                // 获取群组 Recipient
-                val groupRecipient = Recipient.externalGroupExact(decodedGroupId)
                 if (!groupRecipient.isGroup) {
                     Log.w(TAG, "不是群组 Recipient: $groupId")
                     return@withContext null
