@@ -230,8 +230,8 @@ data class CosProviderConfig(
     /** 群组路径前缀 */
     val groupPathPrefix: String = "/group/",
     
-    /** 群组发件箱后缀 */
-    val groupOutboxSuffix: String = "/outbox/",
+    /** 群组发件箱后缀（群组使用简化路径，不需要outbox层级） */
+    val groupOutboxSuffix: String = "/",
     
     /** 连接超时时间（毫秒） */
     val connectionTimeoutMs: Long = 30000L,

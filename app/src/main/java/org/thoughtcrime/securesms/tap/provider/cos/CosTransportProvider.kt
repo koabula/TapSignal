@@ -389,8 +389,8 @@ class CosTransportProvider(
             try {
                 Log.i(TAG, "开始群组推送: groupId=${groupMetadata.groupId}, messageId=${message.messageId}")
                 
-                // 构造群组专用路径
-                val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}${providerConfig.groupOutboxSuffix}"
+                // 构造群组专用路径（简化路径：/group/{groupId}/）
+                val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}/"
                 
                 // 使用自己的COS配置创建元数据
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
@@ -457,8 +457,8 @@ class CosTransportProvider(
                             continue
                         }
                         
-                        // 构造群组消息路径：/group/{groupId}/outbox/
-                        val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}${providerConfig.groupOutboxSuffix}"
+                        // 构造群组消息路径（简化路径：/group/{groupId}/）
+                        val groupPath = "${providerConfig.groupPathPrefix}${groupMetadata.groupId}/"
                         
                         Log.d(TAG, "从群组成员拉取消息: ${memberMetadata.recipientId}, 路径: $groupPath")
                         
@@ -618,7 +618,7 @@ class CosTransportProvider(
     /**
      * 为群组生成Token
      * 
-     * 创建群组目录结构：/group/{groupId}/outbox/messages/ 和 /group/{groupId}/outbox/attachments/
+     * 创建群组目录结构：/group/{groupId}/messages/ 和 /group/{groupId}/attachments/
      * 生成只读Token供其他成员轮询使用
      */
     override suspend fun generateGroupToken(groupId: String, request: TransportTokenRequest): TransportToken? {
@@ -632,11 +632,10 @@ class CosTransportProvider(
                     return@withContext null
                 }
                 
-                // 2. 构建群组目录路径
+                // 2. 构建群组目录路径（简化路径，直接使用 /group/{groupId}/）
                 val groupDirectoryPath = "${providerConfig.groupPathPrefix}${groupId}/"
-                val groupOutboxPath = "${groupDirectoryPath}${providerConfig.groupOutboxSuffix.trimStart('/')}"
                 
-                Log.d(TAG, "群组目录路径: $groupDirectoryPath, outbox: $groupOutboxPath")
+                Log.d(TAG, "群组目录路径: $groupDirectoryPath")
                 
                 // 3. 创建COS客户端和子用户管理器
                 val cosClient = CosClientFactory.createClient(cosConfig, context)
@@ -649,14 +648,11 @@ class CosTransportProvider(
                     // 创建群组主目录
                     cosClient.createDirectory(groupDirectoryPath)
                     
-                    // 创建outbox主目录
-                    cosClient.createDirectory(groupOutboxPath)
+                    // 创建子目录：messages 和 attachments（去掉outbox层级）
+                    cosClient.createDirectory("${groupDirectoryPath}messages/")
+                    cosClient.createDirectory("${groupDirectoryPath}attachments/")
                     
-                    // 创建子目录：messages 和 attachments
-                    cosClient.createDirectory("${groupOutboxPath}messages/")
-                    cosClient.createDirectory("${groupOutboxPath}attachments/")
-                    
-                    Log.i(TAG, "群组目录结构创建成功: $groupOutboxPath")
+                    Log.i(TAG, "群组目录结构创建成功: $groupDirectoryPath")
                 } catch (e: Exception) {
                     Log.e(TAG, "创建群组目录结构失败: groupId=${LogSanitizer.sanitize(groupId)}", e)
                     throw e
@@ -669,11 +665,11 @@ class CosTransportProvider(
                 
                 Log.d(TAG, "生成群组子用户: userName=$subUserName")
                 
-                // 6. 创建只读子用户，权限范围是群组outbox目录
+                // 6. 创建只读子用户，权限范围是群组目录
                 val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
                 val subUserCredential = subUserManager.createSubUser(
                     userName = subUserName,
-                    directoryPath = groupOutboxPath.trimEnd('/'), // 允许其他成员访问我的群组outbox目录
+                    directoryPath = groupDirectoryPath.trimEnd('/'), // 允许其他成员访问我的群组目录
                     permissions = cosPermission // 应该是READ_ONLY
                 )
                 
@@ -1729,15 +1725,15 @@ class CosTransportProvider(
                 "provider" to cosConfig.provider.name
             ))
             
-                         // 对于群组消息，使用群组特定的路径
+                         // 对于群组消息，使用群组特定的路径（简化路径：/group/{groupId}/）
              val basePath = if (groupId != null) {
-                 "${providerConfig.groupPathPrefix}${groupId}${providerConfig.groupOutboxSuffix}"
+                 "${providerConfig.groupPathPrefix}${groupId}/"
              } else {
                  getSendPath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
              }
              
              val receivePath = if (groupId != null) {
-                 "${providerConfig.groupPathPrefix}${groupId}${providerConfig.groupOutboxSuffix}"
+                 "${providerConfig.groupPathPrefix}${groupId}/"
              } else {
                  getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
              }

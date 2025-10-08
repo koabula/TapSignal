@@ -1673,8 +1673,8 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
                 val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
                 
-                // 群组目录路径：成员的 /group/{groupId}/outbox/
-                val memberGroupPath = "/group/${groupId}/outbox/"
+                // 群组目录路径：成员的 /group/{groupId}/ (简化路径，去掉outbox层级)
+                val memberGroupPath = "/group/${groupId}/"
                 
                 org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
                     recipientId = memberAci,

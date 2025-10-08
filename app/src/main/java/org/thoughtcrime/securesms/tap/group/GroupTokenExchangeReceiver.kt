@@ -362,7 +362,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
             if (providerType == "cos" && memberToken is org.thoughtcrime.securesms.tap.CosTransportToken) {
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
                 val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
-                val memberGroupPath = "/group/${groupId}/outbox/"
+                val memberGroupPath = "/group/${groupId}/"
                 
                 org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
                     recipientId = memberAci,

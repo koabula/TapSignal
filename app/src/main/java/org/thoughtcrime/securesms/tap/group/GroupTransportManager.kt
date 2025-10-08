@@ -821,9 +821,9 @@ class GroupTransportManager private constructor(private val context: Context) {
                 // 6. 构建群组消息metadata（指向我的群组目录）
                 val metadata = buildGroupSendMetadata(groupId, myGroupToken, groupState.providerType)
                 
-                // 7. 构建TransportMessage
+                // 7. 构建TransportMessage (保持原始messageId，简洁清晰)
                 val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
-                    messageId = "group_${groupId}_${messageId}",
+                    messageId = messageId,
                     timestamp = System.currentTimeMillis(),
                     senderId = myAci,
                     recipientId = groupId, // 使用groupId作为recipientId
@@ -896,8 +896,8 @@ class GroupTransportManager private constructor(private val context: Context) {
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
             val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
             
-            // 群组目录路径：/group/{groupId}/outbox/
-            val groupPath = "/group/${groupId}/outbox/"
+            // 群组目录路径：/group/{groupId}/ (简化路径，不需要outbox层级)
+            val groupPath = "/group/${groupId}/"
             
             return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
                 recipientId = groupId,
