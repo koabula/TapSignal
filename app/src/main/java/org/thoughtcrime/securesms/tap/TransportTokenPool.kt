@@ -1721,6 +1721,59 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
+     * 获取群组的共享Token（我自己为群组生成的token）
+     * 
+     * @param groupId 群组 ID
+     * @param providerType Provider 类型
+     * @return 我的群组shared token，未找到返回null
+     */
+    fun getGroupSharedToken(groupId: String, providerType: String): TransportToken? {
+        tokenLock.read {
+            // 群组的sharedToken使用groupId作为key
+            val token = sharedTokens[groupId]?.get(providerType)
+            if (token != null && !token.isExpired && token.validate()) {
+                updateTokenAccessTime(token.tokenId)
+                Log.d(TAG, "获取群组SharedToken: groupId=${LogSanitizer.sanitize(groupId)}, providerType=$providerType")
+                return token
+            }
+            Log.w(TAG, "群组SharedToken不存在或已失效: groupId=${LogSanitizer.sanitize(groupId)}, providerType=$providerType")
+            return null
+        }
+    }
+    
+    /**
+     * 获取群组的所有接收Token（其他成员为群组生成的tokens）
+     * 
+     * @param groupId 群组 ID
+     * @param providerType Provider 类型
+     * @return 成员ACI -> Token的映射
+     */
+    fun getGroupReceivedTokens(groupId: String, providerType: String): Map<String, TransportToken> {
+        tokenLock.read {
+            val groupReceivedTokens = mutableMapOf<String, TransportToken>()
+            
+            // 遍历所有receivedTokens，通过metadata中的groupId标记识别
+            receivedTokens.forEach { (memberAci, providerTokens) ->
+                val token = providerTokens[providerType]
+                if (token != null && !token.isExpired && token.validate()) {
+                    // 检查token的metadata，确认是否属于该群组
+                    val tokenMetadata = tokenMetadata[token.tokenId]
+                    if (tokenMetadata?.recipientId == memberAci) {
+                        // 通过tokenId格式判断是否为群组token
+                        if (token.tokenId.contains("group") && token.tokenId.contains(groupId.take(8))) {
+                            groupReceivedTokens[memberAci] = token
+                            updateTokenAccessTime(token.tokenId)
+                        }
+                    }
+                }
+            }
+            
+            Log.d(TAG, "获取群组ReceivedTokens: groupId=${LogSanitizer.sanitize(groupId)}, count=${groupReceivedTokens.size}")
+            return groupReceivedTokens
+        }
+    }
+    
+    /**
      * 移除群组的所有 Token
      * 
      * @param groupId 群组 ID

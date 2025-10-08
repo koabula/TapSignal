@@ -144,6 +144,26 @@ interface TransportProvider {
     }
     
     /**
+     * 权限管理 - 为群组生成Token
+     * 
+     * 与一对一通道的Token不同，群组Token用于访问群组共享目录。
+     * 每个成员为群组创建一个目录（如 /group/{groupId}/outbox/），
+     * 生成一个只读Token供其他成员轮询使用。
+     * 
+     * 目录结构：
+     * /group/{groupId}/outbox/messages/   - 文本消息
+     * /group/{groupId}/outbox/attachments/ - 附件
+     * 
+     * @param groupId 群组ID
+     * @param request Token请求参数（应包含READ和LIST权限）
+     * @return 生成的群组Token，失败返回null
+     */
+    suspend fun generateGroupToken(groupId: String, request: TransportTokenRequest): TransportToken? {
+        // 默认实现：不支持群组token
+        return null
+    }
+    
+    /**
      * 权限管理 - 验证Token有效性
      * 
      * @param token 待验证的Token

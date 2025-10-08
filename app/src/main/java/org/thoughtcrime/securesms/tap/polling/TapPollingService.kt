@@ -138,6 +138,15 @@ class TapPollingService(private val context: Context) {
                 // 启动清理任务
                 startCleanupTask()
                 
+                // 启动群组状态同步器
+                try {
+                    val stateSynchronizer = org.thoughtcrime.securesms.tap.group.GroupV2StateSynchronizer.getInstance(context)
+                    stateSynchronizer.start()
+                    Log.i(TAG, "群组 V2 状态同步器已启动")
+                } catch (e: Exception) {
+                    Log.w(TAG, "启动群组状态同步器失败，继续执行", e)
+                }
+                
                 isRunning.set(true)
                 Log.i(TAG, "Tap轮询服务启动成功")
                 true
@@ -171,6 +180,15 @@ class TapPollingService(private val context: Context) {
                 
                 // 优雅停止
                 gracefulShutdown()
+                
+                // 停止群组状态同步器
+                try {
+                    val stateSynchronizer = org.thoughtcrime.securesms.tap.group.GroupV2StateSynchronizer.getInstance(context)
+                    stateSynchronizer.stop()
+                    Log.i(TAG, "群组 V2 状态同步器已停止")
+                } catch (e: Exception) {
+                    Log.w(TAG, "停止群组状态同步器失败", e)
+                }
                 
                 // 清理资源
                 cleanup()
@@ -582,8 +600,10 @@ class TapPollingService(private val context: Context) {
             
             val responseTime = System.currentTimeMillis() - startTime
             
-            // 仅在发现新消息时更新数据库，避免不必要的数据库写入
-            if (pollingResult.isSuccess && pollingResult.messagesFound > 0) {
+            // 只要轮询成功就更新数据库，避免 processedFiles 丢失导致重复下载
+            if (pollingResult.isSuccess) {
+                // 始终保存 processedFiles，即使没有新消息
+                // 这样可以防止附件文件等被重复下载
                 pollingStateTable.recordSuccessfulPoll(
                     taskInfo.recipientId,
                     taskInfo.metadata.providerType,
@@ -592,10 +612,12 @@ class TapPollingService(private val context: Context) {
                 )
                 // 清除缓存，下次轮询时获取最新状态
                 pollingStateCache.remove(cacheKey)
-                Log.d(TAG, "发现${pollingResult.messagesFound}条新消息，已更新数据库: ${taskInfo.recipientId}")
-            } else if (pollingResult.isSuccess) {
-                // 轮询成功但无新消息，仅记录日志，不写数据库
-                Log.v(TAG, "轮询成功，无新消息: ${taskInfo.recipientId}")
+                
+                if (pollingResult.messagesFound > 0) {
+                    Log.d(TAG, "发现${pollingResult.messagesFound}条新消息，已更新数据库: ${taskInfo.recipientId}")
+                } else {
+                    Log.v(TAG, "轮询成功，无新消息: ${taskInfo.recipientId}")
+                }
             } else {
                 // 轮询失败，记录日志但不写数据库（除非是严重错误）
                 Log.w(TAG, "轮询失败: ${taskInfo.recipientId}, error=${pollingResult.error}")

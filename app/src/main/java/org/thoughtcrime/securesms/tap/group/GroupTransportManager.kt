@@ -8,6 +8,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.SignalDatabase
+import org.thoughtcrime.securesms.tap.TransportTokenPool
 import org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -202,7 +203,9 @@ class GroupTransportManager private constructor(private val context: Context) {
      * 创建或更新群组状态（用于接收者初始化）
      * 
      * 当接收者收到 GROUP_OFFER 消息时，需要在本地数据库创建群组状态记录。
-     * 如果状态已存在，则跳过创建，避免覆盖已有数据。
+     * 如果状态已存在，会判断是否需要更新：
+     * - NATIVE -> PROPOSING: 允许更新（接收到提议消息）
+     * - 其他情况: 跳过更新（避免覆盖已有的提议或激活状态）
      * 
      * Note: Caller should ensure this is called from Dispatchers.IO context
      * 
@@ -221,12 +224,24 @@ class GroupTransportManager private constructor(private val context: Context) {
                     "totalMembers=${initialState.totalMembers.size}, agreedMembers=${initialState.agreedMembers.size}")
                 true
             } else {
-                // 状态已存在，可能已经由本地提议创建，或者是重复消息
-                Log.d(TAG, "群组状态已存在，跳过创建: groupId=$groupId, existingStatus=${existing.status}")
-                true
+                // 状态已存在，判断是否需要更新
+                if (existing.status == GroupV2Status.NATIVE && initialState.status == GroupV2Status.PROPOSING) {
+                    // 允许从 NATIVE 状态升级到 PROPOSING 状态（接收到提议消息）
+                    Log.i(TAG, "更新群组状态: groupId=$groupId, NATIVE -> PROPOSING, " +
+                        "proposer=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(initialState.proposerAci ?: "null")}")
+                    groupV2StatusTable.insertOrUpdateGroupState(
+                        initialState.copy(version = existing.version),
+                        expectedVersion = existing.version
+                    )
+                    true
+                } else {
+                    // 其他情况跳过更新（避免覆盖更高级的状态或重复消息）
+                    Log.d(TAG, "群组状态已存在，跳过更新: groupId=$groupId, existingStatus=${existing.status}, requestedStatus=${initialState.status}")
+                    true
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "创建群组状态失败: groupId=$groupId", e)
+            Log.e(TAG, "创建或更新群组状态失败: groupId=$groupId", e)
             false
         }
     }
@@ -323,29 +338,28 @@ class GroupTransportManager private constructor(private val context: Context) {
                 
                 // 3. 获取我的 ACI
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-                val otherMemberAcis = memberAcis.filter { it != myAci }.toSet()
                 
-                // 4. 为其他成员生成 tokens
-                Log.i(TAG, "为群组其他成员生成 tokens: groupId=$groupId, members=${otherMemberAcis.size}")
-                val generatedTokens = generateGroupTokens(
+                // 4. 生成我的群组token（只生成一个）
+                Log.i(TAG, "为群组生成我的token: groupId=$groupId")
+                val myGroupToken = generateMyGroupToken(
                     groupId = groupId,
-                    memberAcis = otherMemberAcis,
                     providerType = providerType
                 )
                 
-                if (generatedTokens.isEmpty()) {
-                    Log.e(TAG, "生成群组 tokens 失败")
+                if (myGroupToken == null) {
+                    Log.e(TAG, "生成群组token失败")
                     return@withContext false
                 }
                 
-                // 5. 保存生成的 tokens
-                val savedCount = saveGroupTokensToPool(groupId, generatedTokens)
-                if (savedCount == 0) {
-                    Log.e(TAG, "保存群组 tokens 失败")
+                // 5. 保存我的sharedToken（使用groupId作为key）
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                val saved = tokenPool.addSharedToken(groupId, myGroupToken, groupId)
+                if (!saved) {
+                    Log.e(TAG, "保存群组token失败")
                     return@withContext false
                 }
                 
-                Log.i(TAG, "群组 tokens 已保存: groupId=$groupId, saved=$savedCount/${generatedTokens.size}")
+                Log.i(TAG, "群组token已保存: groupId=$groupId, tokenId=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(myGroupToken.tokenId)}")
                 
                 // 6. 更新群组状态为 PROPOSING
                 val stateUpdated = proposeV2Mode(
@@ -360,14 +374,14 @@ class GroupTransportManager private constructor(private val context: Context) {
                     return@withContext false
                 }
                 
-                // 7. 发送提议消息给所有成员
+                // 7. 发送提议消息给所有成员（包含我的token）
                 Log.i(TAG, "发送群组提议消息: groupId=$groupId")
                 val helper = org.thoughtcrime.securesms.tap.group.GroupTokenExchangeHelper.getInstance(context)
                 val sent = helper.sendGroupOfferMessage(
                     groupId = groupId,
                     proposerAci = myAci,
                     memberRecipientIds = memberRecipientIds,
-                    tokens = generatedTokens,
+                    myToken = myGroupToken, // 只发送我的token
                     providerType = providerType
                 )
                 
@@ -472,83 +486,91 @@ class GroupTransportManager private constructor(private val context: Context) {
     suspend fun checkAndActivateV2Mode(groupId: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "检查是否可激活 V2 模式: groupId=$groupId")
+                Log.d(TAG, "[状态检查] 检查是否可激活 V2 模式: groupId=$groupId")
                 
                 // 直接调用数据库操作，不持有应用层锁
                 // 避免"应用层锁 → 数据库事务"的嵌套导致死锁
                 val currentState = groupV2StatusTable.getGroupState(groupId)
                 if (currentState == null) {
-                    Log.w(TAG, "群组状态不存在: $groupId")
+                    Log.w(TAG, "[状态检查] 群组状态不存在: $groupId")
                     return@withContext false
                 }
                 
-                Log.d(TAG, "群组状态检查: groupId=$groupId, status=${currentState.status}, " +
-                        "agreedMembers=${currentState.agreedMembers.size}/${currentState.totalMembers.size}")
-                Log.d(TAG, "同意成员列表: ${currentState.agreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
-                Log.d(TAG, "全部成员列表: ${currentState.totalMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                Log.d(TAG, "[状态检查] 群组当前状态: groupId=$groupId, status=${currentState.status}, " +
+                        "agreed=${currentState.agreedMembers.size}/${currentState.totalMembers.size}, " +
+                        "proposer=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(currentState.proposerAci ?: "unknown")}")
+                Log.d(TAG, "[状态检查] 同意成员: ${currentState.agreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                Log.d(TAG, "[状态检查] 全部成员: ${currentState.totalMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
                 
                 if (currentState.status != GroupV2Status.PROPOSING) {
-                    Log.d(TAG, "群组不在提议状态，无法激活: $groupId, status=${currentState.status}")
+                    Log.d(TAG, "[状态检查] 群组不在提议状态，无法激活: $groupId, status=${currentState.status}")
                     return@withContext false
                 }
                 
                 val isFullyAgreed = currentState.isFullyAgreed()
-                Log.d(TAG, "全员同意检查结果: $isFullyAgreed (agreed=${currentState.agreedMembers.size}, total=${currentState.totalMembers.size})")
+                Log.d(TAG, "[状态检查] 全员同意检查: isFullyAgreed=$isFullyAgreed " +
+                    "(agreed=${currentState.agreedMembers.size}, total=${currentState.totalMembers.size})")
                 
                 if (!isFullyAgreed) {
                     val notAgreedMembers = currentState.totalMembers - currentState.agreedMembers
-                    Log.d(TAG, "群组尚未全员同意: $groupId, 未同意成员: ${notAgreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+                    Log.d(TAG, "[状态检查] 群组尚未全员同意: $groupId, " +
+                        "未同意成员(${notAgreedMembers.size}): ${notAgreedMembers.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
                     return@withContext false
                 }
                 
-                Log.i(TAG, "所有成员已同意，开始激活 V2 模式: $groupId")
+                Log.i(TAG, "[状态激活] ✅ 所有成员已同意，开始激活 V2 模式: $groupId")
                 
                 // 升级为 FULL_V2_ACTIVE（数据库内部有事务保证原子性）
                 val success = groupV2StatusTable.updateGroupStatus(groupId, GroupV2Status.FULL_V2_ACTIVE)
                 if (success) {
-                    Log.i(TAG, "群组 V2 模式激活成功: $groupId")
+                    Log.i(TAG, "[状态激活] ✅ 群组 V2 模式激活成功: $groupId, PROPOSING → FULL_V2_ACTIVE")
+                    
+                    // 验证激活后的状态
+                    val activatedState = groupV2StatusTable.getGroupState(groupId)
+                    if (activatedState != null) {
+                        Log.d(TAG, "[状态激活] 激活后验证: status=${activatedState.status}, version=${activatedState.version}")
+                    }
                 } else {
-                    Log.e(TAG, "群组 V2 模式激活失败（数据库更新失败）: $groupId")
+                    Log.e(TAG, "[状态激活] ❌ 群组 V2 模式激活失败（数据库更新失败）: $groupId")
                 }
                 success
             } catch (e: Exception) {
-                Log.e(TAG, "激活 V2 模式失败: $groupId", e)
+                Log.e(TAG, "[状态激活] ❌ 激活 V2 模式异常: $groupId", e)
                 false
             }
         }
     }
     
     /**
-     * 为群组生成 Tokens
+     * 为群组生成我的Token
      * 
-     * 为群组的每个成员创建独立目录和只读 token，用于 v2 mode 通信
+     * 每个成员为群组创建一个目录和一个只读token，供其他成员轮询使用。
+     * 目录结构：/group/{groupId}/outbox/messages/ 和 /group/{groupId}/outbox/attachments/
      * 
      * @param groupId 群组 ID
-     * @param memberAcis 所有成员 ACI 集合（不包括自己）
      * @param providerType Provider 类型
-     * @return 生成的 Token 映射 (memberAci -> TransportToken)
+     * @return 生成的群组 Token，失败返回null
      */
-    suspend fun generateGroupTokens(
+    suspend fun generateMyGroupToken(
         groupId: String,
-        memberAcis: Set<String>,
         providerType: String
-    ): Map<String, org.thoughtcrime.securesms.tap.TransportToken> {
+    ): org.thoughtcrime.securesms.tap.TransportToken? {
         return withContext(Dispatchers.IO) {
             stateLock.read {
                 try {
-                    Log.i(TAG, "开始为群组生成 Tokens: groupId=$groupId, members=${memberAcis.size}, provider=$providerType")
+                    Log.i(TAG, "开始为群组生成我的Token: groupId=$groupId, provider=$providerType")
                     
                     // 获取 TransportProvider
                     val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
                     val provider = transportManager.getProvider(providerType)
                     if (provider == null) {
                         Log.e(TAG, "Provider 不存在: $providerType")
-                        return@withContext emptyMap()
+                        return@withContext null
                     }
                     
                     if (!provider.supportsAuth) {
                         Log.e(TAG, "Provider 不支持权限管理: $providerType")
-                        return@withContext emptyMap()
+                        return@withContext null
                     }
                     
                     // 获取 Provider 配置
@@ -556,55 +578,36 @@ class GroupTransportManager private constructor(private val context: Context) {
                     val providerConfig = configManager.getProviderConfig(providerType)
                     if (providerConfig == null) {
                         Log.e(TAG, "Provider 配置不存在: $providerType")
-                        return@withContext emptyMap()
+                        return@withContext null
                     }
                     
-                    val generatedTokens = mutableMapOf<String, org.thoughtcrime.securesms.tap.TransportToken>()
+                    // 构建群组token请求（只读权限，供其他成员轮询）
+                    val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
+                        recipientId = groupId, // 使用groupId而不是memberAci
+                        providerType = providerType,
+                        requestedPermissions = setOf(
+                            org.thoughtcrime.securesms.tap.TransportPermission.READ,
+                            org.thoughtcrime.securesms.tap.TransportPermission.LIST
+                        ),
+                        validityDurationMs = 0L, // 使用默认有效期
+                        providerConfig = providerConfig,
+                        purpose = "group_shared:$groupId" // 标识为群组共享token
+                    )
                     
-                    // 为每个成员生成 token
-                    for (memberAci in memberAcis) {
-                        try {
-                            // 构建 token 请求 (只读权限，用于成员轮询)
-                            val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
-                                recipientId = memberAci,
-                                providerType = providerType,
-                                requestedPermissions = setOf(
-                                    org.thoughtcrime.securesms.tap.TransportPermission.READ,
-                                    org.thoughtcrime.securesms.tap.TransportPermission.LIST
-                                ),
-                                validityDurationMs = 0L, // 使用默认有效期
-                                providerConfig = providerConfig,
-                                purpose = "group_member_polling:$groupId"
-                            )
-                            
-                            // 生成 token
-                            val token = provider.generateToken(tokenRequest)
-                            if (token != null) {
-                                // 在 token 中添加群组 ID 标记
-                                val groupToken = when (token) {
-                                    is org.thoughtcrime.securesms.tap.CosTransportToken -> {
-                                        // COS token 无法直接修改，我们在元数据中记录 groupId
-                                        token
-                                    }
-                                    else -> token
-                                }
-                                
-                                generatedTokens[memberAci] = groupToken
-                                Log.d(TAG, "为成员生成 Token: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, tokenId=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(token.tokenId)}")
-                            } else {
-                                Log.w(TAG, "Token 生成失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "为成员生成 Token 时异常: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}", e)
-                        }
+                    // 使用provider的generateGroupToken方法生成群组token
+                    val token = provider.generateGroupToken(groupId, tokenRequest)
+                    
+                    if (token != null) {
+                        Log.i(TAG, "群组Token生成成功: groupId=$groupId, tokenId=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(token.tokenId)}")
+                    } else {
+                        Log.e(TAG, "群组Token生成失败: groupId=$groupId")
                     }
                     
-                    Log.i(TAG, "群组 Token 生成完成: groupId=$groupId, 成功=${generatedTokens.size}/${memberAcis.size}")
-                    generatedTokens
+                    token
                     
                 } catch (e: Exception) {
-                    Log.e(TAG, "生成群组 Tokens 失败: groupId=$groupId", e)
-                    emptyMap()
+                    Log.e(TAG, "生成群组Token失败: groupId=$groupId", e)
+                    null
                 }
             }
         }
@@ -786,41 +789,10 @@ class GroupTransportManager private constructor(private val context: Context) {
                 // 2. 获取我的 ACI
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
                 
-                // 3. 获取其他成员（不包括自己）
-                val otherMembers = groupState.totalMembers.filter { it != myAci }
-                if (otherMembers.isEmpty()) {
-                    Log.w(TAG, "群组中没有其他成员: $groupId")
-                    return@withContext GroupSendResult.Success(
-                        groupId = groupId,
-                        messageId = messageId,
-                        memberCount = 0
-                    )
-                }
+                // 3. 获取群组其他成员数量（用于返回结果）
+                val otherMembersCount = groupState.totalMembers.filter { it != myAci }.size
                 
-                // 4. 获取所有成员的通道
-                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-                val memberChannels = mutableMapOf<String, org.thoughtcrime.securesms.tap.TransportChannel>()
-                
-                for (memberAci in otherMembers) {
-                    val channel = channelManager.getActiveChannel(memberAci, groupState.providerType)
-                    if (channel != null) {
-                        memberChannels[memberAci] = channel
-                    } else {
-                        Log.w(TAG, "成员没有活跃通道: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
-                    }
-                }
-                
-                if (memberChannels.isEmpty()) {
-                    Log.e(TAG, "没有成员有可用的通道: $groupId")
-                    return@withContext GroupSendResult.Failed(
-                        groupId = groupId,
-                        messageId = messageId,
-                        reason = "没有可用的成员通道",
-                        memberCount = otherMembers.size
-                    )
-                }
-                
-                // 5. 获取 Provider
+                // 4. 获取 Provider
                 val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
                 val provider = transportManager.getProvider(groupState.providerType)
                 if (provider == null) {
@@ -829,57 +801,69 @@ class GroupTransportManager private constructor(private val context: Context) {
                         groupId = groupId,
                         messageId = messageId,
                         reason = "Provider 不可用",
-                        memberCount = otherMembers.size
+                        memberCount = otherMembersCount
                     )
                 }
                 
-                // 6. 并发为每个成员上传消息
-                val uploadResults = performConcurrentUpload(
-                    groupId = groupId,
-                    messageId = messageId,
-                    encryptedMessage = encryptedMessage,
-                    memberChannels = memberChannels,
-                    provider = provider
-                )
-                
-                // 7. 统计结果
-                val successMembers = uploadResults.filter { (_, result) -> 
-                    result is org.thoughtcrime.securesms.tap.TransportResult.Success 
-                }.keys
-                val failedMembers = uploadResults.filter { (_, result) -> 
-                    result !is org.thoughtcrime.securesms.tap.TransportResult.Success 
-                }.mapValues { (_, result) ->
-                    when (result) {
-                        is org.thoughtcrime.securesms.tap.TransportResult.Failed -> result.errorMessage ?: "未知错误"
-                        else -> "未知错误"
-                    }
+                // 5. 获取我的群组sharedToken
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                val myGroupToken = tokenPool.getGroupSharedToken(groupId, groupState.providerType)
+                if (myGroupToken == null) {
+                    Log.e(TAG, "无法获取群组SharedToken: groupId=$groupId")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "群组Token不可用",
+                        memberCount = otherMembersCount
+                    )
                 }
                 
-                Log.i(TAG, "群组消息发送完成: groupId=$groupId, 成功=${successMembers.size}/${memberChannels.size}")
+                // 6. 构建群组消息metadata（指向我的群组目录）
+                val metadata = buildGroupSendMetadata(groupId, myGroupToken, groupState.providerType)
                 
-                // 8. 返回结果
-                when {
-                    successMembers.size == memberChannels.size -> {
+                // 7. 构建TransportMessage
+                val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
+                    messageId = "group_${groupId}_${messageId}",
+                    timestamp = System.currentTimeMillis(),
+                    senderId = myAci,
+                    recipientId = groupId, // 使用groupId作为recipientId
+                    messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
+                    signalCiphertext = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage),
+                    contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
+                        originalSize = encryptedMessage.size.toLong()
+                    )
+                )
+                
+                Log.d(TAG, "上传群组消息到我的目录: groupId=$groupId, messageId=$messageId")
+                
+                // 8. 上传消息到我的群组目录（只上传一次）
+                val result = provider.push(transportMessage, metadata)
+                
+                // 9. 返回结果
+                when (result) {
+                    is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
+                        Log.i(TAG, "群组消息上传成功: groupId=$groupId, messageId=$messageId")
                         GroupSendResult.Success(
                             groupId = groupId,
                             messageId = messageId,
-                            memberCount = successMembers.size
+                            memberCount = otherMembersCount
                         )
                     }
-                    successMembers.isNotEmpty() -> {
-                        GroupSendResult.PartialSuccess(
+                    is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
+                        Log.e(TAG, "群组消息上传失败: groupId=$groupId, messageId=$messageId, error=${result.errorMessage}")
+                        GroupSendResult.Failed(
                             groupId = groupId,
                             messageId = messageId,
-                            successMembers = successMembers,
-                            failedMembers = failedMembers
+                            reason = result.errorMessage ?: "上传失败",
+                            memberCount = otherMembersCount
                         )
                     }
                     else -> {
                         GroupSendResult.Failed(
                             groupId = groupId,
                             messageId = messageId,
-                            reason = "所有成员发送失败",
-                            memberCount = memberChannels.size
+                            reason = "未知错误",
+                            memberCount = otherMembersCount
                         )
                     }
                 }
@@ -897,8 +881,50 @@ class GroupTransportManager private constructor(private val context: Context) {
     }
     
     /**
-     * 并发上传消息到所有成员
+     * 构建群组消息发送的metadata
+     * 
+     * 构建指向我的群组目录的metadata，用于上传消息
+     * 注意：myToken设置为null以使用主账户凭证（有写权限），而非只读的sharedToken
      */
+    private fun buildGroupSendMetadata(
+        groupId: String,
+        myGroupToken: org.thoughtcrime.securesms.tap.TransportToken,
+        providerType: String
+    ): org.thoughtcrime.securesms.tap.TransportMetadata {
+        // 构建COS群组metadata
+        if (providerType == "cos" && myGroupToken is org.thoughtcrime.securesms.tap.CosTransportToken) {
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+            val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+            
+            // 群组目录路径：/group/{groupId}/outbox/
+            val groupPath = "/group/${groupId}/outbox/"
+            
+            return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+                recipientId = groupId,
+                providerType = providerType,
+                myAddress = "${myGroupToken.bucketName}.cos.${myGroupToken.region}.myqcloud.com",
+                myToken = null, // ✅ 使用null让CosTransportProvider使用主账户凭证（有写权限）
+                myRegion = myGroupToken.region,
+                myBucketName = myGroupToken.bucketName,
+                mySendPath = groupPath, // 发送到我的群组目录
+                peerAddress = "${myGroupToken.bucketName}.cos.${myGroupToken.region}.myqcloud.com",
+                peerToken = myGroupToken, // 对端token保留（虽然发送时不使用）
+                peerRegion = myGroupToken.region,
+                peerBucketName = myGroupToken.bucketName,
+                peerReceivePath = groupPath,
+                myHashedId = myHashedId,
+                peerHashedId = myHashedId
+            )
+        }
+        
+        // 默认实现（其他provider）
+        throw UnsupportedOperationException("不支持的providerType: $providerType")
+    }
+    
+    /**
+     * 并发上传消息到所有成员（已废弃 - 群组消息只上传一次）
+     */
+    @Deprecated("群组消息只上传一次到自己的目录，不再需要并发上传")
     private suspend fun performConcurrentUpload(
         groupId: String,
         messageId: String,
@@ -951,7 +977,7 @@ class GroupTransportManager private constructor(private val context: Context) {
                 timestamp = System.currentTimeMillis(),
                 senderId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString(),
                 recipientId = memberAci,
-                messageType = org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE,  // 群组消息作为媒体消息类型
+                messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,  // 群组消息使用 TEXT_MESSAGE 类型，进入 messages 目录
                 signalCiphertext = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage),
                 contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
                     originalSize = encryptedMessage.size.toLong()
@@ -1301,38 +1327,35 @@ class GroupTransportManager private constructor(private val context: Context) {
                     return@withContext false
                 }
                 
-                // 4. 获取其他成员（不包括自己）
-                val otherMemberAcis = currentState.totalMembers.filter { it != myAci }.toSet()
-                
-                // 5. 为其他成员生成 tokens
-                Log.i(TAG, "为群组其他成员生成 tokens: groupId=$groupId, members=${otherMemberAcis.size}")
-                val generatedTokens = generateGroupTokens(
+                // 4. 生成我的群组token（只生成一个）
+                Log.i(TAG, "生成我的群组token: groupId=$groupId")
+                val myGroupToken = generateMyGroupToken(
                     groupId = groupId,
-                    memberAcis = otherMemberAcis,
                     providerType = currentState.providerType
                 )
                 
-                if (generatedTokens.isEmpty()) {
-                    Log.e(TAG, "生成群组 tokens 失败")
+                if (myGroupToken == null) {
+                    Log.e(TAG, "生成群组token失败")
                     return@withContext false
                 }
                 
-                // 6. 保存生成的 tokens
-                val savedCount = saveGroupTokensToPool(groupId, generatedTokens)
-                if (savedCount == 0) {
-                    Log.e(TAG, "保存群组 tokens 失败")
+                // 5. 保存我的sharedToken（使用groupId作为key）
+                val tokenPool = TransportTokenPool.getInstance(context)
+                val saved = tokenPool.addSharedToken(groupId, myGroupToken, groupId)
+                if (!saved) {
+                    Log.e(TAG, "保存群组token失败")
                     return@withContext false
                 }
                 
-                Log.i(TAG, "群组 tokens 已保存: groupId=$groupId, saved=$savedCount/${generatedTokens.size}")
+                Log.i(TAG, "群组token已保存: groupId=$groupId, tokenId=${myGroupToken.tokenId}")
                 
-                // 7. 发送 GROUP_ACCEPT 消息给所有成员（使用新成员加入的方式）
+                // 6. 发送 GROUP_ACCEPT 消息给所有成员（使用新成员加入的方式，包含我的token）
                 val helper = GroupTokenExchangeHelper.getInstance(context)
                 val sent = helper.sendNewMemberJoinMessage(
                     groupId = groupId,
                     newMemberAci = myAci,
                     memberRecipientIds = memberRecipientIds,
-                    tokens = generatedTokens,
+                    myToken = myGroupToken,
                     providerType = currentState.providerType
                 )
                 
@@ -1384,23 +1407,16 @@ class GroupTransportManager private constructor(private val context: Context) {
                     return@withContext false
                 }
                 
-                // 2. 为新成员生成 token
-                val token = generateGroupTokens(
-                    groupId = groupId,
-                    memberAcis = setOf(newMemberAci),
-                    providerType = currentState.providerType
-                )[newMemberAci]
+                // 2. 获取我的群组sharedToken
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                val myGroupToken = tokenPool.getGroupSharedToken(groupId, currentState.providerType)
                 
-                if (token == null) {
-                    Log.e(TAG, "为新成员生成 token 失败")
+                if (myGroupToken == null) {
+                    Log.e(TAG, "未找到我的群组token: groupId=$groupId")
                     return@withContext false
                 }
                 
-                // 3. 保存 token
-                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
-                tokenPool.addSharedToken(newMemberAci, token)
-                
-                // 4. 发送 token 给新成员
+                // 3. 发送我的群组token给新成员
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
                 val helper = GroupTokenExchangeHelper.getInstance(context)
                 
@@ -1408,7 +1424,7 @@ class GroupTransportManager private constructor(private val context: Context) {
                     groupId = groupId,
                     senderAci = myAci,
                     newMemberRecipientId = newMemberRecipientId,
-                    token = token,
+                    myToken = myGroupToken,
                     providerType = currentState.providerType
                 )
                 
@@ -1972,5 +1988,142 @@ class GroupTransportManager private constructor(private val context: Context) {
             }
         }
     }
+    
+    /**
+     * 检测群组状态不一致
+     * 
+     * 返回处于不一致状态的群组列表：
+     * - PROPOSING 但全员同意
+     * - FULL_V2_ACTIVE 但缺少通道或轮询
+     * 
+     * @return 不一致群组状态列表
+     */
+    suspend fun detectInconsistentStates(): List<GroupStateInconsistency> = withContext(Dispatchers.IO) {
+        val inconsistencies = mutableListOf<GroupStateInconsistency>()
+        
+        try {
+            // 检查 PROPOSING 状态的群组
+            val proposingGroups = getGroupsByStatus(GroupV2Status.PROPOSING)
+            for (groupState in proposingGroups) {
+                if (groupState.isFullyAgreed()) {
+                    inconsistencies.add(
+                        GroupStateInconsistency(
+                            groupId = groupState.groupId,
+                            type = InconsistencyType.PROPOSING_BUT_FULLY_AGREED,
+                            description = "群组全员同意但状态仍为 PROPOSING",
+                            currentStatus = groupState.status,
+                            expectedStatus = GroupV2Status.FULL_V2_ACTIVE
+                        )
+                    )
+                }
+            }
+            
+            // 检查 FULL_V2_ACTIVE 状态的群组
+            val activeGroups = getGroupsByStatus(GroupV2Status.FULL_V2_ACTIVE)
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            
+            for (groupState in activeGroups) {
+                val otherMembers = groupState.totalMembers.filter { it != myAci }
+                var missingChannels = 0
+                
+                for (memberAci in otherMembers) {
+                    val channel = channelManager.getActiveChannel(memberAci, groupState.providerType)
+                    if (channel == null) {
+                        missingChannels++
+                    }
+                }
+                
+                if (missingChannels > 0) {
+                    inconsistencies.add(
+                        GroupStateInconsistency(
+                            groupId = groupState.groupId,
+                            type = InconsistencyType.ACTIVE_BUT_MISSING_CHANNELS,
+                            description = "群组已激活但缺少 $missingChannels 个通道",
+                            currentStatus = groupState.status,
+                            expectedStatus = GroupV2Status.FULL_V2_ACTIVE
+                        )
+                    )
+                }
+            }
+            
+            if (inconsistencies.isNotEmpty()) {
+                Log.w(TAG, "[状态检测] 发现 ${inconsistencies.size} 个不一致状态")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "[状态检测] 检测状态不一致失败", e)
+        }
+        
+        inconsistencies
+    }
+    
+    /**
+     * 修复群组状态不一致
+     * 
+     * @param groupId 群组 ID
+     * @return 是否成功修复
+     */
+    suspend fun fixInconsistentState(groupId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Log.i(TAG, "[状态修复] 尝试修复群组状态: groupId=$groupId")
+            
+            val groupState = groupV2StatusTable.getGroupState(groupId)
+            if (groupState == null) {
+                Log.w(TAG, "[状态修复] 群组状态不存在: $groupId")
+                return@withContext false
+            }
+            
+            when (groupState.status) {
+                GroupV2Status.PROPOSING -> {
+                    if (groupState.isFullyAgreed()) {
+                        Log.i(TAG, "[状态修复] 修复 PROPOSING 状态：激活群组: $groupId")
+                        return@withContext checkAndActivateV2Mode(groupId)
+                    }
+                }
+                GroupV2Status.FULL_V2_ACTIVE -> {
+                    Log.i(TAG, "[状态修复] 修复 FULL_V2_ACTIVE 状态：重建通道: $groupId")
+                    val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                    val otherMembers = groupState.totalMembers.filter { it != myAci }.toSet()
+                    
+                    val (successCount, _) = establishGroupChannels(
+                        groupId,
+                        otherMembers,
+                        groupState.providerType
+                    )
+                    
+                    return@withContext successCount > 0
+                }
+                else -> {
+                    Log.d(TAG, "[状态修复] 无需修复: $groupId, status=${groupState.status}")
+                }
+            }
+            
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "[状态修复] 修复状态失败: $groupId", e)
+            false
+        }
+    }
 }
+
+/**
+ * 群组状态不一致类型
+ */
+enum class InconsistencyType {
+    PROPOSING_BUT_FULLY_AGREED,   // PROPOSING 但全员同意
+    ACTIVE_BUT_MISSING_CHANNELS,  // ACTIVE 但缺少通道
+    ACTIVE_BUT_NO_POLLING         // ACTIVE 但未启动轮询
+}
+
+/**
+ * 群组状态不一致信息
+ */
+data class GroupStateInconsistency(
+    val groupId: String,
+    val type: InconsistencyType,
+    val description: String,
+    val currentStatus: GroupV2Status,
+    val expectedStatus: GroupV2Status
+)
 

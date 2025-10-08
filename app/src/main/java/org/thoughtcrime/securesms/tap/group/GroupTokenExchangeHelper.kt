@@ -42,7 +42,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
      * @param groupId 群组 ID
      * @param proposerAci 发起人 ACI
      * @param memberRecipientIds 所有成员的 RecipientId 列表（包括发起人）
-     * @param tokens 为每个成员生成的 token 映射 (memberAci -> TransportToken)
+     * @param myToken 我的群组token（单个token）
      * @param providerType Provider 类型
      * @return 发送是否成功
      */
@@ -50,7 +50,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
         groupId: String,
         proposerAci: String,
         memberRecipientIds: List<RecipientId>,
-        tokens: Map<String, TransportToken>,
+        myToken: TransportToken,
         providerType: String
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -73,7 +73,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
                 senderAci = proposerAci,
                 providerType = providerType,
                 tokenData = emptyMap(), // 群组消息中不包含单个 token，而是在 metadata 中
-                metadata = buildGroupOfferMetadata(groupId, proposerAci, tokens, totalMembers),
+                metadata = buildGroupOfferMetadata(groupId, proposerAci, myToken, totalMembers),
                 requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_OFFER,
                 version = 1
             )
@@ -110,7 +110,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
      * @param accepterAci 接受者 ACI
      * @param proposerAci 发起人 ACI
      * @param memberRecipientIds 所有成员的 RecipientId 列表
-     * @param tokens 为每个成员生成的 token 映射
+     * @param myToken 我的群组token（单个token）
      * @param providerType Provider 类型
      * @return 发送是否成功
      */
@@ -119,7 +119,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
         accepterAci: String,
         proposerAci: String,
         memberRecipientIds: List<RecipientId>,
-        tokens: Map<String, TransportToken>,
+        myToken: TransportToken,
         providerType: String
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -129,7 +129,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
                 senderAci = accepterAci,
                 providerType = providerType,
                 tokenData = emptyMap(),
-                metadata = buildGroupAcceptMetadata(groupId, accepterAci, proposerAci, tokens),
+                metadata = buildGroupAcceptMetadata(groupId, accepterAci, proposerAci, myToken),
                 requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACCEPT,
                 version = 1
             )
@@ -275,15 +275,13 @@ class GroupTokenExchangeHelper(private val context: Context) {
     private fun buildGroupOfferMetadata(
         groupId: String,
         proposerAci: String,
-        tokens: Map<String, TransportToken>,
+        myToken: TransportToken,
         totalMembers: Set<String>
     ): Map<String, Any> {
-        val tokensData = tokens.mapValues { (_, token) -> token.toMap() }
-        
         return mapOf(
             "groupId" to groupId,
             "proposerAci" to proposerAci,
-            "tokens" to tokensData,
+            "myToken" to myToken.toMap(), // 只包含我的token
             "totalMembers" to totalMembers.toList(),
             "timestamp" to System.currentTimeMillis()
         )
@@ -296,15 +294,13 @@ class GroupTokenExchangeHelper(private val context: Context) {
         groupId: String,
         accepterAci: String,
         proposerAci: String,
-        tokens: Map<String, TransportToken>
+        myToken: TransportToken
     ): Map<String, Any> {
-        val tokensData = tokens.mapValues { (_, token) -> token.toMap() }
-        
         return mapOf(
             "groupId" to groupId,
             "accepterAci" to accepterAci,
             "proposerAci" to proposerAci,
-            "tokens" to tokensData,
+            "myToken" to myToken.toMap(), // 只包含我的token
             "timestamp" to System.currentTimeMillis()
         )
     }
@@ -512,7 +508,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
         groupId: String,
         newMemberAci: String,
         memberRecipientIds: List<RecipientId>,
-        tokens: Map<String, TransportToken>,
+        myToken: TransportToken,
         providerType: String
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -526,7 +522,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
                 metadata = mapOf(
                     "groupId" to groupId,
                     "accepterAci" to newMemberAci,
-                    "tokens" to tokens.mapValues { (_, token) -> token.toMap() },
+                    "myToken" to myToken.toMap(),
                     "isNewMember" to true,  // 标记为新成员加入
                     "timestamp" to System.currentTimeMillis()
                 ),
@@ -576,7 +572,7 @@ class GroupTokenExchangeHelper(private val context: Context) {
         groupId: String,
         senderAci: String,
         newMemberRecipientId: RecipientId,
-        token: TransportToken,
+        myToken: TransportToken,
         providerType: String
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -585,9 +581,10 @@ class GroupTokenExchangeHelper(private val context: Context) {
             val responseMessage = TapTokenExchangeMessage(
                 senderAci = senderAci,
                 providerType = providerType,
-                tokenData = token.toMap(),  // 直接使用单个 token
+                tokenData = emptyMap(),
                 metadata = mapOf(
                     "groupId" to groupId,
+                    "myToken" to myToken.toMap(),
                     "isNewMemberResponse" to true,  // 标记为新成员响应
                     "timestamp" to System.currentTimeMillis()
                 ),

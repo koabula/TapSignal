@@ -615,6 +615,101 @@ class CosTransportProvider(
         }
     }
     
+    /**
+     * 为群组生成Token
+     * 
+     * 创建群组目录结构：/group/{groupId}/outbox/messages/ 和 /group/{groupId}/outbox/attachments/
+     * 生成只读Token供其他成员轮询使用
+     */
+    override suspend fun generateGroupToken(groupId: String, request: TransportTokenRequest): TransportToken? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始生成群组Token: groupId=${LogSanitizer.sanitize(groupId)}")
+                
+                // 1. 验证请求参数
+                if (!request.validate()) {
+                    Log.w(TAG, "Token请求参数无效: $request")
+                    return@withContext null
+                }
+                
+                // 2. 构建群组目录路径
+                val groupDirectoryPath = "${providerConfig.groupPathPrefix}${groupId}/"
+                val groupOutboxPath = "${groupDirectoryPath}${providerConfig.groupOutboxSuffix.trimStart('/')}"
+                
+                Log.d(TAG, "群组目录路径: $groupDirectoryPath, outbox: $groupOutboxPath")
+                
+                // 3. 创建COS客户端和子用户管理器
+                val cosClient = CosClientFactory.createClient(cosConfig, context)
+                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
+                
+                // 4. 创建群组目录结构
+                try {
+                    Log.d(TAG, "创建群组目录结构: $groupDirectoryPath")
+                    
+                    // 创建群组主目录
+                    cosClient.createDirectory(groupDirectoryPath)
+                    
+                    // 创建outbox主目录
+                    cosClient.createDirectory(groupOutboxPath)
+                    
+                    // 创建子目录：messages 和 attachments
+                    cosClient.createDirectory("${groupOutboxPath}messages/")
+                    cosClient.createDirectory("${groupOutboxPath}attachments/")
+                    
+                    Log.i(TAG, "群组目录结构创建成功: $groupOutboxPath")
+                } catch (e: Exception) {
+                    Log.e(TAG, "创建群组目录结构失败: groupId=${LogSanitizer.sanitize(groupId)}", e)
+                    throw e
+                }
+                
+                // 5. 生成子用户名（标识为群组token）
+                val timestamp = System.currentTimeMillis()
+                val randomSuffix = (1000..9999).random()
+                val subUserName = "signal-group-${groupId.take(8)}-${timestamp}-${randomSuffix}"
+                
+                Log.d(TAG, "生成群组子用户: userName=$subUserName")
+                
+                // 6. 创建只读子用户，权限范围是群组outbox目录
+                val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
+                val subUserCredential = subUserManager.createSubUser(
+                    userName = subUserName,
+                    directoryPath = groupOutboxPath.trimEnd('/'), // 允许其他成员访问我的群组outbox目录
+                    permissions = cosPermission // 应该是READ_ONLY
+                )
+                
+                Log.i(TAG, "群组子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}")
+                
+                // 7. 计算过期时间
+                val expirationTime = if (request.validityDurationMs > 0L) {
+                    System.currentTimeMillis() + request.validityDurationMs
+                } else {
+                    Long.MAX_VALUE // 长期有效
+                }
+                
+                // 8. 创建群组TransportToken
+                val token = org.thoughtcrime.securesms.tap.CosTransportToken(
+                    tokenId = "cos-group-${groupId}-${timestamp}",
+                    recipientId = groupId, // 使用groupId作为recipientId标识这是群组token
+                    permissions = request.requestedPermissions,
+                    expirationTime = expirationTime,
+                    accessKeyId = subUserCredential.accessKeyId,
+                    secretAccessKey = subUserCredential.secretAccessKey,
+                    sessionToken = null,
+                    region = cosConfig.region,
+                    bucketName = cosConfig.bucketName,
+                    cloudProvider = cosConfig.provider.name
+                )
+                
+                Log.i(TAG, "群组Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, groupId=${LogSanitizer.sanitize(groupId)}")
+                token
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "生成群组Token失败: groupId=${LogSanitizer.sanitize(groupId)}, 错误: ${LogSanitizer.sanitizeThrowable(e)}")
+                null
+            }
+        }
+    }
+    
     
     /**
      * 将TransportPermission映射到CosPermission

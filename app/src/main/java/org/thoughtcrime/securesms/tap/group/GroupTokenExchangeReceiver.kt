@@ -72,11 +72,26 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // 2. 如果是提议消息，保存提议者的 tokens
+                // 2. 如果是提议消息，保存提议者的 token（修复：提取myToken而不是tokens map）
                 if (isProposer) {
-                    val tokensData = originalMessage.metadata["tokens"] as? Map<String, Any>
-                    if (tokensData != null) {
-                        saveProposerTokens(context, proposerAci, tokensData)
+                    val proposerTokenData = originalMessage.metadata["myToken"] as? Map<*, *>
+                    if (proposerTokenData != null) {
+                        try {
+                            @Suppress("UNCHECKED_CAST")
+                            val tokenMap = proposerTokenData as Map<String, Any>
+                            val proposerToken = org.thoughtcrime.securesms.tap.CosTransportToken.fromMap(tokenMap)
+                            if (proposerToken != null) {
+                                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                                val saved = tokenPool.addReceivedToken(proposerAci, proposerToken, groupId)
+                                if (saved) {
+                                    Log.i(TAG, "已保存提议者的群组token: proposer=$proposerAci, tokenId=${proposerToken.tokenId}")
+                                } else {
+                                    Log.w(TAG, "保存提议者token失败")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "解析提议者token失败", e)
+                        }
                     }
                 }
                 
@@ -89,36 +104,32 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 
                 val groupRecipient = Recipient.resolved(groupRecipientId)
                 val memberRecipientIds = getGroupMemberRecipientIds(context, groupRecipient)
-                val memberAcis = memberRecipientIds.mapNotNull { recipientId ->
-                    try {
-                        Recipient.resolved(recipientId).requireAci().toString()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "无法获取成员 ACI: recipientId=$recipientId", e)
-                        null
-                    }
-                }.toSet()
                 
                 // 4. 获取我的 ACI
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-                val otherMemberAcis = memberAcis.filter { it != myAci }.toSet()
                 
-                // 5. 为其他成员生成 tokens
-                Log.i(TAG, "为群组其他成员生成 tokens: groupId=$groupId, members=${otherMemberAcis.size}")
+                // 5. 生成我的群组token（只生成一个）
+                Log.i(TAG, "生成我的群组token: groupId=$groupId")
                 val groupManager = GroupTransportManager.getInstance(context)
-                val generatedTokens = groupManager.generateGroupTokens(
+                val myGroupToken = groupManager.generateMyGroupToken(
                     groupId = groupId,
-                    memberAcis = otherMemberAcis,
                     providerType = originalMessage.providerType
                 )
                 
-                if (generatedTokens.isEmpty()) {
-                    Log.e(TAG, "生成群组 tokens 失败")
+                if (myGroupToken == null) {
+                    Log.e(TAG, "生成群组token失败")
                     return@launch
                 }
                 
-                // 6. 保存生成的 tokens
-                val savedCount = groupManager.saveGroupTokensToPool(groupId, generatedTokens)
-                Log.i(TAG, "群组 tokens 已保存: groupId=$groupId, saved=$savedCount/${generatedTokens.size}")
+                // 6. 保存我的sharedToken（使用groupId作为key）
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                val saved = tokenPool.addSharedToken(groupId, myGroupToken, groupId)
+                if (!saved) {
+                    Log.e(TAG, "保存群组token失败")
+                    return@launch
+                }
+                
+                Log.i(TAG, "群组token已保存: groupId=$groupId, tokenId=${myGroupToken.tokenId}")
                 
                 // 7. 标记自己为已同意
                 // 注意: 群组状态已经由提议者创建，这里不需要调用 proposeV2Mode()
@@ -132,7 +143,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 
                 Log.i(TAG, "成功标记为已同意: groupId=$groupId, myAci=$myAci")
                 
-                // 8. 发送接受消息给所有成员
+                // 8. 发送接受消息给所有成员（包含我的token）
                 Log.i(TAG, "发送群组接受消息: groupId=$groupId")
                 val helper = GroupTokenExchangeHelper.getInstance(context)
                 val sent = helper.sendGroupAcceptMessage(
@@ -140,7 +151,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     accepterAci = myAci,
                     proposerAci = proposerAci,
                     memberRecipientIds = memberRecipientIds,
-                    tokens = generatedTokens,
+                    myToken = myGroupToken,  // 只发送我的token
                     providerType = originalMessage.providerType
                 )
                 
@@ -274,29 +285,110 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
     }
     
     /**
-     * 启动群组轮询
+     * 启动群组轮询（修复版：使用群组receivedTokens构建metadata）
      */
     private suspend fun startGroupPolling(context: Context, groupId: String, memberAcis: List<String>) {
         try {
-            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
             val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+            val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
             
-            for (memberAci in memberAcis) {
-                val channels = channelManager.getActiveChannels(memberAci)
-                for (channel in channels) {
-                    if (channel.metadata != null) {
-                        val added = pollingService.addPollingTarget(memberAci, channel.metadata!!, channel)
-                        if (added) {
-                            Log.d(TAG, "群组成员轮询已添加: groupId=$groupId, member=$memberAci")
-                        }
-                    }
+            // 获取群组状态以确定providerType
+            val groupManager = GroupTransportManager.getInstance(context)
+            val groupState = groupManager.getGroupStateSync(groupId)
+            if (groupState == null) {
+                Log.w(TAG, "无法获取群组状态，跳过轮询启动: groupId=$groupId")
+                return
+            }
+            
+            val providerType = groupState.providerType
+            Log.d(TAG, "启动群组轮询: groupId=$groupId, providerType=$providerType, members=${memberAcis.size}")
+            
+            // 获取所有其他成员的receivedTokens
+            val memberTokens = tokenPool.getGroupReceivedTokens(groupId, providerType)
+            
+            if (memberTokens.isEmpty()) {
+                Log.w(TAG, "没有群组成员token，无法启动轮询: groupId=$groupId")
+                return
+            }
+            
+            Log.d(TAG, "获取到群组成员tokens: groupId=$groupId, count=${memberTokens.size}, members=${memberTokens.keys.map { org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(it) }}")
+            
+            // 为每个成员构建群组轮询metadata
+            val memberMetadatas = mutableMapOf<String, org.thoughtcrime.securesms.tap.TransportMetadata>()
+            for ((memberAci, token) in memberTokens) {
+                val metadata = buildGroupPollingMetadata(context, groupId, memberAci, token, providerType)
+                if (metadata != null) {
+                    memberMetadatas[memberAci] = metadata
+                    Log.d(TAG, "构建群组轮询metadata成功: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                } else {
+                    Log.w(TAG, "构建群组轮询metadata失败: groupId=$groupId, memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
                 }
             }
             
+            if (memberMetadatas.isEmpty()) {
+                Log.w(TAG, "无法构建任何有效的群组轮询metadata: groupId=$groupId, tokenCount=${memberTokens.size}")
+                return
+            }
+            
+            Log.d(TAG, "准备添加群组轮询目标: groupId=$groupId, metadataCount=${memberMetadatas.size}")
+            
+            // 先启动轮询服务（确保isRunning=true）
             pollingService.startPolling()
-            Log.i(TAG, "群组轮询已启动: groupId=$groupId, members=${memberAcis.size}")
+            
+            // 批量添加轮询目标
+            val addedCount = pollingService.addGroupPollingTargets(groupId, memberMetadatas)
+            
+            if (addedCount > 0) {
+                Log.i(TAG, "群组轮询已启动: groupId=$groupId, 成功添加=${addedCount}/${memberMetadatas.size}")
+            } else {
+                Log.w(TAG, "未能添加任何群组轮询目标: groupId=$groupId, metadataCount=${memberMetadatas.size}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "启动群组轮询失败: groupId=$groupId", e)
+        }
+    }
+    
+    /**
+     * 构建群组轮询metadata
+     */
+    private fun buildGroupPollingMetadata(
+        context: Context,
+        groupId: String,
+        memberAci: String,
+        memberToken: org.thoughtcrime.securesms.tap.TransportToken,
+        providerType: String
+    ): org.thoughtcrime.securesms.tap.TransportMetadata? {
+        return try {
+            if (providerType == "cos" && memberToken is org.thoughtcrime.securesms.tap.CosTransportToken) {
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+                val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+                val memberGroupPath = "/group/${groupId}/outbox/"
+                
+                org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+                    recipientId = memberAci,
+                    providerType = providerType,
+                    myAddress = "",
+                    myToken = null,
+                    myRegion = "",
+                    myBucketName = "",
+                    mySendPath = "",
+                    peerAddress = "${memberToken.bucketName}.cos.${memberToken.region}.myqcloud.com",
+                    peerToken = memberToken,
+                    peerRegion = memberToken.region,
+                    peerBucketName = memberToken.bucketName,
+                    peerReceivePath = memberGroupPath,
+                    myHashedId = myHashedId,
+                    peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(
+                        org.whispersystems.signalservice.api.push.ServiceId.ACI.parseOrThrow(memberAci)
+                    )
+                )
+            } else {
+                Log.w(TAG, "不支持的providerType或token类型: providerType=$providerType")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "构建群组轮询metadata失败: memberAci=$memberAci", e)
+            null
         }
     }
     

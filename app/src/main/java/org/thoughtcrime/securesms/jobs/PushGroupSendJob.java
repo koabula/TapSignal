@@ -224,6 +224,16 @@ public final class PushGroupSendJob extends PushSendJob {
         RecipientUtil.shareProfileIfFirstSecureMessage(groupRecipient);
       }
 
+      // 检查消息是否为 Tap token 交换控制消息
+      // 控制消息必须通过 Signal Server 发送，不能通过 tap 层发送
+      String messageBody = message.getBody();
+      boolean isTokenExchangeControlMessage = messageBody != null && 
+          org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.Companion.isTapTokenExchangeMessage(messageBody);
+      
+      if (isTokenExchangeControlMessage) {
+        log(TAG, String.valueOf(message.getSentTimeMillis()), "检测到 Token 交换控制消息，强制通过 Signal Server 发送: " + messageId);
+      }
+      
       // 检查群组是否处于 v2 mode
       String groupIdString = android.util.Base64.encodeToString(
           groupRecipient.requireGroupId().getDecodedId(),
@@ -233,7 +243,8 @@ public final class PushGroupSendJob extends PushSendJob {
           org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context);
       org.thoughtcrime.securesms.tap.group.GroupV2Status groupV2Status = groupTransportManager.getGroupStatusSync(groupIdString);
       
-      if (groupV2Status == org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+      // 只有在群组处于 v2 mode 且不是控制消息时，才通过 tap 层发送
+      if (!isTokenExchangeControlMessage && groupV2Status == org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
         log(TAG, String.valueOf(message.getSentTimeMillis()), "群组处于 v2 mode，通过 tap 层发送: " + messageId);
         
         try {
@@ -297,7 +308,12 @@ public final class PushGroupSendJob extends PushSendJob {
       List<SendMessageResult> results = deliver(message, originalEditedMessage, groupRecipient, target);
       processGroupMessageResults(context, messageId, threadId, groupRecipient, message, results, target, skipped, existingNetworkFailures, existingIdentityMismatches);
       ConversationShortcutRankingUpdateJob.enqueueForOutgoingIfNecessary(groupRecipient);
-      Log.i(TAG, JobLogger.format(this, "Finished send."));
+      
+      if (isTokenExchangeControlMessage) {
+        Log.i(TAG, JobLogger.format(this, "Finished send (Token 交换控制消息已通过 Signal Server 发送)."));
+      } else {
+        Log.i(TAG, JobLogger.format(this, "Finished send."));
+      }
 
     } catch (UntrustedIdentityException | UndeliverableMessageException e) {
       warn(TAG, String.valueOf(message.getSentTimeMillis()), e);
