@@ -1967,8 +1967,10 @@ public class SignalServiceMessageSender {
                   Log.d(TAG, "[sendMessage][" + timestamp + "] Extracted ciphertext size: " + ciphertext.length + " bytes");
                   // 使用群组发送逻辑（即使是2人群组也走群组路径）
                   List<SignalServiceAddress> recipientList = Collections.singletonList(recipient);
-                  Log.d(TAG, "[sendMessage][" + timestamp + "] Calling sendGroupMessageViaTap with " + recipientList.size() + " recipient(s)");
-                  List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipientList, ciphertext, timestamp, urgent, online);
+                  // 2人群组使用SessionCipher加密（单收件人），3+人群组使用SenderKey
+                  boolean isSessionCipherEncrypted = true; // 单收件人版本都是SessionCipher
+                  Log.d(TAG, "[sendMessage][" + timestamp + "] Calling sendGroupMessageViaTap with " + recipientList.size() + " recipient(s), isSessionCipher=" + isSessionCipherEncrypted);
+                  List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipientList, ciphertext, timestamp, urgent, online, isSessionCipherEncrypted);
                   Log.i(TAG, "[sendMessage][" + timestamp + "] TAP transport succeeded, results: " + results.size());
                   return results.isEmpty() ? SendMessageResult.networkFailure(recipient) : results.get(0);
                 } else {
@@ -2138,13 +2140,16 @@ public class SignalServiceMessageSender {
               sendEvents.onMessageEncrypted();
             }
             
-            // 提取密文
-            byte[] ciphertext = extractPrimaryCiphertext(messages);
-            if (ciphertext != null) {
-              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Extracted ciphertext size: " + ciphertext.length + " bytes");
-              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Calling sendGroupMessageViaTap");
+            // 构造 Envelope 而不是提取密文
+            // 这样可以保持完整的消息格式，避免类型映射问题
+            byte[] envelopeBytes = constructEnvelopeFromOutgoingMessage(messages, recipient, timestamp, groupId);
+            if (envelopeBytes != null) {
+              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Constructed Envelope size: " + envelopeBytes.length + " bytes");
+              // 2人群组（recipients.size()==1）使用SessionCipher加密，3+人群组使用SenderKey
+              boolean isSessionCipherEncrypted = (recipients.size() == 1);
+              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Calling sendGroupMessageViaTap with Envelope, recipients=" + recipients.size() + ", isSessionCipher=" + isSessionCipherEncrypted);
               
-              List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online);
+              List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipients, envelopeBytes, timestamp, urgent, online, isSessionCipherEncrypted);
               
               Log.i(TAG, "[sendMessage-List][" + timestamp + "] TAP transport succeeded, results: " + results.size());
               
@@ -2155,7 +2160,7 @@ public class SignalServiceMessageSender {
               
               return results;
             } else {
-              Log.w(TAG, "[sendMessage-List][" + timestamp + "] Failed to extract ciphertext, falling back to Signal Server.");
+              Log.w(TAG, "[sendMessage-List][" + timestamp + "] Failed to construct Envelope, falling back to Signal Server.");
             }
           } catch (Exception e) {
             Log.w(TAG, "[sendMessage-List][" + timestamp + "] TAP transport failed: " + e.getClass().getSimpleName() + ": " + e.getMessage() + ", falling back to Signal Server.", e);
@@ -2599,7 +2604,11 @@ public class SignalServiceMessageSender {
       if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
         Log.i(TAG, "[sendGroupMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
         try {
-          return tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online);
+          // 此方法使用 SenderKey 加密（encryptForGroup），用于3+人群组
+          // 因此 isSessionCipherEncrypted = false
+          boolean isSessionCipherEncrypted = false;
+          Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption, isSessionCipher=" + isSessionCipherEncrypted);
+          return tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online, isSessionCipherEncrypted);
         } catch (IOException e) {
           Log.w(TAG, "[sendGroupMessage][" + timestamp + "] TAP transport failed: " + e.getMessage());
           throw e;
@@ -2695,6 +2704,88 @@ public class SignalServiceMessageSender {
    * @param messages 加密后的消息列表
    * @return 主设备的密文（Base64 解码后），如果提取失败则返回 null
    */
+  /**
+   * 从 OutgoingPushMessage 构造完整的 Envelope
+   * 
+   * 这个方法模拟 Signal Server 的行为：将 OutgoingPushMessage 转换为 Envelope 格式
+   * 避免了类型映射和格式转换的问题
+   */
+  private byte[] constructEnvelopeFromOutgoingMessage(OutgoingPushMessageList messages, 
+                                                       SignalServiceAddress recipient,
+                                                       long timestamp,
+                                                       Optional<byte[]> groupId) {
+    if (messages == null || messages.getMessages() == null || messages.getMessages().isEmpty()) {
+      Log.w(TAG, "constructEnvelope: messages is null or empty");
+      return null;
+    }
+
+    // 查找主设备的消息
+    OutgoingPushMessage primaryMessage = null;
+    for (OutgoingPushMessage message : messages.getMessages()) {
+      if (message.getDestinationDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
+        primaryMessage = message;
+        break;
+      }
+    }
+    
+    if (primaryMessage == null) {
+      primaryMessage = messages.getMessages().get(0);
+    }
+
+    try {
+      // 解码密文
+      byte[] content = Base64.decode(primaryMessage.content);
+      
+      // 映射 OutgoingPushMessage.type 到 Envelope.Type
+      org.whispersystems.signalservice.internal.push.Envelope.Type envelopeType;
+      switch (primaryMessage.type) {
+        case 1:  // CIPHERTEXT
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.CIPHERTEXT;
+          break;
+        case 3:  // PREKEY_BUNDLE
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.PREKEY_BUNDLE;
+          break;
+        case 6:  // UNIDENTIFIED_SENDER
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.UNIDENTIFIED_SENDER;
+          break;
+        case 7:  // SENDERKEY_MESSAGE
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.SENDERKEY_MESSAGE;
+          break;
+        case 8:  // PLAINTEXT_CONTENT
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.PLAINTEXT_CONTENT;
+          break;
+        default:
+          Log.w(TAG, "constructEnvelope: Unknown message type: " + primaryMessage.type);
+          envelopeType = org.whispersystems.signalservice.internal.push.Envelope.Type.CIPHERTEXT;
+      }
+      
+      // 构造 Envelope
+      org.whispersystems.signalservice.internal.push.Envelope.Builder envelopeBuilder = 
+        new org.whispersystems.signalservice.internal.push.Envelope.Builder()
+          .type(envelopeType)
+          .timestamp(timestamp)
+          .serverTimestamp(timestamp)
+          .content(okio.ByteString.of(content))
+          .sourceServiceId(localAddress.getServiceId().toString())
+          .sourceDevice(localDeviceId)
+          .destinationServiceId(recipient.getServiceId().toString())
+          .serverGuid(java.util.UUID.randomUUID().toString())
+          .urgent(true)
+          .story(false);
+      
+      // 序列化 Envelope
+      org.whispersystems.signalservice.internal.push.Envelope envelope = envelopeBuilder.build();
+      byte[] envelopeBytes = envelope.encode();
+      
+      Log.d(TAG, "constructEnvelope: Created Envelope with type=" + envelopeType + ", size=" + envelopeBytes.length);
+      return envelopeBytes;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "constructEnvelope: Failed to construct Envelope", e);
+      return null;
+    }
+  }
+
   private byte[] extractPrimaryCiphertext(OutgoingPushMessageList messages) {
     if (messages == null || messages.getMessages() == null || messages.getMessages().isEmpty()) {
       Log.w(TAG, "extractPrimaryCiphertext: messages is null or empty");

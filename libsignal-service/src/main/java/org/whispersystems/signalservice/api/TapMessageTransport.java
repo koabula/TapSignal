@@ -38,6 +38,7 @@ public interface TapMessageTransport {
    * @param timestamp 消息时间戳
    * @param urgent 是否为紧急消息
    * @param online 是否为在线消息
+   * @param isSessionCipherEncrypted 是否使用 SessionCipher 加密（true=SessionCipher用于2人群组, false=SenderKey用于3+人群组）
    * @return 每个收件人的发送结果
    */
   List<SendMessageResult> sendGroupMessageViaTap(
@@ -46,7 +47,8 @@ public interface TapMessageTransport {
       byte[] ciphertext,
       long timestamp,
       boolean urgent,
-      boolean online
+      boolean online,
+      boolean isSessionCipherEncrypted
   ) throws IOException;
   
   /**

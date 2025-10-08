@@ -762,12 +762,14 @@ class GroupTransportManager private constructor(private val context: Context) {
      * @param groupId 群组 ID
      * @param encryptedMessage 加密后的消息内容（Signal 协议已加密）
      * @param messageId 消息 ID
+     * @param isSessionCipherEncrypted 是否使用SessionCipher加密（true=2人群组, false=3+人群组）
      * @return 发送结果
      */
     suspend fun sendGroupMessage(
         groupId: String,
         encryptedMessage: ByteArray,
-        messageId: String
+        messageId: String,
+        isSessionCipherEncrypted: Boolean = false
     ): GroupSendResult {
         return withContext(Dispatchers.IO) {
             try {
@@ -843,7 +845,8 @@ class GroupTransportManager private constructor(private val context: Context) {
                     messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
                     signalCiphertext = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage),
                     contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
-                        originalSize = encryptedMessage.size.toLong()
+                        originalSize = encryptedMessage.size.toLong(),
+                        isSessionCipherEncrypted = isSessionCipherEncrypted
                     )
                 )
                 

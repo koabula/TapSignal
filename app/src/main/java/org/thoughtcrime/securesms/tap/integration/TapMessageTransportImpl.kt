@@ -76,9 +76,10 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
         ciphertext: ByteArray,
         timestamp: Long,
         urgent: Boolean,
-        online: Boolean
+        online: Boolean,
+        isSessionCipherEncrypted: Boolean
     ): List<SendMessageResult> {
-        Log.i(TAG, "sendGroupMessageViaTap: groupId present=${groupId.isPresent}, recipients=${recipients.size}, ciphertextSize=${ciphertext.size}, timestamp=$timestamp")
+        Log.i(TAG, "sendGroupMessageViaTap: groupId present=${groupId.isPresent}, recipients=${recipients.size}, ciphertextSize=${ciphertext.size}, timestamp=$timestamp, isSessionCipher=$isSessionCipherEncrypted")
         
         if (!groupId.isPresent) {
             Log.e(TAG, "sendGroupMessageViaTap: ❌ groupId is not present")
@@ -103,7 +104,8 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
                 groupTransportManager.sendGroupMessage(
                     groupId = groupIdString,
                     encryptedMessage = ciphertext,
-                    messageId = messageId
+                    messageId = messageId,
+                    isSessionCipherEncrypted = isSessionCipherEncrypted
                 )
             }
             

@@ -631,7 +631,11 @@ data class TransportContentMetadata(
     
     /** 发送设备ID（用于Signal Envelope适配） */
     @JsonProperty("sourceDeviceId")
-    val sourceDeviceId: Int = 1
+    val sourceDeviceId: Int = 1,
+    
+    /** 是否使用 SessionCipher 加密（true=SessionCipher用于2人群组和私聊, false=SenderKey用于3+人群组） */
+    @JsonProperty("isSessionCipherEncrypted")
+    val isSessionCipherEncrypted: Boolean = false
 )
 
 /**

@@ -87,10 +87,28 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                     return@withContext TapEnvelopeProcessResult.Failed("消息格式转换失败")
                 }
                 
-                // 3. 使用Signal标准解密流程
-                val decryptionResult = decryptEnvelopeWithSignal(envelope)
+                // 3. 根据加密类型选择解密方法
+                val isSessionCipherEncrypted = transportMessage.contentMetadata.isSessionCipherEncrypted
+                Log.d(TAG, "检测到加密类型标识: isSessionCipherEncrypted=$isSessionCipherEncrypted")
+                
+                val decryptionResult = if (isSessionCipherEncrypted) {
+                    // 2人群组或私聊：使用 SessionCipher 解密
+                    Log.d(TAG, "使用 SessionCipher 解密（2人群组/私聊）")
+                    decryptEnvelopeWithSignal(envelope)
+                } else {
+                    // 3+人群组：检查是否为 SenderKey 消息
+                    if (envelope.type == Envelope.Type.SENDERKEY_MESSAGE) {
+                        Log.d(TAG, "使用 SenderKey 解密（3+人群组）")
+                        decryptSenderKeyMessage(envelope)
+                    } else {
+                        // 兜底：使用标准解密
+                        Log.d(TAG, "使用标准 Signal 解密")
+                        decryptEnvelopeWithSignal(envelope)
+                    }
+                }
+                
                 if (decryptionResult == null) {
-                    Log.e(TAG, "Signal解密失败: messageId=${transportMessage.messageId}")
+                    Log.e(TAG, "Signal解密失败: messageId=${transportMessage.messageId}, isSessionCipher=$isSessionCipherEncrypted")
                     return@withContext TapEnvelopeProcessResult.Failed("消息解密失败")
                 }
                 
@@ -164,10 +182,41 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
     
     /**
      * 将TransportMessage转换为Signal Envelope
+     * 
+     * 发送端现在传输的是完整序列化的 Envelope，不再是单纯的密文
+     * 这避免了类型映射和格式转换的问题
      */
     private fun adaptTransportMessageToEnvelope(transportMessage: TransportMessage): Envelope? {
         return try {
             Log.d(TAG, "转换TransportMessage为Envelope: messageId=${transportMessage.messageId}")
+            
+            // 解码并反序列化 Envelope
+            val envelopeBytes = Base64.decode(transportMessage.signalCiphertext)
+            
+            // 尝试直接反序列化为 Envelope
+            val envelope = try {
+                Envelope.ADAPTER.decode(envelopeBytes)
+            } catch (e: Exception) {
+                Log.w(TAG, "无法反序列化为Envelope，可能是旧格式，尝试手动构造", e)
+                // 兼容旧格式：如果反序列化失败，使用旧方法构造
+                return adaptLegacyFormat(transportMessage, envelopeBytes)
+            }
+            
+            Log.d(TAG, "Envelope反序列化成功: messageId=${transportMessage.messageId}, type=${envelope.type}, timestamp=${envelope.timestamp}")
+            envelope
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "转换Envelope失败: messageId=${transportMessage.messageId}", e)
+            null
+        }
+    }
+    
+    /**
+     * 兼容旧格式：手动构造 Envelope（用于向后兼容）
+     */
+    private fun adaptLegacyFormat(transportMessage: TransportMessage, ciphertextBytes: ByteArray): Envelope? {
+        return try {
+            Log.d(TAG, "使用旧格式兼容模式: messageId=${transportMessage.messageId}")
             
             // 解析发送者ServiceId
             val sourceServiceId = parseServiceIdFromSender(transportMessage.senderId)
@@ -176,13 +225,19 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 return null
             }
             
-            // 解码密文
-            val ciphertextBytes = Base64.decode(transportMessage.signalCiphertext)
+            // 步骤1：从 libsignal CiphertextMessage 类型映射到基础 Envelope 类型
+            var envelopeType = mapSignalTypeToEnvelopeType(transportMessage.signalCiphertextType)
             
-            // 检测消息类型：群组消息 (Sender Key) 还是一对一消息
-            val envelopeType = detectEnvelopeType(ciphertextBytes, transportMessage.recipientId)
+            // 步骤2：检测 Sealed Sender 外层包装
+            if (ciphertextBytes.isNotEmpty()) {
+                val firstByte = ciphertextBytes[0].toInt() and 0xFF
+                if (firstByte >= 0x23) {
+                    Log.d(TAG, "检测到 Sealed Sender 外层包装（firstByte=0x${firstByte.toString(16)}）")
+                    envelopeType = Envelope.Type.UNIDENTIFIED_SENDER
+                }
+            }
             
-            Log.d(TAG, "检测到消息类型: $envelopeType, recipientId=${transportMessage.recipientId}")
+            Log.d(TAG, "最终消息类型: signalCiphertextType=${transportMessage.signalCiphertextType}, envelopeType=$envelopeType")
             
             // 构建Envelope
             val envelopeBuilder = Envelope.Builder()
@@ -203,54 +258,62 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             envelopeBuilder.serverGuid(transportMessage.messageId)
             
             val envelope = envelopeBuilder.build()
-            Log.d(TAG, "Envelope转换成功: messageId=${transportMessage.messageId}, type=$envelopeType")
+            Log.d(TAG, "Envelope转换成功(旧格式): messageId=${transportMessage.messageId}, type=$envelopeType")
             envelope
             
         } catch (e: Exception) {
-            Log.e(TAG, "转换Envelope失败: messageId=${transportMessage.messageId}", e)
+            Log.e(TAG, "旧格式转换失败: messageId=${transportMessage.messageId}", e)
             null
         }
     }
     
     /**
-     * 检测消息类型
+     * 将 libsignal CiphertextMessage 类型映射到 Envelope 类型
      * 
-     * 通过检查 recipientId 是否为群组 ID 来判断是群组消息还是一对一消息
-     * 群组消息使用 Sender Key，一对一消息使用 Session Cipher
+     * 两套类型系统的映射关系：
+     * 
+     * libsignal CiphertextMessage 类型（底层加密库）：
+     * - 2: WHISPER_TYPE (SessionCipher 加密的普通消息)
+     * - 3: PREKEY_TYPE (包含 PreKey 的消息，用于建立会话)
+     * - 7: SENDERKEY_TYPE (SenderKey 加密的群组消息)
+     * - 8: PLAINTEXT_TYPE (明文内容)
+     * 
+     * Envelope.Type（协议层）：
+     * - 1: CIPHERTEXT (SessionCipher 消息)
+     * - 2: reserved (已废弃)
+     * - 3: PREKEY_BUNDLE (PreKey 消息)
+     * - 6: UNIDENTIFIED_SENDER (Sealed Sender 包装)
+     * - 7: SENDERKEY_MESSAGE (SenderKey 消息)
+     * - 8: PLAINTEXT_CONTENT (明文消息)
+     * 
+     * 注意：此方法只映射内层加密类型，Sealed Sender 外层包装需要额外检测
      */
-    private fun detectEnvelopeType(ciphertextBytes: ByteArray, recipientId: String): Envelope.Type {
-        return try {
-            // 检查 recipientId 是否是群组 ID（base64 编码的群组 ID 通常较长）
-            val isGroupMessage = isGroupId(recipientId)
-            
-            if (isGroupMessage) {
-                // 群组消息：Sender Key 加密
-                // 检查密文的第一个字节是否是 Sender Key 类型标识 (7)
-                if (ciphertextBytes.isNotEmpty()) {
-                    val messageVersion = ciphertextBytes[0].toInt() and 0xFF
-                    val messageType = (messageVersion shr 4) and 0x0F
-                    
-                    Log.d(TAG, "密文版本字节: $messageVersion, 类型: $messageType")
-                    
-                    // Sender Key 消息类型是 7
-                    if (messageType == 7) {
-                        Log.d(TAG, "检测到 Sender Key 群组消息")
-                        return Envelope.Type.SENDERKEY_MESSAGE
-                    }
-                }
-                
-                // 如果无法从字节判断，但 recipientId 是群组，仍然认为是 Sender Key
-                Log.d(TAG, "根据 recipientId 判断为群组消息")
-                return Envelope.Type.SENDERKEY_MESSAGE
-            } else {
-                // 一对一消息：Session Cipher 加密
-                Log.d(TAG, "检测到一对一消息")
-                return Envelope.Type.CIPHERTEXT
+    private fun mapSignalTypeToEnvelopeType(signalCiphertextType: Int): Envelope.Type {
+        return when (signalCiphertextType) {
+            2 -> {
+                // libsignal WHISPER_TYPE = 2 → Envelope CIPHERTEXT = 1
+                Log.d(TAG, "libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)")
+                Envelope.Type.CIPHERTEXT
             }
-            
-        } catch (e: Exception) {
-            Log.w(TAG, "检测消息类型异常，默认使用 CIPHERTEXT", e)
-            return Envelope.Type.CIPHERTEXT
+            3 -> {
+                // libsignal PREKEY_TYPE = 3 → Envelope PREKEY_BUNDLE = 3
+                Log.d(TAG, "libsignal类型: PREKEY_TYPE (3) → Envelope.PREKEY_BUNDLE (3)")
+                Envelope.Type.PREKEY_BUNDLE
+            }
+            7 -> {
+                // libsignal SENDERKEY_TYPE = 7 → Envelope SENDERKEY_MESSAGE = 7
+                Log.d(TAG, "libsignal类型: SENDERKEY_TYPE (7) → Envelope.SENDERKEY_MESSAGE (7)")
+                Envelope.Type.SENDERKEY_MESSAGE
+            }
+            8 -> {
+                // libsignal PLAINTEXT_TYPE = 8 → Envelope PLAINTEXT_CONTENT = 8
+                Log.d(TAG, "libsignal类型: PLAINTEXT_TYPE (8) → Envelope.PLAINTEXT_CONTENT (8)")
+                Envelope.Type.PLAINTEXT_CONTENT
+            }
+            else -> {
+                Log.w(TAG, "未知的libsignal类型: $signalCiphertextType, 默认使用 CIPHERTEXT")
+                Envelope.Type.CIPHERTEXT
+            }
         }
     }
     
