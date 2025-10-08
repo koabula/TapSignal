@@ -94,10 +94,19 @@ class GroupTransportManager private constructor(private val context: Context) {
     @Deprecated("使用 suspend 版本", ReplaceWith("getGroupStatus(groupId)"))
     fun getGroupStatusSync(groupId: String): GroupV2Status {
         return try {
+            Log.d(TAG, "getGroupStatusSync: 查询群组状态, groupId=${groupId.substring(0, Math.min(20, groupId.length))}...")
             val state = groupV2StatusTable.getGroupState(groupId)
-            state?.status ?: GroupV2Status.NATIVE
+            val status = state?.status ?: GroupV2Status.NATIVE
+            
+            if (state != null) {
+                Log.d(TAG, "getGroupStatusSync: 找到群组状态, groupId=$groupId, status=$status, version=${state.version}, memberCount=${state.totalMembers.size}")
+            } else {
+                Log.d(TAG, "getGroupStatusSync: 未找到群组状态, groupId=$groupId, 返回 NATIVE")
+            }
+            
+            status
         } catch (e: Exception) {
-            Log.e(TAG, "获取群组状态失败: $groupId", e)
+            Log.e(TAG, "getGroupStatusSync: 获取群组状态失败, groupId=$groupId", e)
             GroupV2Status.NATIVE
         }
     }
@@ -762,12 +771,14 @@ class GroupTransportManager private constructor(private val context: Context) {
     ): GroupSendResult {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "开始群组消息发送: groupId=$groupId, messageId=$messageId, size=${encryptedMessage.size}")
+                Log.i(TAG, "sendGroupMessage: 开始发送, groupId=${groupId.substring(0, Math.min(20, groupId.length))}..., messageId=$messageId, ciphertextSize=${encryptedMessage.size}")
                 
                 // 1. 检查群组状态
+                Log.d(TAG, "sendGroupMessage: 检查群组状态, groupId=$groupId")
                 val groupState = getGroupStateSync(groupId)
+                
                 if (groupState == null) {
-                    Log.e(TAG, "群组状态不存在: $groupId")
+                    Log.e(TAG, "sendGroupMessage: ❌ 群组状态不存在, groupId=$groupId")
                     return@withContext GroupSendResult.Failed(
                         groupId = groupId,
                         messageId = messageId,
@@ -776,12 +787,14 @@ class GroupTransportManager private constructor(private val context: Context) {
                     )
                 }
                 
+                Log.d(TAG, "sendGroupMessage: 群组状态查询成功, status=${groupState.status}, members=${groupState.totalMembers.size}")
+                
                 if (groupState.status != GroupV2Status.FULL_V2_ACTIVE) {
-                    Log.e(TAG, "群组未处于 FULL_V2_ACTIVE 状态: $groupId, status=${groupState.status}")
+                    Log.e(TAG, "sendGroupMessage: ❌ 群组未激活, groupId=$groupId, status=${groupState.status} (需要 FULL_V2_ACTIVE)")
                     return@withContext GroupSendResult.Failed(
                         groupId = groupId,
                         messageId = messageId,
-                        reason = "群组未激活 V2 模式",
+                        reason = "群组未激活 V2 模式: ${groupState.status}",
                         memberCount = groupState.totalMembers.size
                     )
                 }

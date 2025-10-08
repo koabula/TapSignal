@@ -173,7 +173,8 @@ public class ApplicationDependencyProvider implements AppDependencies.Provider {
                                             SignalExecutors.newCachedBoundedExecutor("signal-messages", ThreadUtil.PRIORITY_IMPORTANT_BACKGROUND_THREAD, 1, 16, 30),
                                             ByteUnit.KILOBYTES.toBytes(256),
                                             RemoteConfig::useMessageSendRestFallback,
-                                            RemoteConfig.usePqRatchet());
+                                            RemoteConfig.usePqRatchet(),
+                                            new org.thoughtcrime.securesms.tap.integration.TapMessageTransportImpl(context));
   }
 
   @Override

@@ -176,31 +176,107 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 return null
             }
             
+            // 解码密文
+            val ciphertextBytes = Base64.decode(transportMessage.signalCiphertext)
+            
+            // 检测消息类型：群组消息 (Sender Key) 还是一对一消息
+            val envelopeType = detectEnvelopeType(ciphertextBytes, transportMessage.recipientId)
+            
+            Log.d(TAG, "检测到消息类型: $envelopeType, recipientId=${transportMessage.recipientId}")
+            
             // 构建Envelope
             val envelopeBuilder = Envelope.Builder()
-                .type(Envelope.Type.CIPHERTEXT)  // 假设是密文消息
+                .type(envelopeType)
                 .timestamp(transportMessage.timestamp)
-                .serverTimestamp(transportMessage.timestamp)  // 设置服务器时间戳，避免解密时空指针异常
-                .content(Base64.decode(transportMessage.signalCiphertext).toByteString())
+                .serverTimestamp(transportMessage.timestamp)
+                .content(ciphertextBytes.toByteString())
                 .sourceServiceId(sourceServiceId.toString())
                 .sourceDevice(getSourceDeviceId(transportMessage))
-                .urgent(true)  // TAP消息视为紧急消息
-                .story(false)  // TAP传输的是普通消息，非故事消息
+                .urgent(true)
+                .story(false)
             
-            // 如果有目标ServiceId，设置它
+            // 设置目标ServiceId
             val localServiceId = SignalStore.account.requireAci()
             envelopeBuilder.destinationServiceId(localServiceId.toString())
             
-            // 使用消息时间戳设置serverGuid
+            // 设置serverGuid
             envelopeBuilder.serverGuid(transportMessage.messageId)
             
             val envelope = envelopeBuilder.build()
-            Log.d(TAG, "Envelope转换成功: messageId=${transportMessage.messageId}")
+            Log.d(TAG, "Envelope转换成功: messageId=${transportMessage.messageId}, type=$envelopeType")
             envelope
             
         } catch (e: Exception) {
             Log.e(TAG, "转换Envelope失败: messageId=${transportMessage.messageId}", e)
             null
+        }
+    }
+    
+    /**
+     * 检测消息类型
+     * 
+     * 通过检查 recipientId 是否为群组 ID 来判断是群组消息还是一对一消息
+     * 群组消息使用 Sender Key，一对一消息使用 Session Cipher
+     */
+    private fun detectEnvelopeType(ciphertextBytes: ByteArray, recipientId: String): Envelope.Type {
+        return try {
+            // 检查 recipientId 是否是群组 ID（base64 编码的群组 ID 通常较长）
+            val isGroupMessage = isGroupId(recipientId)
+            
+            if (isGroupMessage) {
+                // 群组消息：Sender Key 加密
+                // 检查密文的第一个字节是否是 Sender Key 类型标识 (7)
+                if (ciphertextBytes.isNotEmpty()) {
+                    val messageVersion = ciphertextBytes[0].toInt() and 0xFF
+                    val messageType = (messageVersion shr 4) and 0x0F
+                    
+                    Log.d(TAG, "密文版本字节: $messageVersion, 类型: $messageType")
+                    
+                    // Sender Key 消息类型是 7
+                    if (messageType == 7) {
+                        Log.d(TAG, "检测到 Sender Key 群组消息")
+                        return Envelope.Type.SENDERKEY_MESSAGE
+                    }
+                }
+                
+                // 如果无法从字节判断，但 recipientId 是群组，仍然认为是 Sender Key
+                Log.d(TAG, "根据 recipientId 判断为群组消息")
+                return Envelope.Type.SENDERKEY_MESSAGE
+            } else {
+                // 一对一消息：Session Cipher 加密
+                Log.d(TAG, "检测到一对一消息")
+                return Envelope.Type.CIPHERTEXT
+            }
+            
+        } catch (e: Exception) {
+            Log.w(TAG, "检测消息类型异常，默认使用 CIPHERTEXT", e)
+            return Envelope.Type.CIPHERTEXT
+        }
+    }
+    
+    /**
+     * 判断 recipientId 是否为群组 ID
+     * 
+     * 群组 ID 格式：base64 编码的群组标识符（通常很长）
+     * 个人 ACI 格式：UUID 格式
+     */
+    private fun isGroupId(recipientId: String): Boolean {
+        return try {
+            // UUID 格式检查
+            val uuidPattern = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+            val isUuid = uuidPattern.matches(recipientId)
+            
+            // 如果不是 UUID，且长度较长（群组 ID 通常是 base64 编码的长字符串）
+            val isLongId = recipientId.length > 40
+            
+            val result = !isUuid && isLongId
+            
+            Log.d(TAG, "recipientId 检查: isUuid=$isUuid, length=${recipientId.length}, isGroupId=$result")
+            
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "判断群组ID异常", e)
+            false
         }
     }
     
@@ -289,12 +365,15 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
      */
     private suspend fun decryptEnvelopeWithSignal(envelope: Envelope): SignalServiceCipherResult? {
         return try {
-            Log.d(TAG, "使用Signal解密Envelope: timestamp=${envelope.timestamp}")
+            Log.d(TAG, "使用Signal解密Envelope: timestamp=${envelope.timestamp}, type=${envelope.type}")
             
-            // 获取Signal的解密服务
+            // 对于 Sender Key 消息，需要特殊处理
+            if (envelope.type == Envelope.Type.SENDERKEY_MESSAGE) {
+                return decryptSenderKeyMessage(envelope)
+            }
+            
+            // 其他类型使用标准解密
             val signalServiceCipher = getSignalServiceCipher()
-            
-            // 执行解密操作
             val cipherResult = signalServiceCipher.decrypt(
                 envelope, 
                 System.currentTimeMillis(), 
@@ -311,6 +390,100 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             
         } catch (e: Exception) {
             Log.e(TAG, "Signal解密失败: timestamp=${envelope.timestamp}", e)
+            null
+        }
+    }
+    
+    /**
+     * 解密 Sender Key 加密的群组消息
+     * 
+     * 直接使用 GroupCipher 解密，不经过 sealed sender 包装
+     */
+    private suspend fun decryptSenderKeyMessage(envelope: Envelope): SignalServiceCipherResult? {
+        return try {
+            Log.d(TAG, "开始解密 Sender Key 消息: timestamp=${envelope.timestamp}")
+            
+            // 1. 获取发送者信息
+            val sourceServiceIdString = envelope.sourceServiceId
+            if (sourceServiceIdString == null) {
+                Log.e(TAG, "Sender Key 消息缺少发送者 ServiceId")
+                return null
+            }
+            
+            val sourceServiceId = org.whispersystems.signalservice.api.push.ServiceId.parseOrThrow(sourceServiceIdString)
+            val sourceAddress = org.whispersystems.signalservice.api.push.SignalServiceAddress(sourceServiceId)
+            
+            // 2. 获取 Protocol Store
+            val protocolStore = AppDependencies.protocolStore.aci()
+            val sessionLock = org.thoughtcrime.securesms.crypto.ReentrantSessionLock.INSTANCE
+            
+            // 3. 构建 SignalProtocolAddress（发送者地址）
+            // 注意：GroupCipher 使用发送者的地址来解密
+            val groupIdString = envelope.serverGuid ?: ""
+            if (groupIdString.isEmpty()) {
+                Log.e(TAG, "Sender Key 消息缺少 groupId")
+                return null
+            }
+            
+            Log.d(TAG, "Sender Key 解密参数: sourceServiceId=$sourceServiceId, groupId=$groupIdString")
+            
+            val senderProtocolAddress = org.signal.libsignal.protocol.SignalProtocolAddress(
+                sourceServiceIdString,
+                envelope.sourceDevice ?: 1
+            )
+            
+            // 4. 创建 GroupCipher
+            val groupCipher = org.signal.libsignal.protocol.groups.GroupCipher(
+                protocolStore,
+                senderProtocolAddress
+            )
+            
+            // 5. 使用线程安全的 SignalGroupCipher 包装器
+            val signalGroupCipher = org.whispersystems.signalservice.api.crypto.SignalGroupCipher(
+                sessionLock,
+                groupCipher
+            )
+            
+            // 6. 解密
+            val ciphertextBytes = envelope.content?.toByteArray()
+            if (ciphertextBytes == null || ciphertextBytes.isEmpty()) {
+                Log.e(TAG, "Sender Key 消息内容为空")
+                return null
+            }
+            
+            val plaintextBytes = signalGroupCipher.decrypt(ciphertextBytes)
+            
+            Log.d(TAG, "Sender Key 解密成功: plaintextSize=${plaintextBytes.size}")
+            
+            // 7. 解析 Content
+            val content = org.whispersystems.signalservice.internal.push.Content.ADAPTER.decode(plaintextBytes)
+            
+            // 8. 构建元数据 - 使用 EnvelopeMetadata
+            val localServiceId = SignalStore.account.requireAci()
+            val metadata = org.whispersystems.signalservice.api.crypto.EnvelopeMetadata(
+                sourceServiceId = sourceServiceId,
+                sourceE164 = null, // TAP 消息没有 E164
+                sourceDeviceId = envelope.sourceDevice ?: 1,
+                sealedSender = false, // TAP 传输非 sealed sender
+                groupId = groupIdString.toByteArray(),
+                destinationServiceId = localServiceId
+            )
+            
+            // 9. 包装为 SignalServiceCipherResult
+            val result = SignalServiceCipherResult(content, metadata)
+            
+            Log.i(TAG, "Sender Key 消息解密完成: timestamp=${envelope.timestamp}")
+            
+            result
+            
+        } catch (e: org.signal.libsignal.protocol.NoSessionException) {
+            Log.e(TAG, "Sender Key 会话不存在", e)
+            null
+        } catch (e: org.signal.libsignal.protocol.DuplicateMessageException) {
+            Log.w(TAG, "Sender Key 消息重复", e)
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Sender Key 解密异常", e)
             null
         }
     }

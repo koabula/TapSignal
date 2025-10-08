@@ -186,6 +186,7 @@ public class SignalServiceMessageSender {
   private final long            maxEnvelopeSize;
   private final BooleanSupplier useRestFallback;
   private final UsePqRatchet usePqRatchet;
+  private final TapMessageTransport tapTransport;
 
   public SignalServiceMessageSender(PushServiceSocket pushServiceSocket,
                                     SignalServiceDataStore store,
@@ -197,7 +198,8 @@ public class SignalServiceMessageSender {
                                     ExecutorService executor,
                                     long maxEnvelopeSize,
                                     BooleanSupplier useRestFallback,
-                                    UsePqRatchet usePqRatchet)
+                                    UsePqRatchet usePqRatchet,
+                                    TapMessageTransport tapTransport)
   {
     CredentialsProvider credentialsProvider = pushServiceSocket.getCredentialsProvider();
 
@@ -216,6 +218,7 @@ public class SignalServiceMessageSender {
     this.keysApi          = keysApi;
     this.useRestFallback  = useRestFallback;
     this.usePqRatchet     = usePqRatchet;
+    this.tapTransport     = tapTransport;
   }
 
   /**
@@ -1938,6 +1941,77 @@ public class SignalServiceMessageSender {
           throw new CancelationException();
         }
 
+        // TAP 拦截：根据 groupId 判断是群组消息还是私聊消息
+        if (tapTransport != null) {
+          // 检查是否为TAP控制消息，控制消息必须通过Signal Server发送以保证可靠性
+          if (content.isTapControlMessage()) {
+            Log.i(TAG, "[sendMessage][" + timestamp + "] Detected TAP control message, forcing Signal Server transport for reliability");
+            // 跳过TAP拦截，直接走Signal Server
+          } else {
+          Optional<byte[]> groupId = content.getGroupId();
+          
+          if (groupId.isPresent()) {
+            // 这是群组消息（包括2人群组），检查是否为 v2 mode
+            String groupIdBase64 = Base64.encodeWithPadding(groupId.get());
+            Log.d(TAG, "[sendMessage][" + timestamp + "] Detected group message, groupId=" + groupIdBase64.substring(0, Math.min(20, groupIdBase64.length())) + "..., checking TAP status");
+            
+            boolean shouldUseTap = tapTransport.shouldUseTapForGroup(groupId);
+            Log.d(TAG, "[sendMessage][" + timestamp + "] shouldUseTapForGroup result: " + shouldUseTap);
+            
+            if (shouldUseTap) {
+              Log.i(TAG, "[sendMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
+              try {
+                // 从 messages 中提取主设备的密文
+                byte[] ciphertext = extractPrimaryCiphertext(messages);
+                if (ciphertext != null) {
+                  Log.d(TAG, "[sendMessage][" + timestamp + "] Extracted ciphertext size: " + ciphertext.length + " bytes");
+                  // 使用群组发送逻辑（即使是2人群组也走群组路径）
+                  List<SignalServiceAddress> recipientList = Collections.singletonList(recipient);
+                  Log.d(TAG, "[sendMessage][" + timestamp + "] Calling sendGroupMessageViaTap with " + recipientList.size() + " recipient(s)");
+                  List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipientList, ciphertext, timestamp, urgent, online);
+                  Log.i(TAG, "[sendMessage][" + timestamp + "] TAP transport succeeded, results: " + results.size());
+                  return results.isEmpty() ? SendMessageResult.networkFailure(recipient) : results.get(0);
+                } else {
+                  Log.w(TAG, "[sendMessage][" + timestamp + "] Failed to extract ciphertext, falling back to Signal Server.");
+                }
+              } catch (IOException e) {
+                Log.w(TAG, "[sendMessage][" + timestamp + "] TAP transport failed: " + e.getClass().getSimpleName() + ": " + e.getMessage() + ", falling back to Signal Server.", e);
+                // Fall through to Signal Server
+              }
+            } else {
+              Log.d(TAG, "[sendMessage][" + timestamp + "] Group is NOT in v2 mode, using Signal Server");
+            }
+          } else {
+            // 这是私聊消息（没有 groupId），检查是否为 v2 mode
+            Log.d(TAG, "[sendMessage][" + timestamp + "] Detected private message, recipient=" + recipient.getIdentifier() + ", checking TAP status");
+            
+            boolean shouldUseTap = tapTransport.shouldUseTapForRecipient(recipient);
+            Log.d(TAG, "[sendMessage][" + timestamp + "] shouldUseTapForRecipient result: " + shouldUseTap);
+            
+            if (shouldUseTap) {
+              Log.i(TAG, "[sendMessage][" + timestamp + "] Private chat is in v2 mode, sending via TAP transport.");
+              try {
+                // 从 messages 中提取主设备的密文
+                byte[] ciphertext = extractPrimaryCiphertext(messages);
+                if (ciphertext != null) {
+                  Log.d(TAG, "[sendMessage][" + timestamp + "] Extracted ciphertext size: " + ciphertext.length + " bytes");
+                  SendMessageResult result = tapTransport.sendMessageViaTap(recipient, ciphertext, timestamp, urgent, online);
+                  Log.i(TAG, "[sendMessage][" + timestamp + "] TAP transport succeeded for private message");
+                  return result;
+                } else {
+                  Log.w(TAG, "[sendMessage][" + timestamp + "] Failed to extract ciphertext, falling back to Signal Server.");
+                }
+              } catch (IOException e) {
+                Log.w(TAG, "[sendMessage][" + timestamp + "] TAP transport failed: " + e.getClass().getSimpleName() + ": " + e.getMessage() + ", falling back to Signal Server.", e);
+                // Fall through to Signal Server
+              }
+            } else {
+              Log.d(TAG, "[sendMessage][" + timestamp + "] Private chat is NOT in v2 mode, using Signal Server");
+            }
+          }
+          } // 结束 TAP 控制消息检查的 else 块
+        }
+
         try {
           SendMessageResponse response = NetworkResultUtil.toMessageSendLegacy(messages.getDestination(), messageApi.sendMessage(messages, sealedSenderAccess, story));
           return SendMessageResult.success(recipient, messages.getDevices(), response.sentUnidentified(), response.getNeedsSync() || aciStore.isMultiDevice(), System.currentTimeMillis() - startTime, content.getContent());
@@ -2027,6 +2101,74 @@ public class SignalServiceMessageSender {
     Log.d(TAG, "[" + timestamp + "] Sending to " + recipients.size() + " recipients.");
     enforceMaxContentSize(content);
 
+    // TAP 拦截：处理2人群组的情况（单收件人 + groupId）
+    if (tapTransport != null && recipients.size() == 1) {
+      // 检查是否为TAP控制消息，控制消息必须通过Signal Server发送以保证可靠性
+      if (content.isTapControlMessage()) {
+        Log.i(TAG, "[sendMessage-List][" + timestamp + "] Detected TAP control message, forcing Signal Server transport for reliability");
+        // 跳过TAP拦截，直接走Signal Server
+      } else {
+      Optional<byte[]> groupId = content.getGroupId();
+      
+      if (groupId.isPresent()) {
+        // 这是群组消息（可能是2人群组），检查是否为 v2 mode
+        String groupIdBase64 = Base64.encodeWithPadding(groupId.get());
+        Log.d(TAG, "[sendMessage-List][" + timestamp + "] Detected group message with 1 recipient, groupId=" + groupIdBase64.substring(0, Math.min(20, groupIdBase64.length())) + "...");
+        
+        boolean shouldUseTap = tapTransport.shouldUseTapForGroup(groupId);
+        Log.d(TAG, "[sendMessage-List][" + timestamp + "] shouldUseTapForGroup result: " + shouldUseTap);
+        
+        if (shouldUseTap) {
+          Log.i(TAG, "[sendMessage-List][" + timestamp + "] Group is in v2 mode, attempting TAP transport.");
+          try {
+            SignalServiceAddress recipient = recipients.get(0);
+            SealedSenderAccess sealedSenderAccess = sealedSenderAccesses.get(0);
+            
+            // 先加密消息
+            OutgoingPushMessageList messages = getEncryptedMessages(recipient,
+                                                                    sealedSenderAccess,
+                                                                    timestamp,
+                                                                    content,
+                                                                    online,
+                                                                    urgent,
+                                                                    story);
+            
+            // 触发加密完成事件
+            if (sendEvents != null) {
+              sendEvents.onMessageEncrypted();
+            }
+            
+            // 提取密文
+            byte[] ciphertext = extractPrimaryCiphertext(messages);
+            if (ciphertext != null) {
+              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Extracted ciphertext size: " + ciphertext.length + " bytes");
+              Log.d(TAG, "[sendMessage-List][" + timestamp + "] Calling sendGroupMessageViaTap");
+              
+              List<SendMessageResult> results = tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online);
+              
+              Log.i(TAG, "[sendMessage-List][" + timestamp + "] TAP transport succeeded, results: " + results.size());
+              
+              // 触发消息发送完成事件
+              if (sendEvents != null) {
+                sendEvents.onMessageSent();
+              }
+              
+              return results;
+            } else {
+              Log.w(TAG, "[sendMessage-List][" + timestamp + "] Failed to extract ciphertext, falling back to Signal Server.");
+            }
+          } catch (Exception e) {
+            Log.w(TAG, "[sendMessage-List][" + timestamp + "] TAP transport failed: " + e.getClass().getSimpleName() + ": " + e.getMessage() + ", falling back to Signal Server.", e);
+            // Fall through to Signal Server
+          }
+        } else {
+          Log.d(TAG, "[sendMessage-List][" + timestamp + "] Group is NOT in v2 mode, using Signal Server");
+        }
+      }
+      } // 结束 TAP 控制消息检查的 else 块
+    }
+
+    // 原有逻辑：通过 Signal Server 发送
     long                                startTime                  = System.currentTimeMillis();
     List<Observable<SendMessageResult>> singleResults              = new LinkedList<>();
     Iterator<SignalServiceAddress>      recipientIterator          = recipients.iterator();
@@ -2453,6 +2595,17 @@ public class SignalServiceMessageSender {
 
       sendEvents.onMessageEncrypted();
 
+      // TAP 拦截：如果群组处于 v2 mode，通过 TAP 传输而不是 Signal Server
+      if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
+        Log.i(TAG, "[sendGroupMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
+        try {
+          return tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online);
+        } catch (IOException e) {
+          Log.w(TAG, "[sendGroupMessage][" + timestamp + "] TAP transport failed: " + e.getMessage());
+          throw e;
+        }
+      }
+
       try {
         try {
 
@@ -2535,6 +2688,39 @@ public class SignalServiceMessageSender {
     return new GroupTargetInfo(new ArrayList<>(destinations), recipientDevices, sessionMap);
   }
 
+
+  /**
+   * 从 OutgoingPushMessageList 中提取主设备的密文（用于 TAP 传输）
+   * 
+   * @param messages 加密后的消息列表
+   * @return 主设备的密文（Base64 解码后），如果提取失败则返回 null
+   */
+  private byte[] extractPrimaryCiphertext(OutgoingPushMessageList messages) {
+    if (messages == null || messages.getMessages() == null || messages.getMessages().isEmpty()) {
+      Log.w(TAG, "extractPrimaryCiphertext: messages is null or empty");
+      return null;
+    }
+
+    // 优先查找主设备（deviceId = 1）的消息
+    for (OutgoingPushMessage message : messages.getMessages()) {
+      if (message.getDestinationDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
+        try {
+          return Base64.decode(message.content);
+        } catch (Exception e) {
+          Log.w(TAG, "extractPrimaryCiphertext: Failed to decode Base64 content", e);
+          return null;
+        }
+      }
+    }
+
+    // 如果没有找到主设备，使用第一个设备的消息（作为回退）
+    try {
+      return Base64.decode(messages.getMessages().get(0).content);
+    } catch (Exception e) {
+      Log.w(TAG, "extractPrimaryCiphertext: Failed to decode Base64 content from first device", e);
+      return null;
+    }
+  }
 
   private static final class GroupTargetInfo {
     private final List<SignalProtocolAddress>               destinations;

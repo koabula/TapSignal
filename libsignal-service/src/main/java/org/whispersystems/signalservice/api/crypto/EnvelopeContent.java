@@ -47,6 +47,17 @@ public interface EnvelopeContent {
   Optional<Content> getContent();
 
   /**
+   * Returns the group ID if this message is for a group, empty otherwise.
+   */
+  Optional<byte[]> getGroupId();
+
+  /**
+   * Checks if this message is a TAP control message (token exchange message).
+   * TAP control messages should always be sent via Signal Server for reliability.
+   */
+  boolean isTapControlMessage();
+
+  /**
    * Wrap {@link Content} you plan on sending as an encrypted message.
    * This is the default. Consider anything else exceptional.
    */
@@ -121,6 +132,20 @@ public interface EnvelopeContent {
     public Optional<Content> getContent() {
       return Optional.of(content);
     }
+
+    @Override
+    public Optional<byte[]> getGroupId() {
+      return groupId;
+    }
+
+    @Override
+    public boolean isTapControlMessage() {
+      // TAP control messages are identified by the TAP_TOKEN_EXCHANGE: prefix in the message body
+      if (content != null && content.dataMessage != null && content.dataMessage.body != null) {
+        return content.dataMessage.body.startsWith("TAP_TOKEN_EXCHANGE:");
+      }
+      return false;
+    }
   }
 
   class Plaintext implements EnvelopeContent {
@@ -168,6 +193,17 @@ public interface EnvelopeContent {
     @Override
     public Optional<Content> getContent() {
       return Optional.empty();
+    }
+
+    @Override
+    public Optional<byte[]> getGroupId() {
+      return groupId;
+    }
+
+    @Override
+    public boolean isTapControlMessage() {
+      // Plaintext content is not used for TAP control messages
+      return false;
     }
   }
 }
