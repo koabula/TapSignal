@@ -480,15 +480,22 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             val protocolStore = AppDependencies.protocolStore.aci()
             val sessionLock = org.thoughtcrime.securesms.crypto.ReentrantSessionLock.INSTANCE
             
-            // 3. 构建 SignalProtocolAddress（发送者地址）
-            // 注意：GroupCipher 使用发送者的地址来解密
-            val groupIdString = envelope.serverGuid ?: ""
-            if (groupIdString.isEmpty()) {
-                Log.e(TAG, "Sender Key 消息缺少 groupId")
+            // 3. 从 envelope.serverGuid 提取 groupId（发送端已将 Base64 编码的 groupId 放入 serverGuid）
+            val groupIdBase64 = envelope.serverGuid
+            if (groupIdBase64.isNullOrEmpty()) {
+                Log.e(TAG, "Sender Key 消息缺少 groupId (serverGuid)")
                 return null
             }
             
-            Log.d(TAG, "Sender Key 解密参数: sourceServiceId=$sourceServiceId, groupId=$groupIdString")
+            // 解码 groupId
+            val groupIdBytes = try {
+                org.signal.core.util.Base64.decode(groupIdBase64)
+            } catch (e: Exception) {
+                Log.e(TAG, "解码 groupId 失败: serverGuid=$groupIdBase64", e)
+                return null
+            }
+            
+            Log.d(TAG, "Sender Key 解密参数: sourceServiceId=$sourceServiceId, groupIdLength=${groupIdBytes.size}")
             
             val senderProtocolAddress = org.signal.libsignal.protocol.SignalProtocolAddress(
                 sourceServiceIdString,
@@ -521,21 +528,21 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             // 7. 解析 Content
             val content = org.whispersystems.signalservice.internal.push.Content.ADAPTER.decode(plaintextBytes)
             
-            // 8. 构建元数据 - 使用 EnvelopeMetadata
+            // 8. 构建元数据 - 使用正确的 groupId
             val localServiceId = SignalStore.account.requireAci()
             val metadata = org.whispersystems.signalservice.api.crypto.EnvelopeMetadata(
                 sourceServiceId = sourceServiceId,
                 sourceE164 = null, // TAP 消息没有 E164
                 sourceDeviceId = envelope.sourceDevice ?: 1,
                 sealedSender = false, // TAP 传输非 sealed sender
-                groupId = groupIdString.toByteArray(),
+                groupId = groupIdBytes, // 使用解码后的真实 groupId
                 destinationServiceId = localServiceId
             )
             
             // 9. 包装为 SignalServiceCipherResult
             val result = SignalServiceCipherResult(content, metadata)
             
-            Log.i(TAG, "Sender Key 消息解密完成: timestamp=${envelope.timestamp}")
+            Log.i(TAG, "Sender Key 消息解密完成: timestamp=${envelope.timestamp}, groupId已正确提取")
             
             result
             

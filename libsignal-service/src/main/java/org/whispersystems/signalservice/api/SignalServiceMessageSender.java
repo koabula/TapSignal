@@ -2604,11 +2604,19 @@ public class SignalServiceMessageSender {
       if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
         Log.i(TAG, "[sendGroupMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
         try {
-          // 此方法使用 SenderKey 加密（encryptForGroup），用于3+人群组
-          // 因此 isSessionCipherEncrypted = false
-          boolean isSessionCipherEncrypted = false;
-          Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption, isSessionCipher=" + isSessionCipherEncrypted);
-          return tapTransport.sendGroupMessageViaTap(groupId, recipients, ciphertext, timestamp, urgent, online, isSessionCipherEncrypted);
+          // 构造完整的 Envelope（SenderKey 类型）
+          // 这样可以保持与 2人群组 Envelope 传输的一致性
+          byte[] envelopeBytes = constructEnvelopeForSenderKey(ciphertext, recipients, timestamp, groupId);
+          
+          if (envelopeBytes != null) {
+            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Constructed SenderKey Envelope size: " + envelopeBytes.length + " bytes");
+            // SenderKey 加密的 3+ 人群组
+            boolean isSessionCipherEncrypted = false;
+            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption, isSessionCipher=" + isSessionCipherEncrypted);
+            return tapTransport.sendGroupMessageViaTap(groupId, recipients, envelopeBytes, timestamp, urgent, online, isSessionCipherEncrypted);
+          } else {
+            Log.w(TAG, "[sendGroupMessage][" + timestamp + "] Failed to construct SenderKey Envelope, falling back to Signal Server");
+          }
         } catch (IOException e) {
           Log.w(TAG, "[sendGroupMessage][" + timestamp + "] TAP transport failed: " + e.getMessage());
           throw e;
@@ -2704,6 +2712,61 @@ public class SignalServiceMessageSender {
    * @param messages 加密后的消息列表
    * @return 主设备的密文（Base64 解码后），如果提取失败则返回 null
    */
+  /**
+   * 为 SenderKey 加密的群组消息构造完整的 Envelope
+   * 
+   * 用于 3+ 人群组，保持与 2人群组 Envelope 传输的一致性
+   * 
+   * @param ciphertext SenderKey 加密的密文
+   * @param recipients 接收者列表
+   * @param timestamp 消息时间戳
+   * @param groupId 群组ID
+   * @return 序列化的 Envelope 字节数组
+   */
+  private byte[] constructEnvelopeForSenderKey(byte[] ciphertext, 
+                                                List<SignalServiceAddress> recipients,
+                                                long timestamp,
+                                                Optional<byte[]> groupId) {
+    try {
+      // 构造 SenderKey 类型的 Envelope
+      org.whispersystems.signalservice.internal.push.Envelope.Builder envelopeBuilder = 
+        new org.whispersystems.signalservice.internal.push.Envelope.Builder()
+          .type(org.whispersystems.signalservice.internal.push.Envelope.Type.SENDERKEY_MESSAGE)
+          .timestamp(timestamp)
+          .serverTimestamp(timestamp)
+          .content(okio.ByteString.of(ciphertext))
+          .sourceServiceId(localAddress.getServiceId().toString())
+          .sourceDevice(localDeviceId)
+          .urgent(true)
+          .story(false);
+      
+      // 设置 serverGuid: 使用 groupId (Base64编码) 或生成随机UUID
+      if (groupId.isPresent()) {
+        String groupIdBase64 = org.signal.core.util.Base64.encodeWithPadding(groupId.get());
+        envelopeBuilder.serverGuid(groupIdBase64);
+        Log.d(TAG, "constructEnvelopeForSenderKey: Using groupId as serverGuid, length=" + groupIdBase64.length());
+      } else {
+        envelopeBuilder.serverGuid(java.util.UUID.randomUUID().toString());
+      }
+      
+      // 设置目标接收者（使用第一个接收者作为代表，实际群组消息会发给所有人）
+      if (!recipients.isEmpty()) {
+        envelopeBuilder.destinationServiceId(recipients.get(0).getServiceId().toString());
+      }
+      
+      // 序列化 Envelope
+      org.whispersystems.signalservice.internal.push.Envelope envelope = envelopeBuilder.build();
+      byte[] envelopeBytes = envelope.encode();
+      
+      Log.d(TAG, "constructEnvelopeForSenderKey: Created SenderKey Envelope, size=" + envelopeBytes.length);
+      return envelopeBytes;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "constructEnvelopeForSenderKey: Failed to construct Envelope", e);
+      return null;
+    }
+  }
+
   /**
    * 从 OutgoingPushMessage 构造完整的 Envelope
    * 
