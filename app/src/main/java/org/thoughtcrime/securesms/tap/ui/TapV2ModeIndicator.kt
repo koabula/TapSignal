@@ -93,14 +93,14 @@ class TapV2ModeIndicator @JvmOverloads constructor(
                     try {
                         val channelManager = TransportChannelManager.getInstance(context)
                         
-                        // 异步检查通道状态，避免主线程死锁
-                        val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+                        // 异步检查通道状态，避免主线程死锁（只检查私聊通道）
+                        val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientAci)
                         
                         Log.d(TAG, "通道查询结果: hasActiveChannel=$hasActiveChannel")
                         
                         if (hasActiveChannel) {
-                            // 获取通道详细信息
-                            val channels = channelManager.getActiveChannels(recipientAci)
+                            // 获取通道详细信息（只获取私聊通道）
+                            val channels = channelManager.getActivePrivateChannels(recipientAci)
                             if (channels.isNotEmpty()) {
                                 val activeChannel = channels.find { it.status == TransportChannelStatus.ACTIVE }
                                 if (activeChannel != null) {

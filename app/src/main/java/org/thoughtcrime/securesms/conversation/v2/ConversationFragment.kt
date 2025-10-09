@@ -4339,10 +4339,10 @@ class ConversationFragment :
         return
       }
       
-      val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+      val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientAci)
       
       try {
-        val activeChannels = channelManager.getActiveChannels(recipientAci)
+        val activeChannels = channelManager.getActivePrivateChannels(recipientAci)
         
         if (activeChannels.isNotEmpty()) {
           Log.i(TAG, "发现 ${activeChannels.size} 个活跃的Tap通道")

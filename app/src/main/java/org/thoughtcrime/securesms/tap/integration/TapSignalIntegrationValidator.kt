@@ -398,10 +398,10 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
                 
                 val issues = mutableListOf<String>()
                 
-                // 1. 检查活跃通道
-                val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+                // 1. 检查活跃的私聊通道（验证器用于私聊状态检查）
+                val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientAci)
                 if (!hasActiveChannel) {
-                    issues.add("无活跃传输通道")
+                    issues.add("无活跃私聊传输通道")
                 }
                 
                 // 2. 检查可用Token
@@ -476,8 +476,8 @@ class TapSignalIntegrationValidator private constructor(private val context: Con
             val channelManager = TransportChannelManager.getInstance(context)
             val tokenPool = TransportTokenPool.getInstance(context)
             
-            // 检查是否有活跃的通道
-            val hasActiveChannel = channelManager.hasActiveChannel(senderAci)
+            // 检查是否有活跃的私聊通道（消息v2模式检测用于私聊）
+            val hasActiveChannel = channelManager.hasActivePrivateChannel(senderAci)
             if (!hasActiveChannel) {
                 return false
             }

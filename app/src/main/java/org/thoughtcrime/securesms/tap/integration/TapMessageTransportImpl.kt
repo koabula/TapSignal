@@ -59,7 +59,7 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
             // 只检查是否为私聊的 v2 mode
             // 2人群组现在通过 shouldUseTapForGroup() 检查，不再在这里处理
             val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-            val hasPrivateChannel = channelManager.hasActiveChannel(recipient.identifier)
+            val hasPrivateChannel = channelManager.hasActivePrivateChannel(recipient.identifier)
             
             Log.d(TAG, "shouldUseTapForRecipient: recipient=${recipient.identifier}, hasPrivateChannel=$hasPrivateChannel")
             return hasPrivateChannel

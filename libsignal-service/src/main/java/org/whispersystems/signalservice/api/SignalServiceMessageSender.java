@@ -2600,19 +2600,23 @@ public class SignalServiceMessageSender {
 
       sendEvents.onMessageEncrypted();
 
-      // TAP 拦截：如果群组处于 v2 mode，通过 TAP 传输而不是 Signal Server
-      if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
+      // TAP 拦截：如果群组处于 v2 mode 且不是TAP控制消息，通过 TAP 传输而不是 Signal Server
+      // TAP控制消息必须通过Signal Server传输，以保证可靠性
+      if (isTapControlMessageContent(content)) {
+        Log.d(TAG, "[sendGroupMessage][" + timestamp + "] TAP control message detected, forcing Signal Server transmission for reliability.");
+      } else if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
         Log.i(TAG, "[sendGroupMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
         try {
-          // 构造完整的 Envelope（SenderKey 类型）
+          // 构造完整的 Envelope（Sealed Sender 类型）
+          // encryptForGroup() 返回的是 Sealed Sender 包装的密文，因此 Envelope.type 应该是 UNIDENTIFIED_SENDER
           // 这样可以保持与 2人群组 Envelope 传输的一致性
           byte[] envelopeBytes = constructEnvelopeForSenderKey(ciphertext, recipients, timestamp, groupId);
           
           if (envelopeBytes != null) {
-            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Constructed SenderKey Envelope size: " + envelopeBytes.length + " bytes");
-            // SenderKey 加密的 3+ 人群组
+            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Constructed Sealed Sender Envelope size: " + envelopeBytes.length + " bytes");
+            // SenderKey 加密的 3+ 人群组（Sealed Sender 包装）
             boolean isSessionCipherEncrypted = false;
-            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption, isSessionCipher=" + isSessionCipherEncrypted);
+            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption (Sealed Sender wrapped), isSessionCipher=" + isSessionCipherEncrypted);
             return tapTransport.sendGroupMessageViaTap(groupId, recipients, envelopeBytes, timestamp, urgent, online, isSessionCipherEncrypted);
           } else {
             Log.w(TAG, "[sendGroupMessage][" + timestamp + "] Failed to construct SenderKey Envelope, falling back to Signal Server");
@@ -2728,10 +2732,12 @@ public class SignalServiceMessageSender {
                                                 long timestamp,
                                                 Optional<byte[]> groupId) {
     try {
-      // 构造 SenderKey 类型的 Envelope
+      // 构造 Sealed Sender 类型的 Envelope
+      // encryptForGroup() 返回的是 Sealed Sender 包装的密文，而不是纯 SenderKey 密文
+      // 因此 Envelope.type 应该是 UNIDENTIFIED_SENDER，而不是 SENDERKEY_MESSAGE
       org.whispersystems.signalservice.internal.push.Envelope.Builder envelopeBuilder = 
         new org.whispersystems.signalservice.internal.push.Envelope.Builder()
-          .type(org.whispersystems.signalservice.internal.push.Envelope.Type.SENDERKEY_MESSAGE)
+          .type(org.whispersystems.signalservice.internal.push.Envelope.Type.UNIDENTIFIED_SENDER)
           .timestamp(timestamp)
           .serverTimestamp(timestamp)
           .content(okio.ByteString.of(ciphertext))
@@ -2758,12 +2764,44 @@ public class SignalServiceMessageSender {
       org.whispersystems.signalservice.internal.push.Envelope envelope = envelopeBuilder.build();
       byte[] envelopeBytes = envelope.encode();
       
-      Log.d(TAG, "constructEnvelopeForSenderKey: Created SenderKey Envelope, size=" + envelopeBytes.length);
+      Log.d(TAG, "constructEnvelopeForSenderKey: Created Sealed Sender Envelope (type=UNIDENTIFIED_SENDER), size=" + envelopeBytes.length);
       return envelopeBytes;
       
     } catch (Exception e) {
       Log.e(TAG, "constructEnvelopeForSenderKey: Failed to construct Envelope", e);
       return null;
+    }
+  }
+
+  /**
+   * 检查protobuf Content是否为TAP控制消息
+   * 
+   * TAP控制消息包括：GROUP_OFFER、GROUP_ACCEPT、GROUP_ACTIVATE、GROUP_DISABLE等
+   * 这些消息必须通过Signal Server传输以保证可靠性，不能通过TAP传输
+   * 
+   * @param content protobuf Content对象
+   * @return true 如果是TAP控制消息，false 否则
+   */
+  private boolean isTapControlMessageContent(Content content) {
+    try {
+      // 检查是否包含DataMessage
+      if (content.dataMessage == null) {
+        return false;
+      }
+      
+      // 获取消息body
+      String body = content.dataMessage.body;
+      if (body == null || body.isEmpty()) {
+        return false;
+      }
+      
+      // TAP控制消息以特定前缀开头
+      final String TAP_TOKEN_EXCHANGE_PREFIX = "TAP_TOKEN_EXCHANGE:";
+      return body.startsWith(TAP_TOKEN_EXCHANGE_PREFIX);
+      
+    } catch (Exception e) {
+      Log.w(TAG, "isTapControlMessageContent: Error checking message content", e);
+      return false;
     }
   }
 

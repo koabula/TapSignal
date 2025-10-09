@@ -318,10 +318,10 @@ internal object ConversationOptionsMenu {
           // 处理私聊的 v2 mode 状态
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
           
-          // 修复：使用ACI字符串查询通道状态，与通道管理保持一致
+          // 修复：使用ACI字符串查询通道状态，与通道管理保持一致（只检查私聊通道）
           val hasActiveChannel = try {
               val recipientAci = recipient.requireAci().toString()
-              channelManager.hasActiveChannel(recipientAci)
+              channelManager.hasActivePrivateChannel(recipientAci)
           } catch (e: Exception) {
               Log.w(TAG, "无法获取recipient ACI进行Tap通道查询: ${e.message}")
               false

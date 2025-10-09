@@ -62,6 +62,7 @@ class TapPollingService(private val context: Context) {
     private val pollingStateCache = ConcurrentHashMap<String, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState>()
     
     // 轮询任务管理
+    // 使用复合key: 私聊使用 recipientId，群聊使用 groupId:recipientId
     private val pollingTasks = ConcurrentHashMap<String, PollingTaskInfo>()
     private val pollingLock = ReentrantReadWriteLock()
     
@@ -242,6 +243,49 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
+     * 生成轮询任务的复合key
+     * 
+     * @param recipientId 接收者ID
+     * @param groupId 群组ID（可为null，表示私聊）
+     * @return 复合key: 私聊使用 recipientId，群聊使用 groupId:recipientId
+     */
+    private fun getPollingTaskKey(recipientId: String, groupId: String?): String {
+        return if (groupId.isNullOrEmpty()) {
+            recipientId  // 私聊：只用 recipientId
+        } else {
+            "$groupId:$recipientId"  // 群聊：groupId:recipientId
+        }
+    }
+    
+    /**
+     * 从 metadata 的接收路径中提取 groupId
+     * 
+     * 群组消息路径格式：/group/{groupId}/messages/
+     * 私聊消息路径格式：/v2-channels/{hashedId}/outbox/messages/
+     */
+    private fun extractGroupId(metadata: TransportMetadata): String? {
+        return try {
+            val receivePath = metadata.getReceiveMetadata().path
+            
+            // 检查是否为群组路径
+            if (receivePath.startsWith("/group/")) {
+                // 提取 groupId：/group/{groupId}/... → groupId
+                val parts = receivePath.split("/")
+                if (parts.size >= 3 && parts[1] == "group") {
+                    parts[2].takeIf { it.isNotEmpty() }
+                } else {
+                    null
+                }
+            } else {
+                null  // 私聊路径，返回 null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "从metadata中提取groupId失败", e)
+            null
+        }
+    }
+    
+    /**
      * 为群组添加轮询目标
      * 
      * 为群组的所有其他成员创建轮询任务，支持批量添加
@@ -272,8 +316,7 @@ class TapPollingService(private val context: Context) {
             // 为每个成员添加轮询目标
             for ((memberAci, metadata) in memberMetadatas) {
                 try {
-                    // 直接使用原有 metadata，群组信息已在 token 交换时包含
-                    // metadata 本身已经包含了必要的群组标识信息
+                    // metadata 的 peerReceivePath 应该已经包含 groupId 信息 (/group/{groupId}/)
                     val added = addPollingTarget(memberAci, metadata, null)
                     if (added) {
                         successCount++
@@ -309,24 +352,32 @@ class TapPollingService(private val context: Context) {
         memberAcis: Set<String>,
         providerType: String
     ): Int {
-        return try {
-            Log.i(TAG, "移除群组轮询目标: groupId=$groupId, members=${memberAcis.size}")
-            
-            var successCount = 0
-            
-            for (memberAci in memberAcis) {
-                val removed = removePollingTarget(memberAci, providerType)
-                if (removed) {
-                    successCount++
+        return pollingLock.write {
+            try {
+                Log.i(TAG, "移除群组轮询目标: groupId=$groupId, members=${memberAcis.size}")
+                
+                var successCount = 0
+                
+                for (memberAci in memberAcis) {
+                    // 生成群组复合key
+                    val taskKey = getPollingTaskKey(memberAci, groupId)
+                    val taskInfo = pollingTasks[taskKey]
+                    
+                    if (taskInfo != null && taskInfo.metadata.providerType == providerType) {
+                        Log.d(TAG, "移除群组轮询目标: taskKey=$taskKey, memberAci=$memberAci")
+                        taskInfo.cleanup()
+                        pollingTasks.remove(taskKey)
+                        successCount++
+                    }
                 }
+                
+                Log.i(TAG, "群组轮询目标移除完成: groupId=$groupId, 成功=$successCount/${memberAcis.size}")
+                successCount
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "移除群组轮询目标失败: groupId=$groupId", e)
+                0
             }
-            
-            Log.i(TAG, "群组轮询目标移除完成: groupId=$groupId, 成功=$successCount/${memberAcis.size}")
-            successCount
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "移除群组轮询目标失败: groupId=$groupId", e)
-            0
         }
     }
     
@@ -340,32 +391,37 @@ class TapPollingService(private val context: Context) {
         }
         
         return try {
-            Log.d(TAG, "添加轮询目标: recipient=$recipientId, provider=${metadata.providerType}")
+            // 从 metadata 中提取 groupId
+            val groupId = extractGroupId(metadata)
+            val taskKey = getPollingTaskKey(recipientId, groupId)
+            
+            Log.d(TAG, "添加轮询目标: recipient=$recipientId, groupId=$groupId, taskKey=$taskKey, provider=${metadata.providerType}")
             
             // 在锁外获取通道信息，避免死锁
             val channelForCalculation = channel ?: channelManager.getActiveChannel(recipientId, metadata.providerType)
             
             pollingLock.write {
-                // 检查是否已存在轮询目标
-                val existingTask = pollingTasks[recipientId]
+                // 检查是否已存在轮询目标（使用复合key）
+                val existingTask = pollingTasks[taskKey]
                 if (existingTask != null) {
-                    Log.d(TAG, "检测到已存在的轮询目标: recipient=$recipientId, 现有Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}")
+                    Log.d(TAG, "检测到已存在的轮询目标: taskKey=$taskKey, 现有Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}")
                     
-                    // 检查Provider类型是否匹配
-                    if (existingTask.metadata.providerType == metadata.providerType) {
-                        // Provider匹配，检查任务状态
+                    // 检查Provider类型和metadata是否匹配
+                    val existingGroupId = extractGroupId(existingTask.metadata)
+                    if (existingTask.metadata.providerType == metadata.providerType && existingGroupId == groupId) {
+                        // Provider和群组都匹配，检查任务状态
                         val currentStatus = existingTask.status
-                        Log.d(TAG, "Provider匹配，检查任务状态: recipient=$recipientId, status=$currentStatus")
+                        Log.d(TAG, "Provider和群组匹配，检查任务状态: taskKey=$taskKey, status=$currentStatus")
                         
                         when (currentStatus) {
                             PollingTaskStatus.RUNNING, PollingTaskStatus.POLLING -> {
-                                // 状态正常，直接返回成功
-                                Log.i(TAG, "轮询目标已存在且状态正常: recipient=$recipientId, status=$currentStatus")
+                                // 状态正常，复合key已匹配，metadata也是正确的
+                                Log.i(TAG, "轮询目标已存在且状态正常: taskKey=$taskKey, status=$currentStatus")
                                 return@write true
                             }
                             PollingTaskStatus.PAUSED -> {
                                 // 暂停状态，重新启动任务
-                                Log.i(TAG, "重新启动暂停的轮询任务: recipient=$recipientId")
+                                Log.i(TAG, "重新启动暂停的轮询任务: taskKey=$taskKey")
                                 existingTask.setStatus(PollingTaskStatus.RUNNING)
                                 val newTask = schedulePollingTask(existingTask)
                                 existingTask.task = newTask
@@ -373,16 +429,16 @@ class TapPollingService(private val context: Context) {
                             }
                             PollingTaskStatus.ERROR_SUSPENDED, PollingTaskStatus.STOPPED, PollingTaskStatus.CREATED -> {
                                 // 异常状态，需要重新创建
-                                Log.w(TAG, "现有轮询任务状态异常，移除并重新创建: recipient=$recipientId, status=$currentStatus")
+                                Log.w(TAG, "现有轮询任务状态异常，移除并重新创建: taskKey=$taskKey, status=$currentStatus")
                                 existingTask.cleanup()
-                                pollingTasks.remove(recipientId)
+                                pollingTasks.remove(taskKey)
                             }
                         }
                     } else {
-                        // Provider不匹配，移除旧任务
-                        Log.w(TAG, "Provider类型不匹配，移除旧任务并创建新任务: recipient=$recipientId, 旧Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}")
+                        // Provider或群组不匹配，移除旧任务
+                        Log.w(TAG, "Provider或群组不匹配，移除旧任务并创建新任务: taskKey=$taskKey, 旧Provider=${existingTask.metadata.providerType}, 新Provider=${metadata.providerType}, 旧GroupId=$existingGroupId, 新GroupId=$groupId")
                         existingTask.cleanup()
-                        pollingTasks.remove(recipientId)
+                        pollingTasks.remove(taskKey)
                     }
                 }
                 
@@ -396,17 +452,17 @@ class TapPollingService(private val context: Context) {
                 // 调度轮询任务
                 val scheduledTask = schedulePollingTask(taskInfo)
                 if (scheduledTask == null) {
-                    Log.e(TAG, "调度轮询任务失败: recipient=$recipientId")
+                    Log.e(TAG, "调度轮询任务失败: taskKey=$taskKey, recipient=$recipientId")
                     return@write false
                 }
                 
                 taskInfo.task = scheduledTask
                 taskInfo.setStatus(PollingTaskStatus.RUNNING)
                 
-                // 添加到任务列表
-                pollingTasks[recipientId] = taskInfo
+                // 添加到任务列表（使用复合key）
+                pollingTasks[taskKey] = taskInfo
                 
-                Log.i(TAG, "轮询目标添加成功: recipient=$recipientId, interval=${initialInterval}ms")
+                Log.i(TAG, "轮询目标添加成功: taskKey=$taskKey, recipient=$recipientId, groupId=$groupId, interval=${initialInterval}ms")
                 true
             }
         } catch (e: Exception) {
@@ -422,31 +478,41 @@ class TapPollingService(private val context: Context) {
     
     /**
      * 移除轮询目标
+     * 
+     * 由于使用了复合key（groupId:recipientId），需要遍历查找匹配的任务
      */
     fun removePollingTarget(recipientId: String, providerType: String): Boolean {
         return pollingLock.write {
             try {
-                val taskInfo = pollingTasks[recipientId]
-                if (taskInfo == null) {
-                    Log.w(TAG, "轮询目标不存在: $recipientId")
+                // 查找所有匹配 recipientId 和 providerType 的任务
+                val tasksToRemove = pollingTasks.filter { (key, taskInfo) ->
+                    // key 格式: recipientId 或 groupId:recipientId
+                    val isMatch = (key == recipientId || key.endsWith(":$recipientId")) && 
+                                  taskInfo.metadata.providerType == providerType
+                    isMatch
+                }
+                
+                if (tasksToRemove.isEmpty()) {
+                    Log.w(TAG, "轮询目标不存在: recipient=$recipientId, provider=$providerType")
                     return@write false
                 }
                 
-                if (taskInfo.metadata.providerType != providerType) {
-                    Log.w(TAG, "Provider类型不匹配: expected=$providerType, actual=${taskInfo.metadata.providerType}")
-                    return@write false
+                // 移除所有匹配的任务
+                var removedCount = 0
+                for ((taskKey, taskInfo) in tasksToRemove) {
+                    Log.d(TAG, "移除轮询目标: taskKey=$taskKey, recipient=$recipientId, provider=$providerType")
+                    
+                    taskInfo.cleanup()
+                    pollingTasks.remove(taskKey)
+                    
+                    // 清理对应的缓存条目
+                    val cacheKey = "${recipientId}_${providerType}"
+                    pollingStateCache.remove(cacheKey)
+                    
+                    removedCount++
                 }
                 
-                Log.d(TAG, "移除轮询目标: recipient=$recipientId, provider=$providerType")
-                
-                taskInfo.cleanup()
-                pollingTasks.remove(recipientId)
-                
-                // 清理对应的缓存条目
-                val cacheKey = "${recipientId}_${providerType}"
-                pollingStateCache.remove(cacheKey)
-                
-                Log.i(TAG, "轮询目标移除成功: $recipientId")
+                Log.i(TAG, "轮询目标移除成功: recipient=$recipientId, 移除数量=$removedCount")
                 true
                 
             } catch (e: Exception) {

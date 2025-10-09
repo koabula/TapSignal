@@ -125,9 +125,9 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
                 return false
             }
             
-            // 检查是否有活跃的Tap通道
-            if (!channelManager.hasActiveChannel(senderAci)) {
-                Log.w(TAG, "没有活跃的Tap通道: senderAci=${senderAci.take(10)}...")
+            // 检查是否有活跃的私聊Tap通道（附件下载应该只在私聊v2 mode下进行）
+            if (!channelManager.hasActivePrivateChannel(senderAci)) {
+                Log.w(TAG, "没有活跃的私聊Tap通道: senderAci=${senderAci.take(10)}...")
                 return false
             }
             

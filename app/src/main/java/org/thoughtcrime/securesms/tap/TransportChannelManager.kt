@@ -2052,11 +2052,68 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
-     * 检查是否有活跃通道
+     * 检查是否有活跃通道（包括私聊和群组通道）
      */
     fun hasActiveChannel(recipientId: String): Boolean {
         return channelLock.read {
             getActiveChannels(recipientId).isNotEmpty()
+        }
+    }
+    
+    /**
+     * 检查是否有活跃的私聊通道（不包括群组通道）
+     * 
+     * @param recipientId 接收者 ID
+     * @return true 如果存在活跃的私聊通道
+     */
+    fun hasActivePrivateChannel(recipientId: String): Boolean {
+        return getActivePrivateChannels(recipientId).isNotEmpty()
+    }
+    
+    /**
+     * 获取活跃的私聊通道（不包括群组通道）
+     * 
+     * 过滤掉 config 中包含 groupId 的群组通道，只返回私聊通道
+     * 
+     * @param recipientId 接收者 ID
+     * @return 活跃的私聊通道列表
+     */
+    fun getActivePrivateChannels(recipientId: String): List<TransportChannel> {
+        return channelLock.read {
+            getActiveChannels(recipientId).filter { channel ->
+                // 过滤掉群组通道：检查 config 中是否有 groupId
+                channel.config["groupId"] == null
+            }
+        }
+    }
+    
+    /**
+     * 检查是否有活跃的群组通道
+     * 
+     * @param recipientId 接收者 ID（成员 ACI）
+     * @param groupId 群组 ID
+     * @return true 如果该成员在指定群组中有活跃通道
+     */
+    fun hasActiveGroupChannel(recipientId: String, groupId: String): Boolean {
+        return channelLock.read {
+            getActiveChannels(recipientId).any { channel ->
+                channel.config["groupId"] == groupId
+            }
+        }
+    }
+    
+    /**
+     * 获取指定群组的活跃通道
+     * 
+     * @param recipientId 接收者 ID（成员 ACI）
+     * @param groupId 群组 ID
+     * @return 该成员在指定群组中的活跃通道列表
+     */
+    fun getActiveGroupChannels(recipientId: String, groupId: String): List<TransportChannel> {
+        return channelLock.read {
+            getActiveChannels(recipientId).filter { channel ->
+                channel.config["groupId"] == groupId
+            }
         }
     }
     

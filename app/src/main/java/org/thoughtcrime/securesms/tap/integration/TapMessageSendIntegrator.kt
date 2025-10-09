@@ -56,10 +56,10 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
             val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
             val recipientAci = recipient.requireAci().toString()
             
-            // 1. 检查是否有活跃的传输通道
-            val hasActiveChannel = channelManager.hasActiveChannel(recipientAci)
+            // 1. 检查是否有活跃的私聊传输通道（只检查私聊v2 mode）
+            val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientAci)
             if (!hasActiveChannel) {
-                Log.d(TAG, "没有活跃的传输通道: recipientId=$recipientId")
+                Log.d(TAG, "没有活跃的私聊传输通道: recipientId=$recipientId")
                 return false
             }
             
@@ -115,8 +115,8 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
         
         return CompletableFuture.supplyAsync {
             try {
-                // 检查是否有可用的传输通道
-                val hasActiveChannel = channelManager.hasActiveChannel(recipient.requireAci().toString())
+                // 检查是否有可用的私聊传输通道（只检查私聊v2 mode）
+                val hasActiveChannel = channelManager.hasActivePrivateChannel(recipient.requireAci().toString())
                 
                 if (hasActiveChannel) {
                     Log.i(TAG, "使用Tap传输层发送: messageId=$messageId")
