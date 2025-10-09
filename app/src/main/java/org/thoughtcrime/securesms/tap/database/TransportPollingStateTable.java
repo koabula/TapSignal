@@ -49,7 +49,10 @@ public class TransportPollingStateTable extends DatabaseTable {
     public static final String PROCESSED_MESSAGES_TABLE = "transport_processed_messages";
     private static final String PM_ID                    = "_id";
     private static final String PM_DUPLICATION_KEY      = "duplication_key";
-    private static final String PM_PROCESSED_TIMESTAMP  = "processed_timestamp";
+    private static final String PM_MESSAGE_ID           = "message_id";
+    private static final String PM_RECIPIENT_ID         = "recipient_id";
+    private static final String PM_TIMESTAMP            = "timestamp";
+    private static final String PM_PROCESSED_AT         = "processed_at";
     private static final String PM_CREATED_AT           = "created_at";
 
     public static final String CREATE_TABLE = 
@@ -71,12 +74,16 @@ public class TransportPollingStateTable extends DatabaseTable {
             "UNIQUE(" + RECIPIENT_ID + ", " + PROVIDER_TYPE + ") ON CONFLICT REPLACE" +
         ")";
 
+    // 消息去重表定义（与 V287_TransportTablesCreation 保持一致）
     public static final String CREATE_PROCESSED_MESSAGES_TABLE = 
-        "CREATE TABLE " + PROCESSED_MESSAGES_TABLE + "(" +
-            PM_ID                    + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            PM_DUPLICATION_KEY       + " TEXT UNIQUE NOT NULL, " +
-            PM_PROCESSED_TIMESTAMP   + " INTEGER NOT NULL, " +
-            PM_CREATED_AT           + " INTEGER NOT NULL" +
+        "CREATE TABLE IF NOT EXISTS " + PROCESSED_MESSAGES_TABLE + " (" +
+            PM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            PM_DUPLICATION_KEY + " TEXT UNIQUE NOT NULL, " +
+            PM_MESSAGE_ID + " TEXT NOT NULL, " +
+            PM_RECIPIENT_ID + " TEXT NOT NULL, " +
+            PM_TIMESTAMP + " INTEGER NOT NULL, " +
+            PM_PROCESSED_AT + " INTEGER NOT NULL, " +
+            PM_CREATED_AT + " INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)" +
         ")";
 
     public static final String[] CREATE_INDEXES = {
@@ -463,7 +470,7 @@ public class TransportPollingStateTable extends DatabaseTable {
         try {
             ContentValues values = new ContentValues();
             values.put(PM_DUPLICATION_KEY, duplicationKey);
-            values.put(PM_PROCESSED_TIMESTAMP, timestamp);
+            values.put(PM_PROCESSED_AT, timestamp);
             values.put(PM_CREATED_AT, System.currentTimeMillis());
 
             // 使用标准的upsert逻辑
@@ -516,11 +523,11 @@ public class TransportPollingStateTable extends DatabaseTable {
         try (Cursor cursor = getReadableDatabase().query(
             PROCESSED_MESSAGES_TABLE,
             new String[]{PM_DUPLICATION_KEY},
-            PM_PROCESSED_TIMESTAMP + " >= ?",
+            PM_PROCESSED_AT + " >= ?",
             new String[]{String.valueOf(cutoffTime)},
             null,
             null,
-            PM_PROCESSED_TIMESTAMP + " DESC",
+            PM_PROCESSED_AT + " DESC",
             "1000"
         )) {
             while (cursor != null && cursor.moveToNext()) {
@@ -541,7 +548,7 @@ public class TransportPollingStateTable extends DatabaseTable {
         try {
             int deletedCount = getWritableDatabase().delete(
                 PROCESSED_MESSAGES_TABLE,
-                PM_PROCESSED_TIMESTAMP + " < ?",
+                PM_PROCESSED_AT + " < ?",
                 new String[]{String.valueOf(cutoffTime)}
             );
             

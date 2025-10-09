@@ -28,11 +28,13 @@ import org.whispersystems.signalservice.api.crypto.AttachmentCipherStreamUtil;
 import org.whispersystems.signalservice.api.crypto.ContentHint;
 import org.whispersystems.signalservice.api.crypto.EnvelopeContent;
 import org.whispersystems.signalservice.api.crypto.SealedSenderAccess;
+import org.whispersystems.signalservice.api.crypto.SignalGroupCipher;
 import org.whispersystems.signalservice.api.crypto.SignalGroupSessionBuilder;
 import org.whispersystems.signalservice.api.crypto.SignalServiceCipher;
 import org.whispersystems.signalservice.api.crypto.SignalSessionBuilder;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
 import org.whispersystems.signalservice.api.crypto.UntrustedIdentityException;
+import org.whispersystems.signalservice.internal.push.PushTransportDetails;
 import org.whispersystems.signalservice.api.groupsv2.GroupSendEndorsements;
 import org.whispersystems.signalservice.api.keys.KeysApi;
 import org.whispersystems.signalservice.api.message.MessageApi;
@@ -2607,19 +2609,25 @@ public class SignalServiceMessageSender {
       } else if (tapTransport != null && tapTransport.shouldUseTapForGroup(groupId)) {
         Log.i(TAG, "[sendGroupMessage][" + timestamp + "] Group is in v2 mode, sending via TAP transport.");
         try {
-          // 构造完整的 Envelope（Sealed Sender 类型）
-          // encryptForGroup() 返回的是 Sealed Sender 包装的密文，因此 Envelope.type 应该是 UNIDENTIFIED_SENDER
-          // 这样可以保持与 2人群组 Envelope 传输的一致性
-          byte[] envelopeBytes = constructEnvelopeForSenderKey(ciphertext, recipients, timestamp, groupId);
+          // 为 TAP 传输使用纯 SenderKey 加密（不使用 Sealed Sender 包装）
+          // 原因：Sealed Sender 的多接收者加密在 TAP 场景下有兼容性问题
+          // TAP 是私有传输通道，不需要 Sealed Sender 的匿名保护
+          byte[] pureSenderKeyCiphertext = encryptForGroupWithoutSealedSender(distributionId, content.encode(), targetInfo.destinations);
           
-          if (envelopeBytes != null) {
-            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Constructed Sealed Sender Envelope size: " + envelopeBytes.length + " bytes");
-            // SenderKey 加密的 3+ 人群组（Sealed Sender 包装）
-            boolean isSessionCipherEncrypted = false;
-            Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using SenderKey encryption (Sealed Sender wrapped), isSessionCipher=" + isSessionCipherEncrypted);
-            return tapTransport.sendGroupMessageViaTap(groupId, recipients, envelopeBytes, timestamp, urgent, online, isSessionCipherEncrypted);
+          if (pureSenderKeyCiphertext != null) {
+            // 构造 SENDERKEY_MESSAGE 类型的 Envelope
+            byte[] envelopeBytes = constructEnvelopeForPureSenderKey(pureSenderKeyCiphertext, recipients, timestamp, groupId);
+            
+            if (envelopeBytes != null) {
+              Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Constructed pure SenderKey Envelope size: " + envelopeBytes.length + " bytes");
+              boolean isSessionCipherEncrypted = false;
+              Log.d(TAG, "[sendGroupMessage][" + timestamp + "] Using pure SenderKey encryption (no Sealed Sender), isSessionCipher=" + isSessionCipherEncrypted);
+              return tapTransport.sendGroupMessageViaTap(groupId, recipients, envelopeBytes, timestamp, urgent, online, isSessionCipherEncrypted);
+            } else {
+              Log.w(TAG, "[sendGroupMessage][" + timestamp + "] Failed to construct SenderKey Envelope, falling back to Signal Server");
+            }
           } else {
-            Log.w(TAG, "[sendGroupMessage][" + timestamp + "] Failed to construct SenderKey Envelope, falling back to Signal Server");
+            Log.w(TAG, "[sendGroupMessage][" + timestamp + "] Failed to encrypt with pure SenderKey, falling back to Signal Server");
           }
         } catch (IOException e) {
           Log.w(TAG, "[sendGroupMessage][" + timestamp + "] TAP transport failed: " + e.getMessage());
@@ -2716,6 +2724,99 @@ public class SignalServiceMessageSender {
    * @param messages 加密后的消息列表
    * @return 主设备的密文（Base64 解码后），如果提取失败则返回 null
    */
+  /**
+   * 使用纯 SenderKey 加密群组消息（不使用 Sealed Sender 包装）
+   * 
+   * 用于 TAP 传输场景，避免 Sealed Sender 的多接收者兼容性问题
+   * 
+   * @param distributionId 分发ID
+   * @param plaintext 明文消息
+   * @param destinations 目标地址列表
+   * @return 纯 SenderKey 密文（未包装 Sealed Sender）
+   */
+  private byte[] encryptForGroupWithoutSealedSender(DistributionId distributionId,
+                                                     byte[] plaintext,
+                                                     List<SignalProtocolAddress> destinations) {
+    try {
+      // 创建 GroupCipher
+      SignalProtocolAddress localProtocolAddress = new SignalProtocolAddress(localAddress.getIdentifier(), localDeviceId);
+      SignalGroupCipher groupCipher = new SignalGroupCipher(sessionLock, new org.signal.libsignal.protocol.groups.GroupCipher(aciStore, localProtocolAddress));
+      
+      // 使用 PushTransportDetails 添加 padding
+      PushTransportDetails transport = new PushTransportDetails();
+      byte[] paddedMessage = transport.getPaddedMessageBody(plaintext);
+      
+      // 纯 SenderKey 加密，不包装 Sealed Sender
+      org.signal.libsignal.protocol.message.CiphertextMessage ciphertextMessage = groupCipher.encrypt(distributionId.asUuid(), paddedMessage);
+      
+      // 序列化密文
+      byte[] serialized = ciphertextMessage.serialize();
+      
+      Log.d(TAG, "encryptForGroupWithoutSealedSender: Pure SenderKey encryption successful, size=" + serialized.length);
+      return serialized;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "encryptForGroupWithoutSealedSender: Failed to encrypt", e);
+      return null;
+    }
+  }
+  
+  /**
+   * 为纯 SenderKey 密文构造 Envelope
+   * 
+   * 构造 SENDERKEY_MESSAGE 类型的 Envelope，用于 TAP 传输
+   * 
+   * @param pureSenderKeyCiphertext 纯 SenderKey 密文（未包装 Sealed Sender）
+   * @param recipients 接收者列表
+   * @param timestamp 消息时间戳
+   * @param groupId 群组ID
+   * @return 序列化的 Envelope 字节数组
+   */
+  private byte[] constructEnvelopeForPureSenderKey(byte[] pureSenderKeyCiphertext,
+                                                    List<SignalServiceAddress> recipients,
+                                                    long timestamp,
+                                                    Optional<byte[]> groupId) {
+    try {
+      // 构造 SENDERKEY_MESSAGE 类型的 Envelope
+      // 纯 SenderKey 密文，不包含 Sealed Sender 包装
+      org.whispersystems.signalservice.internal.push.Envelope.Builder envelopeBuilder = 
+        new org.whispersystems.signalservice.internal.push.Envelope.Builder()
+          .type(org.whispersystems.signalservice.internal.push.Envelope.Type.SENDERKEY_MESSAGE)
+          .timestamp(timestamp)
+          .serverTimestamp(timestamp)
+          .content(okio.ByteString.of(pureSenderKeyCiphertext))
+          .sourceServiceId(localAddress.getServiceId().toString())
+          .sourceDevice(localDeviceId)
+          .urgent(true)
+          .story(false);
+      
+      // 设置 serverGuid: 使用 groupId (Base64编码) 或生成随机UUID
+      if (groupId.isPresent()) {
+        String groupIdBase64 = org.signal.core.util.Base64.encodeWithPadding(groupId.get());
+        envelopeBuilder.serverGuid(groupIdBase64);
+        Log.d(TAG, "constructEnvelopeForPureSenderKey: Using groupId as serverGuid, length=" + groupIdBase64.length());
+      } else {
+        envelopeBuilder.serverGuid(java.util.UUID.randomUUID().toString());
+      }
+      
+      // 设置目标接收者（群组消息使用第一个接收者作为代表）
+      if (!recipients.isEmpty()) {
+        envelopeBuilder.destinationServiceId(recipients.get(0).getServiceId().toString());
+      }
+      
+      // 序列化 Envelope
+      org.whispersystems.signalservice.internal.push.Envelope envelope = envelopeBuilder.build();
+      byte[] envelopeBytes = envelope.encode();
+      
+      Log.d(TAG, "constructEnvelopeForPureSenderKey: Created pure SenderKey Envelope (type=SENDERKEY_MESSAGE), size=" + envelopeBytes.length);
+      return envelopeBytes;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "constructEnvelopeForPureSenderKey: Failed to construct Envelope", e);
+      return null;
+    }
+  }
+
   /**
    * 为 SenderKey 加密的群组消息构造完整的 Envelope
    * 

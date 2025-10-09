@@ -523,10 +523,16 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             
             val plaintextBytes = signalGroupCipher.decrypt(ciphertextBytes)
             
-            Log.d(TAG, "Sender Key 解密成功: plaintextSize=${plaintextBytes.size}")
+            Log.d(TAG, "Sender Key 解密成功 (含padding): plaintextSize=${plaintextBytes.size}")
             
-            // 7. 解析 Content
-            val content = org.whispersystems.signalservice.internal.push.Content.ADAPTER.decode(plaintextBytes)
+            // 6.5. 去除 Padding - Signal 协议标准步骤
+            val transport = org.whispersystems.signalservice.internal.push.PushTransportDetails()
+            val strippedMessage = transport.getStrippedPaddingMessageBody(plaintextBytes)
+            
+            Log.d(TAG, "Padding已去除: originalSize=${plaintextBytes.size}, strippedSize=${strippedMessage.size}")
+            
+            // 7. 解析 Content (使用去除padding后的数据)
+            val content = org.whispersystems.signalservice.internal.push.Content.ADAPTER.decode(strippedMessage)
             
             // 8. 构建元数据 - 使用正确的 groupId
             val localServiceId = SignalStore.account.requireAci()

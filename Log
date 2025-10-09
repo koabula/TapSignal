@@ -1,89 +1,79 @@
-2025-10-09 21:23:10.343 17245-17275 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760016190231] Tap control message detected, processing asynchronously: bodyLength=863
-2025-10-09 21:23:10.343 17245-17275 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760016190231] Tap control message queued for async processing, not inserting into message database
-2025-10-09 21:23:10.348 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=863
-2025-10-09 21:23:10.348 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
-2025-10-09 21:23:10.386 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 提议: senderId=RecipientId::4
-2025-10-09 21:23:10.386 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, proposer=********-****-****-****-*********461, senderPersonalId=RecipientId::4, totalMembers=3
-2025-10-09 21:23:10.389 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  同步处理群组提议: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:10.399 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  群组状态创建成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING
-2025-10-09 21:23:10.414 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存提议者的群组token: proposer=********-****-****-****-*********461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760016183497
-2025-10-09 21:23:10.417 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  异步获取群组 RecipientId 并显示通知: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:10.421 17245-17275 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1760016190231
-2025-10-09 21:23:10.423 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::7
-2025-10-09 21:23:10.423 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息路由成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7
-2025-10-09 21:23:10.424 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  准备显示群组通知: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7, groupName=WWW, sender=AAA
-2025-10-09 21:23:10.453 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 Token 交换通知已显示: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7, groupName=WWW, sender=AAA
-2025-10-09 21:23:10.454 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 V2 提议通知已显示: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:21.070 17245-17275 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760016200662] TAP control message detected, forcing Signal Server transmission for reliability.
-2025-10-09 21:23:23.605 17245-17275 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760016203110] Tap control message detected, processing asynchronously: bodyLength=783
-2025-10-09 21:23:23.606 17245-17275 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760016203110] Tap control message queued for async processing, not inserting into message database
-2025-10-09 21:23:23.606 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::6, bodyLength=783
-2025-10-09 21:23:23.606 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::6
-2025-10-09 21:23:23.606 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 接受: senderId=RecipientId::6
-2025-10-09 21:23:23.606 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  群组接受消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********973, senderPersonalId=RecipientId::6
-2025-10-09 21:23:23.617 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存群组成员token: accepter=********-****-****-****-*********973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760016196327
-2025-10-09 21:23:23.619 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 开始同步处理群组接受: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********973
-2025-10-09 21:23:23.625 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 当前状态: status=PROPOSING, agreed=2/3, members=[5a80****************************e461, 8848****************************72ea]
-2025-10-09 21:23:23.641 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] 群组成员已标记为同意: accepter=********-****-****-****-*********973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:23.644 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 更新后状态: status=PROPOSING, agreed=3/3, isFullyAgreed=true
-2025-10-09 21:23:23.653 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] ✅ A端群组 V2 mode 已激活: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:23.656 17245-17275 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1760016203110
-2025-10-09 21:23:23.656 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 开始处理群组激活后续操作: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, trigger=********-****-****-****-*********973
-2025-10-09 21:23:23.660 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  [激活后处理] 建立群组通道和轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:23.660 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  为群组建立通道: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
-2025-10-09 21:23:30.629 17245-17275 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1760016210330
-2025-10-09 21:23:30.630 17245-17275 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-10-09 21:23:33.765 17245-17275 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1760016213478
-2025-10-09 21:23:33.766 17245-17275 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-10-09 21:23:33.777 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  群组通道建立成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2
-2025-10-09 21:23:33.779 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  启动群组轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, providerType=cos, members=2
-2025-10-09 21:23:33.779 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  获取到群组成员tokens: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, count=2, members=[5a80****************************e461, c716****************************1973]
-2025-10-09 21:23:33.780 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
-2025-10-09 21:23:33.780 17245-17391 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
-2025-10-09 21:23:33.780 17245-17391 TapPollingService       org.thoughtcrime.securesms           I  为群组添加轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
-2025-10-09 21:23:33.780 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
-2025-10-09 21:23:33.781 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=c716****************************1973
-2025-10-09 21:23:33.781 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  准备添加群组轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, metadataCount=2
-2025-10-09 21:23:33.785 17245-17391 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:5a806149-30d0-412a-90d2-9412a40ee461, recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, interval=5000ms
-2025-10-09 21:23:33.786 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
-2025-10-09 21:23:33.786 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-10-09 21:23:33.786 17245-17391 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, interval=5000ms
-2025-10-09 21:23:33.786 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=c716****************************1973
-2025-10-09 21:23:33.786 17245-17391 TapPollingService       org.thoughtcrime.securesms           I  群组轮询目标添加完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2/2
-2025-10-09 21:23:33.786 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  群组轮询已启动: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功添加=2/2
-2025-10-09 21:23:33.789 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::7
-2025-10-09 21:23:33.802 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 系统消息已插入: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:33.802 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] ✅ 群组激活后续操作完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 21:23:33.887 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
-2025-10-09 21:23:33.896 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:34.342 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 2, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:34.668 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760011501197, type=TEXT_MESSAGE
-2025-10-09 21:23:34.668 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1760011501202, currentTime=1760016214668, diff=4713466ms
-2025-10-09 21:23:34.669 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=1760011501197
-2025-10-09 21:23:34.669 17245-17391 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760011501197_1760011501236.dat, error=消息验证失败
-2025-10-09 21:23:34.868 17245-17391 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760011502638_1760011502668.dat, error=消息验证失败
-2025-10-09 21:23:34.880 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:34.880 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760011502638, type=TEXT_MESSAGE
-2025-10-09 21:23:34.882 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1760011502643, currentTime=1760016214867, diff=4712224ms
-2025-10-09 21:23:34.883 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=1760011502638
-2025-10-09 21:23:36.591 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
-2025-10-09 21:23:36.592 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:37.033 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:37.038 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:38.888 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
-2025-10-09 21:23:38.890 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:39.405 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:39.411 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:41.592 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
-2025-10-09 21:23:41.594 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:42.040 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:42.045 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:43.889 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
-2025-10-09 21:23:43.891 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:44.503 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:44.732 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760016222860, type=TEXT_MESSAGE
-2025-10-09 21:23:44.734 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760016222860
-2025-10-09 21:23:44.734 17245-17275 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
+--------- beginning of main
+--------- beginning of system
+2025-10-09 21:48:44.177 18016-18045 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760017723603] Tap control message detected, processing asynchronously: bodyLength=863
+2025-10-09 21:48:44.177 18016-18045 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760017723603] Tap control message queued for async processing, not inserting into message database
+2025-10-09 21:48:44.178 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::6, bodyLength=863
+2025-10-09 21:48:44.178 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::6
+2025-10-09 21:48:44.221 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 提议: senderId=RecipientId::6
+2025-10-09 21:48:44.222 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, proposer=********-****-****-****-*********973, senderPersonalId=RecipientId::6, totalMembers=3
+2025-10-09 21:48:44.224 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  同步处理群组提议: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:44.230 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  群组状态创建成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING
+2025-10-09 21:48:44.245 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存提议者的群组token: proposer=********-****-****-****-*********973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760017717149
+2025-10-09 21:48:44.247 18016-18045 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1760017723603
+2025-10-09 21:48:44.247 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  异步获取群组 RecipientId 并显示通知: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:44.251 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::7
+2025-10-09 21:48:44.251 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息路由成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7
+2025-10-09 21:48:44.252 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  准备显示群组通知: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7, groupName=WWW, sender=koalaawang
+2025-10-09 21:48:44.273 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 Token 交换通知已显示: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::7, groupName=WWW, sender=koalaawang
+2025-10-09 21:48:44.274 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 V2 提议通知已显示: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:53.380 18016-18045 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760017733235] TAP control message detected, forcing Signal Server transmission for reliability.
+2025-10-09 21:48:55.851 18016-18045 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760017735559] Tap control message detected, processing asynchronously: bodyLength=783
+2025-10-09 21:48:55.851 18016-18045 MessageProcessorV2      org.thoughtcrime.securesms           I  [1760017735559] Tap control message queued for async processing, not inserting into message database
+2025-10-09 21:48:55.855 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=783
+2025-10-09 21:48:55.856 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
+2025-10-09 21:48:55.856 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 接受: senderId=RecipientId::4
+2025-10-09 21:48:55.856 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  群组接受消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********461, senderPersonalId=RecipientId::4
+2025-10-09 21:48:55.867 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存群组成员token: accepter=********-****-****-****-*********461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760017729451
+2025-10-09 21:48:55.867 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 开始同步处理群组接受: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********461
+2025-10-09 21:48:55.868 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 当前状态: status=PROPOSING, agreed=2/3, members=[c716****************************1973, 8848****************************72ea]
+2025-10-09 21:48:55.876 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] 群组成员已标记为同意: accepter=********-****-****-****-*********461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:55.877 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 更新后状态: status=PROPOSING, agreed=3/3, isFullyAgreed=true
+2025-10-09 21:48:55.879 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] ✅ A端群组 V2 mode 已激活: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:55.880 18016-18045 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1760017735559
+2025-10-09 21:48:55.880 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 开始处理群组激活后续操作: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, trigger=********-****-****-****-*********461
+2025-10-09 21:48:55.882 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  [激活后处理] 建立群组通道和轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:48:55.882 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  为群组建立通道: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
+2025-10-09 21:49:03.352 18016-18045 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1760017743077
+2025-10-09 21:49:03.352 18016-18045 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-09 21:49:08.130 18016-18045 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1760017747675
+2025-10-09 21:49:08.130 18016-18045 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-09 21:49:08.162 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  群组通道建立成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2
+2025-10-09 21:49:08.164 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  启动群组轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, providerType=cos, members=2
+2025-10-09 21:49:08.164 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  获取到群组成员tokens: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, count=2, members=[5a80****************************e461, c716****************************1973]
+2025-10-09 21:49:08.165 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
+2025-10-09 21:49:08.165 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  轮询服务已经运行
+2025-10-09 21:49:08.165 18016-18121 TapPollingService       org.thoughtcrime.securesms           I  为群组添加轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
+2025-10-09 21:49:08.166 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
+2025-10-09 21:49:08.166 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=c716****************************1973
+2025-10-09 21:49:08.166 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  准备添加群组轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, metadataCount=2
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:5a806149-30d0-412a-90d2-9412a40ee461, recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, interval=5000ms
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=:c716a84d-2fbd-4598-8bc3-b12cbba41973, recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, interval=5000ms
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=c716****************************1973
+2025-10-09 21:49:08.172 18016-18121 TapPollingService       org.thoughtcrime.securesms           I  群组轮询目标添加完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2/2
+2025-10-09 21:49:08.173 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  群组轮询已启动: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功添加=2/2
+2025-10-09 21:49:08.173 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::7
+2025-10-09 21:49:08.184 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 系统消息已插入: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:49:08.185 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] ✅ 群组激活后续操作完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
+2025-10-09 21:49:11.459 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-10-09 21:49:11.465 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:11.914 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 4, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:12.094 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-10-09 21:49:12.095 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:12.246 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760011501197, type=TEXT_MESSAGE
+2025-10-09 21:49:12.247 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1760011501202, currentTime=1760017752246, diff=6251044ms
+2025-10-09 21:49:12.247 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=1760011501197
+2025-10-09 21:49:12.247 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760011501197_1760011501236.dat, error=消息验证失败
+2025-10-09 21:49:12.497 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760011502638_1760011502668.dat, error=消息验证失败
+2025-10-09 21:49:12.498 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760011502638, type=TEXT_MESSAGE
+2025-10-09 21:49:12.498 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1760011502643, currentTime=1760017752497, diff=6249854ms
+2025-10-09 21:49:12.498 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=1760011502638
+2025-10-09 21:49:12.525 18016-18120 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:12.547 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:12.739 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760016222860, type=TEXT_MESSAGE
+2025-10-09 21:49:12.740 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760016222860
+2025-10-09 21:49:12.744 18016-18045 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
                                                                                                     android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: no such column: message_id | ExtraMessage: , while compiling: SELECT COUNT(*) FROM transport_processed_messages 
                                                                                                                     WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
                                                                                                     	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
@@ -118,13 +108,13 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-10-09 21:23:44.735 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760016222860
-2025-10-09 21:23:44.735 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760016222860, type=UNIDENTIFIED_SENDER, timestamp=1760016222836
-2025-10-09 21:23:44.738 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
-2025-10-09 21:23:44.739 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用标准 Signal 解密
-2025-10-09 21:23:44.740 17245-17329 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760016222860_1760016222896.dat, error=消息解密失败
-2025-10-09 21:23:44.740 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1760016222836, type=UNIDENTIFIED_SENDER
-2025-10-09 21:23:44.740 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: timestamp=1760016222836
+2025-10-09 21:49:12.745 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760016222860
+2025-10-09 21:49:12.745 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760016222860, type=UNIDENTIFIED_SENDER, timestamp=1760016222836
+2025-10-09 21:49:12.745 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
+2025-10-09 21:49:12.746 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用标准 Signal 解密
+2025-10-09 21:49:12.746 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1760016222836, type=UNIDENTIFIED_SENDER
+2025-10-09 21:49:12.750 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760016222860_1760016222896.dat, error=消息解密失败
+2025-10-09 21:49:12.751 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: timestamp=1760016222836
                                                                                                     org.signal.libsignal.metadata.InvalidMetadataMessageException: org.signal.libsignal.protocol.InvalidMessageException: invalid sealed sender message: derived ephemeral key did not match key provided in message
                                                                                                     	at org.signal.libsignal.metadata.SealedSessionCipher.decrypt(SealedSessionCipher.java:212)
                                                                                                     	at org.whispersystems.signalservice.api.crypto.SignalSealedSessionCipher.decrypt(SignalSealedSessionCipher.java:71)
@@ -182,19 +172,11 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
-2025-10-09 21:23:44.740 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760016222860, isSessionCipher=false
-2025-10-09 21:23:44.742 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760016222860, error=消息解密失败
-2025-10-09 21:23:44.745 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:46.594 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
-2025-10-09 21:23:46.596 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:47.297 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:47.302 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:48.891 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
-2025-10-09 21:23:48.892 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:49.257 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:49.521 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760016224913, type=TEXT_MESSAGE
-2025-10-09 21:23:49.521 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760016224913
-2025-10-09 21:23:49.522 17245-17275 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
+2025-10-09 21:49:12.751 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760016222860, isSessionCipher=false
+2025-10-09 21:49:12.751 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760016222860, error=消息解密失败
+2025-10-09 21:49:12.998 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760016224913, type=TEXT_MESSAGE
+2025-10-09 21:49:12.998 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760016224913
+2025-10-09 21:49:13.003 18016-18045 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
                                                                                                     android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: no such column: message_id | ExtraMessage: , while compiling: SELECT COUNT(*) FROM transport_processed_messages 
                                                                                                                     WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
                                                                                                     	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
@@ -229,13 +211,12 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-10-09 21:23:49.522 17245-17329 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760016224913_1760016224937.dat, error=消息解密失败
-2025-10-09 21:23:49.523 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760016224913
-2025-10-09 21:23:49.524 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760016224913, type=UNIDENTIFIED_SENDER, timestamp=1760016224645
-2025-10-09 21:23:49.524 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
-2025-10-09 21:23:49.524 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用标准 Signal 解密
-2025-10-09 21:23:49.524 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1760016224645, type=UNIDENTIFIED_SENDER
-2025-10-09 21:23:49.525 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: timestamp=1760016224645
+2025-10-09 21:49:13.004 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760016224913
+2025-10-09 21:49:13.004 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760016224913, type=UNIDENTIFIED_SENDER, timestamp=1760016224645
+2025-10-09 21:49:13.005 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
+2025-10-09 21:49:13.005 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用标准 Signal 解密
+2025-10-09 21:49:13.005 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1760016224645, type=UNIDENTIFIED_SENDER
+2025-10-09 21:49:13.006 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: timestamp=1760016224645
                                                                                                     org.signal.libsignal.metadata.InvalidMetadataMessageException: org.signal.libsignal.protocol.InvalidMessageException: invalid sealed sender message: derived ephemeral key did not match key provided in message
                                                                                                     	at org.signal.libsignal.metadata.SealedSessionCipher.decrypt(SealedSessionCipher.java:212)
                                                                                                     	at org.whispersystems.signalservice.api.crypto.SignalSealedSessionCipher.decrypt(SignalSealedSessionCipher.java:71)
@@ -293,50 +274,185 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
-2025-10-09 21:23:49.525 17245-17275 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760016224913, isSessionCipher=false
-2025-10-09 21:23:49.525 17245-17275 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760016224913, error=消息解密失败
-2025-10-09 21:23:49.525 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:51.596 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
-2025-10-09 21:23:51.597 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:52.049 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:52.056 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:53.894 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=80.00%]
-2025-10-09 21:23:53.896 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:54.809 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:54.812 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:56.598 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=80.00%]
-2025-10-09 21:23:56.599 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:57.044 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:57.050 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:23:58.895 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=83.33%]
-2025-10-09 21:23:58.896 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:59.841 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:23:59.844 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:01.599 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=83.33%]
-2025-10-09 21:24:01.601 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:02.343 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:02.350 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:03.896 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=85.71%]
-2025-10-09 21:24:03.897 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:04.516 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:04.521 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:06.600 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=85.71%]
-2025-10-09 21:24:06.602 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:07.061 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:07.064 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:08.897 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=87.50%]
-2025-10-09 21:24:08.899 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:09.301 17245-17329 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:09.303 17245-17329 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:11.602 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=87.50%]
-2025-10-09 21:24:11.604 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:12.347 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:12.350 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:13.898 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=88.89%]
-2025-10-09 21:24:13.899 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:14.287 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:14.292 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-09 21:24:16.605 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=88.89%]
-2025-10-09 21:24:16.606 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:17.291 17245-17391 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 21:24:17.296 17245-17391 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:13.007 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760016224913, isSessionCipher=false
+2025-10-09 21:49:13.007 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760016224913_1760016224937.dat, error=消息解密失败
+2025-10-09 21:49:13.008 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760016224913, error=消息解密失败
+2025-10-09 21:49:13.010 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:16.459 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
+2025-10-09 21:49:16.461 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:16.983 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:17.000 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:17.095 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=50.00%]
+2025-10-09 21:49:17.097 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:17.514 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:17.519 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:21.461 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
+2025-10-09 21:49:21.463 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:21.957 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 2, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:22.096 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=66.67%]
+2025-10-09 21:49:22.100 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:22.176 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760017756972, type=TEXT_MESSAGE
+2025-10-09 21:49:22.176 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760017756972
+2025-10-09 21:49:22.181 18016-18045 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
+                                                                                                    android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: no such column: message_id | ExtraMessage: , while compiling: SELECT COUNT(*) FROM transport_processed_messages 
+                                                                                                                    WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.acquirePreparedStatement(SQLiteConnection.java:973)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.prepare(SQLiteConnection.java:537)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:592)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteQuery.<init>(SQLiteQuery.java:43)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDirectCursorDriver.query(SQLiteDirectCursorDriver.java:48)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQueryWithFactory(SQLiteDatabase.java:1610)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQuery(SQLiteDatabase.java:1529)
+                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.checkDatabaseForDuplicate(TransportMessageDeduplicator.kt:147)
+                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.isDuplicate(TransportMessageDeduplicator.kt:62)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:72)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:794)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:665)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:620)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-10-09 21:49:22.181 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760017756972
+2025-10-09 21:49:22.181 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760017756972, type=SENDERKEY_MESSAGE, timestamp=1760017756943
+2025-10-09 21:49:22.189 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760017756972_1760017757012.dat, error=消息解密失败
+2025-10-09 21:49:22.196 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
+2025-10-09 21:49:22.196 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SenderKey 解密（3+人群组）
+2025-10-09 21:49:22.197 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  开始解密 Sender Key 消息: timestamp=1760017756943
+2025-10-09 21:49:22.197 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Sender Key 解密参数: sourceServiceId=********-****-****-****-*********973, groupIdLength=32
+2025-10-09 21:49:22.197 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Sender Key 解密成功: plaintextSize=159
+2025-10-09 21:49:22.198 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Sender Key 解密异常
+                                                                                                    java.net.ProtocolException: Unexpected tag 0
+                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:143)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Content$Companion$ADAPTER$1.decode(Content.kt:405)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Content$Companion$ADAPTER$1.decode(Content.kt:287)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.decryptSenderKeyMessage(TapEnvelopeAdapter.kt:529)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$decryptSenderKeyMessage(TapEnvelopeAdapter.kt:40)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:102)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:794)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:665)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:620)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-10-09 21:49:22.198 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760017756972, isSessionCipher=false
+2025-10-09 21:49:22.199 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760017756972, error=消息解密失败
+2025-10-09 21:49:22.458 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=1760017758547, type=TEXT_MESSAGE
+2025-10-09 21:49:22.459 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=1760017758547
+2025-10-09 21:49:22.469 18016-18045 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
+                                                                                                    android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: no such column: message_id | ExtraMessage: , while compiling: SELECT COUNT(*) FROM transport_processed_messages 
+                                                                                                                    WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.acquirePreparedStatement(SQLiteConnection.java:973)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.prepare(SQLiteConnection.java:537)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:592)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteQuery.<init>(SQLiteQuery.java:43)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDirectCursorDriver.query(SQLiteDirectCursorDriver.java:48)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQueryWithFactory(SQLiteDatabase.java:1610)
+                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQuery(SQLiteDatabase.java:1529)
+                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.checkDatabaseForDuplicate(TransportMessageDeduplicator.kt:147)
+                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.isDuplicate(TransportMessageDeduplicator.kt:62)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:72)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:794)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:665)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:620)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-10-09 21:49:22.470 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=1760017758547
+2025-10-09 21:49:22.470 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope反序列化成功: messageId=1760017758547, type=SENDERKEY_MESSAGE, timestamp=1760017758157
+2025-10-09 21:49:22.470 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=false
+2025-10-09 21:49:22.470 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SenderKey 解密（3+人群组）
+2025-10-09 21:49:22.471 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  开始解密 Sender Key 消息: timestamp=1760017758157
+2025-10-09 21:49:22.471 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Sender Key 解密参数: sourceServiceId=********-****-****-****-*********973, groupIdLength=32
+2025-10-09 21:49:22.471 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Sender Key 解密成功: plaintextSize=159
+2025-10-09 21:49:22.472 18016-18121 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1760017758547_1760017758605.dat, error=消息解密失败
+2025-10-09 21:49:22.473 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Sender Key 解密异常
+                                                                                                    java.net.ProtocolException: Unexpected tag 0
+                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:143)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Content$Companion$ADAPTER$1.decode(Content.kt:405)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Content$Companion$ADAPTER$1.decode(Content.kt:287)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.decryptSenderKeyMessage(TapEnvelopeAdapter.kt:529)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$decryptSenderKeyMessage(TapEnvelopeAdapter.kt:40)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:102)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:794)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:665)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:620)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-10-09 21:49:22.474 18016-18045 TapEnvelopeAdapter      org.thoughtcrime.securesms           E  Signal解密失败: messageId=1760017758547, isSessionCipher=false
+2025-10-09 21:49:22.474 18016-18045 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息处理失败: messageId=1760017758547, error=消息解密失败
+2025-10-09 21:49:22.478 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:22.539 18016-18120 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:22.569 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:26.462 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
+2025-10-09 21:49:26.464 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:27.088 18016-18120 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:27.099 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=75.00%]
+2025-10-09 21:49:27.100 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:27.125 18016-18120 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-09 21:49:27.757 18016-18121 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-09 21:49:27.765 18016-18121 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461

@@ -264,6 +264,7 @@ SenderKey (内层)
 
 ## 相关文档
 
+- `SENDERKEY_ENCRYPTION_FIX.md`: 纯SenderKey加密修复（解决3人群组解密失败问题）⭐
 - `ENVELOPE_TRANSPORT_FIX.md`: 2人群组Envelope修复（类似问题）
 - `GROUP_V2_ARCHITECTURE_REFACTOR.md`: 群组V2架构重构
 - `PLAN_GROUP.md`: 群组V2实现计划
@@ -272,14 +273,19 @@ SenderKey (内层)
 ## 总结
 
 **核心修复**：
-1. ✅ Envelope类型从 `SENDERKEY_MESSAGE` 改为 `UNIDENTIFIED_SENDER`
+1. ~~Envelope类型从 `SENDERKEY_MESSAGE` 改为 `UNIDENTIFIED_SENDER`~~ → **已被更好方案取代**（见 `SENDERKEY_ENCRYPTION_FIX.md`）
 2. ✅ 轮询任务使用 `groupId:recipientId` 复合key，避免冲突
 3. ✅ 通过解析路径提取 groupId，避免修改不可变的 `TransportMetadata`
 
+**最终方案**（2025-10-09）：
+1. ✅ **使用纯 SenderKey 加密**（不使用 Sealed Sender 包装）→ `SENDERKEY_ENCRYPTION_FIX.md`
+2. ✅ **修复数据库Schema**（添加缺失的列）→ `SENDERKEY_ENCRYPTION_FIX.md`
+3. ✅ **轮询复合key**（`groupId:recipientId`）→ 本文档
+
 **关键洞察**：
 - TAP只是传输层，不应干涉加密层
-- 应该传输与Signal Server相同格式的数据
-- `encryptForGroup()` 返回的是Sealed Sender密文，不是纯SenderKey密文
+- Sealed Sender 的多接收者加密不适用于广播场景
+- 纯 SenderKey 加密完美支持群组消息的一对多传输
 - `TransportMetadata` 是不可变接口，通过路径识别群组消息
 
 **影响范围**：
