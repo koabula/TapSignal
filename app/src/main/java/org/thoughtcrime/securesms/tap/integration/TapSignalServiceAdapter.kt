@@ -144,6 +144,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             Log.d(TAG, "Signal加密成功: messageId=$messageId, ciphertextLength=${encryptedData.ciphertext.size}")
+            Log.d(TAG, "[TapTimeTest] T2_ENCRYPT_END | msgId=${outgoingMessage.sentTimeMillis} | timestamp=${System.currentTimeMillis()}")
             
             // 3. 构建TransportMessage
             val transportMessage = buildTransportMessage(

@@ -7,6 +7,7 @@ package org.thoughtcrime.securesms.conversation.v2.items
 
 import android.util.TypedValue
 import android.view.View
+import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.components.QuoteView
 import org.thoughtcrime.securesms.conversation.v2.data.ConversationMessageElement
 import org.thoughtcrime.securesms.database.model.MmsMessageRecord
@@ -35,6 +36,8 @@ class V2ConversationItemMediaViewHolder<Model : MappingModel<Model>>(
 
   override fun bind(model: Model) {
     conversationMessage = (model as ConversationMessageElement).conversationMessage
+    
+    Log.d("TapTimeTest", "[TapTimeTest] T6_DISPLAY | msgId=${conversationMessage.messageRecord.dateSent} | timestamp=${System.currentTimeMillis()}")
 
     if (payload.isNotEmpty()) {
       super.bind(model)

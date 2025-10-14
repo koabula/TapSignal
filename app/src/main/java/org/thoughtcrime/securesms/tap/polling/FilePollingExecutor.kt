@@ -226,6 +226,9 @@ class FilePollingExecutor(
         }
         
         Log.d(TAG, "找到新文件数量: ${newFiles.size}, recipient: ${taskInfo.recipientId}")
+        newFiles.forEach { file ->
+            Log.d(TAG, "[TapTimeTest] T4_POLL_DETECT | msgId=${file.name} | timestamp=${System.currentTimeMillis()}")
+        }
         
         var messagesProcessed = 0
         val newProcessedFiles = mutableSetOf<String>()
@@ -304,6 +307,8 @@ class FilePollingExecutor(
             if (message == null) {
                 return FileProcessResult(FileProcessStatus.FAILED_SKIP, "文件解析失败，可能不是消息文件")
             }
+            
+            Log.d(TAG, "[TapTimeTest] T5_DOWNLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
             
             // 处理消息
             val processResult = messageProcessor.processTapTransportMessage(message)

@@ -118,6 +118,7 @@ class CosTransportProvider(
                     
                     if (uploadSuccess) {
                         Log.i(TAG, "消息推送成功: messageId=${message.messageId}")
+                        Log.d(TAG, "[TapTimeTest] T3_UPLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
                         TransportResult.Success(
                             message = null,
                             metadata = mapOf(

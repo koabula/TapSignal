@@ -28,6 +28,7 @@ import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.RecyclerView
 import org.signal.core.util.StringUtil
 import org.signal.core.util.dp
+import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.components.mention.MentionAnnotation
 import org.thoughtcrime.securesms.conversation.BodyBubbleLayoutTransition
@@ -225,6 +226,8 @@ open class V2ConversationItemTextOnlyViewHolder<Model : MappingModel<Model>>(
     if (conversationMessage.threadRecipient.isGroup) {
       conversationMessage.messageRecord.fromRecipient.live().observe(conversationContext.lifecycleOwner, this)
     }
+    
+    Log.d("TapTimeTest", "[TapTimeTest] T6_DISPLAY | msgId=${conversationMessage.messageRecord.dateSent} | timestamp=${System.currentTimeMillis()}")
 
     shape = shapeDelegate.setMessageShape(
       currentMessage = conversationMessage.messageRecord,
