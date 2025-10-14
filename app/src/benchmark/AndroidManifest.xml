@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Benchmark-specific manifest additions -->
+    
     <application>
-        <profileable android:shell="true" />
-
-        <activity android:name="org.signal.benchmark.BenchmarkSetupActivity"
-            android:launchMode="singleTask"
-            android:theme="@style/Theme.Signal.DayNight.NoActionBar"
-            android:windowSoftInputMode="stateHidden"
-            android:exported="true"
-            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"/>
-
+        <!-- FileProvider for sharing benchmark reports -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/benchmark_file_paths" />
+        </provider>
     </application>
 
 </manifest>
