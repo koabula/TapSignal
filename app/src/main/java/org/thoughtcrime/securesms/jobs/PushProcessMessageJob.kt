@@ -133,6 +133,11 @@ class PushProcessMessageJob private constructor(
         getQueueName(RecipientId.from(result.metadata.sourceServiceId))
       }
 
+      // 记录T3：接收到消息（解密完成后）
+      if (result.content.dataMessage != null) {
+        Log.d(TAG, "[SignalTimeTest] T3_RECEIVE_FROM_SERVER | msgId=${result.envelope.timestamp} | timestamp=${System.currentTimeMillis()}")
+      }
+      
       return if (requireNetwork || !isQueueEmpty(queueName = queueName, isGroup = groupId != null)) {
         val builder = Parameters.Builder()
           .setMaxAttempts(Parameters.UNLIMITED)

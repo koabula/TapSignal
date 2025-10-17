@@ -251,6 +251,11 @@ object DataMessageProcessor {
 
     localMetrics?.onPostProcessComplete()
     localMetrics?.complete(groupId != null)
+    
+    // 记录T4：消息处理完成并插入数据库
+    if (insertResult != null || messageId != null) {
+      Log.d(TAG, "[SignalTimeTest] T4_DISPLAY | msgId=${envelope.timestamp} | timestamp=${System.currentTimeMillis()}")
+    }
   }
 
   private fun handleProfileKey(

@@ -386,6 +386,7 @@ public class IndividualSendJob extends PushSendJob {
                                                                  message.isUrgent(),
                                                                  messageRecipient.getNeedsPniSignature());
 
+        Log.d(TAG, "[SignalTimeTest] T2_ENCRYPT_END | msgId=" + message.getSentTimeMillis() + " | timestamp=" + System.currentTimeMillis());
         SignalDatabase.messageLog().insertIfPossible(messageRecipient.getId(), message.getSentTimeMillis(), result, ContentHint.RESENDABLE, new MessageId(messageId), message.isUrgent());
 
         if (messageRecipient.getNeedsPniSignature()) {

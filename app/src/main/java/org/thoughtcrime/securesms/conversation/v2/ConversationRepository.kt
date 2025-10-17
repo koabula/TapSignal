@@ -182,7 +182,6 @@ class ConversationRepository(
   ): Completable {
     val sendCompletable = Completable.create { emitter ->
       val sentTimeMillis = System.currentTimeMillis()
-      Log.d(TAG, "[TapTimeTest] T1_SEND_START | msgId=$sentTimeMillis | timestamp=$sentTimeMillis")
       val splitMessage: MessageUtil.SplitResult = MessageUtil.getSplitMessage(
         applicationContext,
         body
@@ -213,6 +212,7 @@ class ConversationRepository(
       )
 
       if (preUploadResults.isEmpty()) {
+        Log.d(TAG, "[SignalTimeTest] T1_SEND_START | msgId=$sentTimeMillis | timestamp=$sentTimeMillis")
         MessageSender.send(
           AppDependencies.application,
           message,
