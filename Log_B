@@ -1,354 +1,88 @@
 --------- beginning of main
---------- beginning of kernel
+2025-10-14 20:20:17.478 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444417478
+2025-10-14 20:20:17.490 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444417489
+2025-10-14 20:20:17.495 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444417495
+2025-10-14 20:20:17.503 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444417502
+2025-10-14 20:20:17.513 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158606 | timestamp=1760444417512
+2025-10-14 20:20:17.565 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760443910564 | timestamp=1760444417564
 --------- beginning of system
-2025-10-09 20:04:09.433 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  开始完整的群组 V2 提议流程: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=3
-2025-10-09 20:04:09.433 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  为群组生成我的token: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:09.434 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  开始为群组生成我的Token: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, provider=cos
-2025-10-09 20:04:09.434 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           I  开始生成群组Token: groupId=0cbe************************************xrY=
-2025-10-09 20:04:09.435 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  群组目录路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/
-2025-10-09 20:04:09.635 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  创建群组目录结构: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/
-2025-10-09 20:04:10.067 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  创建目录成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/
-2025-10-09 20:04:10.142 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  创建目录成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:10.239 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  创建目录成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:10.240 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           I  群组目录结构创建成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/
-2025-10-09 20:04:10.241 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  生成群组子用户: userName=signal-group-0cbeIJCp-1760011450238-3857
-2025-10-09 20:04:10.242 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           D  开始创建腾讯云CAM子用户: signal-group-0cbeIJCp-1760011450238-3857
-2025-10-09 20:04:10.242 20252-20288 RetryHelper             org.thoughtcrime.securesms           D  创建CAM用户(signal-group-0cbeIJCp-1760011450238-3857): 首次尝试
-2025-10-09 20:04:11.517 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           D  附加腾讯云标准CAM策略: userName=signal-group-0cbeIJCp-1760011450238-3857, userUin=100044516473, permissions=READ_ONLY
-2025-10-09 20:04:11.521 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I  创建CAM策略: Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517
-2025-10-09 20:04:11.521 20252-20288 RetryHelper             org.thoughtcrime.securesms           D  创建CAM策略(Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517): 首次尝试
-2025-10-09 20:04:11.866 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I  CAM策略创建成功: Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517 (ID:253728566)
-2025-10-09 20:04:13.821 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I  验证策略附加状态: userUin=100044516473, policyId=253728566, policyName=Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517
-2025-10-09 20:04:15.967 20252-20288 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 开始状态同步检查
-2025-10-09 20:04:15.972 20252-20288 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 检查 PROPOSING 状态群组: 7个
-2025-10-09 20:04:15.974 20252-20288 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 没有处于 FULL_V2_ACTIVE 状态的群组
-2025-10-09 20:04:15.974 20252-20288 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 状态同步检查完成，耗时: 7ms
-2025-10-09 20:04:16.962 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I  策略附加验证成功: Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517 (ID:253728566) 已正确关联到用户UIN:100044516473
-2025-10-09 20:04:16.963 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I  腾讯云标准CAM策略附加成功: Signal-COS-Policy-signal-group-0cbeIJCp-1760011450238-3857-1760011451517 (ID:253728566)
-2025-10-09 20:04:16.965 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I    用户名: signal-group-0cbeIJCp-1760011450238-3857
-2025-10-09 20:04:16.966 20252-20288 TencentSubUserManager   org.thoughtcrime.securesms           I    允许目录: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:16.968 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           I  群组Token生成成功: tokenId=cos-************************************************************0238, groupId=0cbe************************************xrY=
-2025-10-09 20:04:16.968 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组Token生成成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-************************************************************0238
-2025-10-09 20:04:16.986 20252-20279 TransportTokenPool      org.thoughtcrime.securesms           I  添加共享Token成功: tokenId=cos-************************************************************0238, recipientId=0cbe************************************xrY=, providerType=cos, groupId=0cbe************************************xrY=
-2025-10-09 20:04:16.987 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组token已保存: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-************************************************************0238
-2025-10-09 20:04:16.995 20252-20288 GroupV2StatusTable      org.thoughtcrime.securesms           D  更新群组状态: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, version: 2 -> 3
-2025-10-09 20:04:16.996 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组 V2 模式提议成功: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, proposer=********-****-****-****-*********973, members=3
-2025-10-09 20:04:16.996 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  发送群组提议消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:16.998 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           I  发送群组 V2 提议消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=3
-2025-10-09 20:04:16.999 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  群组成员 ACIs: totalMembers=3
-2025-10-09 20:04:17.322 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::15
-2025-10-09 20:04:17.323 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::15
-2025-10-09 20:04:17.324 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  发送群组消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, groupRecipientId=RecipientId::15, threadId=11
-2025-10-09 20:04:17.341 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  使用 PushGroupSendJob 发送群组消息: messageId=1434
-2025-10-09 20:04:17.369 20252-20288 Job                     org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob] onSubmit() (Time Since Submission: 5 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:17.426 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob][2] Running job. (Time Since Submission: 62 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:17.430 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  数据消息已加入发送队列: recipientId=RecipientId::15, messageId=1434, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:17.431 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           I  群组提议消息发送完成: success=true
-2025-10-09 20:04:17.432 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组 V2 提议完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:17.458 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob][1760011457327] Sending message: 1434, Recipient: RecipientId::15, Thread: 11, Attachments:  (Time Since Submission: 87 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:17.472 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob] Beginning message send. (Time Since Submission: 108 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:17.482 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Starting group send. GroupId: GV2::***b6, DistributionId: ********-****-****-****-*********c36 RelatedMessageId: MessageId(id=1434), Targets: 2, RecipientUpdate: false, Operation: DataSendOperation
-2025-10-09 20:04:17.493 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Can use sender key for 2/2 recipients.
-2025-10-09 20:04:17.531 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [1760011457327] Sending a group data message to 2 recipients using DistributionId ********-****-****-****-*********c36
-2025-10-09 20:04:17.571 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760011457327] TAP control message detected, forcing Signal Server transmission for reliability.
-2025-10-09 20:04:17.970 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           D  Successfully sent using sender key to 2/2 sender key targets.
-2025-10-09 20:04:18.038 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob] Finished send. (Time Since Submission: 674 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:18.041 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::860c8d54-c900-4558-8c13-6285909b78c5][PushGroupSendJob][2] Job finished with result SUCCESS in 614 ms. (Time Since Submission: 676 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:04:29.265 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  群组接受消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********2ea, senderPersonalId=RecipientId::14
-2025-10-09 20:04:29.279 20252-20408 TransportTokenPool      org.thoughtcrime.securesms           I  添加接收Token成功: tokenId=cos-************************************************************1962, recipientId=8848****************************72ea, providerType=cos, groupId=0cbe************************************xrY=
-2025-10-09 20:04:29.280 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存群组成员token: accepter=********-****-****-****-*********2ea, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760011461962
-2025-10-09 20:04:29.281 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 开始同步处理群组接受: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********2ea
-2025-10-09 20:04:29.286 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  开始接受 V2 提议: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=8848****************************72ea
-2025-10-09 20:04:29.287 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  当前群组状态: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING, agreedMembers=1/3, proposer=c716****************************1973
-2025-10-09 20:04:29.287 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  添加前 agreedMembers: [c716****************************1973]
-2025-10-09 20:04:29.293 20252-20288 GroupV2StatusTable      org.thoughtcrime.securesms           D  成功添加同意成员: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, ********-****-****-****-*********2ea, version: 3 -> 4
-2025-10-09 20:04:29.294 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  成员接受 V2 提议成功: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, member=8848****************************72ea
-2025-10-09 20:04:29.295 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  更新后 agreedMembers: [c716****************************1973, 8848****************************72ea]
-2025-10-09 20:04:29.295 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  是否全员同意: false
-2025-10-09 20:04:29.295 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] 群组成员已标记为同意: accepter=********-****-****-****-*********2ea, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.297 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 检查是否可激活 V2 模式: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.300 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 群组当前状态: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING, agreed=2/3, proposer=c716****************************1973
-2025-10-09 20:04:29.300 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 同意成员: [c716****************************1973, 8848****************************72ea]
-2025-10-09 20:04:29.300 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 全部成员: [5a80****************************e461, c716****************************1973, 8848****************************72ea]
-2025-10-09 20:04:29.301 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 全员同意检查: isFullyAgreed=false (agreed=2, total=3)
-2025-10-09 20:04:29.301 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 群组尚未全员同意: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 未同意成员(1): [5a80****************************e461]
-2025-10-09 20:04:29.301 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 群组尚未全员同意，等待其他成员: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.826 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  群组接受消息: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********461, senderPersonalId=RecipientId::4
-2025-10-09 20:04:29.837 20252-20408 TransportTokenPool      org.thoughtcrime.securesms           I  添加接收Token成功: tokenId=cos-************************************************************3695, recipientId=5a80****************************e461, providerType=cos, groupId=0cbe************************************xrY=
-2025-10-09 20:04:29.838 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存群组成员token: accepter=********-****-****-****-*********461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, tokenId=cos-group-0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=-1760011463695
-2025-10-09 20:04:29.839 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 开始同步处理群组接受: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, accepter=********-****-****-****-*********461
-2025-10-09 20:04:29.842 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  开始接受 V2 提议: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
-2025-10-09 20:04:29.843 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  当前群组状态: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING, agreedMembers=2/3, proposer=c716****************************1973
-2025-10-09 20:04:29.844 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  添加前 agreedMembers: [c716****************************1973, 8848****************************72ea]
-2025-10-09 20:04:29.847 20252-20288 GroupV2StatusTable      org.thoughtcrime.securesms           D  成功添加同意成员: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, ********-****-****-****-*********461, version: 4 -> 5
-2025-10-09 20:04:29.847 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  成员接受 V2 提议成功: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, member=5a80****************************e461
-2025-10-09 20:04:29.849 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  更新后 agreedMembers: [c716****************************1973, 8848****************************72ea, 5a80****************************e461]
-2025-10-09 20:04:29.849 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  是否全员同意: true
-2025-10-09 20:04:29.850 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] 群组成员已标记为同意: accepter=********-****-****-****-*********461, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.852 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 检查是否可激活 V2 模式: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.854 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 群组当前状态: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=PROPOSING, agreed=3/3, proposer=c716****************************1973
-2025-10-09 20:04:29.854 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 同意成员: [c716****************************1973, 8848****************************72ea, 5a80****************************e461]
-2025-10-09 20:04:29.854 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 全部成员: [5a80****************************e461, c716****************************1973, 8848****************************72ea]
-2025-10-09 20:04:29.855 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态检查] 全员同意检查: isFullyAgreed=true (agreed=3, total=3)
-2025-10-09 20:04:29.857 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  [状态激活] ✅ 所有成员已同意，开始激活 V2 模式: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.858 20252-20288 GroupV2StatusTable      org.thoughtcrime.securesms           D  更新群组状态: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> FULL_V2_ACTIVE, updated=1
-2025-10-09 20:04:29.859 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  [状态激活] ✅ 群组 V2 模式激活成功: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, PROPOSING → FULL_V2_ACTIVE
-2025-10-09 20:04:29.859 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  [状态激活] 激活后验证: status=FULL_V2_ACTIVE, version=5
-2025-10-09 20:04:29.860 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] ✅ A端群组 V2 mode 已激活: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.863 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 开始处理群组激活后续操作: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, trigger=********-****-****-****-*********461
-2025-10-09 20:04:29.865 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  [激活后处理] 建立群组通道和轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:29.866 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  为群组建立通道: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
-2025-10-09 20:04:29.868 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  开始建立群组通道: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2, provider=cos
-2025-10-09 20:04:37.749 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  群组成员通道建立成功: memberAci=8848****************************72ea, channelId=ch_********-****-****-****-*********2ea_cos_1760011477296
-2025-10-09 20:04:38.978   556-1840  Transition              system_server                        E  Trying to add a ready-group twice: Display{#0 state=ON size=1080x2400 ROTATION_0}
-2025-10-09 20:04:39.288 20252-20288 ConversationGroupCallVi org.thoughtcrime.securesms           I  Peek call for RecipientId::15
-2025-10-09 20:04:39.294 20252-20288 Job                     org.thoughtcrime.securesms           I  [JOB::225a6ca5-dca9-4fd4-8986-1485eb122650][RequestGroupV2InfoJob] onSubmit() (Time Since Submission: 4 ms, Lifespan: Immortal, Run Attempt: 1/Unlimited, Queue: RequestGroupV2InfoSyncJob)
-2025-10-09 20:04:39.298 20252-20288 Job                     org.thoughtcrime.securesms           I  [JOB::4550f49c-609d-4b5a-ba57-63333bfd468f][GroupV2UpdateSelfProfileKeyJob] onSubmit() (Time Since Submission: 8 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: GroupV2UpdateSelfProfileKeyJob)
-2025-10-09 20:04:39.308 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::225a6ca5-dca9-4fd4-8986-1485eb122650][RequestGroupV2InfoJob][1] Running job. (Time Since Submission: 16 ms, Lifespan: Immortal, Run Attempt: 1/Unlimited, Queue: RequestGroupV2InfoSyncJob)
-2025-10-09 20:04:39.320 20252-20288 Job                     org.thoughtcrime.securesms           I  [JOB::876163db-aeff-4727-bce1-5b6a4473304f][RequestGroupV2InfoWorkerJob] onSubmit() (Time Since Submission: 4 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: __PUSH_PROCESS_JOB__RecipientId::15)
-2025-10-09 20:04:39.356 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::876163db-aeff-4727-bce1-5b6a4473304f][RequestGroupV2InfoWorkerJob][7] Running job. (Time Since Submission: 42 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: __PUSH_PROCESS_JOB__RecipientId::15)
-2025-10-09 20:04:39.365 20252-20288 RequestGroupV2InfoWorke org.thoughtcrime.securesms           I  Updating group to latest revision
-2025-10-09 20:04:39.367 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::225a6ca5-dca9-4fd4-8986-1485eb122650][RequestGroupV2InfoJob][1] Job finished with result SUCCESS in 53 ms. (Time Since Submission: 69 ms, Lifespan: Immortal, Run Attempt: 1/Unlimited, Queue: RequestGroupV2InfoSyncJob)
-2025-10-09 20:04:39.371 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::4550f49c-609d-4b5a-ba57-63333bfd468f][GroupV2UpdateSelfProfileKeyJob][8] Running job. (Time Since Submission: 78 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: GroupV2UpdateSelfProfileKeyJob)
-2025-10-09 20:04:39.374 20252-20288 GroupV2UpdateSelfProfil org.thoughtcrime.securesms           I  Ensuring profile key up to date on group GV2::***6b6
-2025-10-09 20:04:39.384 20252-20288 GroupManagerV2          org.thoughtcrime.securesms           I  Own Profile Key is already up to date in group GV2::***6b6
-2025-10-09 20:04:39.389 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::4550f49c-609d-4b5a-ba57-63333bfd468f][GroupV2UpdateSelfProfileKeyJob][8] Job finished with result SUCCESS in 19 ms. (Time Since Submission: 98 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: GroupV2UpdateSelfProfileKeyJob)
-2025-10-09 20:04:39.402 20252-20288 GroupsV2StateProcessor  org.thoughtcrime.securesms           I  [GV2::***b6] Paging from server targetRevision: latest
-2025-10-09 20:04:39.788 20252-20288 CallManager             org.thoughtcrime.securesms           I  peekGroupCall():
-2025-10-09 20:04:39.843 20252-20288 GroupsV2StateProcessor  org.thoughtcrime.securesms           I  [GV2::***b6] Requesting change logs from server, currentRevision=0 logsNeededFrom=0 includeFirstState=true sendEndorsementExpiration=true
-2025-10-09 20:04:40.184 20252-20288 ringrtc                 org.thoughtcrime.securesms           I  sfu.rs:616: Got group call peek result with device count = 0 (status code 404)
-2025-10-09 20:04:40.191 20252-20288 CallTable               org.thoughtcrime.securesms           D  Updating group call from peek.
-2025-10-09 20:04:40.207 20252-20288 GroupsV2StateProcessor  org.thoughtcrime.securesms           I  [GV2::***b6] Local state is at or later than server revision: 0
-2025-10-09 20:04:40.208 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::876163db-aeff-4727-bce1-5b6a4473304f][RequestGroupV2InfoWorkerJob][7] Job finished with result SUCCESS in 831 ms. (Time Since Submission: 873 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: __PUSH_PROCESS_JOB__RecipientId::15)
-2025-10-09 20:04:40.316 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  群组成员通道建立成功: memberAci=5a80****************************e461, channelId=ch_********-****-****-****-*********461_cos_1760011479862
-2025-10-09 20:04:40.320 20252-20279 TransportTokenPool      org.thoughtcrime.securesms           D  获取群组ReceivedTokens: groupId=0cbe************************************xrY=, count=2
-2025-10-09 20:04:40.321 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组通道建立完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2/2, 失败=0
-2025-10-09 20:04:40.322 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  群组通道建立成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2
-2025-10-09 20:04:40.322 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  启动群组轮询: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, providerType=cos, members=2
-2025-10-09 20:04:40.323 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  获取到群组成员tokens: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, count=2, members=[5a80****************************e461, 8848****************************72ea]
-2025-10-09 20:04:40.326 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
-2025-10-09 20:04:40.326 20252-20279 TapPollingService       org.thoughtcrime.securesms           I  为群组添加轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, members=2
-2025-10-09 20:04:40.329 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=8848****************************72ea
-2025-10-09 20:04:40.329 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  准备添加群组轮询目标: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, metadataCount=2
-2025-10-09 20:04:40.337 20252-20279 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=5a80****************************e461
-2025-10-09 20:04:40.339 20252-20279 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, memberAci=8848****************************72ea
-2025-10-09 20:04:40.339 20252-20279 TapPollingService       org.thoughtcrime.securesms           I  群组轮询目标添加完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功=2/2
-2025-10-09 20:04:40.343 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  群组轮询已启动: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, 成功添加=2/2
-2025-10-09 20:04:40.345 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY= -> RecipientId::15
-2025-10-09 20:04:40.377 20252-20288 GroupTokenExchangeHelpe org.thoughtcrime.securesms           I  系统消息已插入: recipientId=RecipientId::15, messageId=1435, enabled=true
-2025-10-09 20:04:40.378 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 系统消息已插入: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:40.378 20252-20288 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] ✅ 群组激活后续操作完成: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:04:42.446 20252-20486 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:04:42.450 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:42.453 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.454 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.454 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.456 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.704 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:42.706 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:42.707 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:42.707 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:42.710 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:42.737 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:04:42.738 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:42.742 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.743 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.743 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.747 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:42.949 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D    - 远程路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760004117913_1760004117955.dat
-2025-10-09 20:04:42.954 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D    - 原始路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760004117913_1760004117955.dat
-2025-10-09 20:04:42.955 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D    - 标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760004117913_1760004117955.dat
-2025-10-09 20:04:43.046 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:43.049 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:43.051 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:43.055 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:43.061 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:43.236 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  下载文件成功: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760004117913_1760004117955.dat -> /data/user/0/org.thoughtcrime.securesms/cache/cos_download_7033859699412101617.dat, 大小: 2527 bytes
-2025-10-09 20:04:47.448 20252-20486 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:04:47.449 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:47.453 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.453 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.453 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.458 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.708 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:47.718 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.719 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.720 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.728 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.730 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:04:47.732 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:47.739 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.739 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.740 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.754 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:47.992 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:47.996 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.997 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:47.998 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:48.002 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.450 20252-20486 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:04:52.452 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:52.455 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.456 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.456 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.459 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.713 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:52.717 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.718 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.719 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.722 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.731 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:04:52.733 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:52.737 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.737 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.737 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.742 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:52.962 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:52.982 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.982 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.983 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:52.986 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:57.454 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:04:57.456 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:57.459 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.459 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.460 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.464 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.730 20252-20486 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:04:57.732 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:57.735 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.736 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.736 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.741 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:04:57.964 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:04:57.968 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:57.968 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:57.969 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:57.985 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:58.020 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:04:58.029 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:58.031 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:58.032 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:04:58.037 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:01.178 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Starting group send. GroupId: GV2::***b6, DistributionId: ********-****-****-****-*********c36 RelatedMessageId: none, Targets: 2, RecipientUpdate: false, Operation: TypingSendOperation
-2025-10-09 20:05:01.187 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Can use sender key for 2/2 recipients.
-2025-10-09 20:05:01.194 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForGroup: groupId bytes size=32, base64=0cbeIJCp9OuN72EQz+fc...
-2025-10-09 20:05:01.195 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  getGroupStatusSync: 查询群组状态, groupId=0cbeIJCp9OuN72EQz+fc...
-2025-10-09 20:05:01.196 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  getGroupStatusSync: 找到群组状态, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=FULL_V2_ACTIVE, version=5, memberCount=3
-2025-10-09 20:05:01.197 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForGroup: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=FULL_V2_ACTIVE, shouldUse=true
-2025-10-09 20:05:01.197 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           I  [sendGroupMessage][1760011501176] Group is in v2 mode, sending via TAP transport.
-2025-10-09 20:05:01.198 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  constructEnvelopeForSenderKey: Using groupId as serverGuid, length=44
-2025-10-09 20:05:01.200 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760011501176] Constructed SenderKey Envelope size: 892 bytes
-2025-10-09 20:05:01.201 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760011501176] Using SenderKey encryption, isSessionCipher=false
-2025-10-09 20:05:01.201 20252-20374 TransportTokenPool      org.thoughtcrime.securesms           D  获取群组SharedToken: groupId=0cbe************************************xrY=, providerType=cos
-2025-10-09 20:05:01.202 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           I  sendGroupMessageViaTap: groupId present=true, recipients=2, ciphertextSize=892, timestamp=1760011501176, isSessionCipher=false
-2025-10-09 20:05:01.203 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: groupId bytes size=32, base64=0cbeIJCp9OuN72EQz+fc..., messageId=1760011501197
-2025-10-09 20:05:01.204 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: recipients list: ********-****-****-****-*********461, ********-****-****-****-*********2ea
-2025-10-09 20:05:01.215 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: 调用 GroupTransportManager.sendGroupMessage
-2025-10-09 20:05:01.217 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  sendGroupMessage: 开始发送, groupId=0cbeIJCp9OuN72EQz+fc..., messageId=1760011501197, ciphertextSize=892
-2025-10-09 20:05:01.219 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  sendGroupMessage: 检查群组状态, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:05:01.220 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  sendGroupMessage: 群组状态查询成功, status=FULL_V2_ACTIVE, members=3
-2025-10-09 20:05:01.221 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  上传群组消息到我的目录: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, messageId=1760011501197
-2025-10-09 20:05:01.239 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  v2-channels路径: messageType=TEXT_MESSAGE, path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:01.606 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  上传文件成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760011501197_1760011501236.dat
-2025-10-09 20:05:01.608 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组消息上传成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, messageId=1760011501197
-2025-10-09 20:05:01.610 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           I  TAP 群组消息发送成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:05:01.611 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           D  Successfully sent using sender key to 2/2 sender key targets.
-2025-10-09 20:05:02.397 20252-20288 Job                     org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob] onSubmit() (Time Since Submission: 23 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:02.433 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob][8] Running job. (Time Since Submission: 46 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:02.458 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:05:02.479 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:02.507 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.514 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.515 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.521 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.530 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob][1760011502254] Sending message: 1436, Recipient: RecipientId::15, Thread: 11, Attachments:  (Time Since Submission: 127 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:02.572 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob] Beginning message send. (Time Since Submission: 176 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:02.573 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Starting group send. GroupId: GV2::***b6, DistributionId: ********-****-****-****-*********c36 RelatedMessageId: MessageId(id=1436), Targets: 2, RecipientUpdate: false, Operation: DataSendOperation
-2025-10-09 20:05:02.589 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           I  Can use sender key for 2/2 recipients.
-2025-10-09 20:05:02.602 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [1760011502254] Sending a group data message to 2 recipients using DistributionId ********-****-****-****-*********c36
-2025-10-09 20:05:02.629 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForGroup: groupId bytes size=32, base64=0cbeIJCp9OuN72EQz+fc...
-2025-10-09 20:05:02.631 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  getGroupStatusSync: 查询群组状态, groupId=0cbeIJCp9OuN72EQz+fc...
-2025-10-09 20:05:02.634 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  getGroupStatusSync: 找到群组状态, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=FULL_V2_ACTIVE, version=5, memberCount=3
-2025-10-09 20:05:02.636 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForGroup: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, status=FULL_V2_ACTIVE, shouldUse=true
-2025-10-09 20:05:02.642 20252-20486 TransportTokenPool      org.thoughtcrime.securesms           D  获取群组SharedToken: groupId=0cbe************************************xrY=, providerType=cos
-2025-10-09 20:05:02.647 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           I  [sendGroupMessage][1760011502254] Group is in v2 mode, sending via TAP transport.
-2025-10-09 20:05:02.648 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  constructEnvelopeForSenderKey: Using groupId as serverGuid, length=44
-2025-10-09 20:05:02.648 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760011502254] Constructed SenderKey Envelope size: 892 bytes
-2025-10-09 20:05:02.649 20252-20288 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1760011502254] Using SenderKey encryption, isSessionCipher=false
-2025-10-09 20:05:02.650 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           I  sendGroupMessageViaTap: groupId present=true, recipients=2, ciphertextSize=892, timestamp=1760011502254, isSessionCipher=false
-2025-10-09 20:05:02.650 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: groupId bytes size=32, base64=0cbeIJCp9OuN72EQz+fc..., messageId=1760011502638
-2025-10-09 20:05:02.651 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: recipients list: ********-****-****-****-*********461, ********-****-****-****-*********2ea
-2025-10-09 20:05:02.651 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           D  sendGroupMessageViaTap: 调用 GroupTransportManager.sendGroupMessage
-2025-10-09 20:05:02.653 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  sendGroupMessage: 开始发送, groupId=0cbeIJCp9OuN72EQz+fc..., messageId=1760011502638, ciphertextSize=892
-2025-10-09 20:05:02.660 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  sendGroupMessage: 检查群组状态, groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:05:02.662 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  sendGroupMessage: 群组状态查询成功, status=FULL_V2_ACTIVE, members=3
-2025-10-09 20:05:02.663 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           D  上传群组消息到我的目录: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, messageId=1760011502638
-2025-10-09 20:05:02.670 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  v2-channels路径: messageType=TEXT_MESSAGE, path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.770 20252-20407 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:05:02.778 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:02.808 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.812 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.813 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.817 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:02.850 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:02.854 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:02.855 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:02.857 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:02.863 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:02.974 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  上传文件成功: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/1760011502638_1760011502668.dat
-2025-10-09 20:05:02.975 20252-20288 GroupTransportManager   org.thoughtcrime.securesms           I  群组消息上传成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=, messageId=1760011502638
-2025-10-09 20:05:02.977 20252-20288 TapMessageTransportImpl org.thoughtcrime.securesms           I  TAP 群组消息发送成功: groupId=0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=
-2025-10-09 20:05:02.977 20252-20288 GroupSendUtil           org.thoughtcrime.securesms           D  Successfully sent using sender key to 2/2 sender key targets.
-2025-10-09 20:05:03.014 20252-20288 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob] Finished send. (Time Since Submission: 629 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:03.018 20252-20288 JobRunner               org.thoughtcrime.securesms           I  [JOB::3b20bcae-0213-4233-ae53-8155a638d1a0][PushGroupSendJob][8] Job finished with result SUCCESS in 587 ms. (Time Since Submission: 633 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::15)
-2025-10-09 20:05:03.043 20252-20288 LocalMetrics            org.thoughtcrime.securesms           D  [group-message-send][1760011502254] total: 785 | db-insert: 54, job-enqueue: 162, job-pre-network: 128, sk-shared: 30, encryption: 22, network-sk: 348, network-sk-sync: 1, msl-sk: 0, network-legacy: 0, network-legacy-sync: 0, job-post-network: 36, ui-update: 3
-2025-10-09 20:05:03.074 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:03.090 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:03.090 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:03.091 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:03.104 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:07.459 20252-20407 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:05:07.460 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:07.465 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.465 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.466 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.469 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.695 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:07.699 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:07.699 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:07.700 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:07.705 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:07.732 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:05:07.733 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:07.736 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.737 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.738 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:07.741 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:08.004 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:08.014 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:08.014 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:08.014 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:08.016 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.482 20252-20374 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 88480fbe-588a-443e-adc9-e3b7807b72ea
-2025-10-09 20:05:12.484 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:12.487 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.487 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.488 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.490 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.734 20252-20407 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-09 20:05:12.736 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:12.749 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.749 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.749 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.758 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/messages/
-2025-10-09 20:05:12.769 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********2ea
-2025-10-09 20:05:12.776 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.776 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.777 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.781 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.949 20252-20288 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, recipientId=********-****-****-****-*********461
-2025-10-09 20:05:12.956 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.957 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  标准化路径: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.958 20252-20288 TencentCosClient        org.thoughtcrime.securesms           I  使用前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
-2025-10-09 20:05:12.962 20252-20288 TencentCosClient        org.thoughtcrime.securesms           D  列举文件 - 原始路径: /group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/, 前缀: group/0cbeIJCp9OuN72EQz+fc+ZZ6TZrYQ1iktjX5dhL3xrY=/attachments/
+2025-10-14 20:20:24.538 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444424538
+2025-10-14 20:20:24.540 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444424539
+2025-10-14 20:20:24.541 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444424540
+2025-10-14 20:20:24.546 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444424545
+2025-10-14 20:20:24.548 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158606 | timestamp=1760444424547
+--------- beginning of kernel
+2025-10-14 20:20:24.549 15785-15824 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760443910564 | timestamp=1760444424549
+
+
+2025-10-14 20:27:00.997 26735-26735 TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=680.9658, y[0]=1846.875, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=379436832, downTime=379436832, deviceId=4, source=0x5002, displayId=0, eventId=771586112 }
+2025-10-14 20:27:01.092 26735-26735 TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=680.9658, y[0]=1846.875, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=379436927, downTime=379436832, deviceId=4, source=0x5002, displayId=0, eventId=426380243 }
+2025-10-14 20:27:03.512 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=99.25%]
+2025-10-14 20:27:03.513 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/messages/, /v2-channels/a3adde1ba3b08264/outbox/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:04.027 28077-28232 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:04.031 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:08.514 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=99.26%]
+2025-10-14 20:27:08.515 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/messages/, /v2-channels/a3adde1ba3b08264/outbox/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:09.323 28077-28232 TapPollingService       org.thoughtcrime.securesms           D  找到新文件数量: 1, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:09.756 28077-28115 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********94a, type=TEXT_MESSAGE
+2025-10-14 20:27:09.757 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********94a
+2025-10-14 20:27:09.758 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********94a
+2025-10-14 20:27:09.759 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
+                                                                                                    java.net.ProtocolException: Unexpected end group
+                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:152)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:552)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:372)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:198)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:40)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:84)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:794)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performSinglePoll(TapPollingService.kt:665)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performSinglePoll(TapPollingService.kt:32)
+                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$executePollingTask$1.invokeSuspend(TapPollingService.kt:620)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+2025-10-14 20:27:09.759 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********94a
+2025-10-14 20:27:09.759 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
+2025-10-14 20:27:09.760 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
+2025-10-14 20:27:09.760 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-10-14 20:27:09.760 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********94a, type=CIPHERTEXT
+2025-10-14 20:27:09.761 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
+2025-10-14 20:27:09.761 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
+2025-10-14 20:27:09.761 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1760444828421, type=CIPHERTEXT
+2025-10-14 20:27:09.766 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1760444828421
+2025-10-14 20:27:09.766 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1760444828421
+2025-10-14 20:27:09.828 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1760444828421
+2025-10-14 20:27:09.841 28077-28232 TapPollingService       org.thoughtcrime.securesms           D  消息处理成功: 531d41a9-3059-49c1-8ad5-354c4562294a_1760444828583.dat
+2025-10-14 20:27:09.843 28077-28232 TapPollingService       org.thoughtcrime.securesms           D  发现1条新消息，已更新数据库: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:09.846 28077-28115 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********94a
+2025-10-14 20:27:09.846 28077-28115 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********94a
+2025-10-14 20:27:09.909 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444828421 | timestamp=1760444829909
+2025-10-14 20:27:09.922 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444829918
+2025-10-14 20:27:09.928 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444829927
+2025-10-14 20:27:09.931 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444829931
+2025-10-14 20:27:09.941 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444829941
+2025-10-14 20:27:09.951 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158015 | timestamp=1760444829951
+2025-10-14 20:27:09.968 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444142061 | timestamp=1760444829968
+2025-10-14 20:27:13.516 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=99.26%]
+2025-10-14 20:27:13.518 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/messages/, /v2-channels/a3adde1ba3b08264/outbox/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:14.097 28077-28232 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:14.101 28077-28232 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:18.516 28077-28193 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=5000ms, errors=0, activity=INACTIVE, successRate=99.27%]
+2025-10-14 20:27:18.518 28077-28193 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/messages/, /v2-channels/a3adde1ba3b08264/outbox/attachments/, recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-14 20:27:19.250 28077-28193 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461

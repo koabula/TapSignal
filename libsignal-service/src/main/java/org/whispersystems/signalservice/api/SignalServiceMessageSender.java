@@ -1985,7 +1985,13 @@ public class SignalServiceMessageSender {
             } else {
               Log.d(TAG, "[sendMessage][" + timestamp + "] Group is NOT in v2 mode, using Signal Server");
             }
-          } else {
+          } 
+          // ===== 注释掉私聊TAP拦截代码 =====
+          // 原因：私聊消息应该通过 IndividualSendJob → TapMessageSendIntegrator → TapSignalServiceAdapter 路径发送
+          // 这个拦截点会错误地拦截系统消息（如已读回执、ProfileKey等），导致解密失败
+          // 系统消息应该继续使用 Signal Server 发送
+          /*
+          else {
             // 这是私聊消息（没有 groupId），检查是否为 v2 mode
             Log.d(TAG, "[sendMessage][" + timestamp + "] Detected private message, recipient=" + recipient.getIdentifier() + ", checking TAP status");
             
@@ -2013,6 +2019,8 @@ public class SignalServiceMessageSender {
               Log.d(TAG, "[sendMessage][" + timestamp + "] Private chat is NOT in v2 mode, using Signal Server");
             }
           }
+          */
+          // ===== 注释结束 =====
           } // 结束 TAP 控制消息检查的 else 块
         }
 

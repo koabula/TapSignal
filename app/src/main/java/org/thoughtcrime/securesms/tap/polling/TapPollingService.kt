@@ -768,6 +768,9 @@ class TapPollingService(private val context: Context) {
             }
             
             Log.d(TAG, "找到新文件数量: ${newFiles.size}, recipient: ${taskInfo.recipientId}")
+            newFiles.forEach { file ->
+                Log.d(TAG, "[TapTimeTest] T4_POLL_DETECT | msgId=${file.name} | timestamp=${System.currentTimeMillis()}")
+            }
             
             var messagesProcessed = 0
             val newProcessedFiles = mutableSetOf<String>()
@@ -791,6 +794,7 @@ class TapPollingService(private val context: Context) {
                         if (file.isInMessagesDirectory()) {
                             val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
                             if (message != null) {
+                                Log.d(TAG, "[TapTimeTest] T5_DOWNLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
                                 val processResult = messageProcessor.processTapTransportMessage(message)
                                 if (processResult is TapProcessResult.Success) {
                                     messagesProcessed++

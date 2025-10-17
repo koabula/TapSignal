@@ -135,6 +135,7 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                     )
                     
                     Log.i(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
+                    Log.d(TAG, "[TapTimeTest] T6_DISPLAY | msgId=${transportMessage.timestamp} | timestamp=${System.currentTimeMillis()}")
                     TapEnvelopeProcessResult.Success(transportMessage.messageId)
                 } else {
                     Log.w(TAG, "消息内容处理失败: messageId=${transportMessage.messageId}")
@@ -226,18 +227,10 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             }
             
             // 步骤1：从 libsignal CiphertextMessage 类型映射到基础 Envelope 类型
-            var envelopeType = mapSignalTypeToEnvelopeType(transportMessage.signalCiphertextType)
+            // TAP传输层不使用 Sealed Sender 包装，直接使用 signalCiphertextType 映射
+            val envelopeType = mapSignalTypeToEnvelopeType(transportMessage.signalCiphertextType)
             
-            // 步骤2：检测 Sealed Sender 外层包装
-            if (ciphertextBytes.isNotEmpty()) {
-                val firstByte = ciphertextBytes[0].toInt() and 0xFF
-                if (firstByte >= 0x23) {
-                    Log.d(TAG, "检测到 Sealed Sender 外层包装（firstByte=0x${firstByte.toString(16)}）")
-                    envelopeType = Envelope.Type.UNIDENTIFIED_SENDER
-                }
-            }
-            
-            Log.d(TAG, "最终消息类型: signalCiphertextType=${transportMessage.signalCiphertextType}, envelopeType=$envelopeType")
+            Log.d(TAG, "消息类型: signalCiphertextType=${transportMessage.signalCiphertextType}, envelopeType=$envelopeType")
             
             // 构建Envelope
             val envelopeBuilder = Envelope.Builder()

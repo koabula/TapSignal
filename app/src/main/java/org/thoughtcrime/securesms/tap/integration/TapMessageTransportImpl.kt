@@ -156,50 +156,32 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
         urgent: Boolean,
         online: Boolean
     ): SendMessageResult {
-        Log.i(TAG, "sendMessageViaTap: 发送私聊消息, recipient=${recipient.identifier}, ciphertextSize=${ciphertext.size}")
+        // 此方法已废弃：私聊应该使用 TapSignalServiceAdapter 路径
+        // 如果调用到这里，说明某处代码仍在使用旧的发送路径
+        // 抛出异常以快速定位问题调用点
+        val errorMessage = """
+            ========================================
+            TapMessageTransportImpl.sendMessageViaTap() 已废弃
+            ========================================
+            私聊消息应该通过以下路径发送：
+            IndividualSendJob 
+              → TapMessageSendIntegrator
+                → TapSignalServiceAdapter.sendWithSignalEncryption()
+            
+            如果调用到此方法，说明：
+            1. 某处代码仍在使用旧的发送路径
+            2. 可能导致密文版本不正确（version 1 错误）
+            
+            请检查调用栈，找到调用此方法的位置并修复
+            ========================================
+            recipient: ${recipient.identifier}
+            ciphertextSize: ${ciphertext.size}
+            timestamp: $timestamp
+            ========================================
+        """.trimIndent()
         
-        try {
-            val messageId = System.currentTimeMillis().toString()
-            
-            // 只处理私聊消息（2人群组现在走 sendGroupMessageViaTap）
-            val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
-                messageId = messageId,
-                senderId = "",  // 由 TransportManager 自动填充
-                recipientId = recipient.identifier,
-                timestamp = timestamp,
-                messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
-                signalCiphertext = Base64.encodeToString(ciphertext, Base64.NO_WRAP),
-                contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
-                    originalSize = ciphertext.size.toLong()
-                )
-            )
-            
-            val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
-            val result = runBlocking {
-                transportManager.sendMessage(
-                    recipientId = recipient.identifier,
-                    message = transportMessage
-                )
-            }
-            
-            return when (result) {
-                is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
-                    Log.i(TAG, "TAP 私聊消息发送成功")
-                    SendMessageResult.success(recipient, emptyList(), true, false, timestamp, Optional.empty())
-                }
-                is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
-                    Log.e(TAG, "TAP 私聊消息发送失败: ${result.errorMessage}")
-                    throw IOException("TAP transport failed: ${result.errorMessage}")
-                }
-                else -> {
-                    throw IOException("TAP transport unexpected result: $result")
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "TAP 私聊消息传输异常", e)
-            throw IOException("TAP transport exception: ${e.message}", e)
-        }
+        Log.e(TAG, errorMessage)
+        throw IOException(errorMessage)
     }
 }
 

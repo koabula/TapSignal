@@ -634,7 +634,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             originalSize = encryptedData.ciphertext.size.toLong(),
             compressionType = org.thoughtcrime.securesms.tap.TransportCompressionType.NONE,
             encryptionAlgorithm = "signal-protocol",
-            sourceDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId
+            sourceDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId,
+            isSessionCipherEncrypted = true  // 私聊使用 SessionCipher 加密
         )
         
         // 构建附件列表
