@@ -15,7 +15,7 @@ object TapPollingConstants {
      * 根据不同存储服务的特性和性能优化设置
      */
     object ProviderIntervals {
-        const val COS_BASE_INTERVAL_MS = 5000L        // COS: 5秒，云存储响应快
+        const val COS_BASE_INTERVAL_MS = 1000L        // COS: 5秒，云存储响应快
         const val DEFAULT_BASE_INTERVAL_MS = 30000L   // 未知Provider默认间隔
         
         /**

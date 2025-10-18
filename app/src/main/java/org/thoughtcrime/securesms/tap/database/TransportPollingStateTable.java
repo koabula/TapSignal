@@ -244,8 +244,13 @@ public class TransportPollingStateTable extends DatabaseTable {
             Set<String> allProcessedFiles = new HashSet<>(currentState.processedFiles);
             allProcessedFiles.addAll(newProcessedFiles);
             
+            // 关键修复：只在找到新消息时更新 lastProcessedTime
+            // 这样可以避免本地时钟与COS服务器时钟偏差导致刚上传的文件被时间戳过滤掉
+            long newLastProcessedTime = messagesFoundCount > 0 ? 
+                currentTime : currentState.lastProcessedTime;
+            
             PollingState updatedState = new PollingState(
-                recipientId, providerType, currentTime, allProcessedFiles, currentState.lastPollingCursor,
+                recipientId, providerType, newLastProcessedTime, allProcessedFiles, currentState.lastPollingCursor,
                 0, // 成功时重置错误计数
                 currentState.lastErrorTime, currentState.lastErrorMessage,
                 currentState.totalPolls + 1, currentState.successfulPolls + 1,

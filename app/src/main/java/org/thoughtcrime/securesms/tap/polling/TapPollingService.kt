@@ -570,14 +570,21 @@ class TapPollingService(private val context: Context) {
     
     /**
      * 调度轮询任务
+     * 
+     * @param taskInfo 轮询任务信息
+     * @param isRescheduling 是否为重新调度（热调整）。首次调度添加抖动延迟防止冷启动风暴，重新调度立即执行
      */
-    private fun schedulePollingTask(taskInfo: PollingTaskInfo): ScheduledFuture<*>? {
-        // 添加初始延迟抖动，防止冷启动风暴
-        val jitterMs = (Math.random() * TapPollingConstants.PollingService.INITIAL_DELAY_JITTER_MAX_MS).toLong()
+    private fun schedulePollingTask(taskInfo: PollingTaskInfo, isRescheduling: Boolean = false): ScheduledFuture<*>? {
+        // 首次调度添加抖动防止冷启动风暴，重新调度立即执行以快速响应活跃度变化
+        val initialDelayMs = if (isRescheduling) {
+            0L  // 立即执行
+        } else {
+            (Math.random() * TapPollingConstants.PollingService.INITIAL_DELAY_JITTER_MAX_MS).toLong()
+        }
         
         return pollingExecutor?.scheduleWithFixedDelay(
             { executePollingTask(taskInfo) },
-            jitterMs,
+            initialDelayMs,
             taskInfo.getCurrentInterval(),
             TimeUnit.MILLISECONDS
         )
@@ -843,6 +850,22 @@ class TapPollingService(private val context: Context) {
             // 更新任务信息中的已处理文件列表
             taskInfo.lastProcessedFiles = newProcessedFiles
             
+            // 如果成功处理了消息，更新通道活跃时间以维持正确的活跃度级别
+            if (messagesProcessed > 0) {
+                try {
+                    val channel = channelManager.getActiveChannel(
+                        taskInfo.recipientId,
+                        taskInfo.metadata.providerType
+                    )
+                    channel?.let {
+                        channelManager.updateChannelSuccess(it.channelId)
+                        Log.d(TAG, "更新通道活跃时间: recipient=${taskInfo.recipientId}, messagesProcessed=$messagesProcessed")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "更新通道活跃时间失败: recipient=${taskInfo.recipientId}", e)
+                }
+            }
+            
             FilePollingResult.success(newProcessedFiles, messagesProcessed)
             
         } catch (e: Exception) {
@@ -860,6 +883,39 @@ class TapPollingService(private val context: Context) {
                 // 轮询成功
                 taskInfo.recordSuccess()
                 taskInfo.recordMessagesFound(result.messagesFound)
+                
+                // 如果收到新消息，通道活跃度可能改变，重新评估并调整轮询间隔
+                if (result.messagesFound > 0) {
+                    pollingLock.write {
+                        try {
+                            // 重新获取通道信息计算新间隔（此时lastActiveAt已更新）
+                            val channel = channelManager.getActiveChannel(
+                                taskInfo.recipientId,
+                                taskInfo.metadata.providerType
+                            )
+                            val newInterval = calculatePollingInterval(taskInfo.metadata, channel)
+                            val currentInterval = taskInfo.getCurrentInterval()
+                            
+                            if (newInterval != currentInterval) {
+                                Log.d(TAG, "收到消息后重新调整轮询间隔: recipient=${taskInfo.recipientId}, ${currentInterval}ms -> ${newInterval}ms")
+                                
+                                // 取消当前任务
+                                taskInfo.task?.cancel(false)
+                                
+                                // 更新间隔
+                                taskInfo.setCurrentInterval(newInterval)
+                                
+                                // 重新调度任务（立即执行，无延迟）
+                                val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
+                                taskInfo.task = newTask
+                            } else {
+                                Log.v(TAG, "轮询间隔无需调整: recipient=${taskInfo.recipientId}, interval=${currentInterval}ms")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "重新评估轮询间隔失败: recipient=${taskInfo.recipientId}", e)
+                        }
+                    }
+                }
             }
             
             result.needsRetry -> {
@@ -1136,8 +1192,8 @@ class TapPollingService(private val context: Context) {
                     // 更新间隔
                     taskInfo.setCurrentInterval(newInterval)
                     
-                    // 重新调度任务
-                    val newTask = schedulePollingTask(taskInfo)
+                    // 重新调度任务（立即执行，无延迟）
+                    val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
                     taskInfo.task = newTask
                     
                     return@write true
@@ -1196,8 +1252,8 @@ class TapPollingService(private val context: Context) {
                         // 更新间隔
                         taskInfo.setCurrentInterval(newInterval)
                         
-                        // 重新调度任务
-                        val newTask = schedulePollingTask(taskInfo)
+                        // 重新调度任务（立即执行，无延迟）
+                        val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
                         taskInfo.task = newTask
                         
                         true
