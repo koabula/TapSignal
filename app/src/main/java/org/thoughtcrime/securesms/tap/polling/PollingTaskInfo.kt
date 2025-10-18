@@ -80,6 +80,11 @@ class PollingTaskInfo(
     val consecutiveErrors = AtomicInteger(0)
     
     /**
+     * 连续空轮询次数（用于动态退避）
+     */
+    val consecutiveEmptyPolls = AtomicInteger(0)
+    
+    /**
      * 当前活跃度级别
      */
     private val currentActivityLevel = AtomicReference(TransportActivityLevel.INACTIVE)

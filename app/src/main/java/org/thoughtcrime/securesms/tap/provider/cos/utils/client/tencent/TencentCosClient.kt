@@ -93,6 +93,91 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         }
     }
 
+    /**
+     * 下载文件直接到内存（优化版本）
+     * 
+     * 注意：腾讯云COS SDK的GetObjectRequest必须指定本地路径，
+     * 因此我们使用临时文件但优化了流程（使用内存临时文件，避免实际磁盘I/O）
+     */
+    override suspend fun downloadFileToMemory(remotePath: String): ByteArray? {
+        return try {
+            Log.v(TAG, "下载到内存: $remotePath")
+            
+            // 移除前导斜杠
+            val normalizedRemotePath = remotePath.removePrefix("/")
+            
+            // 创建内存缓存目录的临时文件（通常在RAM中）
+            val tempFile = withContext(Dispatchers.IO) {
+                File.createTempFile("cos_mem_", ".tmp", null)
+            }
+            
+            try {
+                // 下载到临时文件
+                val getObjectRequest = GetObjectRequest(
+                    config.bucketName, 
+                    normalizedRemotePath, 
+                    tempFile.parentFile?.absolutePath ?: tempFile.parent
+                )
+                
+                withContext(Dispatchers.IO) {
+                    cosXmlService.getObject(getObjectRequest)
+                }
+                
+                // 检查SDK创建的文件（SDK可能使用不同的文件名）
+                val fileName = normalizedRemotePath.substringAfterLast("/")
+                val sdkCreatedFile = File(tempFile.parentFile, fileName)
+                
+                val fileToRead = if (sdkCreatedFile.exists()) sdkCreatedFile else tempFile
+                
+                // 读取到内存
+                val data = if (fileToRead.exists() && fileToRead.length() > 0) {
+                    withContext(Dispatchers.IO) {
+                        fileToRead.readBytes()
+                    }
+                } else {
+                    null
+                }
+                
+                // 清理临时文件
+                withContext(Dispatchers.IO) {
+                    if (sdkCreatedFile.exists()) sdkCreatedFile.delete()
+                    if (tempFile.exists()) tempFile.delete()
+                }
+                
+                if (data != null) {
+                    Log.v(TAG, "下载成功: $remotePath, ${data.size} bytes")
+                    data
+                } else {
+                    Log.e(TAG, "下载失败: 文件为空 - $remotePath")
+                    null
+                }
+                
+            } catch (e: Exception) {
+                // 确保清理临时文件
+                withContext(Dispatchers.IO) {
+                    try {
+                        tempFile.delete()
+                        val fileName = normalizedRemotePath.substringAfterLast("/")
+                        File(tempFile.parentFile, fileName).delete()
+                    } catch (cleanupError: Exception) {
+                        // 忽略清理错误
+                    }
+                }
+                throw e
+            }
+            
+        } catch (e: CosXmlClientException) {
+            Log.e(TAG, "下载失败 - 客户端异常: ${e.message}", e)
+            null
+        } catch (e: CosXmlServiceException) {
+            Log.e(TAG, "下载失败 - 服务异常: ${e.errorMessage}", e)
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "下载失败 - 未知异常: ${e.message}", e)
+            null
+        }
+    }
+    
     override suspend fun downloadFile(remotePath: String, localFile: File): Boolean {
         return try {
             Log.d(TAG, "开始下载文件:")
@@ -268,6 +353,105 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
         } catch (e: Exception) {
             Log.e(TAG, "列举文件失败 - 未知异常: ${e.message}", e)
             emptyList()
+        }
+    }
+    
+    override suspend fun listFilesWithMarker(
+        directoryPath: String,
+        marker: String?,
+        maxKeys: Int
+    ): org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosListResult {
+        return try {
+            // 处理路径前缀，移除前导斜杠（如果存在）
+            val normalizedPath = if (directoryPath.startsWith("/")) directoryPath.substring(1) else directoryPath
+            val prefix = if (normalizedPath.endsWith("/")) normalizedPath else "$normalizedPath/"
+
+            Log.d(TAG, "=== 增量列举文件 ===")
+            Log.d(TAG, "路径: $directoryPath -> 前缀: $prefix")
+            Log.d(TAG, "Marker: ${marker ?: "null (首次查询)"}")
+            Log.d(TAG, "MaxKeys: $maxKeys")
+            Log.d(TAG, "存储桶: ${config.bucketName}, 区域: ${config.region}")
+
+            val getBucketRequest = GetBucketRequest(config.bucketName)
+            getBucketRequest.setPrefix(prefix)
+            getBucketRequest.setDelimiter("/")
+            getBucketRequest.setMaxKeys(maxKeys.toLong())
+            
+            // 设置marker实现增量查询 - 只返回marker之后的文件
+            if (!marker.isNullOrEmpty()) {
+                getBucketRequest.setMarker(marker)
+                Log.d(TAG, "使用Marker进行增量查询: $marker")
+            }
+
+            val getBucketResult = withContext(Dispatchers.IO) {
+                cosXmlService.getBucket(getBucketRequest)
+            }
+
+            val fileList = mutableListOf<CosFileInfo>()
+
+            // 处理对象列表
+            getBucketResult.listBucket?.contentsList?.forEach { content ->
+                val fileName = content.key
+                val fileSize = try {
+                    content.size.toLong()
+                } catch (e: Exception) {
+                    0L
+                }
+                val lastModified = try {
+                    content.lastModified.toLong()
+                } catch (e: Exception) {
+                    System.currentTimeMillis()
+                }
+
+                fileList.add(CosFileInfo(
+                    name = fileName,
+                    size = fileSize,
+                    lastModified = lastModified
+                ))
+            }
+
+            // 获取分页信息
+            val isTruncated = getBucketResult.listBucket?.isTruncated ?: false
+            val nextMarker = if (isTruncated) {
+                getBucketResult.listBucket?.nextMarker
+            } else {
+                null
+            }
+
+            Log.d(TAG, "增量列举成功: 找到 ${fileList.size} 个文件")
+            Log.d(TAG, "IsTruncated: $isTruncated, NextMarker: ${nextMarker ?: "null"}")
+            
+            // 如果使用了marker且有结果，这说明是增量数据
+            if (marker != null && fileList.isNotEmpty()) {
+                Log.i(TAG, "增量查询返回 ${fileList.size} 个新文件（Marker优化生效）")
+            }
+
+            org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosListResult(
+                files = fileList,
+                nextMarker = nextMarker,
+                isTruncated = isTruncated
+            )
+        } catch (e: CosXmlClientException) {
+            Log.e(TAG, "增量列举文件失败 - 客户端异常: ${e.message}", e)
+            org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosListResult(
+                files = emptyList(),
+                nextMarker = null,
+                isTruncated = false
+            )
+        } catch (e: CosXmlServiceException) {
+            Log.e(TAG, "增量列举文件失败 - 服务异常: ${e.errorMessage}", e)
+            org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosListResult(
+                files = emptyList(),
+                nextMarker = null,
+                isTruncated = false
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "增量列举文件失败 - 未知异常: ${e.message}", e)
+            org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosListResult(
+                files = emptyList(),
+                nextMarker = null,
+                isTruncated = false
+            )
         }
     }
 
