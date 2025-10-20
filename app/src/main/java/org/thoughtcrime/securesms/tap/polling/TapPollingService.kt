@@ -1015,7 +1015,7 @@ class TapPollingService(private val context: Context) {
                             taskInfo.metadata.providerType
                         )
                         channel?.let {
-                            channelManager.wupdateChannelSuccess(it.channelId)
+                            channelManager.updateChannelSuccess(it.channelId)
                             Log.v(TAG, "更新通道活跃时间: recipient=${taskInfo.recipientId}, messagesFound=${result.messagesFound}")
                         }
                     } catch (e: Exception) {
