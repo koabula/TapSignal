@@ -208,7 +208,7 @@ class AwsS3Client(private val config: CosConfig) : CosClient {
             val queryParams = mutableListOf(
                 "list-type=2",
                 "prefix=${prefix.encodeUtf8().utf8()}",
-                "delimiter=/",
+                // "delimiter=/",  // 注释掉：需要递归列举子目录（messages/和attachments/）中的文件
                 "max-keys=$maxKeys"
             )
             

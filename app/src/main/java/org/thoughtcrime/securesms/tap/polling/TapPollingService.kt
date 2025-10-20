@@ -787,9 +787,20 @@ class TapPollingService(private val context: Context) {
                                 )
                                 Log.d(TAG, "保存新marker: path=$basePath, marker=${nextMarker.take(20)}..., files=$fileCount")
                             } else if (fileCount > 0) {
-                                // 有文件但nextMarker为null → 真正到末尾了，清除marker
-                                markerCache.remove(markerKey)
-                                Log.v(TAG, "清除marker（已到末尾，有文件）: path=$basePath, files=$fileCount")
+                                // 有文件但nextMarker为null → 保存最后一个文件的key作为marker实现增量查询
+                                // 修复：不清除marker，而是使用字典序最大的文件key
+                                val lastFileKey = result.files?.maxByOrNull { it.path }?.path
+                                if (lastFileKey != null) {
+                                    markerCache[markerKey] = PathMarkerInfo(
+                                        marker = lastFileKey,
+                                        lastUpdateTime = System.currentTimeMillis(),
+                                        path = basePath
+                                    )
+                                    Log.d(TAG, "保存最后文件key作为marker: path=$basePath, marker=${lastFileKey.takeLast(50)}, files=$fileCount")
+                                } else {
+                                    Log.w(TAG, "无法获取最后文件key，清除marker: path=$basePath")
+                                    markerCache.remove(markerKey)
+                                }
                             } else if (marker != null) {
                                 // 使用了marker但没有新文件 → 保持marker并更新时间戳
                                 val existingMarkerInfo = markerCache[markerKey]
@@ -989,82 +1000,74 @@ class TapPollingService(private val context: Context) {
      * 
      * 优化：实现动态退避机制，连续空轮询时自动增加间隔
      */
-    private fun handlePollingResult(taskInfo: PollingTaskInfo, result: PollingExecutionResult) {
+    private suspend fun handlePollingResult(taskInfo: PollingTaskInfo, result: PollingExecutionResult) {
         when {
             result.isSuccess -> {
                 // 轮询成功
                 taskInfo.recordSuccess()
                 taskInfo.recordMessagesFound(result.messagesFound)
                 
-                // 动态退避：检查是否有新消息
+                // 更新通道活跃时间（如果有新消息）
                 if (result.messagesFound > 0) {
-                    // 有新消息：重置空轮询计数器，恢复正常间隔
-                    val emptyPollCount = taskInfo.consecutiveEmptyPolls.getAndSet(0)
-                    if (emptyPollCount > 0) {
-                        Log.d(TAG, "收到新消息，重置空轮询计数: recipient=${taskInfo.recipientId}, 之前连续空轮询=${emptyPollCount}次")
+                    try {
+                        val channel = channelManager.getActiveChannel(
+                            taskInfo.recipientId,
+                            taskInfo.metadata.providerType
+                        )
+                        channel?.let {
+                            channelManager.wupdateChannelSuccess(it.channelId)
+                            Log.v(TAG, "更新通道活跃时间: recipient=${taskInfo.recipientId}, messagesFound=${result.messagesFound}")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "更新通道活跃时间失败: recipient=${taskInfo.recipientId}", e)
                     }
-                    
-                    pollingLock.write {
-                        try {
-                            // 重新获取通道信息计算新间隔（此时lastActiveAt已更新）
-                            val channel = channelManager.getActiveChannel(
-                                taskInfo.recipientId,
-                                taskInfo.metadata.providerType
-                            )
-                            val newInterval = calculatePollingInterval(taskInfo.metadata, channel)
-                            val currentInterval = taskInfo.getCurrentInterval()
-                            
-                            if (newInterval != currentInterval) {
-                                Log.d(TAG, "收到消息后重新调整轮询间隔: recipient=${taskInfo.recipientId}, ${currentInterval}ms -> ${newInterval}ms")
-                                
-                                // 取消当前任务
-                                taskInfo.task?.cancel(false)
-                                
-                                // 更新间隔
-                                taskInfo.setCurrentInterval(newInterval)
-                                
-                                // 重新调度任务（立即执行，无延迟）
-                                val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
-                                taskInfo.task = newTask
+                }
+                
+                // 【新策略】无论有无新消息，都根据时间窗口重新计算轮询间隔
+                pollingLock.write {
+                    try {
+                        // 获取通道信息以获取最后活跃时间
+                        val channel = channelManager.getActiveChannel(
+                            taskInfo.recipientId,
+                            taskInfo.metadata.providerType
+                        )
+                        
+                        // 使用新的基于时间窗口的间隔计算
+                        val newInterval = calculatePollingIntervalByTimeWindow(channel)
+                        val currentInterval = taskInfo.getCurrentInterval()
+                        
+                        if (newInterval != currentInterval) {
+                            val windowDesc = if (channel != null) {
+                                val timeSinceLastMsg = System.currentTimeMillis() - channel.lastActiveAt
+                                TapPollingConstants.TimeBasedInterval.getWindowDescription(timeSinceLastMsg)
                             } else {
-                                Log.v(TAG, "轮询间隔无需调整: recipient=${taskInfo.recipientId}, interval=${currentInterval}ms")
+                                "无通道信息"
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "重新评估轮询间隔失败: recipient=${taskInfo.recipientId}", e)
-                        }
-                    }
-                } else {
-                    // 空轮询：增加计数器，可能触发动态退避
-                    val emptyPollCount = taskInfo.consecutiveEmptyPolls.incrementAndGet()
-                    
-                    if (emptyPollCount >= TapPollingConstants.PollingService.EMPTY_POLL_BACKOFF_THRESHOLD) {
-                        // 达到阈值，应用动态退避
-                        pollingLock.write {
-                            try {
-                                val currentInterval = taskInfo.getCurrentInterval()
-                                val backoffMultiplier = TapPollingConstants.PollingService.EMPTY_POLL_BACKOFF_MULTIPLIER
-                                val newInterval = (currentInterval * backoffMultiplier).toLong()
-                                    .coerceAtMost(TapPollingConstants.PollingService.MAX_EMPTY_POLL_INTERVAL_MS)
-                                
-                                if (newInterval != currentInterval) {
-                                    Log.d(TAG, "空轮询退避: recipient=${taskInfo.recipientId}, 连续空轮询=${emptyPollCount}次, ${currentInterval}ms -> ${newInterval}ms")
-                                    
-                                    // 取消当前任务
-                                    taskInfo.task?.cancel(false)
-                                    
-                                    // 更新间隔
-                                    taskInfo.setCurrentInterval(newInterval)
-                                    
-                                    // 重新调度任务
-                                    val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
-                                    taskInfo.task = newTask
-                                }
-                            } catch (e: Exception) {
-                                Log.w(TAG, "应用空轮询退避失败: recipient=${taskInfo.recipientId}", e)
+                            
+                            if (result.messagesFound > 0) {
+                                Log.d(TAG, "收到${result.messagesFound}条消息，调整轮询间隔: recipient=${taskInfo.recipientId}, ${currentInterval}ms -> ${newInterval}ms [$windowDesc]")
+                            } else {
+                                Log.d(TAG, "空轮询，根据时间窗口调整间隔: recipient=${taskInfo.recipientId}, ${currentInterval}ms -> ${newInterval}ms [$windowDesc]")
+                            }
+                            
+                            // 取消当前任务
+                            taskInfo.task?.cancel(false)
+                            
+                            // 更新间隔
+                            taskInfo.setCurrentInterval(newInterval)
+                            
+                            // 重新调度任务（立即执行，无延迟）
+                            val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
+                            taskInfo.task = newTask
+                        } else {
+                            if (result.messagesFound > 0) {
+                                Log.v(TAG, "收到消息但轮询间隔无需调整: recipient=${taskInfo.recipientId}, interval=${currentInterval}ms")
+                            } else {
+                                Log.v(TAG, "空轮询，间隔无需调整: recipient=${taskInfo.recipientId}, interval=${currentInterval}ms")
                             }
                         }
-                    } else {
-                        Log.v(TAG, "空轮询: recipient=${taskInfo.recipientId}, 连续=${emptyPollCount}次")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "重新评估轮询间隔失败: recipient=${taskInfo.recipientId}", e)
                     }
                 }
             }
@@ -1613,6 +1616,32 @@ class TapPollingService(private val context: Context) {
             timeDiffMs <= TapPollingConstants.ActivityThresholds.SUSPENDED_THRESHOLD_MS -> TransportActivityLevel.SUSPENDED
             else -> TransportActivityLevel.DORMANT
         }
+    }
+    
+    /**
+     * 基于时间窗口计算轮询间隔（新策略）
+     * 
+     * 根据距离最后一条消息的时间，采用阶梯式降级策略：
+     * - 5分钟内有消息：500ms快速轮询（活跃期）
+     * - 5-10分钟：10秒轮询（中等活跃期）
+     * - 10-20分钟：20秒轮询（低活跃期）
+     * - 20分钟-1小时：30秒轮询（静默期）
+     * - 1小时以上：1分钟轮询（长期静默期）
+     * 
+     * @param channel 传输通道信息，包含最后活跃时间
+     * @return 建议的轮询间隔（毫秒）
+     */
+    private fun calculatePollingIntervalByTimeWindow(channel: TransportChannel?): Long {
+        if (channel == null) {
+            // 没有通道信息，使用默认的低频轮询
+            return TapPollingConstants.TimeBasedInterval.SILENT_INTERVAL_MS
+        }
+        
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastMessage = currentTime - channel.lastActiveAt
+        
+        // 使用TapPollingConstants中的阶梯式间隔计算
+        return TapPollingConstants.TimeBasedInterval.calculateInterval(timeSinceLastMessage)
     }
     
     /**

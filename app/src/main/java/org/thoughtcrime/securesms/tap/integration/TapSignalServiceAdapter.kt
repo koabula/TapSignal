@@ -469,7 +469,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             val basePath = sendMetadata.path
             
             // 构建与消息路由完全一致的TAP通道路径
-            val attachmentFileName = "${messageId}_${timestamp}.dat"
+            // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
+            val attachmentFileName = "${timestamp}_${messageId}.dat"
             val fullTapPath = "${basePath}attachments/$attachmentFileName"
             
             // 存储路径映射，供buildTransportMessage使用
@@ -658,7 +659,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                     ?: "/v2-channels/${recipient.requireAci()}/outbox/"
                 val fallbackTimestamp = globalTimestamp ?: System.currentTimeMillis()
                 val fallbackMessageId = globalMessageId ?: org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId()
-                "${basePath}attachments/${fallbackMessageId}_${fallbackTimestamp}.dat"
+                // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
+                "${basePath}attachments/${fallbackTimestamp}_${fallbackMessageId}.dat"
             }
             
             org.thoughtcrime.securesms.tap.TransportAttachment(

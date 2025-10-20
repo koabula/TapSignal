@@ -1,24 +1,197 @@
 --------- beginning of main
+2025-10-20 13:11:06.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.91%]
+2025-10-20 13:11:06.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:06.508 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:06.510 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:06.522 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:06.523 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:06.810 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.92%]
+2025-10-20 13:11:06.816 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.037 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:07.039 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.047 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.048 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:07.310 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.94%]
+2025-10-20 13:11:07.315 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.504 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:07.506 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.515 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:07.516 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:07.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.95%]
+2025-10-20 13:11:07.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.029 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:08.032 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.039 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.039 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:08.308 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.96%]
+2025-10-20 13:11:08.314 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.507 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:08.510 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.520 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:08.520 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:08.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.97%]
+2025-10-20 13:11:08.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.028 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:09.034 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.043 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.044 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:09.308 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.98%]
+2025-10-20 13:11:09.313 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.500 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:09.502 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.509 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:09.509 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:09.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.99%]
+2025-10-20 13:11:09.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
 --------- beginning of system
-2025-10-14 20:20:10.194 28077-28115 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1760444410193 | timestamp=1760444410193
-2025-10-14 20:20:10.343 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444410342
-2025-10-14 20:20:10.391 28077-28115 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1760444410193 | timestamp=1760444410361
-2025-10-14 20:20:10.408 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444410365
-2025-10-14 20:20:10.425 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444410381
-2025-10-14 20:20:10.428 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444410392
-2025-10-14 20:20:10.428 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158015 | timestamp=1760444410408
-2025-10-14 20:20:10.445 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444142061 | timestamp=1760444410441
-2025-10-14 20:20:10.693 28077-28115 CosTransportProvider    org.thoughtcrime.securesms           D  [TapTimeTest] T3_UPLOAD_END | msgId=1760444410193 | timestamp=1760444410693
-2025-10-14 20:20:10.842 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444410841
-2025-10-14 20:20:10.858 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444410856
-2025-10-14 20:20:10.863 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444410862
-2025-10-14 20:20:10.870 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444410869
-2025-10-14 20:20:10.882 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158015 | timestamp=1760444410882
-2025-10-14 20:20:10.902 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444142061 | timestamp=1760444410901
+2025-10-20 13:11:10.020 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:10.022 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:10.029 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:10.030 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:10.306 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.00%]
+2025-10-20 13:11:10.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:10.505 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:10.507 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:10.515 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:10.515 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:10.808 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.01%]
+2025-10-20 13:11:10.813 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.034 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:11.036 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.046 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.046 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:11.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.02%]
+2025-10-20 13:11:11.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.507 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:11.510 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.516 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:11.516 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:11.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.03%]
+2025-10-20 13:11:11.812 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
 --------- beginning of kernel
-2025-10-14 20:20:16.775 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444410193 | timestamp=1760444416775
-2025-10-14 20:20:16.784 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444252416 | timestamp=1760444416784
-2025-10-14 20:20:16.793 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444182420 | timestamp=1760444416789
-2025-10-14 20:20:16.796 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444170092 | timestamp=1760444416796
-2025-10-14 20:20:16.809 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444158015 | timestamp=1760444416808
-2025-10-14 20:20:16.828 28077-28115 TapTimeTest             org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1760444142061 | timestamp=1760444416826
+2025-10-20 13:11:12.023 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:12.025 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:12.030 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:12.031 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:12.306 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.04%]
+2025-10-20 13:11:12.311 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:12.605 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:12.607 18057-18219 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:12.615 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:12.617 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:12.806 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.05%]
+2025-10-20 13:11:12.812 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.022 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:13.023 18057-18219 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.031 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.032 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:13.114  1025-1025  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=515.97266, y[0]=1863.9404, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=12661620, downTime=12661620, deviceId=4, source=0x5002, displayId=0, eventId=204384705 }
+2025-10-20 13:11:13.149  1025-1025  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=515.97266, y[0]=1863.9404, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=12661656, downTime=12661620, deviceId=4, source=0x5002, displayId=0, eventId=936304581 }
+2025-10-20 13:11:13.306 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.06%]
+2025-10-20 13:11:13.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.501 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:13.503 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.512 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:13.512 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:13.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.07%]
+2025-10-20 13:11:13.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.022 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:14.023 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.032 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.032 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:14.307 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.07%]
+2025-10-20 13:11:14.311 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.513 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:14.514 18057-18219 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.524 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.525 18057-18219 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:14.538  1025-1025  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=992.9551, y[0]=1420.8984, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=12663044, downTime=12663044, deviceId=4, source=0x5002, displayId=0, eventId=544792514 }
+2025-10-20 13:11:14.620  1025-1025  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=992.9551, y[0]=1420.8984, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=12663126, downTime=12663044, deviceId=4, source=0x5002, displayId=0, eventId=222094804 }
+2025-10-20 13:11:14.627 18057-18092 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1760937074627 | timestamp=1760937074627
+2025-10-20 13:11:14.699 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-10-20 13:11:14.736 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-10-20 13:11:14.737 18057-18092 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=3503
+2025-10-20 13:11:14.738 18057-18092 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=3503, recipient=RecipientId::4
+2025-10-20 13:11:14.759 18057-18092 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=3503
+2025-10-20 13:11:14.780 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=3503, recipient=RecipientId::4
+2025-10-20 13:11:14.806 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=3503
+2025-10-20 13:11:14.807 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=3503
+2025-10-20 13:11:14.808 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=3503, recipient=RecipientId::4
+2025-10-20 13:11:14.809 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientAci=********-****-****-****-*********461
+2025-10-20 13:11:14.812 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider
+2025-10-20 13:11:14.813 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
+2025-10-20 13:11:14.813 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
+2025-10-20 13:11:14.817 18057-18224 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.08%]
+2025-10-20 13:11:14.847 18057-18224 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:14.914 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=105
+2025-10-20 13:11:14.919 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=3503, ciphertextLength=105
+2025-10-20 13:11:14.920 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1760937074627 | timestamp=1760937074910
+2025-10-20 13:11:14.930 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********453
+2025-10-20 13:11:14.935 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-10-20 13:11:14.938 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-10-20 13:11:14.938 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-10-20 13:11:14.939 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-10-20 13:11:14.955 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
+2025-10-20 13:11:14.959 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1760937002208, status=FULL_ACTIVE, provider=cos
+2025-10-20 13:11:14.963 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-10-20 13:11:15.134 18057-18224 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:15.135 18057-18224 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:15.150 18057-18224 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:15.150 18057-18224 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:15.262 18057-18092 CosTransportProvider    org.thoughtcrime.securesms           D  [TapTimeTest] T3_UPLOAD_END | msgId=1760937074627 | timestamp=1760937075260
+2025-10-20 13:11:15.267 18057-18092 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1760937002208
+2025-10-20 13:11:15.268 18057-18092 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-20 13:11:15.277 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********453
+2025-10-20 13:11:15.278 18057-18092 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=3503
+2025-10-20 13:11:15.278 18057-18092 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=3503, path=/v2-channels/053abb43f297ee1d/outbox/messages/********-****-****-****-*********453_1760937075017.dat
+2025-10-20 13:11:15.278 18057-18092 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=3503, method=TAP_TRANSPORT, path=/v2-channels/053abb43f297ee1d/outbox/messages/********-****-****-****-*********453_1760937075017.dat
+2025-10-20 13:11:15.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.09%]
+2025-10-20 13:11:15.320 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:15.567 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:15.570 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:15.578 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:15.578 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:15.806 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.10%]
+2025-10-20 13:11:15.810 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.002 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:16.004 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.012 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.012 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:16.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.11%]
+2025-10-20 13:11:16.312 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.508 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:16.512 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.541 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:16.543 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:16.806 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.12%]
+2025-10-20 13:11:16.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.021 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:17.023 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.030 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.034 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:17.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.12%]
+2025-10-20 13:11:17.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.523 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:17.525 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.533 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:17.533 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:17.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.13%]
+2025-10-20 13:11:17.812 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.040 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:18.043 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.050 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.050 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:18.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.14%]
+2025-10-20 13:11:18.313 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.513 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:18.515 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.526 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:18.527 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:18.807 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.15%]
+2025-10-20 13:11:18.811 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:19.004 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  清除marker（已到末尾，有文件）: path=/v2-channels/a3adde1ba3b08264/outbox/, files=17
+2025-10-20 13:11:19.007 18057-18221 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:19.016 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-20 13:11:19.017 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
+2025-10-20 13:11:19.307 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=99.15%]
+2025-10-20 13:11:19.311 18057-18221 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/a3adde1ba3b08264/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461

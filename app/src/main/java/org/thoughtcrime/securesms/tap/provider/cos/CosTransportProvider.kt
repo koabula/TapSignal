@@ -109,7 +109,8 @@ class CosTransportProvider(
                         else -> "messages" // TEXT_MESSAGE, CONTROL_MESSAGE, RATCHET_UPDATE, CALL_MESSAGE
                     }
                     val fullPath = "${basePath}${messageTypePath}/"
-                    val remotePath = "${fullPath}${message.messageId}_${System.currentTimeMillis()}.dat"
+                    // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
+                    val remotePath = "${fullPath}${System.currentTimeMillis()}_${message.messageId}.dat"
                     
                     Log.d(TAG, "v2-channels路径: messageType=${message.messageType}, path=$fullPath")
                     
@@ -1645,7 +1646,8 @@ class CosTransportProvider(
         val name = fileInfo.name.lowercase()
         // COS使用.dat作为消息文件扩展名
         return name.endsWith(".dat") && 
-               name.matches(Regex("^[a-zA-Z0-9_-]+_\\d+\\.dat$")) && // 基本格式验证
+               (name.matches(Regex("^\\d+_[a-zA-Z0-9_-]+\\.dat$")) || // 新格式: timestamp_messageId.dat
+                name.matches(Regex("^[a-zA-Z0-9_-]+_\\d+\\.dat$"))) && // 旧格式兼容: messageId_timestamp.dat
                fileInfo.size > 0 && fileInfo.size < 50 * 1024 * 1024 // 大小限制50MB
     }
     
@@ -1654,22 +1656,42 @@ class CosTransportProvider(
      */
     override fun parseMessageFileName(fileName: String): MessageFileInfo? {
         return try {
-            // COS使用格式: senderId_messageId_timestamp.dat
             val baseName = fileName.substringBeforeLast('.')
             val parts = baseName.split('_')
             
-            when (parts.size) {
-                3 -> {
-                    // senderId_messageId_timestamp格式（COS标准格式）
+            // 判断是新格式还是旧格式
+            val isNewFormat = parts.firstOrNull()?.all { it.isDigit() } == true
+            
+            when {
+                // 新格式: timestamp_messageId.dat (2段，时间戳在前)
+                parts.size == 2 && isNewFormat -> {
+                    MessageFileInfo(
+                        messageId = parts[1],
+                        timestamp = parts[0].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = "",  // 从路径推断
+                        recipientId = "" // 从路径推断
+                    )
+                }
+                // 旧格式: messageId_timestamp.dat (2段，时间戳在后) - 向后兼容
+                parts.size == 2 && !isNewFormat -> {
+                    MessageFileInfo(
+                        messageId = parts[0],
+                        timestamp = parts[1].toLongOrNull() ?: System.currentTimeMillis(),
+                        senderId = "",
+                        recipientId = ""
+                    )
+                }
+                // 旧格式: senderId_messageId_timestamp.dat (3段)
+                parts.size == 3 -> {
                     MessageFileInfo(
                         messageId = parts[1],
                         timestamp = parts[2].toLongOrNull() ?: System.currentTimeMillis(),
                         senderId = parts[0],
-                        recipientId = "" // COS文件名中不包含recipientId，从路径推断
+                        recipientId = ""
                     )
                 }
-                4 -> {
-                    // senderId_recipientId_messageId_timestamp格式（扩展格式）
+                // 旧格式: senderId_recipientId_messageId_timestamp.dat (4段)
+                parts.size == 4 -> {
                     MessageFileInfo(
                         messageId = parts[2],
                         timestamp = parts[3].toLongOrNull() ?: System.currentTimeMillis(),

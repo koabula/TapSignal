@@ -374,7 +374,7 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
 
             val getBucketRequest = GetBucketRequest(config.bucketName)
             getBucketRequest.setPrefix(prefix)
-            getBucketRequest.setDelimiter("/")
+            // getBucketRequest.setDelimiter("/")  // 注释掉：需要递归列举子目录（messages/和attachments/）中的文件
             getBucketRequest.setMaxKeys(maxKeys.toLong())
             
             // 设置marker实现增量查询 - 只返回marker之后的文件

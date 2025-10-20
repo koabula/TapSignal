@@ -241,7 +241,8 @@ data class FileInfo(
             size: Long,
             etag: String? = null
         ): FileInfo {
-            val fileName = "${messageId}_${timestamp}.dat"
+            // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
+            val fileName = "${timestamp}_${messageId}.dat"
             val fullPath = if (path.endsWith("/")) "${path}${fileName}" else "${path}/${fileName}"
             
             return FileInfo(

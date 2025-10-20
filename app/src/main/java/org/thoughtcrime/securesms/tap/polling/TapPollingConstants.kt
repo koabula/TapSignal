@@ -54,9 +54,10 @@ object TapPollingConstants {
     // ==================== 活跃度级别配置 ====================
     
     /**
-     * 传输活跃度判断阈值
+     * 传输活跃度判断阈值（已废弃，使用TimeBasedInterval代替）
      * 基于最后活动时间划分活跃度级别
      */
+    @Deprecated("使用TimeBasedInterval代替")
     object ActivityThresholds {
         const val ACTIVE_THRESHOLD_MS = 5 * 60 * 1000L           // 5分钟内视为活跃
         const val INACTIVE_THRESHOLD_MS = 60 * 60 * 1000L        // 1小时内视为非活跃
@@ -66,14 +67,72 @@ object TapPollingConstants {
     }
     
     /**
-     * 活跃度级别对应的基础间隔倍数
+     * 活跃度级别对应的基础间隔倍数（已废弃，使用TimeBasedInterval代替）
      */
+    @Deprecated("使用TimeBasedInterval代替")
     object ActivityMultipliers {
         const val ACTIVE_MULTIPLIER = 1.0        // 活跃级别：标准频率
         const val INACTIVE_MULTIPLIER = 1.5      // 非活跃：降低33%频率
         const val BACKGROUND_MULTIPLIER = 2.0    // 后台：降低50%频率
         const val SUSPENDED_MULTIPLIER = 4.0     // 暂停：降低75%频率
         const val DORMANT_MULTIPLIER = 8.0       // 休眠：降低87.5%频率
+    }
+    
+    /**
+     * 基于时间窗口的阶梯式轮询间隔配置
+     * 
+     * 新的轮询策略：根据距离最后一条消息的时间，采用阶梯式降级
+     * - 活跃期（最近有消息）：快速轮询，尽快发现新消息
+     * - 静默期（较长时间无消息）：降低频率，节省资源
+     */
+    object TimeBasedInterval {
+        // 活跃期：最近有消息时的快速轮询
+        const val ACTIVE_WINDOW_MS = 5 * 60 * 1000L               // 5分钟内有消息视为活跃期
+        const val ACTIVE_INTERVAL_MS = 500L                       // 活跃期轮询间隔：500ms（快速响应）
+        
+        // 第一级降级：中等活跃期
+        const val MEDIUM_ACTIVE_WINDOW_MS = 10 * 60 * 1000L       // 10分钟内有消息
+        const val MEDIUM_ACTIVE_INTERVAL_MS = 10000L              // 10秒轮询
+        
+        // 第二级降级：低活跃期
+        const val LOW_ACTIVE_WINDOW_MS = 20 * 60 * 1000L          // 20分钟内有消息
+        const val LOW_ACTIVE_INTERVAL_MS = 20000L                 // 20秒轮询
+        
+        // 第三级降级：静默期
+        const val SILENT_INTERVAL_MS = 30000L                     // 30秒轮询（超过20分钟无消息）
+        
+        // 第四级降级：长期静默期（可选）
+        const val DORMANT_WINDOW_MS = 60 * 60 * 1000L             // 1小时内有消息
+        const val DORMANT_INTERVAL_MS = 60000L                    // 1分钟轮询（超过1小时无消息）
+        
+        /**
+         * 根据距离最后活跃时间计算轮询间隔
+         * 
+         * @param timeSinceLastMessage 距离最后一条消息的时间（毫秒）
+         * @return 应该使用的轮询间隔（毫秒）
+         */
+        fun calculateInterval(timeSinceLastMessage: Long): Long {
+            return when {
+                timeSinceLastMessage <= ACTIVE_WINDOW_MS -> ACTIVE_INTERVAL_MS
+                timeSinceLastMessage <= MEDIUM_ACTIVE_WINDOW_MS -> MEDIUM_ACTIVE_INTERVAL_MS
+                timeSinceLastMessage <= LOW_ACTIVE_WINDOW_MS -> LOW_ACTIVE_INTERVAL_MS
+                timeSinceLastMessage <= DORMANT_WINDOW_MS -> SILENT_INTERVAL_MS
+                else -> DORMANT_INTERVAL_MS
+            }
+        }
+        
+        /**
+         * 获取时间窗口描述（用于日志）
+         */
+        fun getWindowDescription(timeSinceLastMessage: Long): String {
+            return when {
+                timeSinceLastMessage <= ACTIVE_WINDOW_MS -> "活跃期(<5min)"
+                timeSinceLastMessage <= MEDIUM_ACTIVE_WINDOW_MS -> "中等活跃期(<10min)"
+                timeSinceLastMessage <= LOW_ACTIVE_WINDOW_MS -> "低活跃期(<20min)"
+                timeSinceLastMessage <= DORMANT_WINDOW_MS -> "静默期(<1h)"
+                else -> "长期静默期(>1h)"
+            }
+        }
     }
     
     // ==================== 错误处理配置 ====================
@@ -153,9 +212,12 @@ object TapPollingConstants {
         // 并发下载配置
         const val MAX_CONCURRENT_DOWNLOADS = 4          // 最大并发下载数量: 4个
         
-        // 动态退避配置
+        // 动态退避配置（已废弃，使用TimeBasedInterval代替）
+        @Deprecated("已改用基于时间窗口的阶梯式降级策略，参见TimeBasedInterval")
         const val EMPTY_POLL_BACKOFF_THRESHOLD = 3      // 连续空轮询阈值: 3次
+        @Deprecated("已改用基于时间窗口的阶梯式降级策略，参见TimeBasedInterval")
         const val EMPTY_POLL_BACKOFF_MULTIPLIER = 1.5   // 空轮询退避倍数: 1.5x
+        @Deprecated("已改用基于时间窗口的阶梯式降级策略，参见TimeBasedInterval")
         const val MAX_EMPTY_POLL_INTERVAL_MS = 10000L   // 空轮询最大间隔: 10秒
     }
     
