@@ -261,9 +261,77 @@ class CosTransportProvider(
             }
         }
     }
+    
+    /**
+     * 列出指定路径下的文件（支持增量查询）
+     * 
+     * 使用marker机制实现增量查询，显著减少网络传输和处理时间
+     */
+    override suspend fun listFilesWithMarker(
+        path: String,
+        metadata: TransportMetadata,
+        marker: String?,
+        maxKeys: Int
+    ): TransportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "增量列举文件: path=$path, marker=${marker ?: "null"}, recipientId=${metadata.recipientId}")
+                
+                // 验证元数据类型
+                val cosMetadata = metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                    ?: return@withContext TransportResult.failure(
+                        TransportError.INVALID_FORMAT,
+                        false,
+                        "元数据不是COS类型"
+                    )
+
+                // 获取接收元数据（使用对端凭证和存储）
+                val receiveMetadata = cosMetadata.getReceiveMetadata()
+                
+                // 创建COS客户端（使用接收元数据）
+                val cosClient = createCosClientForReceive(cosMetadata)
+                    ?: return@withContext TransportResult.failure(
+                        TransportError.PROVIDER_UNAVAILABLE,
+                        true,
+                        "无法创建COS客户端"
+                    )
+
+                // 使用marker进行增量列举
+                val listResult = cosClient.listFilesWithMarker(path, marker, maxKeys)
+                
+                // 转换为FileInfo列表
+                val fileInfos = listResult.files.map { cosFile ->
+                    FileInfo(
+                        name = cosFile.name.substringAfterLast('/'), // 只取文件名部分
+                        path = cosFile.name, // cosFile.name已经是完整的对象key路径，无需拼接
+                        size = cosFile.size,
+                        lastModified = cosFile.lastModified,
+                        etag = null, // CosFileInfo中暂无etag字段，保持null
+                        mimeType = "application/octet-stream"
+                    )
+                }.filter { it.isMessageFile() } // 只返回消息文件
+                
+                Log.d(TAG, "增量查询找到文件数量: ${fileInfos.size}, nextMarker=${listResult.nextMarker ?: "null"}")
+                
+                // 返回包含marker信息的结果
+                TransportResult.success(
+                    files = fileInfos,
+                    metadata = mapOf(
+                        "nextMarker" to (listResult.nextMarker ?: ""),
+                        "isTruncated" to listResult.isTruncated,
+                        "hasMore" to (listResult.nextMarker != null)
+                    )
+                )
+
+            } catch (e: Exception) {
+                Log.e(TAG, "增量列举文件时发生异常: path=${LogSanitizer.sanitize(path, "path")}, marker=${marker?.let { LogSanitizer.sanitize(it, "marker") } ?: "null"}, recipientId=${LogSanitizer.sanitize(metadata.recipientId, "recipientId")}, error=${LogSanitizer.sanitizeThrowable(e)}")
+                TransportResult.fromException(e, true)
+            }
+        }
+    }
 
     /**
-     * 下载指定文件
+     * 下载指定文件（优化版本：直接下载到内存，避免临时文件I/O）
      */
     override suspend fun downloadFile(fileInfo: FileInfo, metadata: TransportMetadata): TransportResult {
         return withContext(Dispatchers.IO) {
@@ -286,29 +354,19 @@ class CosTransportProvider(
                         "无法创建接收COS客户端"
                     )
 
-                // 下载文件
-                val tempFile = File.createTempFile("cos_download_", ".dat", context.cacheDir)
+                // 优化：直接下载到内存，跳过临时文件I/O
+                val data = cosClient.downloadFileToMemory(fileInfo.path)
                 
-                try {
-                    val downloadSuccess = cosClient.downloadFile(fileInfo.path, tempFile)
-                    
-                    if (downloadSuccess && tempFile.exists()) {
-                        val data = tempFile.readBytes()
-                        Log.d(TAG, "文件下载成功: ${fileInfo.name}")
-                        TransportResult.success(data)
-                    } else {
-                        Log.e(TAG, "文件下载失败: ${fileInfo.name}")
-                        TransportResult.failure(
-                            TransportError.NETWORK_ERROR,
-                            true,
-                            "文件下载失败"
-                        )
-                    }
-                } finally {
-                    // 清理临时文件
-                    if (tempFile.exists()) {
-                        tempFile.delete()
-                    }
+                if (data != null && data.isNotEmpty()) {
+                    Log.d(TAG, "文件下载成功: ${fileInfo.name}, 大小=${data.size} bytes")
+                    TransportResult.success(data)
+                } else {
+                    Log.e(TAG, "文件下载失败: ${fileInfo.name}")
+                    TransportResult.failure(
+                        TransportError.NETWORK_ERROR,
+                        true,
+                        "文件下载失败"
+                    )
                 }
 
             } catch (e: Exception) {
