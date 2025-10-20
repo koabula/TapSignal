@@ -149,14 +149,6 @@ object TapPollingConstants {
         
         // 内存管理配置
         const val MAX_FILE_FAILURE_RECORDS = 500        // 最大文件失败记录数量
-        
-        // 并发下载配置
-        const val MAX_CONCURRENT_DOWNLOADS = 4          // 最大并发下载数量: 4个
-        
-        // 动态退避配置
-        const val EMPTY_POLL_BACKOFF_THRESHOLD = 3      // 连续空轮询阈值: 3次
-        const val EMPTY_POLL_BACKOFF_MULTIPLIER = 1.5   // 空轮询退避倍数: 1.5x
-        const val MAX_EMPTY_POLL_INTERVAL_MS = 10000L   // 空轮询最大间隔: 10秒
     }
     
     // ==================== Token管理配置 ====================

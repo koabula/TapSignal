@@ -61,11 +61,6 @@ class TapPollingService(private val context: Context) {
     // 轮询状态缓存，避免每次读数据库
     private val pollingStateCache = ConcurrentHashMap<String, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState>()
     
-    // Marker缓存：用于增量查询优化
-    // Key格式: "recipientId:providerType:path"
-    // Value: PathMarkerInfo包含该路径的marker和更新时间
-    private val markerCache = ConcurrentHashMap<String, PathMarkerInfo>()
-    
     // 轮询任务管理
     // 使用复合key: 私聊使用 recipientId，群聊使用 groupId:recipientId
     private val pollingTasks = ConcurrentHashMap<String, PollingTaskInfo>()
@@ -514,9 +509,6 @@ class TapPollingService(private val context: Context) {
                     val cacheKey = "${recipientId}_${providerType}"
                     pollingStateCache.remove(cacheKey)
                     
-                    // 清理marker缓存
-                    clearMarkersForRecipient(recipientId, providerType)
-                    
                     removedCount++
                 }
                 
@@ -590,8 +582,7 @@ class TapPollingService(private val context: Context) {
             (Math.random() * TapPollingConstants.PollingService.INITIAL_DELAY_JITTER_MAX_MS).toLong()
         }
         
-        // 使用scheduleAtFixedRate确保固定轮询频率，避免执行时间累积导致间隔延长
-        return pollingExecutor?.scheduleAtFixedRate(
+        return pollingExecutor?.scheduleWithFixedDelay(
             { executePollingTask(taskInfo) },
             initialDelayMs,
             taskInfo.getCurrentInterval(),
@@ -726,9 +717,7 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
-     * 执行基于文件操作的轮询（支持增量查询优化）
-     * 
-     * 优化：合并messages和attachments目录的查询为一次请求，减少网络往返
+     * 执行基于文件操作的轮询
      */
     private suspend fun performFileBasedPolling(
         provider: TransportProvider,
@@ -736,102 +725,34 @@ class TapPollingService(private val context: Context) {
         pollingState: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.PollingState?
     ): FilePollingResult {
         return try {
-            // 优化：直接查询basePath，而不是分别查询messages/和attachments/
-            // 这样只需一次网络请求，将延迟从~400ms降低到~200ms
+            // 获取基础路径并构建messages和attachments轮询路径
             val basePath = taskInfo.metadata.getReceiveMetadata().path
+            val pollingPaths = listOf(
+                "${basePath}messages/",
+                "${basePath}attachments/"
+            )
             
-            Log.v(TAG, "轮询路径: $basePath (合并查询), recipient: ${taskInfo.recipientId}")
+            Log.v(TAG, "轮询路径: ${pollingPaths.joinToString(", ")}, recipient: ${taskInfo.recipientId}")
             
             val allFiles = mutableListOf<FileInfo>()
             val processedFiles = pollingState?.processedFiles ?: emptySet()
             
-            // 生成marker缓存key（使用basePath而不是子目录）
-            val markerKey = "${taskInfo.recipientId}:${taskInfo.metadata.providerType}:${basePath}"
-            
-            // 获取上次的marker（如果存在）
-            val cachedMarkerInfo = markerCache[markerKey]
-            val marker = if (cachedMarkerInfo != null && !cachedMarkerInfo.isExpired()) {
-                Log.d(TAG, "使用缓存的marker进行增量查询: path=$basePath, ${cachedMarkerInfo.getSummary()}")
-                cachedMarkerInfo.marker
-            } else {
-                if (cachedMarkerInfo != null) {
-                    Log.d(TAG, "Marker已过期，重置为全量查询: path=$basePath")
-                    markerCache.remove(markerKey)
-                }
-                null // marker不存在或已过期，执行全量查询
-            }
-            
-            // 单次网络请求获取所有文件
-            val listResult = try {
-                withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
+            // 轮询所有路径
+            for (path in pollingPaths) {
+                val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
                     errorHandler.executeWithRetry({
-                        // 使用增量查询API - 查询basePath获取所有子文件
-                        val result = provider.listFilesWithMarker(
-                            path = basePath,
-                            metadata = taskInfo.metadata,
-                            marker = marker,
-                            maxKeys = 1000
-                        )
-                        
-                        // 保存返回的nextMarker（如果有）
-                        if (result is TransportResult.Success && result.metadata != null) {
-                            val nextMarker = result.metadata["nextMarker"] as? String
-                            val fileCount = result.files?.size ?: 0
-                            
-                            if (!nextMarker.isNullOrEmpty()) {
-                                // 有nextMarker，保存用于下次增量查询
-                                markerCache[markerKey] = PathMarkerInfo(
-                                    marker = nextMarker,
-                                    lastUpdateTime = System.currentTimeMillis(),
-                                    path = basePath
-                                )
-                                Log.d(TAG, "保存新marker: path=$basePath, marker=${nextMarker.take(20)}..., files=$fileCount")
-                            } else if (fileCount > 0) {
-                                // 有文件但nextMarker为null → 真正到末尾了，清除marker
-                                markerCache.remove(markerKey)
-                                Log.v(TAG, "清除marker（已到末尾，有文件）: path=$basePath, files=$fileCount")
-                            } else if (marker != null) {
-                                // 使用了marker但没有新文件 → 保持marker并更新时间戳
-                                val existingMarkerInfo = markerCache[markerKey]
-                                if (existingMarkerInfo != null) {
-                                    markerCache[markerKey] = PathMarkerInfo(
-                                        marker = existingMarkerInfo.marker,
-                                        lastUpdateTime = System.currentTimeMillis(),
-                                        path = basePath
-                                    )
-                                    Log.v(TAG, "目录为空，刷新marker时间戳: path=$basePath")
-                                }
-                            }
-                        }
-                        
-                        result
+                        provider.listFiles(path, taskInfo.metadata)
                     }, ErrorContext(
                         providerType = taskInfo.metadata.providerType,
-                        operationType = "listFilesWithMarker",
+                        operationType = "listFiles",
                         targetId = taskInfo.recipientId,
                         channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
-                        metadata = mapOf(
-                            "pollingPath" to basePath,
-                            "useMarker" to (marker != null)
-                        )
+                        metadata = mapOf("pollingPath" to path)
                     ))
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "listFilesWithMarker失败: path=$basePath, recipient=${taskInfo.recipientId}", e)
-                TransportResult.failure(TransportError.NETWORK_ERROR, true, "增量列举文件失败")
-            }
-            
-            // 收集文件列表（过滤只保留messages/和attachments/子目录的文件）
-            if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
-                // 只保留messages/和attachments/目录下的文件
-                val filteredFiles = listResult.files.filter { file ->
-                    val path = file.path.lowercase()
-                    path.contains("/messages/") || path.contains("/attachments/")
-                }
-                allFiles.addAll(filteredFiles)
                 
-                if (filteredFiles.size < listResult.files.size) {
-                    Log.v(TAG, "过滤后文件数: ${filteredFiles.size}/${listResult.files.size}")
+                if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
+                    allFiles.addAll(listResult.files)
                 }
             }
             
@@ -840,10 +761,7 @@ class TapPollingService(private val context: Context) {
                 return FilePollingResult.success(emptySet(), 0)
             }
             
-            // 修复排序：使用文件名中的timestamp而不是lastModified
-            // 原因：COS的lastModified是上传时间，可能不准确
-            // 文件名格式：senderId_messageId_timestamp.dat
-            val sortedFiles = sortFilesByMessageTimestamp(allFiles)
+            val sortedFiles = FileInfo.sortByTime(allFiles, ascending = true)
             
             val newFiles = sortedFiles.filter { file ->
                 !processedFiles.contains(file.name) && 
@@ -864,95 +782,67 @@ class TapPollingService(private val context: Context) {
             var messagesProcessed = 0
             val newProcessedFiles = mutableSetOf<String>()
             
-            // 优化：使用并发下载，设置并发限制为4，避免过多并发请求
-            val maxConcurrentDownloads = TapPollingConstants.PollingService.MAX_CONCURRENT_DOWNLOADS
-            
-            // 将文件分组，每组最多maxConcurrentDownloads个文件
-            newFiles.chunked(maxConcurrentDownloads).forEach { fileChunk ->
-                // 并发下载一组文件
-                val downloadResults = coroutineScope {
-                    fileChunk.map { file ->
-                        async {
-                            try {
-                                val downloadResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
-                                    errorHandler.executeWithRetry({
-                                        provider.downloadFile(file, taskInfo.metadata)
-                                    }, ErrorContext(
-                                        providerType = taskInfo.metadata.providerType,
-                                        operationType = "downloadFile",
-                                        targetId = taskInfo.recipientId,
-                                        channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
-                                        metadata = mapOf("fileName" to file.name)
-                                    ))
-                                }
-                                
-                                Pair(file, downloadResult)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "下载文件时发生异常: ${file.name}", e)
-                                Pair(file, null)
-                            }
-                        }
-                    }.awaitAll()
-                }
-                
-                // 处理下载结果（保持串行处理以维持消息顺序）
-                for ((file, downloadResult) in downloadResults) {
-                    try {
-                        if (downloadResult is TransportResult.Success && downloadResult.data != null) {
-                            // 基于路径区分文件类型，只解析消息文件
-                            if (file.isInMessagesDirectory()) {
-                                val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
-                                if (message != null) {
-                                    Log.d(TAG, "[TapTimeTest] T5_DOWNLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
-                                    val processResult = messageProcessor.processTapTransportMessage(message)
-                                    if (processResult is TapProcessResult.Success) {
-                                        messagesProcessed++
-                                        // 仅在成功处理消息后标记文件已处理
-                                        newProcessedFiles.add(file.name)
-                                        // 清除失败记录（如果存在）
-                                        clearFileProcessingFailure(file.name, taskInfo.recipientId)
-                                        Log.d(TAG, "消息处理成功: ${file.name}")
-                                    } else {
-                                        // 消息处理失败，记录失败并判断是否可重试
-                                        val error = (processResult as? TapProcessResult.Failed)?.error ?: "Unknown processing error"
-                                        val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, error)
-                                        if (!shouldRetry) {
-                                            // 超过重试次数，标记为已处理避免无限重试
-                                            newProcessedFiles.add(file.name)
-                                            Log.w(TAG, "消息处理失败超过重试次数，跳过: ${file.name}")
-                                        } else {
-                                            Log.w(TAG, "消息处理失败，将重试: ${file.name}, error=$error")
-                                        }
-                                    }
-                                } else {
-                                    // 消息文件解析失败，记录失败信息
+            for (file in newFiles) {
+                try {
+                    val downloadResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
+                        errorHandler.executeWithRetry({
+                            provider.downloadFile(file, taskInfo.metadata)
+                        }, ErrorContext(
+                            providerType = taskInfo.metadata.providerType,
+                            operationType = "downloadFile",
+                            targetId = taskInfo.recipientId,
+                            channelId = "${taskInfo.metadata.providerType}:${taskInfo.recipientId}",
+                            metadata = mapOf("fileName" to file.name)
+                        ))
+                    }
+                    
+                    if (downloadResult is TransportResult.Success && downloadResult.data != null) {
+                        // 基于路径区分文件类型，只解析消息文件
+                        if (file.isInMessagesDirectory()) {
+                            val message = provider.parseTransportMessage(downloadResult.data, file, taskInfo.metadata)
+                            if (message != null) {
+                                Log.d(TAG, "[TapTimeTest] T5_DOWNLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
+                                val processResult = messageProcessor.processTapTransportMessage(message)
+                                if (processResult is TapProcessResult.Success) {
+                                    messagesProcessed++
+                                    // 仅在成功处理消息后标记文件已处理
                                     newProcessedFiles.add(file.name)
-                                    Log.w(TAG, "消息文件解析失败: ${file.name}")
+                                    // 清除失败记录（如果存在）
+                                    clearFileProcessingFailure(file.name, taskInfo.recipientId)
+                                    Log.d(TAG, "消息处理成功: ${file.name}")
+                                } else {
+                                    // 消息处理失败，记录失败并判断是否可重试
+                                    val error = (processResult as? TapProcessResult.Failed)?.error ?: "Unknown processing error"
+                                    val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, error)
+                                    if (!shouldRetry) {
+                                        // 超过重试次数，标记为已处理避免无限重试
+                                        newProcessedFiles.add(file.name)
+                                        Log.w(TAG, "消息处理失败超过重试次数，跳过: ${file.name}")
+                                    } else {
+                                        Log.w(TAG, "消息处理失败，将重试: ${file.name}, error=$error")
+                                    }
                                 }
                             } else {
-                                // 附件文件，直接标记为已处理
+                                // 消息文件解析失败，记录失败信息
                                 newProcessedFiles.add(file.name)
-                                Log.v(TAG, "附件文件已发现，无需解析: ${file.name}")
+                                Log.w(TAG, "消息文件解析失败: ${file.name}")
                             }
                         } else {
-                            // 下载失败，不标记已处理，下次继续尝试
-                            Log.w(TAG, "文件下载失败: ${file.name}")
-                            
-                            // 异常情况下记录失败，判断是否可重试
-                            val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, "Download failed")
-                            if (!shouldRetry) {
-                                // 超过重试次数，标记为已处理
-                                newProcessedFiles.add(file.name)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "处理文件时发生异常: ${file.name}", e)
-                        // 异常情况下记录失败，判断是否可重试
-                        val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, e.message ?: "Exception during processing")
-                        if (!shouldRetry) {
-                            // 超过重试次数，标记为已处理
+                            // 附件文件，直接标记为已处理
                             newProcessedFiles.add(file.name)
+                            Log.v(TAG, "附件文件已发现，无需解析: ${file.name}")
                         }
+                    } else {
+                        // 下载失败，不标记已处理，下次继续尝试
+                        Log.w(TAG, "文件下载失败: ${file.name}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理文件时发生异常: ${file.name}", e)
+                    // 异常情况下记录失败，判断是否可重试
+                    val shouldRetry = recordFileProcessingFailure(file.name, taskInfo.recipientId, e.message ?: "Exception during processing")
+                    if (!shouldRetry) {
+                        // 超过重试次数，标记为已处理
+                        newProcessedFiles.add(file.name)
                     }
                 }
             }
@@ -986,8 +876,6 @@ class TapPollingService(private val context: Context) {
     
     /**
      * 处理轮询结果
-     * 
-     * 优化：实现动态退避机制，连续空轮询时自动增加间隔
      */
     private fun handlePollingResult(taskInfo: PollingTaskInfo, result: PollingExecutionResult) {
         when {
@@ -996,14 +884,8 @@ class TapPollingService(private val context: Context) {
                 taskInfo.recordSuccess()
                 taskInfo.recordMessagesFound(result.messagesFound)
                 
-                // 动态退避：检查是否有新消息
+                // 如果收到新消息，通道活跃度可能改变，重新评估并调整轮询间隔
                 if (result.messagesFound > 0) {
-                    // 有新消息：重置空轮询计数器，恢复正常间隔
-                    val emptyPollCount = taskInfo.consecutiveEmptyPolls.getAndSet(0)
-                    if (emptyPollCount > 0) {
-                        Log.d(TAG, "收到新消息，重置空轮询计数: recipient=${taskInfo.recipientId}, 之前连续空轮询=${emptyPollCount}次")
-                    }
-                    
                     pollingLock.write {
                         try {
                             // 重新获取通道信息计算新间隔（此时lastActiveAt已更新）
@@ -1032,39 +914,6 @@ class TapPollingService(private val context: Context) {
                         } catch (e: Exception) {
                             Log.w(TAG, "重新评估轮询间隔失败: recipient=${taskInfo.recipientId}", e)
                         }
-                    }
-                } else {
-                    // 空轮询：增加计数器，可能触发动态退避
-                    val emptyPollCount = taskInfo.consecutiveEmptyPolls.incrementAndGet()
-                    
-                    if (emptyPollCount >= TapPollingConstants.PollingService.EMPTY_POLL_BACKOFF_THRESHOLD) {
-                        // 达到阈值，应用动态退避
-                        pollingLock.write {
-                            try {
-                                val currentInterval = taskInfo.getCurrentInterval()
-                                val backoffMultiplier = TapPollingConstants.PollingService.EMPTY_POLL_BACKOFF_MULTIPLIER
-                                val newInterval = (currentInterval * backoffMultiplier).toLong()
-                                    .coerceAtMost(TapPollingConstants.PollingService.MAX_EMPTY_POLL_INTERVAL_MS)
-                                
-                                if (newInterval != currentInterval) {
-                                    Log.d(TAG, "空轮询退避: recipient=${taskInfo.recipientId}, 连续空轮询=${emptyPollCount}次, ${currentInterval}ms -> ${newInterval}ms")
-                                    
-                                    // 取消当前任务
-                                    taskInfo.task?.cancel(false)
-                                    
-                                    // 更新间隔
-                                    taskInfo.setCurrentInterval(newInterval)
-                                    
-                                    // 重新调度任务
-                                    val newTask = schedulePollingTask(taskInfo, isRescheduling = true)
-                                    taskInfo.task = newTask
-                                }
-                            } catch (e: Exception) {
-                                Log.w(TAG, "应用空轮询退避失败: recipient=${taskInfo.recipientId}", e)
-                            }
-                        }
-                    } else {
-                        Log.v(TAG, "空轮询: recipient=${taskInfo.recipientId}, 连续=${emptyPollCount}次")
                     }
                 }
             }
@@ -1230,10 +1079,6 @@ class TapPollingService(private val context: Context) {
             pollingTasks.values.forEach { it.cleanup() }
             pollingTasks.clear()
             
-            // 清理marker缓存
-            markerCache.clear()
-            Log.d(TAG, "已清理所有marker缓存")
-            
             // 关闭协程作用域
             serviceScope?.cancel()
             serviceScope = null
@@ -1252,94 +1097,6 @@ class TapPollingService(private val context: Context) {
             
         } catch (e: Exception) {
             Log.e(TAG, "资源清理时发生错误", e)
-        }
-    }
-    
-    /**
-     * 清理特定recipient的marker缓存
-     * 
-     * @param recipientId 接收者ID
-     * @param providerType Provider类型
-     */
-    private fun clearMarkersForRecipient(recipientId: String, providerType: String) {
-        try {
-            val keysToRemove = markerCache.keys.filter { key ->
-                key.startsWith("${recipientId}:${providerType}:")
-            }
-            
-            for (key in keysToRemove) {
-                markerCache.remove(key)
-            }
-            
-            if (keysToRemove.isNotEmpty()) {
-                Log.d(TAG, "清理marker缓存: recipient=$recipientId, provider=$providerType, 清理数量=${keysToRemove.size}")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "清理marker缓存时出错: recipient=$recipientId", e)
-        }
-    }
-    
-    /**
-     * 按消息时间戳排序文件
-     * 
-     * 从文件名中提取timestamp进行排序，而不是使用COS的lastModified时间
-     * 文件名格式：senderId_messageId_timestamp.dat 或 senderId_recipientId_messageId_timestamp.dat
-     * 
-     * 原因：COS的lastModified是上传时间，在批量上传时可能不准确或顺序错误
-     * 而文件名中的timestamp是消息的真实发送时间，应该用它来保证显示顺序正确
-     * 
-     * @param files 待排序的文件列表
-     * @return 按消息时间戳升序排列的文件列表
-     */
-    private fun sortFilesByMessageTimestamp(files: List<FileInfo>): List<FileInfo> {
-        return try {
-            files.sortedBy { file ->
-                extractTimestampFromFileName(file.name) ?: file.lastModified
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "按消息时间戳排序失败，回退到lastModified排序", e)
-            FileInfo.sortByTime(files, ascending = true)
-        }
-    }
-    
-    /**
-     * 从文件名中提取时间戳
-     * 
-     * 支持的格式：
-     * - senderId_messageId_timestamp.dat (3段)
-     * - senderId_recipientId_messageId_timestamp.dat (4段)
-     * - group_groupId_senderId_messageId_timestamp.dat (5段，群组消息)
-     * 
-     * @param fileName 文件名
-     * @return 提取的时间戳，失败返回null
-     */
-    private fun extractTimestampFromFileName(fileName: String): Long? {
-        return try {
-            val baseName = fileName.substringBeforeLast('.')
-            val parts = baseName.split('_')
-            
-            when {
-                // 群组消息格式：group_groupId_senderId_messageId_timestamp
-                parts.size >= 5 && parts[0] == "group" -> {
-                    parts[4].toLongOrNull()
-                }
-                // 标准格式：senderId_recipientId_messageId_timestamp
-                parts.size == 4 -> {
-                    parts[3].toLongOrNull()
-                }
-                // 简化格式：senderId_messageId_timestamp
-                parts.size == 3 -> {
-                    parts[2].toLongOrNull()
-                }
-                // 其他格式，尝试最后一段
-                parts.size >= 2 -> {
-                    parts.last().toLongOrNull()
-                }
-                else -> null
-            }
-        } catch (e: Exception) {
-            Log.v(TAG, "从文件名提取时间戳失败: $fileName", e)
-            null
         }
     }
     
@@ -1735,44 +1492,4 @@ enum class IntervalChangeType {
     ERROR_BACKOFF,  // 错误退避
     LOW_POWER,      // 低电量模式
     REEVALUATE      // 重新评估
-}
-
-/**
- * 路径Marker信息
- * 
- * 用于增量查询优化，记录每个路径的最后marker位置和更新时间
- * 
- * @param marker COS返回的marker，用于下次增量查询
- * @param lastUpdateTime 最后更新时间戳（毫秒）
- * @param path 路径字符串（用于调试）
- */
-data class PathMarkerInfo(
-    val marker: String,
-    val lastUpdateTime: Long = System.currentTimeMillis(),
-    val path: String = ""
-) {
-    /**
-     * 检查marker是否过期
-     * 
-     * 为了避免长时间不轮询导致marker失效，超过一定时间后重置marker
-     * 
-     * @param maxAgeMs 最大有效期（毫秒），默认30分钟
-     * @return true表示已过期，需要重新全量查询
-     */
-    fun isExpired(maxAgeMs: Long = 30 * 60 * 1000L): Boolean {
-        return System.currentTimeMillis() - lastUpdateTime > maxAgeMs
-    }
-    
-    /**
-     * 获取摘要信息（用于日志）
-     */
-    fun getSummary(): String {
-        val markerPreview = if (marker.length > 20) {
-            "${marker.take(10)}...${marker.takeLast(10)}"
-        } else {
-            marker
-        }
-        val age = System.currentTimeMillis() - lastUpdateTime
-        return "PathMarkerInfo[marker=$markerPreview, age=${age}ms, path=$path]"
-    }
 } 

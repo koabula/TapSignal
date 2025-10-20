@@ -115,30 +115,6 @@ interface TransportProvider {
     suspend fun listFiles(path: String, metadata: TransportMetadata): TransportResult
     
     /**
-     * 列出指定路径下的文件（支持增量查询）
-     * 
-     * 使用marker机制实现增量查询，可以显著减少网络传输和处理时间。
-     * 当第一次调用时marker为null，返回所有文件；
-     * 后续调用时传入上次返回的nextMarker，只返回增量数据。
-     * 
-     * @param path 文件路径
-     * @param metadata 传输元数据
-     * @param marker 起始标记，用于增量查询。传入上次查询返回的nextMarker可以获取增量数据
-     * @param maxKeys 返回的最大文件数量，默认1000
-     * @return 包含文件列表和分页信息的结果
-     */
-    suspend fun listFilesWithMarker(
-        path: String, 
-        metadata: TransportMetadata,
-        marker: String? = null,
-        maxKeys: Int = 1000
-    ): TransportResult {
-        // 默认实现：调用标准listFiles方法，不支持marker
-        // 支持增量查询的Provider应该重写此方法
-        return listFiles(path, metadata)
-    }
-    
-    /**
      * 下载指定文件
      * 
      * @param fileInfo 文件信息
