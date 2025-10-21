@@ -72,15 +72,15 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // 使用senderAci作为键，统一使用ACI格式
+                // ✅ 使用senderId（RecipientId格式）作为键，与其他代码保持一致
                 val senderAci = tokenExchangeMessage.senderAci
                 if (senderAci.isBlank()) {
                     Log.e(TAG, "Token交换消息中缺少senderAci")
                     return@launch
                 }
                 
-                // 保存到接收Token池
-                val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
+                // 保存到接收Token池（使用RecipientId格式）
+                val saved = tokenPool.addReceivedToken(senderId, receivedToken)
                 if (!saved) {
                     Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
                     return@launch
@@ -228,13 +228,13 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 return
             }
             
-            val tokenSaved = tokenPool.addSharedToken(originalMessage.senderAci, generatedToken)
+            val tokenSaved = tokenPool.addSharedToken(senderId, generatedToken)
             if (!tokenSaved) {
                 Log.e(TAG, "保存共享Token失败")
                 return
             }
             
-            // 8. 建立传输通道 (B端为接收方建立通道)
+            // 8. 建立传输通道 (B端为接收方建立通道，使用RecipientId格式)
             try {
                 val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
                 
@@ -243,38 +243,38 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 if (!initialized) {
                     Log.w(TAG, "通道管理器初始化失败，跳过通道建立")
                 } else {
-                    // 使用getOrCreateChannel方法，它会自动处理metadata创建
+                    // 使用getOrCreateChannel方法，它会自动处理metadata创建（使用RecipientId格式）
                     val channel = channelManager.getOrCreateChannel(
-                        recipientId = originalMessage.senderAci,
+                        recipientId = senderId,
                         providerType = originalMessage.providerType,
                         provider = provider
                     )
                     
                     if (channel != null) {
-                        Log.i(TAG, "B端成功建立传输通道: channelId=${channel.channelId}, recipientId=${originalMessage.senderAci}")
+                        Log.i(TAG, "B端成功建立传输通道: channelId=${channel.channelId}, recipientId=$senderId, senderAci=${originalMessage.senderAci}")
                         
-                        // B端通道建立成功后立即启动轮询
+                        // B端通道建立成功后立即启动轮询（使用RecipientId格式）
                         try {
-                            Log.d(TAG, "B端通道建立后启动轮询: recipientId=${originalMessage.senderAci}")
+                            Log.d(TAG, "B端通道建立后启动轮询: recipientId=$senderId")
                             val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
                             
                             if (channel.metadata != null) {
                                 val pollingStarted = pollingService.startPolling()
                                 if (pollingStarted) {
-                                    val targetAdded = pollingService.addPollingTarget(originalMessage.senderAci, channel.metadata!!, channel)
+                                    val targetAdded = pollingService.addPollingTarget(senderId, channel.metadata!!, channel)
                                     if (targetAdded) {
-                                        Log.i(TAG, "B端通道建立后轮询启动成功: recipientId=${originalMessage.senderAci}")
+                                        Log.i(TAG, "B端通道建立后轮询启动成功: recipientId=$senderId")
                                     } else {
-                                        Log.w(TAG, "B端通道建立后轮询目标添加失败: recipientId=${originalMessage.senderAci}")
+                                        Log.w(TAG, "B端通道建立后轮询目标添加失败: recipientId=$senderId")
                                     }
                                 } else {
-                                    Log.w(TAG, "B端通道建立后轮询服务启动失败: recipientId=${originalMessage.senderAci}")
+                                    Log.w(TAG, "B端通道建立后轮询服务启动失败: recipientId=$senderId")
                                 }
                             } else {
-                                Log.w(TAG, "B端通道建立时metadata为null，暂不启动轮询: recipientId=${originalMessage.senderAci}")
+                                Log.w(TAG, "B端通道建立时metadata为null，暂不启动轮询: recipientId=$senderId")
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "B端通道建立后启动轮询异常: recipientId=${originalMessage.senderAci}", e)
+                            Log.e(TAG, "B端通道建立后启动轮询异常: recipientId=$senderId", e)
                         }
                     } else {
                         Log.w(TAG, "B端建立传输通道失败: recipientId=${originalMessage.senderAci}")
@@ -302,31 +302,31 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             // 10. 发送响应消息
             sendTokenExchangeResponse(context, senderId, responseMessage)
             
-            // 11. 验证B端通道状态和Token状态
+            // 11. 验证B端通道状态和Token状态（使用RecipientId格式）
             delay(1000L) // 等待响应处理完成
             try {
                 val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-                val channels = channelManager.getActiveChannels(originalMessage.senderAci)
+                val channels = channelManager.getActiveChannels(senderId)
                 val fullActiveChannels = channels.filter { it.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE }
                 
                 if (fullActiveChannels.isEmpty()) {
-                    Log.w(TAG, "B端响应发送后未发现FULL_ACTIVE通道，状态可能异常: senderAci=${originalMessage.senderAci}")
+                    Log.w(TAG, "B端响应发送后未发现FULL_ACTIVE通道，状态可能异常: senderId=$senderId")
                     channels.forEach { channel ->
                         Log.d(TAG, "B端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
                     }
                 } else {
-                    Log.i(TAG, "B端响应发送后确认通道状态正常: senderAci=${originalMessage.senderAci}, fullActiveChannels=${fullActiveChannels.size}")
+                    Log.i(TAG, "B端响应发送后确认通道状态正常: senderId=$senderId, fullActiveChannels=${fullActiveChannels.size}")
                 }
                 
-                // 验证Token状态
+                // 验证Token状态（使用RecipientId格式查询）
                 val tokenPool = TransportTokenPool.getInstance(context)
-                val receivedToken = tokenPool.getValidReceivedToken(originalMessage.senderAci, originalMessage.providerType)
-                val sharedToken = tokenPool.getValidSharedToken(originalMessage.senderAci, originalMessage.providerType)
+                val receivedToken = tokenPool.getValidReceivedToken(senderId, originalMessage.providerType)
+                val sharedToken = tokenPool.getValidSharedToken(senderId, originalMessage.providerType)
                 
-                Log.d(TAG, "B端Token状态验证: senderAci=${originalMessage.senderAci}, hasReceivedToken=${receivedToken != null}, hasSharedToken=${sharedToken != null}")
+                Log.d(TAG, "B端Token状态验证: senderId=$senderId, hasReceivedToken=${receivedToken != null}, hasSharedToken=${sharedToken != null}")
                 
             } catch (verifyException: Exception) {
-                Log.w(TAG, "B端状态验证失败，但不影响主流程: senderAci=${originalMessage.senderAci}", verifyException)
+                Log.w(TAG, "B端状态验证失败，但不影响主流程: senderId=$senderId", verifyException)
             }
             
         } catch (e: Exception) {

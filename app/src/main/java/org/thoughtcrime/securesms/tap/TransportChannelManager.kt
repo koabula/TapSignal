@@ -225,22 +225,27 @@ class TransportChannelManager private constructor(private val context: Context) 
         provider: TransportProvider
     ): TransportChannel? {
         return withContext(Dispatchers.IO) {
-            // 首先尝试获取现有活跃通道
-            val existingChannel = getActiveChannel(recipientId, providerType)
+            // ✅ 步骤1：规范化RecipientId为ACI格式，确保与内部逻辑一致
+            val normalizedRecipientId = normalizeRecipientId(recipientId)
+            Log.d(TAG, "获取或创建通道: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, provider=$providerType")
+            
+            // 步骤2：首先尝试获取现有活跃通道（使用规范化ID）
+            val existingChannel = getActiveChannel(normalizedRecipientId, providerType)
             if (existingChannel != null) {
-                Log.d(TAG, "使用现有通道: ${existingChannel.channelId}")
+                Log.d(TAG, "使用现有通道: ${existingChannel.channelId}, 原始ID=$recipientId")
                 return@withContext existingChannel
             }
             
-            // 创建新的元数据
-            val metadata = createChannelMetadata(recipientId, providerType, provider)
+            // 步骤3：创建新的元数据
+            // ✅ 传入规范化ID和原始ID，确保Token操作使用正确的格式
+            val metadata = createChannelMetadata(normalizedRecipientId, recipientId, providerType, provider)
             if (metadata == null) {
-                Log.w(TAG, "无法创建通道元数据: $recipientId, $providerType")
+                Log.w(TAG, "无法创建通道元数据: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, providerType=$providerType")
                 return@withContext null
             }
             
-            // 建立新通道
-            establishChannel(recipientId, providerType, metadata)
+            // 步骤4：建立新通道（使用规范化ID）
+            establishChannel(normalizedRecipientId, providerType, metadata)
         }
     }
     
@@ -248,15 +253,21 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 获取活跃通道
      */
     fun getActiveChannels(recipientId: String): List<TransportChannel> {
+        // ✅ 规范化RecipientId为ACI格式，确保与通道创建时的格式一致
+        val normalizedId = normalizeRecipientId(recipientId)
+        
         channelLock.read {
-            Log.d(TAG, "getActiveChannels查询: recipientId=$recipientId")
+            Log.d(TAG, "getActiveChannels查询: recipientId=$recipientId, normalizedId=$normalizedId")
             Log.d(TAG, "recipientChannels映射大小: ${recipientChannels.size}")
             Log.d(TAG, "现有recipientChannels keys: ${recipientChannels.keys.joinToString(", ")}")
             
-            val channelIds = recipientChannels[recipientId] ?: run {
-                Log.w(TAG, "recipientChannels中没有找到recipientId: $recipientId")
-                return emptyList()
-            }
+            // ✅ 先用规范化ID查找，如果找不到则fallback到原始ID（向后兼容）
+            val channelIds = recipientChannels[normalizedId] 
+                ?: recipientChannels[recipientId] 
+                ?: run {
+                    Log.w(TAG, "recipientChannels中没有找到recipientId: $recipientId (normalized: $normalizedId)")
+                    return emptyList()
+                }
             
             Log.d(TAG, "找到channelIds: $channelIds")
             
@@ -287,8 +298,15 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 获取指定Provider的活跃通道
      */
     fun getActiveChannel(recipientId: String, providerType: String): TransportChannel? {
+        // ✅ 规范化RecipientId为ACI格式，确保与通道创建时的格式一致
+        val normalizedId = normalizeRecipientId(recipientId)
+        
         channelLock.read {
-            val channelIds = recipientChannels[recipientId] ?: return null
+            // ✅ 先用规范化ID查找，如果找不到则fallback到原始ID（向后兼容）
+            val channelIds = recipientChannels[normalizedId] 
+                ?: recipientChannels[recipientId]
+                ?: return null
+                
             return channelIds.mapNotNull { channelId ->
                 channels[channelId]?.takeIf { 
                     it.providerType == providerType && it.isActive()
@@ -664,14 +682,19 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     suspend fun upgradeChannelToFullActive(recipientId: String, providerType: String): Boolean {
         return withContext(Dispatchers.IO) {
+            // ✅ 步骤1：规范化RecipientId为ACI格式，确保与内部逻辑一致
+            val normalizedRecipientId = normalizeRecipientId(recipientId)
+            Log.d(TAG, "升级通道到FULL_ACTIVE: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, provider=$providerType")
+            
             // 预先准备可能需要的metadata更新（在锁外执行）
+            // ✅ 传入规范化ID和原始ID，确保Token操作使用正确的格式
             val updatedMetadata = if (providerType == "cos") {
                 try {
                     val tokenPool = TransportTokenPool.getInstance(context)
                     val provider = getTransportManager().getProvider(providerType)
                     val configManager = TransportProviderConfigManager.getInstance(context)
                     if (provider != null && configManager != null) {
-                        createCosChannelMetadata(recipientId, provider, configManager, tokenPool)
+                        createCosChannelMetadata(normalizedRecipientId, recipientId, provider, configManager, tokenPool)
                     } else {
                         Log.w(TAG, "无法获取provider或configManager for metadata更新")
                         null
@@ -684,12 +707,15 @@ class TransportChannelManager private constructor(private val context: Context) 
                 null // 其他provider暂时不需要metadata更新
             }
             
-            // 第一步：在锁内完成状态更新和数据库保存
+            // 第一步：在锁内完成状态更新和数据库保存（使用规范化ID）
             val upgradedChannel = channelLock.write {
-                val channelIds = recipientChannels[recipientId] ?: run {
-                    Log.w(TAG, "未找到recipientId对应的通道: recipientId=$recipientId, 现有keys=${recipientChannels.keys}")
-                    return@write null
-                }
+                // 尝试使用规范化ID和原始ID查找通道
+                val channelIds = recipientChannels[normalizedRecipientId] 
+                    ?: recipientChannels[recipientId]
+                    ?: run {
+                        Log.w(TAG, "未找到recipientId对应的通道: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, 现有keys=${recipientChannels.keys}")
+                        return@write null
+                    }
                 
                 for (channelId in channelIds) {
                     val channel = channels[channelId]
@@ -719,10 +745,10 @@ class TransportChannelManager private constructor(private val context: Context) 
                             
                             channels[channelId] = upgradedChannel
                             
-                            Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, recipientId=$recipientId, providerType=$providerType, fromStatus=${channel.status}, metadataUpdated=${updatedMetadata != null}")
+                            Log.i(TAG, "通道升级为FULL_ACTIVE: channelId=$channelId, 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, providerType=$providerType, fromStatus=${channel.status}, metadataUpdated=${updatedMetadata != null}")
                             return@write upgradedChannel
                         } else {
-                            Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, recipientId=$recipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
+                            Log.w(TAG, "通道状态不支持升级: channelId=$channelId, currentStatus=${channel.status}, 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, providerType=$providerType, 支持的状态=[ESTABLISHING, SEND_READY, ACTIVE] 或已经是FULL_ACTIVE")
                         }
                     } else if (channel != null) {
                         Log.d(TAG, "通道providerType不匹配: channelId=$channelId, expected=$providerType, actual=${channel.providerType}")
@@ -731,7 +757,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                 }
                 
-                Log.w(TAG, "未找到可升级的通道: recipientId=$recipientId, providerType=$providerType, 检查了${channelIds.size}个通道")
+                Log.w(TAG, "未找到可升级的通道: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, providerType=$providerType, 检查了${channelIds.size}个通道")
                 if (channelIds.isNotEmpty()) {
                     val channelDetails = channelIds.mapNotNull { channelId ->
                         channels[channelId]?.let { channel ->
@@ -740,22 +766,22 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                     Log.d(TAG, "通道详细状态: ${channelDetails.joinToString("; ")}")
                 } else {
-                    Log.d(TAG, "recipientChannels中没有找到对应的通道ID列表")
+                    Log.d(TAG, "recipientChannels中没有找到对应的通道ID列表（尝试了规范化ID和原始ID）")
                 }
                 return@write null
             }
             
-            // 第二步：在锁外进行数据库保存和轮询启动
+            // 第二步：在锁外进行数据库保存和轮询启动（使用规范化ID）
             if (upgradedChannel != null) {
                 try {
                     // 保存到数据库
                     saveChannelToDatabaseAsync(upgradedChannel)
                     Log.d(TAG, "通道数据库保存完成: channelId=${upgradedChannel.channelId}")
                     
-                    // 启动轮询
+                    // 启动轮询（使用规范化ID）
                     try {
-                        ensurePollingServiceRunning(recipientId, upgradedChannel)
-                        Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}")
+                        ensurePollingServiceRunning(normalizedRecipientId, upgradedChannel)
+                        Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}, recipientId=$normalizedRecipientId")
                     } catch (e: Exception) {
                         Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
                         // 轮询启动失败不影响通道升级结果
@@ -822,15 +848,27 @@ class TransportChannelManager private constructor(private val context: Context) 
                         
                         Log.d(TAG, "已关闭通道: ${channel.channelId}, provider=${channel.providerType}")
                         
-                        // 移除轮询目标
+                        // 移除轮询目标（尝试多种ID格式，确保完全清理）
                         try {
                             val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                            // 使用标准化的ID格式匹配轮询任务
-                            val removeResult = pollingService.removePollingTarget(normalizedRecipientId, channel.providerType)
-                            if (removeResult) {
-                                Log.d(TAG, "已移除轮询目标: recipient=$normalizedRecipientId, provider=${channel.providerType}")
-                            } else {
-                                Log.w(TAG, "移除轮询目标失败: recipient=$normalizedRecipientId, provider=${channel.providerType}")
+                            var removed = false
+                            
+                            // ✅ 尝试使用规范化ID（ACI格式）移除
+                            if (pollingService.removePollingTarget(normalizedRecipientId, channel.providerType)) {
+                                Log.d(TAG, "已移除轮询目标 [规范化ID]: recipient=$normalizedRecipientId, provider=${channel.providerType}")
+                                removed = true
+                            }
+                            
+                            // ✅ 尝试使用原始ID移除（如果格式不同）
+                            if (recipientId != normalizedRecipientId) {
+                                if (pollingService.removePollingTarget(recipientId, channel.providerType)) {
+                                    Log.d(TAG, "已移除轮询目标 [原始ID]: recipient=$recipientId, provider=${channel.providerType}")
+                                    removed = true
+                                }
+                            }
+                            
+                            if (!removed) {
+                                Log.w(TAG, "移除轮询目标失败（尝试了2种格式）: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, provider=${channel.providerType}")
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "移除轮询目标异常", e)
@@ -919,6 +957,141 @@ class TransportChannelManager private constructor(private val context: Context) 
         }
         
         return success
+    }
+    
+    /**
+     * 检查并降级不健康的v2 mode通道
+     * 
+     * 用于私聊场景的健康检查：
+     * - 检查通道是否存在
+     * - 检查Token是否有效
+     * - 检查轮询是否正常
+     * 
+     * 如果发现异常，自动降级到Native模式
+     * 
+     * @param recipientId 接收者ID
+     * @return 是否发现并处理了异常
+     */
+    suspend fun checkAndDegradeIfUnhealthy(recipientId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val normalizedId = normalizeRecipientId(recipientId)
+                val channels = getActiveChannels(normalizedId)
+                
+                if (channels.isEmpty()) {
+                    // 没有活跃通道，无需检查
+                    return@withContext false
+                }
+                
+                val issues = mutableListOf<String>()
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                
+                for (channel in channels) {
+                    // 检查通道元数据
+                    if (channel.metadata == null) {
+                        issues.add("通道元数据缺失")
+                        continue
+                    }
+                    
+                    // 检查Token
+                    val token = tokenPool.getValidReceivedToken(normalizedId, channel.providerType)
+                    if (token == null) {
+                        issues.add("Token缺失")
+                        continue
+                    }
+                    
+                    // 检查轮询状态
+                    val pollingState = pollingService.getPollingState(normalizedId, channel.providerType)
+                    if (pollingState != null && pollingState.consecutiveErrors > 10) {
+                        issues.add("轮询连续失败(${pollingState.consecutiveErrors}次)")
+                        continue
+                    }
+                }
+                
+                if (issues.isNotEmpty()) {
+                    Log.w(TAG, "⚠️ 检测到私聊v2 mode异常，自动降级: recipientId=$normalizedId, issues=${issues.joinToString("; ")}")
+                    
+                    // 降级到Native模式
+                    val degraded = disableV2Mode(
+                        recipientId = normalizedId,
+                        sendControlMessage = false, // 不发送控制消息，避免通知对方
+                        insertSystemMessage = true   // 插入系统消息通知用户
+                    )
+                    
+                    if (degraded) {
+                        Log.i(TAG, "✅ 私聊v2 mode已降级到Native: recipientId=$normalizedId")
+                        // 通知用户（可以在这里添加通知逻辑）
+                        notifyUserAboutPrivateChatDegradation(normalizedId, issues.first())
+                    }
+                    
+                    return@withContext degraded
+                }
+                
+                // 没有发现异常
+                return@withContext false
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "健康检查失败: recipientId=$recipientId", e)
+                return@withContext false
+            }
+        }
+    }
+    
+    /**
+     * 通知用户私聊v2 mode已自动降级
+     */
+    private fun notifyUserAboutPrivateChatDegradation(recipientId: String, reason: String) {
+        try {
+            val recipientIdObj = getRecipientIdFromString(recipientId)
+            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
+            val recipientName = recipient.getDisplayName(context)
+            
+            val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) 
+                as android.app.NotificationManager
+            
+            // 创建通知渠道
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    "tap_private_degradation",
+                    "Private Chat V2 Degradation",
+                    android.app.NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "私聊 V2 模式降级通知"
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+            
+            // 创建点击通知后跳转到对话的 Intent
+            val conversationIntent = android.content.Intent(context, org.thoughtcrime.securesms.conversation.v2.ConversationActivity::class.java).apply {
+                putExtra("recipient_id", recipientIdObj.serialize())
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val conversationPendingIntent = android.app.PendingIntent.getActivity(
+                context,
+                recipientId.hashCode(),
+                conversationIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            // 创建通知
+            val notification = androidx.core.app.NotificationCompat.Builder(context, "tap_private_degradation")
+                .setSmallIcon(org.thoughtcrime.securesms.R.drawable.ic_notification)
+                .setContentTitle("对话已切换回常规模式")
+                .setContentText("$recipientName: $reason")
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle()
+                    .bigText("与 $recipientName 的对话\n\nv2 mode 因异常已自动关闭: $reason\n\n已切换回 Signal Server 模式。如需重新启用，请在对话菜单中选择 \"Use v2 mode\""))
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true)
+                .setContentIntent(conversationPendingIntent)
+                .build()
+            
+            notificationManager.notify(recipientId.hashCode(), notification)
+            Log.d(TAG, "[通知] 发送私聊降级通知: recipientId=$recipientId, reason=$reason")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "[通知] 发送私聊降级通知失败", e)
+        }
     }
     
     /**
@@ -1246,22 +1419,26 @@ class TransportChannelManager private constructor(private val context: Context) 
     
     /**
      * 创建通道元数据
+     * 
+     * @param normalizedRecipientId 规范化后的recipientId（ACI格式），用于metadata构建
+     * @param originalRecipientId 原始的recipientId（可能是RecipientId格式或ACI格式），用于Token保存
      */
     private suspend fun createChannelMetadata(
-        recipientId: String, 
+        normalizedRecipientId: String,
+        originalRecipientId: String,
         providerType: String,
         provider: TransportProvider
     ): TransportMetadata? {
         return try {
-            Log.d(TAG, "创建通道元数据: recipientId=$recipientId, providerType=$providerType")
+            Log.d(TAG, "创建通道元数据: normalizedId=$normalizedRecipientId, originalId=$originalRecipientId, providerType=$providerType")
             
             // 获取Provider配置管理器和Token池
             val configManager = TransportProviderConfigManager.getInstance(context)
             val tokenPool = TransportTokenPool.getInstance(context)
             
             val metadata = when (providerType) {
-                "cos" -> createCosChannelMetadata(recipientId, provider, configManager, tokenPool)
-                else -> createGenericChannelMetadata(recipientId, providerType, provider, configManager, tokenPool)
+                "cos" -> createCosChannelMetadata(normalizedRecipientId, originalRecipientId, provider, configManager, tokenPool)
+                else -> createGenericChannelMetadata(normalizedRecipientId, providerType, provider, configManager, tokenPool)
             }
             
             if (metadata != null) {
@@ -1269,7 +1446,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                 metadata
             } else {
                 Log.w(TAG, "通道元数据创建返回null，尝试创建基础元数据: $providerType")
-                createFallbackMetadata(recipientId, providerType, provider, configManager)
+                createFallbackMetadata(normalizedRecipientId, providerType, provider, configManager)
             }
         } catch (e: Exception) {
             Log.e(TAG, "创建通道元数据异常: $providerType - ${LogSanitizer.sanitizeThrowable(e)}")
@@ -1277,7 +1454,7 @@ class TransportChannelManager private constructor(private val context: Context) 
             // 异常时创建最基础的metadata，确保轮询能启动
             try {
                 val configManager = TransportProviderConfigManager.getInstance(context)
-                val fallbackMetadata = createFallbackMetadata(recipientId, providerType, provider, configManager)
+                val fallbackMetadata = createFallbackMetadata(normalizedRecipientId, providerType, provider, configManager)
                 if (fallbackMetadata != null) {
                     Log.w(TAG, "使用fallback元数据: $providerType")
                 }
@@ -1344,9 +1521,13 @@ class TransportChannelManager private constructor(private val context: Context) 
     
     /**
      * 创建COS通道元数据
+     * 
+     * @param recipientAci 规范化后的recipientId（ACI格式），用于metadata构建和哈希
+     * @param originalRecipientId 原始的recipientId（可能是RecipientId格式或ACI格式），用于Token查询和保存
      */
     private suspend fun createCosChannelMetadata(
-        recipientId: String,
+        recipientAci: String,
+        originalRecipientId: String,
         provider: TransportProvider,
         configManager: TransportProviderConfigManager,
         tokenPool: TransportTokenPool
@@ -1359,11 +1540,12 @@ class TransportChannelManager private constructor(private val context: Context) 
             }
         
         // 2. 获取对端Token信息（用于轮询对方消息）
-        val peerTokenInfo = tokenPool.getPeerTokenInfo(recipientId, "cos")
+        // ✅ 使用 originalRecipientId 查询Token，确保与Token保存时的格式一致
+        val peerTokenInfo = tokenPool.getPeerTokenInfo(originalRecipientId, "cos")
         
         // 在v2模式建立初期，可能还没有对端Token信息，此时使用默认值
         if (peerTokenInfo == null) {
-            Log.w(TAG, "未找到对端Token信息，使用默认配置进行通道建立: recipientId=$recipientId")
+            Log.w(TAG, "未找到对端Token信息，使用默认配置进行通道建立: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
         }
         
         // 3. 构建本端地址和参数
@@ -1389,16 +1571,18 @@ class TransportChannelManager private constructor(private val context: Context) 
         // 本端发送消息时不使用此Token，而是直接使用本地高权限配置
         val sharedTokenForPeer = run {
             // 检查是否已经为此对方生成了shared token
-            val existingSharedToken = tokenPool.getValidSharedToken(recipientId, "cos")
+            // ✅ 使用 originalRecipientId 查询Token，确保与Token保存时的格式一致
+            val existingSharedToken = tokenPool.getValidSharedToken(originalRecipientId, "cos")
             if (existingSharedToken != null) {
-                Log.d(TAG, "已存在共享Token，复用: tokenId=${LogSanitizer.sanitize(existingSharedToken.tokenId)}")
+                Log.d(TAG, "已存在共享Token，复用: tokenId=${LogSanitizer.sanitize(existingSharedToken.tokenId)}, originalRecipientId=$originalRecipientId")
                 existingSharedToken
             } else {
-                Log.d(TAG, "共享Token不存在，生成新的只读Token供对方轮询")
+                Log.d(TAG, "共享Token不存在，生成新的只读Token供对方轮询: originalRecipientId=$originalRecipientId")
                 try {
                     // 创建Token请求：只读权限，供对方轮询我们的outbox
+                    // 注意：tokenRequest 中的 recipientId 用于生成 Token，应使用 ACI 格式
                     val tokenRequest = TransportTokenRequest(
-                        recipientId = recipientId,
+                        recipientId = recipientAci,  // ✅ 用于生成Token，使用ACI格式
                         providerType = "cos",
                         requestedPermissions = setOf(
                             TransportPermission.READ,
@@ -1413,7 +1597,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                     val generatedToken = provider.generateToken(tokenRequest)
                     if (generatedToken != null) {
                         // 保存到Token池（作为共享Token，供对方访问我们的存储）
-                        val saveSuccess = tokenPool.addSharedToken(recipientId, generatedToken)
+                        // ✅ 使用 originalRecipientId 保存Token，确保与查询时的格式一致
+                        val saveSuccess = tokenPool.addSharedToken(originalRecipientId, generatedToken)
                         if (saveSuccess) {
                             Log.i(TAG, "对方轮询Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
                             generatedToken
@@ -1435,11 +1620,14 @@ class TransportChannelManager private constructor(private val context: Context) 
         // 6. 生成哈希化ID
         val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
         val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
-        val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientId)
+        // ✅ 使用 recipientAci（ACI格式）生成哈希ID
+        val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientAci)
         
         // 7. 构建路径
-        val mySendPath = provider.getSendPath(peerHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
-        val peerReceivePath = provider.getReceivePath(myHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        // ✅ mySendPath: 我发送消息时上传到我自己的outbox
+        val mySendPath = provider.getSendPath(myHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        // ✅ peerReceivePath: 我轮询对方的outbox获取对方发送的消息
+        val peerReceivePath = provider.getReceivePath(peerHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
         
         Log.d(TAG, "COS元数据创建: " +
               "myAddress=${LogSanitizer.sanitize(myAddress, "address")}, " +
@@ -1448,7 +1636,7 @@ class TransportChannelManager private constructor(private val context: Context) 
               "mySendPath=$mySendPath, peerReceivePath=$peerReceivePath")
         
         return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
-            recipientId = recipientId,
+            recipientId = recipientAci,  // ✅ 使用规范化的ACI格式，与通道管理内部格式一致
             providerType = "cos",
             myAddress = myAddress,
             myToken = null, // 重要：发送消息时不使用token，直接使用本地高权限配置

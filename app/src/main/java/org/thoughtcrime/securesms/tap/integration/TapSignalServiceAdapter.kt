@@ -124,9 +124,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             setCurrentSendingRecipient(recipient)
             
             // 0. 发送前状态验证和同步
-            val recipientAci = recipient.requireAci().toString()
-            if (!validateAndSyncStateBeforeSend(recipientAci)) {
-                Log.e(TAG, "发送前状态验证失败: messageId=$messageId, recipientAci=$recipientAci")
+            if (!validateAndSyncStateBeforeSend(recipient)) {
+                Log.e(TAG, "发送前状态验证失败: messageId=$messageId, recipientId=${recipient.id}")
                 clearSendingContext() // 清理发送上下文
                 return TapSignalSendResult.Failed("发送前状态验证失败")
             }
@@ -926,9 +925,15 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
     
     /**
      * 发送前状态验证和同步
+     * 
+     * @param recipient 接收者Recipient对象
+     * @return 是否验证通过
      */
-    private suspend fun validateAndSyncStateBeforeSend(recipientAci: String): Boolean {
-        Log.d(TAG, "发送前状态验证和同步: recipientAci=$recipientAci")
+    private suspend fun validateAndSyncStateBeforeSend(recipient: Recipient): Boolean {
+        val recipientId = recipient.id.toString()  // RecipientId格式，如 "RecipientId::8"
+        val recipientAci = recipient.requireAci().toString()  // ACI格式，如 "c716a84d-..."
+        
+        Log.d(TAG, "发送前状态验证和同步: recipientId=$recipientId, recipientAci=$recipientAci")
         
         return try {
             // 1. 确保TransportManager已初始化
@@ -938,24 +943,24 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 tapInitializer.initializeSync(true)
             }
             
-            // 2. 验证通道状态
+            // 2. 验证通道状态（使用RecipientId格式）
             val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-            val activeChannels = channelManager.getActiveChannels(recipientAci)
+            val activeChannels = channelManager.getActiveChannels(recipientId)
             val fullActiveChannels = activeChannels.filter { it.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE }
             
             if (fullActiveChannels.isEmpty()) {
-                Log.w(TAG, "发送前验证失败：没有FULL_ACTIVE状态的通道")
+                Log.w(TAG, "发送前验证失败：没有FULL_ACTIVE状态的通道, recipientId=$recipientId")
                 return false
             }
             
-            // 3. 验证Token状态
+            // 3. 验证Token状态（✅ 使用RecipientId格式查询，与Token保存格式一致）
             val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
             for (channel in fullActiveChannels) {
-                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
-                val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
+                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientId, channel.providerType) != null
+                val hasSharedToken = tokenPool.getValidSharedToken(recipientId, channel.providerType) != null
                 
                 if (!hasReceivedToken || !hasSharedToken) {
-                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken")
+                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken, recipientId=$recipientId")
                     return false
                 }
             }
@@ -971,11 +976,11 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 return false
             }
             
-            Log.i(TAG, "发送前状态验证通过：${fullActiveChannels.size}个FULL_ACTIVE通道，${matchingProviders.size}个匹配Provider")
+            Log.i(TAG, "发送前状态验证通过：${fullActiveChannels.size}个FULL_ACTIVE通道，${matchingProviders.size}个匹配Provider, recipientId=$recipientId")
             return true
             
         } catch (e: Exception) {
-            Log.e(TAG, "发送前状态验证异常", e)
+            Log.e(TAG, "发送前状态验证异常: recipientId=$recipientId", e)
             return false
         }
     }

@@ -781,22 +781,74 @@ class TransportTokenPool private constructor(private val context: Context) {
             tokenLock.write {
                 try {
                     var removedCount = 0
+                    val keysToRemove = mutableSetOf<String>()
                     
-                    // 移除接收Token
-                    receivedTokens[recipientId]?.values?.forEach { token ->
-                        tokenMetadata.remove(token.tokenId)
-                        removedCount++
-                        Log.d(TAG, "移除接收Token: ${token.tokenId}")
-                    }
-                    receivedTokens.remove(recipientId)
+                    // ✅ 收集所有可能的ID格式
+                    // 1. 添加原始格式
+                    keysToRemove.add(recipientId)
                     
-                    // 移除共享Token
-                    sharedTokens[recipientId]?.values?.forEach { token ->
-                        tokenMetadata.remove(token.tokenId)
-                        removedCount++
-                        Log.d(TAG, "移除共享Token: ${token.tokenId}")
+                    // 2. 如果是RecipientId::格式，转换为ACI格式
+                    if (recipientId.startsWith("RecipientId::")) {
+                        try {
+                            val idNum = recipientId.removePrefix("RecipientId::").toLong()
+                            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(
+                                org.thoughtcrime.securesms.recipients.RecipientId.from(idNum)
+                            )
+                            keysToRemove.add(recipient.requireAci().toString())
+                            Log.d(TAG, "RecipientId格式转换: $recipientId -> ${recipient.requireAci()}")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "无法转换RecipientId格式: $recipientId", e)
+                        }
                     }
-                    sharedTokens.remove(recipientId)
+                    
+                    // 3. 如果是ACI/UUID格式，查找对应的RecipientId::格式
+                    if (recipientId.contains("-") && recipientId.length >= 32) {
+                        try {
+                            val aci = org.whispersystems.signalservice.api.push.ServiceId.parseOrNull(recipientId)
+                            if (aci != null) {
+                                val recipient = org.thoughtcrime.securesms.recipients.Recipient.externalPush(aci)
+                                keysToRemove.add("RecipientId::${recipient.id.toLong()}")
+                                Log.d(TAG, "ACI格式转换: $recipientId -> RecipientId::${recipient.id.toLong()}")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "无法查找RecipientId格式: $recipientId", e)
+                        }
+                    }
+                    
+                    // 4. 如果是纯数字格式，也尝试转换
+                    if (recipientId.all { it.isDigit() }) {
+                        try {
+                            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(
+                                org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId.toLong())
+                            )
+                            keysToRemove.add(recipient.requireAci().toString())
+                            keysToRemove.add("RecipientId::$recipientId")
+                            Log.d(TAG, "数字格式转换: $recipientId -> ${recipient.requireAci()}")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "无法转换数字格式: $recipientId", e)
+                        }
+                    }
+                    
+                    Log.d(TAG, "Token清理目标格式: ${keysToRemove.joinToString(", ")}")
+                    
+                    // ✅ 遍历所有格式，删除匹配的Token
+                    for (key in keysToRemove) {
+                        // 移除接收Token
+                        receivedTokens[key]?.values?.forEach { token ->
+                            tokenMetadata.remove(token.tokenId)
+                            removedCount++
+                            Log.d(TAG, "移除接收Token [key=$key]: ${token.tokenId}")
+                        }
+                        receivedTokens.remove(key)
+                        
+                        // 移除共享Token
+                        sharedTokens[key]?.values?.forEach { token ->
+                            tokenMetadata.remove(token.tokenId)
+                            removedCount++
+                            Log.d(TAG, "移除共享Token [key=$key]: ${token.tokenId}")
+                        }
+                        sharedTokens.remove(key)
+                    }
                     
                     if (removedCount > 0) {
                         // 清理空的映射
@@ -805,7 +857,9 @@ class TransportTokenPool private constructor(private val context: Context) {
                         // 持久化存储
                         saveTokensToStorage()
                         
-                        Log.i(TAG, "移除联系人所有Token: recipientId=$recipientId, count=$removedCount")
+                        Log.i(TAG, "移除联系人所有Token: recipientId=$recipientId, 清理了${keysToRemove.size}种格式, count=$removedCount")
+                    } else {
+                        Log.d(TAG, "没有找到需要移除的Token: recipientId=$recipientId")
                     }
                     
                     removedCount

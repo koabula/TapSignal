@@ -549,53 +549,46 @@ class TapMessageProcessor private constructor(private val context: Context) {
         Log.i(TAG, "处理Token接受回应: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
         
         return try {
-            // 将RecipientId转换为ACI作为统一键
-            val senderAci = recipientIdToAci(senderId)
-            if (senderAci == null) {
-                Log.w(TAG, "无法获取发送者ACI: senderId=$senderId")
-                return TapProcessResult.Failed("无法获取发送者ACI")
-            }
-            
-            // 将对方的Token保存到TokenPool，使用ACI作为键
+            // 将对方的Token保存到TokenPool，使用RecipientId格式保持一致性
             val peerToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(tokenExchangeMessage.tokenData)
             if (peerToken == null) {
                 Log.w(TAG, "无法解析对方Token: senderId=$senderId")
                 return TapProcessResult.Failed("无法解析对方Token")
             }
             
-            val saved = tokenPool.addReceivedToken(senderAci, peerToken)
+            val saved = tokenPool.addReceivedToken(senderId.toString(), peerToken)
             if (!saved) {
-                Log.w(TAG, "保存对方Token失败: senderId=$senderId, senderAci=$senderAci")
+                Log.w(TAG, "保存对方Token失败: senderId=$senderId")
                 return TapProcessResult.Failed("保存对方Token失败")
             }
             
-            Log.i(TAG, "已保存对方Token: senderId=$senderId, senderAci=$senderAci, tokenId=${peerToken.tokenId}")
+            Log.i(TAG, "已保存对方Token: senderId=$senderId, tokenId=${peerToken.tokenId}")
             
-            // 更新通道状态为FULL_ACTIVE，使用ACI作为键
-            val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
+            // 更新通道状态为FULL_ACTIVE，使用RecipientId格式
+            val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
             if (upgraded) {
-                Log.i(TAG, "A端通道成功升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                Log.i(TAG, "A端通道成功升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                 
                 // 通道升级成功后，按顺序执行后续操作
                 // 1. 先处理轮询启动（upgradeChannelToFullActive已经处理了）
                 // 2. 再异步处理后续操作（发送确认消息和插入系统消息）
                 processorScope.launch {
                     try {
-                        handlePostUpgradeOperations(senderAci, senderId, tokenExchangeMessage.providerType)
+                        handlePostUpgradeOperations(senderId, tokenExchangeMessage.providerType)
                     } catch (e: Exception) {
-                        Log.e(TAG, "A端后续操作处理异常: senderAci=$senderAci", e)
+                        Log.e(TAG, "A端后续操作处理异常: senderId=$senderId", e)
                     }
                 }
                 
             } else {
-                Log.w(TAG, "A端通道升级失败，检查通道状态: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                Log.w(TAG, "A端通道升级失败，检查通道状态: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                 // 添加调试信息，检查当前通道状态
-                val channels = channelManager.getActiveChannels(senderAci)
+                val channels = channelManager.getActiveChannels(senderId.toString())
                 channels.forEach { channel ->
                     Log.d(TAG, "A端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
                 }
                 if (channels.isEmpty()) {
-                    Log.w(TAG, "A端未找到任何活跃通道: senderAci=$senderAci")
+                    Log.w(TAG, "A端未找到任何活跃通道: senderId=$senderId")
                 }
             }
             
@@ -1024,11 +1017,15 @@ private suspend fun <T> safeDatabaseOperation(
 /**
  * 发送Tap确认消息
  */
-private suspend fun sendTapConfirmationMessage(recipientAci: String, providerType: String) {
+private suspend fun sendTapConfirmationMessage(
+    recipientId: org.thoughtcrime.securesms.recipients.RecipientId,
+    providerType: String
+) {
     withContext(Dispatchers.IO) {
         val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-        val serviceId = org.whispersystems.signalservice.api.push.ServiceId.ACI.parseOrThrow(recipientAci)
-        val recipient = org.thoughtcrime.securesms.recipients.Recipient.externalPush(serviceId)
+        
+        // ✅ 直接使用RecipientId解析Recipient，避免格式转换问题
+        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
         
         val confirmMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
             senderAci = myAci,
@@ -1055,10 +1052,10 @@ private suspend fun sendTapConfirmationMessage(recipientAci: String, providerTyp
             val messageId = org.thoughtcrime.securesms.database.SignalDatabase.messages.insertMessageOutbox(outgoingMessage, threadId, false, null)
             if (messageId > 0) {
                 org.thoughtcrime.securesms.jobs.IndividualSendJob.enqueue(context, org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager, messageId, recipient, false)
-                Log.i(TAG, "Tap确认消息已加入发送队列: messageId=$messageId")
+                Log.i(TAG, "Tap确认消息已加入发送队列: recipientId=$recipientId, messageId=$messageId")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "发送Tap确认消息失败: recipientAci=$recipientAci", e)
+            Log.e(TAG, "发送Tap确认消息失败: recipientId=$recipientId", e)
             throw e
         }
     }
@@ -1071,44 +1068,39 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
     Log.i(TAG, "处理Token交换确认: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
     
     return try {
-        val senderAci = recipientIdToAci(senderId)
-        if (senderAci == null) {
-            Log.w(TAG, "无法获取发送者ACI: senderId=$senderId")
-            return TapProcessResult.Failed("无法获取发送者ACI")
-        }
-        
+        // ✅ 直接使用senderId（RecipientId格式），保持与其他流程的一致性
         // B端收到A的确认消息，将自己的通道升级为FULL_ACTIVE
-        val upgraded = channelManager.upgradeChannelToFullActive(senderAci, tokenExchangeMessage.providerType)
+        val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
         if (upgraded) {
-            Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+            Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
             
-            // 通道升级成功后立即启动轮询
+            // 通道升级成功后立即启动轮询（使用RecipientId格式）
             try {
                 val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                val channel = channelManager.getActiveChannel(senderAci, tokenExchangeMessage.providerType)
+                val channel = channelManager.getActiveChannel(senderId.toString(), tokenExchangeMessage.providerType)
                 
                                     if (channel?.metadata != null) {
-                        Log.d(TAG, "通道升级后启动轮询: senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+                        Log.d(TAG, "通道升级后启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                         val pollingStarted = pollingService.startPolling()
                         if (pollingStarted) {
-                            val targetAdded = pollingService.addPollingTarget(senderAci, channel.metadata!!, channel)
+                            val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
                             if (targetAdded) {
-                                Log.i(TAG, "通道升级后轮询启动成功: senderAci=$senderAci")
+                                Log.i(TAG, "通道升级后轮询启动成功: senderId=$senderId")
                             } else {
-                                Log.w(TAG, "通道升级后轮询目标添加失败: senderAci=$senderAci")
+                                Log.w(TAG, "通道升级后轮询目标添加失败: senderId=$senderId")
                                 // 增强诊断：详细分析轮询目标添加失败的原因
-                                diagnosisPollingTargetFailure(pollingService, senderAci, channel.metadata!!)
+                                diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
                             }
                         } else {
-                            Log.w(TAG, "通道升级后轮询服务启动失败: senderAci=$senderAci")
+                            Log.w(TAG, "通道升级后轮询服务启动失败: senderId=$senderId")
                         }
                     } else {
-                        Log.w(TAG, "通道升级后无法获取metadata，跳过轮询启动: senderAci=$senderAci")
+                        Log.w(TAG, "通道升级后无法获取metadata，跳过轮询启动: senderId=$senderId")
                         // 诊断metadata为null的原因
-                        diagnosisChannelMetadataIssue(channel, senderAci, tokenExchangeMessage.providerType)
+                        diagnosisChannelMetadataIssue(channel, senderId.toString(), tokenExchangeMessage.providerType)
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "通道升级后启动轮询异常: senderAci=$senderAci", e)
+                Log.e(TAG, "通道升级后启动轮询异常: senderId=$senderId", e)
             }
             
             // B端插入v2 mode启用提示消息
@@ -1124,11 +1116,11 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
                     insertV2ModeEnabledMessage(senderId)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "插入v2模式提示消息失败: senderAci=$senderAci", e)
+                Log.e(TAG, "插入v2模式提示消息失败: senderId=$senderId", e)
             }
             
         } else {
-            Log.w(TAG, "收到确认消息但通道升级失败: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+            Log.w(TAG, "收到确认消息但通道升级失败: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
         }
         
         TapProcessResult.Success("Token交换确认处理完成")
@@ -1468,36 +1460,26 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             
             val senderAci = tokenExchangeMessage.senderAci
             
-            // 【关键修复】异步处理禁用请求，避免阻塞消息处理流程
-            processorScope.launch(Dispatchers.IO) {
-                try {
-                    withTimeout(5000L) {
-                        Log.d(TAG, "异步处理群组禁用: groupId=$groupId, sender=$senderAci")
-                        
-                        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
-                        val result = groupManager.handleDisableV2ModeRequest(groupId, senderAci)
-                        
-                        when (result) {
-                            is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success -> {
-                                Log.i(TAG, "群组 V2 模式已禁用: groupId=$groupId")
-                            }
-                            is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Failed -> {
-                                Log.w(TAG, "群组 V2 模式禁用失败: groupId=$groupId, error=${result.message}")
-                            }
-                            else -> {
-                                Log.w(TAG, "群组 V2 模式禁用结果未知: groupId=$groupId")
-                            }
-                        }
-                    }
-                } catch (e: TimeoutCancellationException) {
-                    Log.w(TAG, "处理群组禁用超时: groupId=$groupId")
-                } catch (e: Exception) {
-                    Log.e(TAG, "异步处理群组禁用失败: groupId=$groupId", e)
+            // 【修复】同步处理禁用请求，确保立即生效，避免被状态同步器误判
+            Log.d(TAG, "同步处理群组禁用: groupId=$groupId, sender=$senderAci")
+            
+            val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+            val result = groupManager.handleDisableV2ModeRequest(groupId, senderAci)
+            
+            when (result) {
+                is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success -> {
+                    Log.i(TAG, "✅ 群组 V2 模式已禁用: groupId=$groupId")
+                    TapProcessResult.Success("群组 V2 模式已禁用")
+                }
+                is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Failed -> {
+                    Log.w(TAG, "❌ 群组 V2 模式禁用失败: groupId=$groupId, error=${result.message}")
+                    TapProcessResult.Failed("禁用失败: ${result.message}")
+                }
+                else -> {
+                    Log.w(TAG, "群组 V2 模式禁用结果未知: groupId=$groupId")
+                    TapProcessResult.Failed("禁用结果未知")
                 }
             }
-            
-            // 立即返回成功，不等待异步操作完成
-            TapProcessResult.Success("群组 V2 禁用请求已接收，将在后台处理")
         } catch (e: Exception) {
             Log.e(TAG, "处理群组 V2 禁用失败", e)
             TapProcessResult.Failed("处理失败: ${e.message}")
@@ -1931,19 +1913,22 @@ private fun diagnosisChannelMetadataIssue(
 /**
  * 异步处理通道升级后的操作
  */
-private suspend fun handlePostUpgradeOperations(senderAci: String, senderId: org.thoughtcrime.securesms.recipients.RecipientId, providerType: String) {
+private suspend fun handlePostUpgradeOperations(
+    senderId: org.thoughtcrime.securesms.recipients.RecipientId,
+    providerType: String
+) {
     // 已经在 IO 调度器上下文中，直接执行即可
     try {
-        // 1. 发送确认消息
-        sendTapConfirmationMessage(senderAci, providerType)
-        Log.i(TAG, "已发送Tap确认消息: senderAci=$senderAci")
+        // 1. 发送确认消息（直接传递RecipientId对象）
+        sendTapConfirmationMessage(senderId, providerType)
+        Log.i(TAG, "已发送Tap确认消息: senderId=$senderId")
         
         // 2. 插入v2启用提示消息
         insertV2ModeEnabledMessage(senderId)
         Log.i(TAG, "A端已插入v2模式启用提示消息: senderId=$senderId")
         
     } catch (e: Exception) {
-        Log.e(TAG, "处理通道升级后续操作失败: senderAci=$senderAci", e)
+        Log.e(TAG, "处理通道升级后续操作失败: senderId=$senderId", e)
         // 不抛出异常，避免影响主流程
     }
 }

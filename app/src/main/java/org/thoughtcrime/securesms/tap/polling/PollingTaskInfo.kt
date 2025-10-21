@@ -261,9 +261,16 @@ class PollingTaskInfo(
     
     /**
      * 清理任务资源
+     * 
+     * 使用 cancel(true) 强制中断周期性任务，确保 scheduleAtFixedRate 创建的任务能立即停止
      */
     fun cleanup() {
-        task?.cancel(false)
+        // ✅ 使用 cancel(true) 强制中断周期性任务
+        // 对于 scheduleAtFixedRate 创建的周期性任务，这会：
+        // 1. 取消所有未来的调度
+        // 2. 尝试中断正在执行的任务
+        // 3. 确保任务不会继续执行
+        task?.cancel(true)  // mayInterruptIfRunning = true
         task = null
         setStatus(PollingTaskStatus.STOPPED)
     }

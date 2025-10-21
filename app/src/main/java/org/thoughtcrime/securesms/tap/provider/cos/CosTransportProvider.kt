@@ -1810,13 +1810,15 @@ class CosTransportProvider(
              val basePath = if (groupId != null) {
                  "${providerConfig.groupPathPrefix}${groupId}/"
              } else {
-                 getSendPath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
+                 // ✅ basePath是发送路径，应该使用myHashedId（我的outbox）
+                 getSendPath(myHashedId, TransportMessageType.TEXT_MESSAGE)
              }
              
              val receivePath = if (groupId != null) {
                  "${providerConfig.groupPathPrefix}${groupId}/"
              } else {
-                 getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
+                 // ✅ receivePath是接收路径，应该使用peerHashedId（对方的outbox）
+                 getReceivePath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
              }
             
             // 创建CosTransportMetadata实例
@@ -1887,8 +1889,10 @@ class CosTransportProvider(
         val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(cosToken.recipientId)
         
         // 构建路径
-        val mySendPath = getSendPath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
-        val peerReceivePath = getReceivePath(myHashedId, TransportMessageType.TEXT_MESSAGE)
+        // ✅ mySendPath: 我发送到我自己的outbox
+        val mySendPath = getSendPath(myHashedId, TransportMessageType.TEXT_MESSAGE)
+        // ✅ peerReceivePath: 我轮询对方的outbox
+        val peerReceivePath = getReceivePath(peerHashedId, TransportMessageType.TEXT_MESSAGE)
         
         return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
             recipientId = cosToken.recipientId,

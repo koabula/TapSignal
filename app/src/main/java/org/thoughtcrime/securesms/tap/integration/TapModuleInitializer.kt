@@ -419,7 +419,11 @@ class TapModuleInitializer private constructor(private val context: Context) {
                                 val addResult = pollingService.addPollingTarget(recipientId, channel.metadata, channel)
                                 Log.d(TAG, "添加轮询目标: recipientId=$recipientId, 结果=$addResult")
                             } else {
-                                Log.w(TAG, "联系人无活跃通道，跳过轮询: recipientId=$recipientId")
+                                // ✅ 有Token但没有活跃通道：可能是正在建立通道，或等待用户确认
+                                // 不自动清理，Token会在明确的disable/降级/拒绝时被清理
+                                Log.w(TAG, "有Token但无活跃通道，跳过轮询添加: recipientId=$recipientId")
+                                Log.d(TAG, "  可能原因: 1)通道正在建立中 2)等待用户确认 3)历史残留Token")
+                                Log.d(TAG, "  Token会在用户disable v2 mode或自动降级时被清理")
                             }
                         } catch (addTargetEx: Exception) {
                             Log.e(TAG, "添加轮询目标失败: recipientId=$recipientId", addTargetEx)
