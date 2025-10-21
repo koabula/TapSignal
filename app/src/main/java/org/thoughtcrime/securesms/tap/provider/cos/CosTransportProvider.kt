@@ -601,14 +601,18 @@ class CosTransportProvider(
                     return@withContext null
                 }
                 
-                // 3. 生成唯一的子用户标识
+                // 3. 生成目录名（使用hashedId确保与实际使用路径一致）
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+                val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+                val channelDirectoryName = myHashedId
+                val channelDirectoryPath = "/v2-channels/$channelDirectoryName/"
+                
+                // 生成子用户名（包含时间戳确保唯一性）
                 val timestamp = System.currentTimeMillis()
                 val randomSuffix = (1000..9999).random()
-                val channelDirectoryName = "signal-v2-${timestamp}-${randomSuffix}"
-                val channelDirectoryPath = "/v2-channels/$channelDirectoryName/"
-                val subUserName = "signal-cos-$channelDirectoryName"
+                val subUserName = "signal-cos-signal-v2-${timestamp}-${randomSuffix}"
                 
-                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/")
+                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/, hashedId=$myHashedId")
                 
                 // 4. 创建COS客户端和子用户管理器
                 val cosClient = CosClientFactory.createClient(tapCosConfig, context)
@@ -1502,10 +1506,10 @@ class CosTransportProvider(
     private fun createCosClient(metadata: org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata): CosClient? {
         return try {
             if (metadata.myToken != null) {
-                // 使用Token创建客户端
+                // 使用Token创建客户端（使用token中的云服务商类型）
                 val cosToken = metadata.myToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
-                    provider = getProviderFromConfig(),
+                    provider = cosToken.cloudProvider,
                     region = cosToken.region,
                     bucketName = cosToken.bucketName,
                     accessKeyId = cosToken.accessKeyId,
@@ -1518,7 +1522,7 @@ class CosTransportProvider(
                 CosClientFactory.createClient(cosConfig, context)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "创建COS客户端失败: provider=${getProviderFromConfig()}, region=${cosConfig.region}, error=${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "创建COS客户端失败: provider=${metadata.myToken?.let { (it as CosTransportToken).cloudProvider } ?: getProviderFromConfig()}, region=${cosConfig.region}, error=${LogSanitizer.sanitizeThrowable(e)}")
             null
         }
     }
@@ -1529,10 +1533,10 @@ class CosTransportProvider(
     private fun createCosClientForSend(metadata: org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata): CosClient? {
         return try {
             if (metadata.myToken != null) {
-                // 使用本端Token创建客户端
+                // 使用本端Token创建客户端（使用token中的云服务商类型）
                 val cosToken = metadata.myToken as CosTransportToken
                 CosClientFactory.createClientWithToken(
-                    provider = getProviderFromConfig(),
+                    provider = cosToken.cloudProvider,
                     region = metadata.myRegion,
                     bucketName = metadata.myBucketName,
                     accessKeyId = cosToken.accessKeyId,

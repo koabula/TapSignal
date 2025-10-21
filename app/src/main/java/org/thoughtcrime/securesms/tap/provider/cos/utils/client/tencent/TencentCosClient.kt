@@ -22,6 +22,16 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
     private val cosXmlService: CosXmlService
 
     init {
+        // 清理凭证，避免签名错误（与AwsS3Client保持一致）
+        val cleanedSecretId = config.secretId.trim()
+        val cleanedSecretKey = config.secretKey.trim()
+        val cleanedSessionToken = config.sessionToken?.trim()
+        
+        Log.d(TAG, "腾讯云COS客户端初始化")
+        Log.d(TAG, "  - SecretId: ${cleanedSecretId.take(8)}***")
+        Log.d(TAG, "  - SecretKey长度: ${cleanedSecretKey.length}")
+        Log.d(TAG, "  - SessionToken: ${if (cleanedSessionToken.isNullOrEmpty()) "无" else "有 (长度: ${cleanedSessionToken.length})"}")
+        
         // 创建CosXmlServiceConfig对象，根据需要修改默认的配置参数
         val serviceConfig = CosXmlServiceConfig.Builder()
             .setRegion(config.region)
@@ -29,17 +39,17 @@ class TencentCosClient(private val config: CosConfig, private val context: Conte
             .builder()
 
         // 创建凭证提供者
-        val credentialProvider: QCloudCredentialProvider = if (!config.sessionToken.isNullOrEmpty()) {
+        val credentialProvider: QCloudCredentialProvider = if (!cleanedSessionToken.isNullOrEmpty()) {
             // 使用临时凭证
             object : BasicLifecycleCredentialProvider() {
                 override fun fetchNewCredentials(): QCloudLifecycleCredentials {
                     val expiredTime = System.currentTimeMillis() / 1000 + 7200 // 2小时后过期
-                    return SessionQCloudCredentials(config.secretId, config.secretKey, config.sessionToken, expiredTime)
+                    return SessionQCloudCredentials(cleanedSecretId, cleanedSecretKey, cleanedSessionToken, expiredTime)
                 }
             }
         } else {
             // 使用永久凭证
-            ShortTimeCredentialProvider(config.secretId, config.secretKey, 300)
+            ShortTimeCredentialProvider(cleanedSecretId, cleanedSecretKey, 300)
         }
 
         // 初始化COS服务

@@ -18,6 +18,10 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
     private val service = "iam"
     private val host = "iam.amazonaws.com"
     
+    // 清理后的凭证，避免签名错误（与AwsS3Client保持一致）
+    private val cleanedSecretId = config.secretId.trim()
+    private val cleanedSecretKey = config.secretKey.trim()
+    
     override fun createSubUser(
         userName: String, 
         directoryPath: String, 
@@ -93,7 +97,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val amzDate = iso8601(date)
         val dateStamp = dateStamp(date)
         
-        val action = "Action=CreateAccessKey&Version=2010-05-08&UserName=$userName"
+        val action = "Action=CreateAccessKey&Version=2010-05-08&UserName=${urlEncode(userName)}"
         val canonicalUri = "/"
         val canonicalQueryString = ""
         val payloadHash = AwsSigner.hash(action)
@@ -105,7 +109,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
         
         val authorization = AwsSigner.buildAuthorizationHeader(
-            config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+            cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
         )
         
         val request = Request.Builder()
@@ -133,7 +137,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val amzDate = iso8601(date)
             val dateStamp = dateStamp(date)
             
-            val action = "Action=DeleteAccessKey&Version=2010-05-08&UserName=$userName&AccessKeyId=$accessKeyId"
+            val action = "Action=DeleteAccessKey&Version=2010-05-08&UserName=${urlEncode(userName)}&AccessKeyId=${urlEncode(accessKeyId)}"
             val canonicalUri = "/"
             val canonicalQueryString = ""
             val payloadHash = AwsSigner.hash(action)
@@ -145,7 +149,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
             
             val authorization = AwsSigner.buildAuthorizationHeader(
-                config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+                cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
             )
             
             val request = Request.Builder()
@@ -178,12 +182,27 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
     
     // 私有辅助方法
     
+    /**
+     * URL编码辅助函数
+     * AWS Signature V4要求所有参数都正确URL编码
+     */
+    private fun urlEncode(value: String): String {
+        return java.net.URLEncoder.encode(value, "UTF-8")
+            .replace("+", "%20")  // AWS要求空格编码为%20而不是+
+            .replace("*", "%2A")  // 编码星号
+            .replace("%7E", "~")  // 波浪号不编码
+    }
+    
     private fun createIamUser(userName: String) {
+        Log.d(TAG, "===== AWS IAM创建用户操作 =====")
+        Log.d(TAG, "用户名: $userName")
+        Log.d(TAG, "使用凭证 - AccessKeyId: ${cleanedSecretId.take(8)}***, SecretKey长度: ${cleanedSecretKey.length}")
+        
         val date = Date()
         val amzDate = iso8601(date)
         val dateStamp = dateStamp(date)
         
-        val action = "Action=CreateUser&Version=2010-05-08&UserName=$userName"
+        val action = "Action=CreateUser&Version=2010-05-08&UserName=${urlEncode(userName)}"
         val canonicalUri = "/"
         val canonicalQueryString = ""
         val payloadHash = AwsSigner.hash(action)
@@ -195,8 +214,10 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
         
         val authorization = AwsSigner.buildAuthorizationHeader(
-            config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+            cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
         )
+        
+        Log.d(TAG, "发送IAM CreateUser请求...")
         
         val request = Request.Builder()
             .url("https://$host/")
@@ -209,8 +230,12 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         okHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
                 val errorBody = resp.body?.string() ?: "No error body"
+                Log.e(TAG, "✗ 创建IAM用户失败: ${resp.code}")
+                Log.e(TAG, "  - 错误响应: $errorBody")
                 throw CosSubUserException("创建IAM用户失败: ${resp.code} - $errorBody")
             }
+            Log.d(TAG, "✓ 创建IAM用户成功: $userName")
+            Log.d(TAG, "===== 操作完成 =====")
         }
     }
     
@@ -222,7 +247,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val amzDate = iso8601(date)
         val dateStamp = dateStamp(date)
         
-        val action = "Action=PutUserPolicy&Version=2010-05-08&UserName=$userName&PolicyName=$policyName&PolicyDocument=${java.net.URLEncoder.encode(policyDocument, "UTF-8")}"
+        val action = "Action=PutUserPolicy&Version=2010-05-08&UserName=${urlEncode(userName)}&PolicyName=${urlEncode(policyName)}&PolicyDocument=${urlEncode(policyDocument)}"
         val canonicalUri = "/"
         val canonicalQueryString = ""
         val payloadHash = AwsSigner.hash(action)
@@ -234,7 +259,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
         
         val authorization = AwsSigner.buildAuthorizationHeader(
-            config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+            cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
         )
         
         val request = Request.Builder()
@@ -253,30 +278,42 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         }
     }
     
+    /**
+     * 构建标准AWS S3 IAM策略
+     * 参考TencentSubUserManager.buildStandardTencentCamPolicy的实现，硬编码所有必需权限
+     */
     private fun buildS3Policy(directoryPath: String, permissions: CosPermission): String {
         val normalizedPath = if (directoryPath.startsWith("/")) directoryPath.substring(1) else directoryPath
         val bucketArn = "arn:aws:s3:::${config.bucketName}"
-        // 确保路径以/*结尾，覆盖所有子目录和文件
-        val pathWithWildcard = if (normalizedPath.endsWith("/")) "${normalizedPath}*" else "${normalizedPath}/*"
+        val pathWithWildcard = "${normalizedPath}*"
         val objectArn = "arn:aws:s3:::${config.bucketName}/${pathWithWildcard}"
         
-        val s3Actions = permissions.actions.map { "s3:$it" }
+        // 硬编码所有必需的AWS S3权限（参考Tencent的实现方式）
+        // Bucket级别操作：ListBucket是列举文件的必需权限
+        val bucketActions = listOf("s3:ListBucket")
+        
+        // Object级别操作：对应Tencent的GetObject, HeadObject等
+        val objectActions = listOf(
+            "s3:GetObject",
+            "s3:HeadObject",
+            "s3:GetObjectVersion",
+            "s3:ListMultipartUploadParts"
+        )
+        
+        Log.d(TAG, "构建S3策略 - 目录: $directoryPath")
+        Log.d(TAG, "  Bucket ARN: $bucketArn")
+        Log.d(TAG, "  Object ARN: $objectArn")
+        Log.d(TAG, "  Bucket操作: $bucketActions")
+        Log.d(TAG, "  Object操作: $objectActions")
 
-        Log.d(TAG, "构建S3策略 - 目录路径: $directoryPath, 标准化路径: $normalizedPath, 路径通配符: $pathWithWildcard")
-        Log.d(TAG, "S3策略 - 存储桶ARN: $bucketArn, 对象ARN: $objectArn")
+        // 构建两个Statement：bucket级别和object级别（参考Tencent的实现）
+        val bucketActionsStr = bucketActions.joinToString(",") { "\"$it\"" }
+        val objectActionsStr = objectActions.joinToString(",") { "\"$it\"" }
+        
+        val bucketStatement = """{"Effect":"Allow","Action":[$bucketActionsStr],"Resource":"$bucketArn"}"""
+        val objectStatement = """{"Effect":"Allow","Action":[$objectActionsStr],"Resource":"$objectArn"}"""
 
-        return """
-        {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [${s3Actions.joinToString(",") { "\"$it\"" }}],
-                    "Resource": ["$bucketArn", "$objectArn"]
-                }
-            ]
-        }
-        """.trimIndent().replace("\n", "").replace(" ", "")
+        return """{"Version":"2012-10-17","Statement":[$bucketStatement,$objectStatement]}"""
     }
     
     private fun parseCreateAccessKeyResponse(xml: String): CosAccessKey {
@@ -300,7 +337,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val amzDate = iso8601(date)
         val dateStamp = dateStamp(date)
         
-        val action = "Action=DeleteUser&Version=2010-05-08&UserName=$userName"
+        val action = "Action=DeleteUser&Version=2010-05-08&UserName=${urlEncode(userName)}"
         val canonicalUri = "/"
         val canonicalQueryString = ""
         val payloadHash = AwsSigner.hash(action)
@@ -312,7 +349,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
         
         val authorization = AwsSigner.buildAuthorizationHeader(
-            config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+            cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
         )
         
         val request = Request.Builder()
@@ -340,7 +377,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val amzDate = iso8601(date)
             val dateStamp = dateStamp(date)
             
-            val action = "Action=ListAccessKeys&Version=2010-05-08&UserName=$userName"
+            val action = "Action=ListAccessKeys&Version=2010-05-08&UserName=${urlEncode(userName)}"
             val canonicalUri = "/"
             val canonicalQueryString = ""
             val payloadHash = AwsSigner.hash(action)
@@ -352,7 +389,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
             
             val authorization = AwsSigner.buildAuthorizationHeader(
-                config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+                cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
             )
             
             val request = Request.Builder()
@@ -422,7 +459,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val amzDate = iso8601(date)
             val dateStamp = dateStamp(date)
             
-            val action = "Action=ListUserPolicies&Version=2010-05-08&UserName=$userName"
+            val action = "Action=ListUserPolicies&Version=2010-05-08&UserName=${urlEncode(userName)}"
             val canonicalUri = "/"
             val canonicalQueryString = ""
             val payloadHash = AwsSigner.hash(action)
@@ -434,7 +471,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
             
             val authorization = AwsSigner.buildAuthorizationHeader(
-                config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+                cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
             )
             
             val request = Request.Builder()
@@ -481,7 +518,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val amzDate = iso8601(date)
             val dateStamp = dateStamp(date)
             
-            val action = "Action=DeleteUserPolicy&Version=2010-05-08&UserName=$userName&PolicyName=$policyName"
+            val action = "Action=DeleteUserPolicy&Version=2010-05-08&UserName=${urlEncode(userName)}&PolicyName=${urlEncode(policyName)}"
             val canonicalUri = "/"
             val canonicalQueryString = ""
             val payloadHash = AwsSigner.hash(action)
@@ -493,7 +530,7 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
             val canonicalRequest = "POST\n$canonicalUri\n$canonicalQueryString\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
             
             val authorization = AwsSigner.buildAuthorizationHeader(
-                config.secretId, config.secretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
+                cleanedSecretId, cleanedSecretKey, "us-east-1", service, canonicalRequest, amzDate, dateStamp, signedHeaders
             )
             
             val request = Request.Builder()

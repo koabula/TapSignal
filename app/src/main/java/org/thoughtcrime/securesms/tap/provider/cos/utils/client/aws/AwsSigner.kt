@@ -1,13 +1,15 @@
 package org.thoughtcrime.securesms.tap.provider.cos.utils.client.aws
 
-import java.nio.charset.Charset
+import okio.ByteString
+import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import java.security.MessageDigest
-import okio.ByteString
 
 /**
- * AWS Signature Version 4 实现 (适用于 S3 / STS 等服务)。
+ * AWS Signature Version 4签名工具
+ * 
+ * 轻量级实现，专门用于AWS IAM API签名
+ * 核心S3操作已使用AWS SDK for Kotlin，不需要手动签名
  */
 object AwsSigner {
     private const val HMAC_ALGORITHM = "HmacSHA256"
@@ -27,9 +29,6 @@ object AwsSigner {
         return mac.doFinal(data.toByteArray(Charsets.UTF_8))
     }
 
-    /**
-     * 生成签名密钥。
-     */
     private fun getSignatureKey(secretKey: String, dateStamp: String, regionName: String, serviceName: String): ByteArray {
         val kDate = hmacSHA256("AWS4$secretKey".toByteArray(Charsets.UTF_8), dateStamp)
         val kRegion = hmacSHA256(kDate, regionName)
@@ -37,18 +36,14 @@ object AwsSigner {
         return hmacSHA256(kService, "aws4_request")
     }
 
-    /**
-     * 生成 Authorization header。
-     * @param canonicalRequest 已计算的 canonical request (字符串)
-     */
     fun buildAuthorizationHeader(
         accessKeyId: String,
         secretKey: String,
         region: String,
         service: String,
         canonicalRequest: String,
-        requestDateTime: String, // yyyyMMdd'T'HHmmss'Z'
-        dateStamp: String, // yyyyMMdd
+        requestDateTime: String,
+        dateStamp: String,
         signedHeaders: String
     ): String {
         val algorithm = "AWS4-HMAC-SHA256"
@@ -61,4 +56,5 @@ object AwsSigner {
 
         return "$algorithm Credential=$accessKeyId/$credentialScope, SignedHeaders=$signedHeaders, Signature=$signature"
     }
-} 
+}
+

@@ -610,6 +610,9 @@ dependencies {
 
   // Tencent Cloud COS SDK
   implementation(libs.tencent.cos.android)
+  
+  // AWS S3 SDK for Kotlin
+  implementation(libs.aws.sdk.s3)
 
   "playImplementation"(project(":billing"))
   "nightlyImplementation"(project(":billing"))

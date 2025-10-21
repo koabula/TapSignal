@@ -49,7 +49,7 @@ class TencentSubUserManager(
         directoryPath: String,
         permissions: CosPermission
     ): CosSubUserCredential {
-        Log.d(TAG, "开始创建腾讯云CAM子用户: $userName")
+        Log.d(TAG, "开始创建腾讯云CAM子用户: $userName, 目录: $directoryPath")
 
         try {
             // 1. 创建CAM子用户
@@ -58,8 +58,8 @@ class TencentSubUserManager(
             // 2. 创建访问密钥（使用UIN而不是用户名）
             val accessKey = createAccessKey(userUin)
 
-            // 3. 使用自定义策略并传递UIN（修复关键问题）
-            attachCustomPolicy(userName, userUin, permissions)
+            // 3. 使用自定义策略并传递UIN和目录路径（修复关键问题）
+            attachCustomPolicy(userName, userUin, directoryPath, permissions)
 
             // 4. 自定义策略已包含所有必要权限
             Log.i(TAG, "使用自定义CAM策略，支持跨存储桶访问")
@@ -477,12 +477,12 @@ class TencentSubUserManager(
     /**
      * 附加符合腾讯云标准的CAM策略
      */
-    private fun attachCustomPolicy(userName: String, userUin: Long, permissions: CosPermission) {
-        Log.d(TAG, "附加腾讯云标准CAM策略: userName=$userName, userUin=$userUin, permissions=$permissions")
+    private fun attachCustomPolicy(userName: String, userUin: Long, directoryPath: String, permissions: CosPermission) {
+        Log.d(TAG, "附加腾讯云标准CAM策略: userName=$userName, userUin=$userUin, directoryPath=$directoryPath, permissions=$permissions")
 
         // 创建符合腾讯云标准的策略，使用更易识别的策略名称
         val policyName = "Signal-COS-Policy-${userName}-${System.currentTimeMillis()}"
-        val policyDocument = buildStandardTencentCamPolicy()
+        val policyDocument = buildStandardTencentCamPolicy(directoryPath)
 
         try {
             // 1. 创建策略并获取策略ID
@@ -512,9 +512,9 @@ class TencentSubUserManager(
     }
 
     /**
-     * 构建符合腾讯云标准的CAM策略
+     * 构建符合腾讯云标准的CAM策略（基于目录路径）
      */
-    private fun buildStandardTencentCamPolicy(): String {
+    private fun buildStandardTencentCamPolicy(directoryPath: String): String {
         val actions = listOf(
             "cos:GetBucket",
             "cos:GetBucketObjectVersions", 
@@ -533,8 +533,14 @@ class TencentSubUserManager(
             throw CosSubUserException("无法从存储桶名称中提取AppID: ${config.bucketName}")
         }
 
+        // 标准化目录路径（与AWS实现保持一致）
+        val normalizedPath = if (directoryPath.startsWith("/")) directoryPath.substring(1) else directoryPath
+        val pathWithWildcard = "${normalizedPath}*"
+        
         // 腾讯云标准Resource格式：qcs::cos:region:uid/appid:bucket-name/path
-        val resourceArn = "qcs::cos:${config.region}:uid/${appId}:${config.bucketName}/*"
+        val resourceArn = "qcs::cos:${config.region}:uid/${appId}:${config.bucketName}/${pathWithWildcard}"
+        
+        Log.d(TAG, "构建CAM策略 - 目录: $directoryPath, 标准化路径: $normalizedPath, ARN: $resourceArn")
 
         val statement = JSONObject().apply {
             put("effect", "allow")  // 腾讯云标准：小写
@@ -861,8 +867,8 @@ class TencentSubUserManager(
             }
 
             val accessKey = response.getJSONObject("AccessKey")
-            val accessKeyId = accessKey.getString("AccessKeyId")
-            val secretAccessKey = accessKey.getString("SecretAccessKey")
+            val accessKeyId = accessKey.getString("AccessKeyId").trim()  // 清理凭证，避免签名错误
+            val secretAccessKey = accessKey.getString("SecretAccessKey").trim()  // 清理凭证，避免签名错误
             val status = accessKey.optString("Status", "Active")
 
             return CosAccessKey(accessKeyId, secretAccessKey, status)

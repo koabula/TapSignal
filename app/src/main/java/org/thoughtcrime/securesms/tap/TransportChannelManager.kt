@@ -138,12 +138,15 @@ class TransportChannelManager private constructor(private val context: Context) 
         metadata: TransportMetadata
     ): TransportChannel? {
         var channelToSave: TransportChannel? = null
-        val result = withContext(Dispatchers.IO) {
+        var channelIdToActivate: String? = null
+        
+        // 阶段1: 在写锁中创建通道（不调用suspend函数）
+        val channel = withContext(Dispatchers.IO) {
             channelLock.write {
                 try {
                     if (!isInitialized) {
                         Log.w(TAG, "通道管理器未初始化")
-                        return@withContext null
+                        return@write null
                     }
                     
                     // 检查是否超过最大通道数限制
@@ -152,14 +155,14 @@ class TransportChannelManager private constructor(private val context: Context) 
                         cleanupExpiredChannels()
                         if (channels.size >= config.maxChannels) {
                             Log.e(TAG, "无法建立新通道，已达到最大限制")
-                            return@withContext null
+                            return@write null
                         }
                     }
                     
                     val channelId = generateChannelId(recipientId, providerType)
                     val currentTime = System.currentTimeMillis()
                     
-                    val channel = TransportChannel(
+                    val newChannel = TransportChannel(
                         channelId = channelId,
                         recipientId = recipientId,
                         providerType = providerType,
@@ -170,50 +173,50 @@ class TransportChannelManager private constructor(private val context: Context) 
                         priority = calculateChannelPriority(recipientId, providerType)
                     )
                     
-                    // 存储通道到内存，收集用于后续数据库保存
-                    channels[channelId] = channel
-                    channelToSave = channel
+                    // 存储通道到内存
+                    channels[channelId] = newChannel
+                    channelToSave = newChannel
+                    channelIdToActivate = channelId
                     
                     // 更新索引
                     recipientChannels.computeIfAbsent(recipientId) { mutableSetOf() }.add(channelId)
                     providerChannels.computeIfAbsent(providerType) { mutableSetOf() }.add(channelId)
                     
                     Log.d(TAG, "建立通道: $channelId, 接收者: $recipientId, 提供者: $providerType")
-                    
-                    // 同步激活通道，确保通道在创建完成时就处于正确状态
-                    try {
-                        activateChannel(channelId)
-                        Log.d(TAG, "通道同步激活完成: $channelId")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "通道同步激活失败: $channelId", e)
-                        // 激活失败时清理已创建的通道
-                        channels.remove(channelId)
-                        recipientChannels[recipientId]?.remove(channelId)
-                        providerChannels[providerType]?.remove(channelId)
-                        channelToSave = null
-                        return@withContext null
-                    }
-                    
-                    channel
+                    newChannel
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "建立通道失败", e)
-                    channelToSave = null
                     null
                 }
             }
-        }
+        } ?: return null
         
-        // 在锁外异步保存通道到数据库，避免死锁
-        channelToSave?.let { channel ->
-            try {
-                saveChannelToDatabaseAsync(channel)
-            } catch (e: Exception) {
-                Log.e(TAG, "保存新建通道到数据库失败: ${channel.channelId}", e)
+        // 阶段2: 在锁外激活通道（安全调用suspend函数）
+        try {
+            activateChannel(channelIdToActivate!!)
+            Log.d(TAG, "通道激活完成: $channelIdToActivate")
+        } catch (e: Exception) {
+            Log.e(TAG, "通道激活失败: $channelIdToActivate", e)
+            // 激活失败时清理通道
+            withContext(Dispatchers.IO) {
+                channelLock.write {
+                    channels.remove(channelIdToActivate)
+                    recipientChannels[recipientId]?.remove(channelIdToActivate)
+                    providerChannels[providerType]?.remove(channelIdToActivate)
+                }
             }
+            return null
         }
         
-        return result
+        // 阶段3: 异步保存到数据库
+        try {
+            saveChannelToDatabaseAsync(channel)
+        } catch (e: Exception) {
+            Log.e(TAG, "保存通道到数据库失败: ${channel.channelId}", e)
+        }
+        
+        return channel
     }
     
     /**
@@ -1727,17 +1730,18 @@ class TransportChannelManager private constructor(private val context: Context) 
     
     /**
      * 激活通道
+     * 使用ConcurrentHashMap的原子操作避免死锁（参考Tencent的实现思路）
      */
     private suspend fun activateChannel(channelId: String) {
         try {
-            // 获取通道信息
-            val channel = channelLock.read { channels[channelId] }
+            // 获取通道信息（无需锁，ConcurrentHashMap线程安全）
+            val channel = channels[channelId]
             if (channel?.status != TransportChannelStatus.ESTABLISHING) {
                 Log.w(TAG, "通道状态不正确，无法激活: $channelId, status=${channel?.status}")
                 return
             }
             
-            // 获取对应的Provider
+            // 获取Provider（不持有锁）
             val transportManager = TransportManager.getInstance(context)
             val provider = transportManager.getProvider(channel.providerType)
             if (provider == null) {
@@ -1746,30 +1750,38 @@ class TransportChannelManager private constructor(private val context: Context) 
                 return
             }
             
-            // 执行健康检查
-            val healthCheckResult = performHealthCheck(provider, channel.metadata)
+            // 执行健康检查（不持有锁，避免阻塞其他线程，添加超时）
+            val healthCheckResult = try {
+                withTimeout(30000L) {
+                    performHealthCheck(provider, channel.metadata)
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.w(TAG, "健康检查超时: $channelId")
+                false
+            }
             
-            channelLock.write {
-                val currentChannel = channels[channelId]
+            // 使用ConcurrentHashMap.compute原子操作更新状态（无需额外的锁）
+            channels.compute(channelId) { _, currentChannel ->
                 if (currentChannel != null && currentChannel.status == TransportChannelStatus.ESTABLISHING) {
                     if (healthCheckResult) {
-                        // 根据是否有对端Token设置不同的状态
                         val cosMetadata = currentChannel.metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
                         val newStatus = if (cosMetadata != null && cosMetadata.peerToken != null) {
                             TransportChannelStatus.FULL_ACTIVE
                         } else {
                             TransportChannelStatus.SEND_READY
                         }
-                        channels[channelId] = currentChannel.updateStatus(newStatus)
-                        Log.d(TAG, "通道健康检查通过，状态更新为: $newStatus, channelId: $channelId")
+                        Log.d(TAG, "通道激活成功: $newStatus, $channelId")
+                        currentChannel.updateStatus(newStatus)
                     } else {
-                        channels[channelId] = currentChannel.updateStatus(TransportChannelStatus.FAILED)
-                        Log.w(TAG, "通道健康检查失败: $channelId")
+                        Log.w(TAG, "通道健康检查失败，标记为FAILED: $channelId")
+                        currentChannel.updateStatus(TransportChannelStatus.FAILED)
                     }
+                } else {
+                    currentChannel
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "激活通道失败: $channelId - ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "激活通道异常: $channelId - ${LogSanitizer.sanitizeThrowable(e)}")
             markChannelFailed(channelId)
         }
     }
@@ -1779,73 +1791,83 @@ class TransportChannelManager private constructor(private val context: Context) 
      */
     private suspend fun performHealthCheck(provider: TransportProvider, metadata: TransportMetadata): Boolean {
         return try {
-            // 根据Provider类型执行不同的健康检查
             when (provider.providerType) {
                 "cos" -> {
-                    // 对COS执行健康检查
                     val cosMetadata = metadata as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
                     if (cosMetadata != null && cosMetadata.peerToken != null) {
-                        // 有对端Token，可以测试双向能力（接收）- 测试messages目录
+                        // 有对端Token，测试接收能力
                         val testPath = "${metadata.getReceiveMetadata().path}messages/"
                         val listResult = provider.listFiles(testPath, metadata)
                         when (listResult) {
-                            is TransportResult.Success -> true
+                            is TransportResult.Success -> {
+                                Log.d(TAG, "健康检查通过：可以列举对端文件")
+                                true
+                            }
                             is TransportResult.Failed -> {
-                                Log.w(TAG, "COS健康检查失败: ${LogSanitizer.sanitizeGeneric(listResult.error.toString())}")
+                                val error = listResult.error
+                                when {
+                                    error.toString().contains("not authorized", ignoreCase = true) ||
+                                    error.toString().contains("AccessDenied", ignoreCase = true) ||
+                                    error.toString().contains("ListBucket", ignoreCase = true) -> {
+                                        Log.e(TAG, "健康检查失败：权限不足")
+                                        Log.e(TAG, "  提示：对端Token可能缺少ListBucket权限，请检查对端云存储配置")
+                                        Log.e(TAG, "  错误详情：${LogSanitizer.sanitizeGeneric(error.toString())}")
+                                    }
+                                    else -> {
+                                        Log.w(TAG, "健康检查失败：${LogSanitizer.sanitizeGeneric(error.toString())}")
+                                    }
+                                }
                                 false
                             }
                             is TransportResult.RetryScheduled -> {
-                                Log.w(TAG, "COS健康检查需要重试: ${LogSanitizer.sanitizeGeneric(listResult.reason)}")
+                                Log.w(TAG, "健康检查需要重试：${LogSanitizer.sanitizeGeneric(listResult.reason)}")
                                 false
                             }
                             is TransportResult.PartialSuccess -> {
-                                Log.w(TAG, "COS健康检查部分成功: ${listResult.successCount}/${listResult.successCount + listResult.failureCount}")
+                                Log.w(TAG, "健康检查部分成功：${listResult.successCount}/${listResult.successCount + listResult.failureCount}")
                                 listResult.successCount > 0
                             }
                         }
                     } else {
                         // 没有对端Token，只测试发送能力
-                        Log.d(TAG, "COS健康检查：缺少对端Token，当前为单向发送模式，recipientId=${metadata.recipientId}")
+                        Log.d(TAG, "健康检查：单向模式，测试发送能力")
                         val cosProvider = provider as? org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider
                         if (cosProvider != null) {
                             val sendTestResult = cosProvider.testSendCapability(metadata)
                             when (sendTestResult) {
                                 is TransportResult.Success -> {
-                                    Log.d(TAG, "COS发送能力测试通过，通道将设置为SEND_READY状态")
+                                    Log.d(TAG, "发送能力测试通过")
                                     true
                                 }
                                 else -> {
-                                    Log.w(TAG, "COS发送能力测试失败，通道将标记为FAILED：$sendTestResult")
+                                    Log.w(TAG, "发送能力测试失败：$sendTestResult")
                                     false
                                 }
                             }
                         } else {
-                            Log.w(TAG, "无法转换为CosTransportProvider，健康检查失败")
+                            Log.w(TAG, "无法转换为CosTransportProvider")
                             false
                         }
                     }
                 }
                 else -> {
-                    // 其他Provider暂时返回true，假设健康
                     Log.d(TAG, "跳过健康检查: ${provider.providerType}")
                     true
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "健康检查过程中出现异常: ${LogSanitizer.sanitizeThrowable(e)}")
+            Log.e(TAG, "健康检查异常：${LogSanitizer.sanitizeThrowable(e)}")
             false
         }
     }
     
     /**
      * 标记通道为失败状态
+     * 使用ConcurrentHashMap原子操作避免死锁
      */
     private fun markChannelFailed(channelId: String) {
-        channelLock.write {
-            val channel = channels[channelId]
-            if (channel != null) {
-                channels[channelId] = channel.updateStatus(TransportChannelStatus.FAILED)
-            }
+        channels.compute(channelId) { _, channel ->
+            channel?.updateStatus(TransportChannelStatus.FAILED)
         }
     }
     

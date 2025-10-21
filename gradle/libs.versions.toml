@@ -22,6 +22,7 @@ navigation-safe-args-gradle-plugin = "2.8.5"
 protobuf-gradle-plugin = "0.9.0"
 ktlint = "12.1.1"
 tencent-cos = "5.9.46"
+aws-sdk-kotlin = "1.3.95"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
@@ -189,6 +190,9 @@ mp4parser-muxer = { module = "org.mp4parser:muxer", version.ref = "mp4parser" }
 
 # Tencent Cloud COS
 tencent-cos-android = { module = "com.qcloud.cos:cos-android", version.ref = "tencent-cos" }
+
+# AWS S3 SDK for Kotlin
+aws-sdk-s3 = { module = "aws.sdk.kotlin:s3", version.ref = "aws-sdk-kotlin" }
 
 [bundles]
 media3 = ["androidx-media3-exoplayer", "androidx-media3-session", "androidx-media3-ui"]
