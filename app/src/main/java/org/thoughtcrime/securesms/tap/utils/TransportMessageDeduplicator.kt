@@ -29,7 +29,10 @@ class TransportMessageDeduplicator private constructor(private val context: Cont
         
         fun getInstance(context: Context): TransportMessageDeduplicator {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: TransportMessageDeduplicator(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: TransportMessageDeduplicator(context.applicationContext).also { 
+                    INSTANCE = it
+                    it.ensureTableExists()
+                }
             }
         }
     }
@@ -291,6 +294,171 @@ class TransportMessageDeduplicator private constructor(private val context: Cont
                 
             } catch (e: Exception) {
                 Log.e(TAG, "清空去重记录失败", e)
+            }
+        }
+    }
+    
+    /**
+     * 确保数据库表存在并且结构正确
+     * 在实例初始化时调用，提供自愈能力
+     */
+    private fun ensureTableExists() {
+        try {
+            val database = SignalDatabase.rawDatabase
+            
+            // 检查表是否存在
+            val cursor = database.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='transport_processed_messages'",
+                null
+            )
+            
+            val tableExists = cursor.use { it.moveToFirst() }
+            
+            if (!tableExists) {
+                Log.w(TAG, "检测到transport_processed_messages表不存在，正在创建...")
+                createTable(database)
+                Log.i(TAG, "transport_processed_messages表创建成功")
+            } else {
+                // 表存在，验证列是否完整
+                Log.d(TAG, "transport_processed_messages表已存在，验证结构...")
+                verifyTableSchema(database)
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "检查/创建去重表失败，去重功能可能受影响", e)
+        }
+    }
+    
+    /**
+     * 创建去重表及其索引
+     */
+    private fun createTable(database: net.zetetic.database.sqlcipher.SQLiteDatabase) {
+        // 创建主表
+        database.execSQL(
+            "CREATE TABLE IF NOT EXISTS transport_processed_messages (" +
+            "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "duplication_key TEXT UNIQUE NOT NULL, " +
+            "message_id TEXT NOT NULL, " +
+            "recipient_id TEXT NOT NULL, " +
+            "timestamp INTEGER NOT NULL, " +
+            "processed_at INTEGER NOT NULL, " +
+            "created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)" +
+            ")"
+        )
+        
+        // 创建索引
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_processed_messages_key_idx " +
+            "ON transport_processed_messages (duplication_key)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_processed_messages_timestamp_idx " +
+            "ON transport_processed_messages (processed_at)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_processed_messages_recipient_idx " +
+            "ON transport_processed_messages (recipient_id)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_processed_messages_message_idx " +
+            "ON transport_processed_messages (message_id)"
+        )
+        
+        Log.i(TAG, "transport_processed_messages表及索引创建完成")
+    }
+    
+    /**
+     * 验证表结构是否完整
+     * 如果表结构不完整，会重建表
+     */
+    private fun verifyTableSchema(database: net.zetetic.database.sqlcipher.SQLiteDatabase) {
+        try {
+            // 验证必需列是否存在
+            val requiredColumns = listOf(
+                "duplication_key", 
+                "message_id", 
+                "recipient_id", 
+                "timestamp", 
+                "processed_at", 
+                "created_at"
+            )
+            
+            val cursor = database.rawQuery(
+                "PRAGMA table_info(transport_processed_messages)", 
+                null
+            )
+            
+            val existingColumns = mutableListOf<String>()
+            cursor.use {
+                val nameIndex = it.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (it.moveToNext()) {
+                        existingColumns.add(it.getString(nameIndex))
+                    }
+                }
+            }
+            
+            val missingColumns = requiredColumns.filter { it !in existingColumns }
+            
+            if (missingColumns.isNotEmpty()) {
+                Log.w(TAG, "transport_processed_messages表结构不完整，缺少列: $missingColumns")
+                Log.i(TAG, "正在重建表以修复结构...")
+                
+                // 备份现有数据
+                val hasData = database.rawQuery(
+                    "SELECT COUNT(*) FROM transport_processed_messages", 
+                    null
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getInt(0) > 0 else false
+                }
+                
+                if (hasData) {
+                    Log.w(TAG, "表中存在数据，尝试迁移...")
+                    // 创建临时表用于数据迁移
+                    database.execSQL("ALTER TABLE transport_processed_messages RENAME TO transport_processed_messages_backup")
+                    
+                    // 创建新表
+                    createTable(database)
+                    
+                    // 尝试迁移数据（只迁移存在的列）
+                    val columnsToMigrate = requiredColumns.filter { it in existingColumns }.joinToString(", ")
+                    if (columnsToMigrate.isNotEmpty()) {
+                        try {
+                            database.execSQL(
+                                "INSERT INTO transport_processed_messages ($columnsToMigrate) " +
+                                "SELECT $columnsToMigrate FROM transport_processed_messages_backup"
+                            )
+                            Log.i(TAG, "数据迁移成功")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "数据迁移失败，旧数据将丢失", e)
+                        }
+                    }
+                    
+                    // 删除备份表
+                    database.execSQL("DROP TABLE IF EXISTS transport_processed_messages_backup")
+                } else {
+                    // 没有数据，直接删除重建
+                    Log.i(TAG, "表为空，直接重建...")
+                    database.execSQL("DROP TABLE IF EXISTS transport_processed_messages")
+                    createTable(database)
+                }
+                
+                Log.i(TAG, "表结构修复完成")
+            } else {
+                Log.d(TAG, "表结构验证通过，所有必需列都存在")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "验证表结构失败", e)
+            // 如果验证失败，尝试完全重建
+            try {
+                Log.w(TAG, "尝试完全重建表...")
+                database.execSQL("DROP TABLE IF EXISTS transport_processed_messages")
+                database.execSQL("DROP TABLE IF EXISTS transport_processed_messages_backup")
+                createTable(database)
+                Log.i(TAG, "表重建成功")
+            } catch (rebuildException: Exception) {
+                Log.e(TAG, "表重建也失败，去重功能将受影响", rebuildException)
             }
         }
     }
