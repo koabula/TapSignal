@@ -1549,12 +1549,21 @@ class TransportChannelManager private constructor(private val context: Context) 
             }
         
         // 2. 获取对端Token信息（用于轮询对方消息）
-        // ✅ 使用 originalRecipientId 查询Token，确保与Token保存时的格式一致
-        val peerTokenInfo = tokenPool.getPeerTokenInfo(originalRecipientId, "cos")
+        // ✅ 首先使用 originalRecipientId 查询Token（保持向后兼容）
+        var peerTokenInfo = tokenPool.getPeerTokenInfo(originalRecipientId, "cos")
+        
+        // ✅ 如果查不到，尝试使用规范化的ACI格式查询（兼容不同ID格式）
+        if (peerTokenInfo == null && originalRecipientId != recipientAci) {
+            Log.d(TAG, "使用originalRecipientId查询peerToken失败,尝试使用ACI格式: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
+            peerTokenInfo = tokenPool.getPeerTokenInfo(recipientAci, "cos")
+            if (peerTokenInfo != null) {
+                Log.i(TAG, "使用ACI格式成功查询到peerToken: recipientAci=$recipientAci")
+            }
+        }
         
         // 在v2模式建立初期，可能还没有对端Token信息，此时使用默认值
         if (peerTokenInfo == null) {
-            Log.w(TAG, "未找到对端Token信息，使用默认配置进行通道建立: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
+            Log.w(TAG, "未找到对端Token信息(已尝试两种格式)，使用默认配置进行通道建立: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
         }
         
         // 3. 构建本端地址和参数
@@ -1580,13 +1589,23 @@ class TransportChannelManager private constructor(private val context: Context) 
         // 本端发送消息时不使用此Token，而是直接使用本地高权限配置
         val sharedTokenForPeer = run {
             // 检查是否已经为此对方生成了shared token
-            // ✅ 使用 originalRecipientId 查询Token，确保与Token保存时的格式一致
-            val existingSharedToken = tokenPool.getValidSharedToken(originalRecipientId, "cos")
+            // ✅ 首先使用 originalRecipientId 查询Token（保持向后兼容）
+            var existingSharedToken = tokenPool.getValidSharedToken(originalRecipientId, "cos")
+            
+            // ✅ 如果查不到，尝试使用规范化的ACI格式查询（兼容不同ID格式）
+            if (existingSharedToken == null && originalRecipientId != recipientAci) {
+                Log.d(TAG, "使用originalRecipientId查询sharedToken失败,尝试使用ACI格式: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
+                existingSharedToken = tokenPool.getValidSharedToken(recipientAci, "cos")
+                if (existingSharedToken != null) {
+                    Log.i(TAG, "使用ACI格式成功查询到sharedToken: recipientAci=$recipientAci")
+                }
+            }
+            
             if (existingSharedToken != null) {
                 Log.d(TAG, "已存在共享Token，复用: tokenId=${LogSanitizer.sanitize(existingSharedToken.tokenId)}, originalRecipientId=$originalRecipientId")
                 existingSharedToken
             } else {
-                Log.d(TAG, "共享Token不存在，生成新的只读Token供对方轮询: originalRecipientId=$originalRecipientId")
+                Log.d(TAG, "共享Token不存在(已尝试两种格式)，生成新的只读Token供对方轮询: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
                 try {
                     // 创建Token请求：只读权限，供对方轮询我们的outbox
                     // 注意：tokenRequest 中的 recipientId 用于生成 Token，应使用 ACI 格式
