@@ -444,33 +444,6 @@ class TransportChannelManager private constructor(private val context: Context) 
     }
     
     /**
-     * 关闭群组的所有通道
-     * 
-     * @param groupId 群组 ID
-     * @return 关闭的通道数量
-     */
-    suspend fun closeGroupChannels(groupId: String): Int {
-        return withContext(Dispatchers.IO) {
-            val groupChannels = channelLock.read {
-                channels.values.filter { channel ->
-                    channel.config["groupId"] == groupId
-                }.map { it.channelId }
-            }
-            
-            var closedCount = 0
-            for (channelId in groupChannels) {
-                val success = closeChannel(channelId)
-                if (success) {
-                    closedCount++
-                }
-            }
-            
-            Log.i(TAG, "关闭群组通道: groupId=$groupId, 关闭=$closedCount/${groupChannels.size}")
-            closedCount
-        }
-    }
-    
-    /**
      * 批量升级群组通道为 FULL_ACTIVE
      * 
      * @param groupId 群组 ID
@@ -657,23 +630,56 @@ class TransportChannelManager private constructor(private val context: Context) 
                 val channel = channels[channelId] ?: return@withContext false
                 
                 try {
-                    // 更新状态为关闭
-                    val closedChannel = channel.updateStatus(TransportChannelStatus.CLOSED)
-                    channels[channelId] = closedChannel
+                    // 从内存中移除
+                    channels.remove(channelId)
                     
-                    Log.i(TAG, "关闭通道: $channelId")
+                    // 同步删除数据库记录
+                    deleteChannelFromDatabase(channelId)
                     
-                    // 异步清理通道资源
-                    managerScope.launch {
-                        cleanupChannel(channelId)
-                        deleteChannelFromDatabase(channelId)
-                    }
-                    
+                    Log.i(TAG, "通道已关闭并删除: $channelId")
                     true
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "关闭通道失败: $channelId", e)
                     false
+                }
+            }
+        }
+    }
+    
+    /**
+     * 批量关闭群组通道
+     * 
+     * @param groupId 群组ID
+     * @return 关闭的通道数量
+     */
+    suspend fun closeGroupChannels(groupId: String): Int {
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    // 找出所有属于该群组的通道
+                    val groupChannels = channels.values.filter { channel ->
+                        channel.config["groupId"] == groupId
+                    }
+                    
+                    var closedCount = 0
+                    groupChannels.forEach { channel ->
+                        try {
+                            channels.remove(channel.channelId)
+                            deleteChannelFromDatabase(channel.channelId)
+                            closedCount++
+                            Log.d(TAG, "群组通道已删除: channelId=${channel.channelId}, groupId=$groupId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "删除群组通道失败: channelId=${channel.channelId}", e)
+                        }
+                    }
+                    
+                    Log.i(TAG, "批量清理群组通道完成: groupId=$groupId, 清理数量=$closedCount")
+                    closedCount
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "批量清理群组通道异常: groupId=$groupId", e)
+                    0
                 }
             }
         }
@@ -1997,8 +2003,34 @@ class TransportChannelManager private constructor(private val context: Context) 
             try {
                 Log.d(TAG, "开始从数据库恢复通道状态...")
                 
-                // 从独立数据库获取所有活跃通道（与保存逻辑一致）
+                // 从独立数据库获取所有活跃通道
                 val activeChannels = independentChannelTable.getActiveChannels()
+                
+                // 验证群组通道的有效性
+                val groupV2StatusTable = org.thoughtcrime.securesms.database.SignalDatabase.instance?.let {
+                    org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, it)
+                }
+                
+                val validChannels = mutableListOf<TransportChannel>()
+                val invalidChannels = mutableListOf<String>()
+                
+                for (channel in activeChannels) {
+                    val groupId = channel.config["groupId"] as? String
+                    if (groupId != null && groupV2StatusTable != null) {
+                        // 验证群组通道
+                        val groupState = groupV2StatusTable.getGroupState(groupId)
+                        if (groupState == null) {
+                            Log.w(TAG, "跳过加载孤立的群组通道: groupId不存在, channelId=${channel.channelId}")
+                            invalidChannels.add(channel.channelId)
+                            continue
+                        } else if (groupState.status != org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                            Log.w(TAG, "跳过加载无效的群组通道: status=${groupState.status}, channelId=${channel.channelId}")
+                            invalidChannels.add(channel.channelId)
+                            continue
+                        }
+                    }
+                    validChannels.add(channel)
+                }
                 
                 channelLock.write {
                     // 清空当前内存缓存
@@ -2006,8 +2038,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                     recipientChannels.clear()
                     providerChannels.clear()
                     
-                    // 将数据库中的活跃通道加载到内存并重建索引
-                    for (channel in activeChannels) {
+                    // 将有效通道加载到内存并重建索引
+                    for (channel in validChannels) {
                         channels[channel.channelId] = channel
                         
                         // 重建recipientChannels索引
@@ -2020,8 +2052,13 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                 }
                 
-                Log.i(TAG, "通道状态恢复完成，从独立数据库恢复 ${activeChannels.size} 个活跃通道")
-                activeChannels.forEach { channel ->
+                // 删除无效通道
+                invalidChannels.forEach { channelId ->
+                    deleteChannelFromDatabase(channelId)
+                }
+                
+                Log.i(TAG, "通道状态恢复完成，有效通道=${validChannels.size}, 清理无效通道=${invalidChannels.size}")
+                validChannels.forEach { channel ->
                     Log.d(TAG, "恢复通道: ${channel.channelId}, recipient=${channel.recipientId}, provider=${channel.providerType}, status=${channel.status}")
                 }
                 
@@ -2349,6 +2386,45 @@ class TransportChannelManager private constructor(private val context: Context) 
                 } catch (e: Exception) {
                     Log.e(TAG, "更新通道配置失败: recipientId=$recipientId", e)
                     false
+                }
+            }
+        }
+    }
+    
+    /**
+     * 更新通道的config map（用于添加元数据如groupId）
+     */
+    suspend fun updateChannelConfigMap(channelId: String, configMap: Map<String, Any>): Boolean {
+        var channelToSave: TransportChannel? = null
+        
+        return withContext(Dispatchers.IO) {
+            channelLock.write {
+                try {
+                    val channel = channels[channelId]
+                    if (channel == null) {
+                        Log.w(TAG, "通道不存在，无法更新config: channelId=$channelId")
+                        return@withContext false
+                    }
+                    
+                    // 更新通道的config
+                    val updatedChannel = channel.copy(config = configMap)
+                    channels[channelId] = updatedChannel
+                    channelToSave = updatedChannel
+                    
+                    Log.d(TAG, "通道config已更新: channelId=$channelId, config=$configMap")
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "更新通道config失败: channelId=$channelId", e)
+                    false
+                }
+            }.also { success ->
+                // 在锁外异步保存到数据库
+                if (success && channelToSave != null) {
+                    try {
+                        saveChannelToDatabaseAsync(channelToSave!!)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "保存更新后的通道到数据库失败: channelId=$channelId", e)
+                    }
                 }
             }
         }

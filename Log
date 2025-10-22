@@ -1,37 +1,92 @@
-2025-10-22 10:01:32.254 20825-21107 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:32.365 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761098490543 | timestamp=1761098492365
-2025-10-22 10:01:32.365 20825-20854 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********3c9, type=TEXT_MESSAGE
-2025-10-22 10:01:32.365 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********3c9
-2025-10-22 10:01:32.366 20825-20854 TransportMessageDedupli org.thoughtcrime.securesms           E  检查数据库重复消息失败
-                                                                                                    android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: no such column: message_id | ExtraMessage: , while compiling: SELECT COUNT(*) FROM transport_processed_messages 
-                                                                                                                    WHERE duplication_key = ? OR (message_id = ? AND recipient_id = ? AND timestamp = ?)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.acquirePreparedStatement(SQLiteConnection.java:973)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.prepare(SQLiteConnection.java:537)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:592)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteQuery.<init>(SQLiteQuery.java:43)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDirectCursorDriver.query(SQLiteDirectCursorDriver.java:48)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQueryWithFactory(SQLiteDatabase.java:1610)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.rawQuery(SQLiteDatabase.java:1529)
-                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.checkDatabaseForDuplicate(TransportMessageDeduplicator.kt:147)
-                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.isDuplicate(TransportMessageDeduplicator.kt:62)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:72)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+2025-10-22 12:38:31.818 26018-26047 MessageProcessorV2      org.thoughtcrime.securesms           I  [1761107911399] Tap control message detected, processing asynchronously: bodyLength=845
+2025-10-22 12:38:31.818 26018-26047 MessageProcessorV2      org.thoughtcrime.securesms           I  [1761107911399] Tap control message queued for async processing, not inserting into message database
+2025-10-22 12:38:31.819 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=845
+2025-10-22 12:38:31.819 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
+2025-10-22 12:38:31.870 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 提议: senderId=RecipientId::4
+2025-10-22 12:38:31.870 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, proposer=********-****-****-****-*********461, senderPersonalId=RecipientId::4, totalMembers=3
+2025-10-22 12:38:31.874 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  同步处理群组提议: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:31.886 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  群组状态创建成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, status=PROPOSING
+2025-10-22 12:38:31.900 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存提议者的群组token: proposer=********-****-****-****-*********461, groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, tokenId=cos-group-6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=-1761107908712
+2025-10-22 12:38:31.903 26018-26047 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1761107911399
+2025-10-22 12:38:31.903 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  异步获取群组 RecipientId 并显示通知: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:31.907 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY= -> RecipientId::8
+2025-10-22 12:38:31.907 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  群组提议消息路由成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, groupRecipientId=RecipientId::8
+2025-10-22 12:38:31.908 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  准备显示群组通知: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, groupRecipientId=RecipientId::8, groupName=test1, sender=AAA
+2025-10-22 12:38:31.934 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 Token 交换通知已显示: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, groupRecipientId=RecipientId::8, groupName=test1, sender=AAA
+2025-10-22 12:38:31.936 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  群组 V2 提议通知已显示: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:40.842 26018-26047 SignalServ...sageSender org.thoughtcrime.securesms           D  [sendGroupMessage][1761107920521] TAP control message detected, forcing Signal Server transmission for reliability.
+2025-10-22 12:38:42.985 26018-26047 MessageProcessorV2      org.thoughtcrime.securesms           I  [1761107922674] Tap control message detected, processing asynchronously: bodyLength=783
+2025-10-22 12:38:42.985 26018-26047 MessageProcessorV2      org.thoughtcrime.securesms           I  [1761107922674] Tap control message queued for async processing, not inserting into message database
+2025-10-22 12:38:42.985 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::6, bodyLength=783
+2025-10-22 12:38:42.987 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::6
+2025-10-22 12:38:42.987 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  处理群组 V2 接受: senderId=RecipientId::6
+2025-10-22 12:38:42.988 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  群组接受消息: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, accepter=********-****-****-****-*********973, senderPersonalId=RecipientId::6
+2025-10-22 12:38:42.998 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存群组成员token: accepter=********-****-****-****-*********973, groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, tokenId=cos-group-6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=-1761107916670
+2025-10-22 12:38:43.000 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 开始同步处理群组接受: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, accepter=********-****-****-****-*********973
+2025-10-22 12:38:43.006 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 当前状态: status=PROPOSING, agreed=2/3, members=[5a80****************************e461, 8848****************************72ea]
+2025-10-22 12:38:43.021 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] 群组成员已标记为同意: accepter=********-****-****-****-*********973, groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:43.021 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  [状态转换] 更新后状态: status=PROPOSING, agreed=3/3, isFullyAgreed=true
+2025-10-22 12:38:43.023 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  [状态转换] ✅ A端群组 V2 mode 已激活: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:43.024 26018-26047 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1761107922674
+2025-10-22 12:38:43.024 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 开始处理群组激活后续操作: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, trigger=********-****-****-****-*********973
+2025-10-22 12:38:43.030 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  [激活后处理] 建立群组通道和轮询: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:43.031 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  为群组建立通道: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, members=2
+2025-10-22 12:38:54.073 26018-26047 TencentCosClient        org.thoughtcrime.securesms           E  列举文件失败 - 服务异常: Access Denied.
+                                                                                                    CosXmlServiceException{Access Denied. (Service: /; Status Code: 403; Status Message: Forbidden; Error Code: AccessDenied; Request ID: NjhmODVmZTBfMTcxNjUzMGJfNWRlMV9hOTVlZmFi)}
+                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.parseCOSXMLError(ResponseXmlS3BodySerializer.java:66)
+                                                                                                    	at com.tencent.cos.xml.transfer.ResponseXmlS3BodySerializer.convert(ResponseXmlS3BodySerializer.java:57)
+                                                                                                    	at com.tencent.qcloud.core.http.NetworkProxy.convertResponse(NetworkProxy.java:104)
+                                                                                                    	at com.tencent.qcloud.core.http.OkHttpProxy.executeHttpRequest(OkHttpProxy.java:95)
+                                                                                                    	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:289)
+                                                                                                    	at com.tencent.qcloud.core.http.HttpTask.execute(HttpTask.java:55)
+                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.call(QCloudTask.java:306)
+                                                                                                    	at bolts.Task$4.run(Task.java:357)
+                                                                                                    	at bolts.BoltsExecutors$ImmediateExecutor.execute(BoltsExecutors.java:105)
+                                                                                                    	at bolts.Task.call(Task.java:348)
+                                                                                                    	at bolts.Task.call(Task.java:379)
+                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.executeNowSilently(QCloudTask.java:122)
+                                                                                                    	at com.tencent.qcloud.core.task.QCloudTask.executeNow(QCloudTask.java:103)
+                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:517)
+                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:507)
+                                                                                                    	at com.tencent.cos.xml.CosXmlBaseService.execute(CosXmlBaseService.java:500)
+                                                                                                    	at com.tencent.cos.xml.CosXmlService.getBucket(CosXmlService.java:778)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$listFiles$getBucketResult$1.invokeSuspend(TencentCosClient.kt:329)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$listFiles$getBucketResult$1.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient$listFiles$getBucketResult$1.invoke(Unknown Source:4)
                                                                                                     	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
                                                                                                     	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
                                                                                                     	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
                                                                                                     	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:1055)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performFileBasedPolling(TapPollingService.kt:32)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$1.invokeSuspend(Unknown Source:15)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.client.tencent.TencentCosClient.listFiles(TencentCosClient.kt:328)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$listFiles$2.invokeSuspend(CosTransportProvider.kt:242)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$listFiles$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$listFiles$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider.listFiles(CosTransportProvider.kt:218)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager.performHealthCheck(TransportChannelManager.kt:1806)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager.access$performHealthCheck(TransportChannelManager.kt:29)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$activateChannel$healthCheckResult$1.invokeSuspend(TransportChannelManager.kt:1762)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$activateChannel$healthCheckResult$1.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$activateChannel$healthCheckResult$1.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturnIgnoreTimeout(Undispatched.kt:50)
+                                                                                                    	at kotlinx.coroutines.TimeoutKt.setupTimeout(Timeout.kt:149)
+2025-10-22 12:38:54.074 26018-26047 TencentCosClient        org.thoughtcrime.securesms           E  	at kotlinx.coroutines.TimeoutKt.withTimeout(Timeout.kt:44)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager.activateChannel(TransportChannelManager.kt:1761)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager.establishChannel(TransportChannelManager.kt:197)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$getOrCreateChannel$2.invokeSuspend(TransportChannelManager.kt:251)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$getOrCreateChannel$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager$getOrCreateChannel$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.TransportChannelManager.getOrCreateChannel(TransportChannelManager.kt:230)
+                                                                                                    	at org.thoughtcrime.securesms.tap.group.GroupTransportManager$establishGroupChannels$2$1$jobs$1$1.invokeSuspend(GroupTransportManager.kt:665)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.internal.ScopeCoroutine.afterResume(Scopes.kt:35)
-                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
                                                                                                     	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
                                                                                                     	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
                                                                                                     	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
@@ -39,110 +94,68 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-10-22 10:01:32.366 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********3c9
-2025-10-22 10:01:32.366 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
-                                                                                                    java.net.ProtocolException: Unexpected end group
-                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:152)
-                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:552)
-                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:372)
-                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
-                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:199)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:40)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:84)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
-                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
-                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:1055)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performFileBasedPolling(TapPollingService.kt:32)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$1.invokeSuspend(Unknown Source:15)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.internal.ScopeCoroutine.afterResume(Scopes.kt:35)
-                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
-                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-10-22 10:01:32.366 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********3c9
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********3c9, type=CIPHERTEXT
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
-2025-10-22 10:01:32.367 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1761098490543, type=CIPHERTEXT
-2025-10-22 10:01:32.368 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1761098490543
-2025-10-22 10:01:32.368 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1761098490543
-2025-10-22 10:01:32.406 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1761098490543
-2025-10-22 10:01:32.409 20825-20854 TransportMessageDedupli org.thoughtcrime.securesms           E  保存去重记录到数据库失败: ********-****-****-****-*********3c9:********-****-****-****-*********461:1761098490543
-                                                                                                    android.database.sqlite.SQLiteException: FullCode: 1 | ErrorCode: 1 | ExtendedErrorCode: 0 | Message: table transport_processed_messages has no column named message_id | ExtraMessage: , while compiling: INSERT OR REPLACE INTO transport_processed_messages 
-                                                                                                                    (duplication_key, message_id, recipient_id, timestamp, processed_at, created_at) 
-                                                                                                                    VALUES (?, ?, ?, ?, ?, ?)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.nativePrepareStatement(Native Method)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.acquirePreparedStatement(SQLiteConnection.java:973)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteConnection.prepare(SQLiteConnection.java:537)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteSession.prepare(SQLiteSession.java:592)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteProgram.<init>(SQLiteProgram.java:64)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteStatement.<init>(SQLiteStatement.java:38)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.executeSql(SQLiteDatabase.java:1990)
-                                                                                                    	at net.zetetic.database.sqlcipher.SQLiteDatabase.execSQL(SQLiteDatabase.java:1950)
-                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.saveToDatabase(TransportMessageDeduplicator.kt:175)
-                                                                                                    	at org.thoughtcrime.securesms.tap.utils.TransportMessageDeduplicator.markAsProcessed(TransportMessageDeduplicator.kt:97)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:131)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
-                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
-                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
-                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
-                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.performFileBasedPolling(TapPollingService.kt:1055)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService.access$performFileBasedPolling(TapPollingService.kt:32)
-                                                                                                    	at org.thoughtcrime.securesms.tap.polling.TapPollingService$performFileBasedPolling$1.invokeSuspend(Unknown Source:15)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.internal.ScopeCoroutine.afterResume(Scopes.kt:35)
-                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
-                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-10-22 10:01:32.410 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  消息处理成功: 1761098490763_2724fc8d-955a-4569-a94c-6be8334403c9.dat
-2025-10-22 10:01:32.414 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********3c9
-2025-10-22 10:01:32.414 20825-20854 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1761098490543 | timestamp=1761098492409
-2025-10-22 10:01:32.415 20825-20854 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********3c9
-2025-10-22 10:01:32.418 20825-20854 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1761098434883
-2025-10-22 10:01:32.418 20825-20854 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-10-22 10:01:32.422 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  更新通道活跃时间: recipient=5a806149-30d0-412a-90d2-9412a40ee461, messagesProcessed=1
-2025-10-22 10:01:32.424 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  发现1条新消息，已更新数据库: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:32.426 20825-20854 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1761098434883
-2025-10-22 10:01:32.427 20825-20854 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-10-22 10:01:32.434 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  更新通道活跃时间: recipient=5a806149-30d0-412a-90d2-9412a40ee461, messagesFound=1
-2025-10-22 10:01:32.435 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  收到消息但轮询间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
-2025-10-22 10:01:32.756 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.08%]
-2025-10-22 10:01:32.758 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:32.758 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  使用缓存的marker进行增量查询: path=/v2-channels/053abb43f297ee1d/outbox/, PathMarkerInfo[marker=v2-channel...4403c9.dat, age=979ms, path=/v2-channels/053abb43f297ee1d/outbox/]
-2025-10-22 10:01:33.255 20825-21107 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:33.358 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  目录为空，刷新marker时间戳: path=/v2-channels/053abb43f297ee1d/outbox/
-2025-10-22 10:01:33.358 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:33.360 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:33.360 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  空轮询，间隔无需调整: recipient=5a806149-30d0-412a-90d2-9412a40ee461, interval=500ms
-2025-10-22 10:01:33.755 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=98.11%]
-2025-10-22 10:01:33.756 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /v2-channels/053abb43f297ee1d/outbox/ (合并查询), recipient: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:33.756 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  使用缓存的marker进行增量查询: path=/v2-channels/053abb43f297ee1d/outbox/, PathMarkerInfo[marker=v2-channel...4403c9.dat, age=398ms, path=/v2-channels/053abb43f297ee1d/outbox/]
-2025-10-22 10:01:34.255 20825-21107 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: 5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 10:01:34.510 20825-20926 TapPollingService       org.thoughtcrime.securesms           V  目录为空，刷新marker时间戳: path=/v2-channels/053abb43f297ee1d/outbox/
-2025-10-22 10:01:34.510 20825-20926 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: 5a806149-30d0-412a-90d2-9412a40ee461
+2025-10-22 12:38:54.085 26018-26047 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1761107933836
+2025-10-22 12:38:54.085 26018-26047 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-22 12:38:54.096 26018-26047 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1761107933836
+2025-10-22 12:38:54.096 26018-26047 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-22 12:38:55.762 26018-26047 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1761107934506
+2025-10-22 12:38:55.762 26018-26047 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-22 12:38:55.775 26018-26047 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1761107934506
+2025-10-22 12:38:55.775 26018-26047 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-10-22 12:38:55.786 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  群组通道建立成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, 成功=2
+2025-10-22 12:38:55.787 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  启动群组轮询: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, providerType=cos, members=2
+2025-10-22 12:38:55.788 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  获取到群组成员tokens: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, count=2, members=[5a80****************************e461, c716****************************1973]
+2025-10-22 12:38:55.788 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, memberAci=5a80****************************e461
+2025-10-22 12:38:55.789 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  启动Tap轮询服务...
+2025-10-22 12:38:55.789 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  构建群组轮询metadata成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, memberAci=c716****************************1973
+2025-10-22 12:38:55.789 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  准备添加群组轮询目标: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, metadataCount=2
+2025-10-22 12:38:55.797 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  设备性能: Device[cores=4, memory=1971MB, performance=HIGH, lowPower=false, memoryPressure=false]
+2025-10-22 12:38:55.797 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  线程池配置: ThreadPool[core=3, max=8, keepAlive=120s, queue=200]
+2025-10-22 12:38:55.802 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  群组 V2 状态同步器已启动
+2025-10-22 12:38:55.804 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  Tap轮询服务启动成功
+2025-10-22 12:38:55.804 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  为群组添加轮询目标: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, members=2
+2025-10-22 12:38:55.804 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=5a806149-30d0-412a-90d2-9412a40ee461, 规范化recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=6jPrgPDznEWlpN7WnsFFlQehB, taskKey=6jPrgPDznEWlpN7WnsFFlQehB:5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
+2025-10-22 12:38:55.807 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=6jPrgPDznEWlpN7WnsFFlQehB:5a806149-30d0-412a-90d2-9412a40ee461, normalizedRecipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=6jPrgPDznEWlpN7WnsFFlQehB, interval=1000ms
+2025-10-22 12:38:55.808 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, memberAci=5a80****************************e461
+2025-10-22 12:38:55.808 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 规范化recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=6jPrgPDznEWlpN7WnsFFlQehB, taskKey=6jPrgPDznEWlpN7WnsFFlQehB:c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-10-22 12:38:55.809 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  轮询目标添加成功: taskKey=6jPrgPDznEWlpN7WnsFFlQehB:c716a84d-2fbd-4598-8bc3-b12cbba41973, normalizedRecipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=6jPrgPDznEWlpN7WnsFFlQehB, interval=1000ms
+2025-10-22 12:38:55.809 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  群组成员轮询目标添加成功: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, memberAci=c716****************************1973
+2025-10-22 12:38:55.809 26018-26163 TapPollingService       org.thoughtcrime.securesms           I  群组轮询目标添加完成: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, 成功=2/2
+2025-10-22 12:38:55.814 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  群组轮询已启动: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=, 成功添加=2/2
+2025-10-22 12:38:55.814 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: 6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY= -> RecipientId::8
+2025-10-22 12:38:55.821 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] 系统消息已插入: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:55.824 26018-26047 TapMessageProcessor     org.thoughtcrime.securesms           I  [激活后处理] ✅ 群组激活后续操作完成: groupId=6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=
+2025-10-22 12:38:56.369 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=1000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-10-22 12:38:56.374 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/ (合并查询), recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-22 12:38:56.566 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  保存最后文件key作为marker: path=/group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/, marker=Zgoy/kOY=/messages/1761103921555_1761103921510.dat, files=8
+2025-10-22 12:38:56.567 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  没有新文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-22 12:38:56.573 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  轮询成功，无新消息: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-22 12:38:56.574 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  空轮询，根据时间窗口调整间隔: recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 1000ms -> 500ms [活跃期(<5min)]
+2025-10-22 12:38:56.576 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=50.00%]
+2025-10-22 12:38:56.579 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  轮询路径: /group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/ (合并查询), recipient: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-22 12:38:56.579 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  使用缓存的marker进行增量查询: path=/group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/, PathMarkerInfo[marker=group/6jPr...921510.dat, age=13ms, path=/group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/]
+2025-10-22 12:38:56.764 26018-26163 TapPollingService       org.thoughtcrime.securesms           V  目录为空，刷新marker时间戳: path=/group/6jPrgPDznEWlpN7WnsFFlQehB/JBR5BMKS/Zgoy/kOY=/
+2025-10-22 12:38:56.764 26018-26163 TapPollingService       org.thoughtcrime.securesms           D  未找到文件: c716a84d-2fbd-4598-8bc3-b12cbba41973
+
+---
+[FIX] 2025-10-22 群组Token重复生成问题修复
+
+问题分析:
+- 每次调用 generateMyGroupToken() 都会无条件生成新的 token，包含时间戳的 tokenId 导致 ID 不一致
+- 多处调用点可能导致同一成员为同一群组生成多个 token，浪费云端资源
+- 缺少 token 复用机制，未能检查已存在的有效 token
+
+修复方案:
+在 GroupTransportManager.generateMyGroupToken() 方法中增加 token 复用逻辑:
+1. 调用 TokenPool.getValidSharedToken() 检查是否已存在有效的群组 token
+2. 如果存在有效 token，直接返回并记录复用日志
+3. 如果不存在，按原逻辑生成新 token
+
+修改位置:
+- app/src/main/java/org/thoughtcrime/securesms/tap/group/GroupTransportManager.kt (行 572-580)
+
+预期效果:
+- 每个成员对同一群组只生成一个 token
+- 避免重复创建云端子用户和权限资源
+- TokenId 保持一致，便于追踪和调试
+- 提高系统效率和资源利用率

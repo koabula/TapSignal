@@ -410,14 +410,61 @@ class TapModuleInitializer private constructor(private val context: Context) {
                     Log.i(TAG, "轮询服务启动成功，活跃联系人数量: ${allActiveRecipients.size}")
                     
                     // 为每个活跃联系人添加轮询目标
+                    val groupV2StatusTable = org.thoughtcrime.securesms.database.SignalDatabase.instance?.let {
+                        org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, it)
+                    }
                     allActiveRecipients.forEach { recipientId ->
                         try {
                             // 获取该联系人的活跃通道
                             val recipientChannels = channelManager.getActiveChannels(recipientId)
                             if (recipientChannels.isNotEmpty()) {
-                                val channel = recipientChannels.first() // 使用第一个活跃通道
+                                val channel = recipientChannels.first()
+                                
+                                // 验证群组通道的有效性
+                                val groupId = channel.config["groupId"] as? String
+                                if (groupId != null) {
+                                    // 这是已标记的群组通道
+                                    if (groupV2StatusTable != null) {
+                                        val groupState = groupV2StatusTable.getGroupState(groupId)
+                                        if (groupState == null) {
+                                            Log.w(TAG, "清理孤立的群组通道: groupId不存在, recipientId=${LogSanitizer.sanitize(recipientId)}")
+                                            channelManager.closeChannel(channel.channelId)
+                                        } else if (groupState.status != org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                                            Log.w(TAG, "清理无效的群组通道: status=${groupState.status}, recipientId=${LogSanitizer.sanitize(recipientId)}")
+                                            channelManager.closeChannel(channel.channelId)
+                                        } else {
+                                            Log.d(TAG, "跳过群组通道的个人轮询: recipientId=${LogSanitizer.sanitize(recipientId)}, groupId=${LogSanitizer.sanitize(groupId)}")
+                                        }
+                                    }
+                                    // 群组通道不应该添加到个人轮询，由群组管理器统一管理
+                                    return@forEach
+                                } else {
+                                    // config中没有groupId标记，检查该recipientId是否在某个群组中
+                                    if (groupV2StatusTable != null) {
+                                        val allGroups = groupV2StatusTable.getAllGroupStates()
+                                        for (group in allGroups) {
+                                            if (recipientId in group.totalMembers) {
+                                                // 该通道的recipientId在群组成员列表中
+                                                if (group.status != org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                                                    Log.w(TAG, "清理孤立的群组通道: recipientId=${LogSanitizer.sanitize(recipientId)}, " +
+                                                        "groupId=${LogSanitizer.sanitize(group.groupId)}, status=${group.status}")
+                                                    channelManager.closeChannel(channel.channelId)
+                                                    return@forEach
+                                                } else {
+                                                    // 群组是ACTIVE状态，但这个通道没有groupId标记（可能是旧版本数据）
+                                                    Log.w(TAG, "发现未标记groupId的群组通道（已禁用数据残留）: recipientId=${LogSanitizer.sanitize(recipientId)}, " +
+                                                        "groupId=${LogSanitizer.sanitize(group.groupId)}")
+                                                    // 跳过该通道，不添加轮询（群组通道由群组管理器管理）
+                                                    return@forEach
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // 只为真正的私聊通道添加轮询（不在任何群组中的通道）
                                 val addResult = pollingService.addPollingTarget(recipientId, channel.metadata, channel)
-                                Log.d(TAG, "添加轮询目标: recipientId=$recipientId, 结果=$addResult")
+                                Log.d(TAG, "添加私聊轮询目标: recipientId=${LogSanitizer.sanitize(recipientId)}, 结果=$addResult")
                             } else {
                                 // ✅ 有Token但没有活跃通道：可能是正在建立通道，或等待用户确认
                                 // 不自动清理，Token会在明确的disable/降级/拒绝时被清理
@@ -454,23 +501,39 @@ class TapModuleInitializer private constructor(private val context: Context) {
         return try {
             Log.d(TAG, "获取活跃接收者列表")
             
-            // 使用公开的方法获取有效的Token
             val activeRecipients = mutableSetOf<String>()
+            val groupV2StatusTable = org.thoughtcrime.securesms.database.SignalDatabase.instance?.let {
+                org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, it)
+            }
             
             // 获取所有有效的接收Token
             val validReceivedTokens = tokenPool.getAllValidReceivedTokens()
             validReceivedTokens.forEach { (recipientId, token) ->
                 activeRecipients.add(recipientId)
-                // 诊断日志：记录recipientId格式
-                Log.d(TAG, "接收Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")}, 数字格式: ${recipientId.all { it.isDigit() || it == ':' }})")
+                Log.d(TAG, "接收Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")})")
             }
             
-            // 获取所有有效的共享Token
+            // 获取所有有效的共享Token，并验证群组Token
             val validSharedTokens = tokenPool.getAllValidSharedTokens()
             validSharedTokens.forEach { (recipientId, token) ->
-                activeRecipients.add(recipientId)
-                // 诊断日志：记录recipientId格式
-                Log.d(TAG, "共享Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")}, 数字格式: ${recipientId.all { it.isDigit() || it == ':' }})")
+                if (isGroupId(recipientId)) {
+                    // 验证群组状态
+                    val groupState = groupV2StatusTable?.getGroupState(recipientId)
+                    if (groupState != null && groupState.status == org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                        activeRecipients.add(recipientId)
+                        Log.d(TAG, "有效的群组SharedToken: groupId=${LogSanitizer.sanitize(recipientId)}, status=${groupState.status}")
+                    } else {
+                        Log.w(TAG, "清理无效的群组SharedToken: groupId=${LogSanitizer.sanitize(recipientId)}, status=${groupState?.status}")
+                        // 在协程中异步清理
+                        initScope.launch {
+                            tokenPool.removeToken(recipientId, token.providerType)
+                        }
+                    }
+                } else {
+                    // 私聊Token
+                    activeRecipients.add(recipientId)
+                    Log.d(TAG, "共享Token recipientId格式: $recipientId (包含'-': ${recipientId.contains("-")})")
+                }
             }
             
             Log.d(TAG, "找到活跃接收者数量: ${activeRecipients.size}")
@@ -617,14 +680,59 @@ class TapModuleInitializer private constructor(private val context: Context) {
             val startResult = pollingService.startPolling()
             if (startResult) {
                 // 为每个活跃联系人添加轮询目标
+                val groupV2StatusTable = org.thoughtcrime.securesms.database.SignalDatabase.instance?.let {
+                    org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, it)
+                }
                 allActiveRecipients.forEach { recipientId ->
                     try {
                         val recipientChannels = channelManager.getActiveChannels(recipientId)
                         if (recipientChannels.isNotEmpty()) {
                             val channel = recipientChannels.first()
+                            
+                            // 验证群组通道的有效性
+                            val groupId = channel.config["groupId"] as? String
+                            if (groupId != null) {
+                                // 这是已标记的群组通道
+                                if (groupV2StatusTable != null) {
+                                    val groupState = groupV2StatusTable.getGroupState(groupId)
+                                    if (groupState == null) {
+                                        Log.w(TAG, "Token加载后清理孤立的群组通道: groupId不存在")
+                                        channelManager.closeChannel(channel.channelId)
+                                    } else if (groupState.status != org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                                        Log.w(TAG, "Token加载后清理无效群组通道: status=${groupState.status}")
+                                        channelManager.closeChannel(channel.channelId)
+                                    }
+                                }
+                                // 群组通道不应该添加到个人轮询
+                                return@forEach
+                            } else {
+                                // config中没有groupId标记，检查该recipientId是否在某个群组中
+                                if (groupV2StatusTable != null) {
+                                    val allGroups = groupV2StatusTable.getAllGroupStates()
+                                    for (group in allGroups) {
+                                        if (recipientId in group.totalMembers) {
+                                            // 该通道的recipientId在群组成员列表中
+                                            if (group.status != org.thoughtcrime.securesms.tap.group.GroupV2Status.FULL_V2_ACTIVE) {
+                                                Log.w(TAG, "Token加载后清理孤立的群组通道: recipientId=${LogSanitizer.sanitize(recipientId)}, " +
+                                                    "groupId=${LogSanitizer.sanitize(group.groupId)}, status=${group.status}")
+                                                channelManager.closeChannel(channel.channelId)
+                                                return@forEach
+                                            } else {
+                                                // 群组是ACTIVE状态，但这个通道没有groupId标记
+                                                Log.w(TAG, "Token加载后发现未标记groupId的群组通道: recipientId=${LogSanitizer.sanitize(recipientId)}, " +
+                                                    "groupId=${LogSanitizer.sanitize(group.groupId)}")
+                                                // 跳过该通道，不添加轮询
+                                                return@forEach
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 只为真正的私聊通道添加轮询（不在任何群组中的通道）
                             val addResult = pollingService.addPollingTarget(recipientId, channel.metadata, channel)
                             if (addResult) {
-                                Log.d(TAG, "Token加载后成功添加轮询目标: recipientId=$recipientId")
+                                Log.d(TAG, "Token加载后成功添加私聊轮询目标: recipientId=$recipientId")
                             }
                         }
                     } catch (e: Exception) {
@@ -648,6 +756,14 @@ class TapModuleInitializer private constructor(private val context: Context) {
     fun cleanup() {
         initScope.cancel()
         isInitialized = false
+    }
+    
+    /**
+     * 判断recipientId是否为群组ID
+     * 群组ID特征：Base64格式，不包含'-'（UUID包含'-'）
+     */
+    private fun isGroupId(recipientId: String): Boolean {
+        return !recipientId.contains("-") && recipientId.length > 20
     }
 }
 

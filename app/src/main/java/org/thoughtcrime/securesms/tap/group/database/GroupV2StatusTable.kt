@@ -192,6 +192,45 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
     }
 
     /**
+     * 获取所有群组状态（包括所有状态）
+     */
+    @WorkerThread
+    @NonNull
+    fun getAllGroupStates(): List<GroupV2State> {
+        return try {
+            val states = mutableListOf<GroupV2State>()
+            
+            readableDatabase.query(
+                TABLE_NAME,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    try {
+                        val state = readGroupState(cursor)
+                        if (state != null) {
+                            states.add(state)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "解析群组状态失败", e)
+                    }
+                }
+            }
+            
+            Log.d(TAG, "获取所有群组状态: 数量=${states.size}")
+            states
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "获取所有群组状态失败", e)
+            emptyList()
+        }
+    }
+
+    /**
      * 删除群组状态
      */
     @WorkerThread

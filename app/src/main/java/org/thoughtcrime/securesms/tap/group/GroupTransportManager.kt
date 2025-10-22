@@ -569,6 +569,16 @@ class GroupTransportManager private constructor(private val context: Context) {
                 try {
                     Log.i(TAG, "开始为群组生成我的Token: groupId=$groupId, provider=$providerType")
                     
+                    // 检查是否已存在有效的群组token，避免重复生成
+                    val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                    val existingToken = tokenPool.getValidSharedToken(groupId, providerType)
+                    if (existingToken != null) {
+                        Log.i(TAG, "复用已存在的群组Token: groupId=$groupId, tokenId=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(existingToken.tokenId)}")
+                        return@withContext existingToken
+                    }
+                    
+                    Log.d(TAG, "未找到有效的群组Token，生成新Token: groupId=$groupId")
+                    
                     // 获取 TransportProvider
                     val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
                     val provider = transportManager.getProvider(providerType)
@@ -673,14 +683,16 @@ class GroupTransportManager private constructor(private val context: Context) {
                                     val groupConfig = channel.config.toMutableMap()
                                     groupConfig["groupId"] = groupId
                                     
-                                    // 更新通道配置
-                                    val updatedChannel = channel.copy(config = groupConfig)
-                                    
-                                    // 保存更新后的通道
-                                    // (TransportChannelManager 会自动保存)
-                                    
-                                    Log.d(TAG, "群组成员通道建立成功: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, channelId=${updatedChannel.channelId}")
-                                    true
+                                    // 更新通道配置并保存到数据库
+                                    val updated = channelManager.updateChannelConfigMap(channel.channelId, groupConfig)
+                                    if (updated) {
+                                        Log.d(TAG, "群组成员通道建立成功: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, channelId=${channel.channelId}, groupId标记已保存")
+                                        true
+                                    } else {
+                                        Log.w(TAG, "群组成员通道建立但groupId标记保存失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                                        // 即使标记失败也返回true，因为通道本身已建立
+                                        true
+                                    }
                                 } else {
                                     Log.w(TAG, "群组成员通道建立失败: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
                                     false
@@ -1742,6 +1754,12 @@ class GroupTransportManager private constructor(private val context: Context) {
             var channelsClosed = 0
             var tokensRemoved = 0
             
+            // 首先尝试批量清理群组通道（按config中的groupId标记）
+            val batchClosedCount = channelManager.closeGroupChannels(groupId)
+            channelsClosed += batchClosedCount
+            Log.d(TAG, "批量清理群组通道: groupId=$groupId, 清理数量=$batchClosedCount")
+            
+            // 逐个清理成员资源（即使config中没有groupId标记，也能清理）
             for (memberAci in otherMembers) {
                 try {
                     // 移除轮询目标
@@ -1750,12 +1768,13 @@ class GroupTransportManager private constructor(private val context: Context) {
                         pollingRemoved++
                     }
                     
-                    // 关闭通道
-                    val channel = channelManager.getActiveChannel(memberAci, groupState.providerType)
-                    if (channel != null) {
-                        val closed = channelManager.closeChannel(channel.channelId)
-                        if (closed) {
+                    // 关闭该成员的通道（不依赖groupId标记）
+                    val memberChannel = channelManager.getActiveChannel(memberAci, groupState.providerType)
+                    if (memberChannel != null) {
+                        val channelClosed = channelManager.closeChannel(memberChannel.channelId)
+                        if (channelClosed) {
                             channelsClosed++
+                            Log.d(TAG, "清理群组成员通道: memberAci=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}, channelId=${memberChannel.channelId}")
                         }
                     }
                     
@@ -1770,10 +1789,17 @@ class GroupTransportManager private constructor(private val context: Context) {
                 }
             }
             
+            // 清理群组的sharedToken（使用groupId作为key）
+            val groupTokenRemoved = tokenPool.removeToken(groupId, groupState.providerType)
+            if (groupTokenRemoved) {
+                Log.d(TAG, "群组SharedToken已清理: groupId=$groupId")
+            }
+            
             Log.i(TAG, "群组资源清理完成: groupId=$groupId, " +
                 "轮询移除=$pollingRemoved/${otherMembers.size}, " +
                 "通道关闭=$channelsClosed/${otherMembers.size}, " +
-                "Token移除=$tokensRemoved/${otherMembers.size}")
+                "成员Token移除=$tokensRemoved/${otherMembers.size}, " +
+                "群组Token移除=$groupTokenRemoved")
             
         } catch (e: Exception) {
             Log.e(TAG, "清理群组资源异常: groupId=$groupId", e)
