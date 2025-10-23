@@ -893,6 +893,19 @@ class TransportChannelManager private constructor(private val context: Context) 
                         Log.e(TAG, "清理Token失败", e)
                     }
                     
+                    // 清理轮询状态（包括marker）
+                    try {
+                        val pollingStateTable = org.thoughtcrime.securesms.database.SignalDatabase.transportPollingStates
+                        channelsToClose.forEach { channel ->
+                            val deleted = pollingStateTable.deletePollingState(normalizedRecipientId, channel.providerType)
+                            if (deleted) {
+                                Log.d(TAG, "已清理轮询状态: recipientId=$normalizedRecipientId, provider=${channel.providerType}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "清理轮询状态失败", e)
+                    }
+                    
                     // 收集disable控制消息信息，稍后在锁外发送（仅当允许发送时）
                     if (sendControlMessage && channelsToClose.isNotEmpty()) {
                         disableMessageInfo = normalizedRecipientId to channelsToClose.first().providerType
@@ -1584,64 +1597,50 @@ class TransportChannelManager private constructor(private val context: Context) 
         val peerRegion = peerTokenInfo?.region ?: myRegion // 回退到本端region
         val peerBucketName = peerTokenInfo?.bucketName ?: myBucketName // 回退到本端bucket
         
-        // 5. 生成本端Token供对方使用（如果不存在）
+        // 5. 生成本端Token供对方使用
+        // 私聊场景：每次都生成新Token，不复用（避免旧Token指向已失效的云端资源）
         // 注意：此Token仅用于分享给对方，让对方能轮询我们的消息
-        // 本端发送消息时不使用此Token，而是直接使用本地高权限配置
         val sharedTokenForPeer = run {
-            // 检查是否已经为此对方生成了shared token
-            // ✅ 首先使用 originalRecipientId 查询Token（保持向后兼容）
-            var existingSharedToken = tokenPool.getValidSharedToken(originalRecipientId, "cos")
+            Log.d(TAG, "私聊场景：生成新Token（不复用）: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
             
-            // ✅ 如果查不到，尝试使用规范化的ACI格式查询（兼容不同ID格式）
-            if (existingSharedToken == null && originalRecipientId != recipientAci) {
-                Log.d(TAG, "使用originalRecipientId查询sharedToken失败,尝试使用ACI格式: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
-                existingSharedToken = tokenPool.getValidSharedToken(recipientAci, "cos")
-                if (existingSharedToken != null) {
-                    Log.i(TAG, "使用ACI格式成功查询到sharedToken: recipientAci=$recipientAci")
+            try {
+                // 先删除旧Token（如果存在）
+                val oldTokenRemoved = tokenPool.removeSharedToken(originalRecipientId, "cos")
+                if (oldTokenRemoved) {
+                    Log.d(TAG, "已删除旧的SharedToken: recipientId=$originalRecipientId")
                 }
-            }
-            
-            if (existingSharedToken != null) {
-                Log.d(TAG, "已存在共享Token，复用: tokenId=${LogSanitizer.sanitize(existingSharedToken.tokenId)}, originalRecipientId=$originalRecipientId")
-                existingSharedToken
-            } else {
-                Log.d(TAG, "共享Token不存在(已尝试两种格式)，生成新的只读Token供对方轮询: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
-                try {
-                    // 创建Token请求：只读权限，供对方轮询我们的outbox
-                    // 注意：tokenRequest 中的 recipientId 用于生成 Token，应使用 ACI 格式
-                    val tokenRequest = TransportTokenRequest(
-                        recipientId = recipientAci,  // ✅ 用于生成Token，使用ACI格式
-                        providerType = "cos",
-                        requestedPermissions = setOf(
-                            TransportPermission.READ,
-                            TransportPermission.LIST
-                        ),
-                        validityDurationMs = 0L, // 0表示使用默认（长期有效）
-                        providerConfig = myProviderConfig,
-                        purpose = "peer_polling_token"
-                    )
-                    
-                    // 使用Provider生成Token
-                    val generatedToken = provider.generateToken(tokenRequest)
-                    if (generatedToken != null) {
-                        // 保存到Token池（作为共享Token，供对方访问我们的存储）
-                        // ✅ 使用 originalRecipientId 保存Token，确保与查询时的格式一致
-                        val saveSuccess = tokenPool.addSharedToken(originalRecipientId, generatedToken)
-                        if (saveSuccess) {
-                            Log.i(TAG, "对方轮询Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
-                            generatedToken
-                        } else {
-                            Log.w(TAG, "对方轮询Token保存失败")
-                            null
-                        }
+                
+                // 创建Token请求：只读权限，供对方轮询我们的outbox
+                val tokenRequest = TransportTokenRequest(
+                    recipientId = recipientAci,
+                    providerType = "cos",
+                    requestedPermissions = setOf(
+                        TransportPermission.READ,
+                        TransportPermission.LIST
+                    ),
+                    validityDurationMs = 0L,
+                    providerConfig = myProviderConfig,
+                    purpose = "peer_polling_token"
+                )
+                
+                // 使用Provider生成Token
+                val generatedToken = provider.generateToken(tokenRequest)
+                if (generatedToken != null) {
+                    val saveSuccess = tokenPool.addSharedToken(originalRecipientId, generatedToken)
+                    if (saveSuccess) {
+                        Log.i(TAG, "对方轮询Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
+                        generatedToken
                     } else {
-                        Log.w(TAG, "Provider生成对方轮询Token失败")
+                        Log.w(TAG, "对方轮询Token保存失败")
                         null
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "生成对方轮询Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
+                } else {
+                    Log.w(TAG, "Provider生成对方轮询Token失败")
                     null
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "生成对方轮询Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
+                null
             }
         }
         

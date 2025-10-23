@@ -1,23 +1,72 @@
-5-10-22 14:38:33.681 32331-3242  TransportTokenPool      org.thoughtcrime.securesms           I  添加共享Token成功: tokenId=cos-*************************************************6944, recipientId=RecipientId::4, providerType=cos
-2025-10-22 14:38:33.682 32331-3242  TransportTokenPool      org.thoughtcrime.securesms           D  获取有效共享Token: cos-signal-cos-signal-v2-1761115106944-6713-1761115106944
-2025-10-22 14:38:33.682 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  获取或创建通道: 原始ID=RecipientId::4, 规范化ID=********-****-****-****-*********461, provider=cos
-2025-10-22 14:38:33.683 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  创建通道元数据: normalizedId=********-****-****-****-*********461, originalId=RecipientId::4, providerType=cos
-2025-10-22 14:38:33.683 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  已存在共享Token，复用: tokenId=cos-*************************************************6944, originalRecipientId=RecipientId::4
-2025-10-22 14:38:33.684 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=a3adde1ba3b08264, peerHashedId=053abb43f297ee1d, mySendPath=/v2-channels/a3adde1ba3b08264/outbox/, peerReceivePath=/v2-channels/053abb43f297ee1d/outbox/
-2025-10-22 14:38:33.685 32331-32366 TransportChannelManager org.thoughtcrime.securesms           I  通道元数据创建成功: cos
-2025-10-22 14:38:33.685 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  建立通道: ch_********-****-****-****-*********461_cos_1761115113684, 接收者: ********-****-****-****-*********461, 提供者: cos
-2025-10-22 14:38:33.686 32331-32366 CosTransportProvider    org.thoughtcrime.securesms           D  列举文件: path=/v2-channels/053abb43f297ee1d/outbox/messages/, recipientId=********-****-****-****-*********461
-2025-10-22 14:38:33.975 32331-32366 CosTransportProvider    org.thoughtcrime.securesms           D  找到文件数量: 26
-2025-10-22 14:38:33.976 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  通道激活成功: FULL_ACTIVE, ch_********-****-****-****-*********461_cos_1761115113684
-2025-10-22 14:38:33.976 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  通道激活完成: ch_********-****-****-****-*********461_cos_1761115113684
-2025-10-22 14:38:33.978 32331-32366 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1761115113684
-2025-10-22 14:38:33.992 32331-3242  TapTokenEx...geReceiver org.thoughtcrime.securesms           I  B端成功建立传输通道: channelId=ch_5a806149-30d0-412a-90d2-9412a40ee461_cos_1761115113684, recipientId=RecipientId::4, senderAci=5a806149-30d0-412a-90d2-9412a40ee461
-2025-10-22 14:38:33.993 32331-3242  TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=RecipientId::4, 规范化recipient=5a806149-30d0-412a-90d2-9412a40ee461, groupId=null, taskKey=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
-2025-10-22 14:38:33.995 32331-32366 TransportChannelManager org.thoughtcrime.securesms           V  保存通道到独立数据库成功: ch_********-****-****-****-*********461_cos_1761115113684
-2025-10-22 14:38:35.054 32331-3238  TransportTokenPool      org.thoughtcrime.securesms           D  获取有效接收Token: cos-signal-cos-signal-v2-1761115094722-8594-1761115094722
-2025-10-22 14:38:35.055 32331-3238  TransportTokenPool      org.thoughtcrime.securesms           D  获取有效共享Token: cos-signal-cos-signal-v2-1761115106944-6713-1761115106944
-2025-10-22 14:38:35.055 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  找到channelIds: [ch_********-****-****-****-*********461_cos_1761115113684]
-2025-10-22 14:38:35.055 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  通道详情: channelId=ch_********-****-****-****-*********461_cos_1761115113684, status=FULL_ACTIVE, recipientId=********-****-****-****-*********461
-2025-10-22 14:38:35.056 32331-32366 TransportChannelManager org.thoughtcrime.securesms           D  通道活跃状态检查: channelId=ch_********-****-****-****-*********461_cos_1761115113684, isActive=true, status=FULL_ACTIVE
-2025-10-22 14:38:35.115 32331-3238  TransportTokenPool      org.thoughtcrime.securesms           D  获取有效共享Token: cos-signal-cos-signal-v2-1761115106944-6713-1761115106944
-2025-10-22 14:38:35.115 32331-32366 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换确认: senderId=RecipientId::4, providerType=cos
+2025-10-23 17:56:46.906 10156-10193 DefaultTransportProvide org.thoughtcrime.securesms           D  创建Provider实例: cos
+2025-10-23 17:56:46.907 10156-10193 CosProviderRegistrar    org.thoughtcrime.securesms           I  创建COS Provider实例
+2025-10-23 17:56:46.908 10156-10193 CosProviderRegistrar    org.thoughtcrime.securesms           I  COS Provider实例创建成功
+2025-10-23 17:56:46.908 10156-10193 TransportProviderManage org.thoughtcrime.securesms           I  注册Provider: cos
+2025-10-23 17:56:46.908 10156-10193 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
+2025-10-23 17:56:46.909 10156-10193 ProviderRegistry        org.thoughtcrime.securesms           D  Provider注册中心验证通过，已注册Provider类型: [cos]
+2025-10-23 17:56:46.909 10156-10193 DefaultTransportProvide org.thoughtcrime.securesms           D  获取支持的Provider类型: [cos]
+2025-10-23 17:56:46.910 10156-10193 TapModuleInitializer    org.thoughtcrime.securesms           I  已注册Provider: cos - 云对象存储 (COS)
+2025-10-23 17:56:46.922 10156-10193 ConversationFragment    org.thoughtcrime.securesms           D  可用Provider: cos - 云对象存储 (COS)
+2025-10-23 17:56:46.922 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  COS Provider获取成功: 云对象存储 (COS)
+2025-10-23 17:56:46.924 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  开始生成COS传输Token: recipientId=********-****-****-****-*********973
+2025-10-23 17:56:46.929 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  生成子用户标识: userName=signal-cos-signal-v2-1761213406926-3359, directoryPath=/v2-channels/053abb43f297ee1d/outbox/, hashedId=053abb43f297ee1d
+2025-10-23 17:56:46.934 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  创建COS v2通道目录结构: /v2-channels/053abb43f297ee1d/
+2025-10-23 17:56:47.586 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  COS v2通道目录结构创建成功
+2025-10-23 17:56:47.586 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  开始创建AWS IAM子用户: signal-cos-signal-v2-1761213406926-3359
+2025-10-23 17:56:47.588 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  用户名: signal-cos-signal-v2-1761213406926-3359
+2025-10-23 17:56:48.673 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  ✓ 创建IAM用户成功: signal-cos-signal-v2-1761213406926-3359
+2025-10-23 17:56:49.293 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           I  AWS IAM子用户创建成功: signal-cos-signal-v2-1761213406926-3359
+2025-10-23 17:56:49.293 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  子用户创建成功: userName=sign*******************************3359, accessKeyId=AKIA************QDPE
+2025-10-23 17:56:49.293 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  COS传输Token生成成功: tokenId=cos-*************************************************6926, recipientId=c716****************************1973
+2025-10-23 17:56:49.294 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           D  开始添加共享Token: tokenId=cos-*************************************************6926, recipientId=RecipientId::8, providerType=cos
+2025-10-23 17:56:49.299 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           I  添加共享Token成功: tokenId=cos-*************************************************6926, recipientId=RecipientId::8, providerType=cos
+2025-10-23 17:56:49.300 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  为对方生成Token成功: tokenId=cos-signal-cos-signal-v2-1761213406926-3359-1761213406926
+2025-10-23 17:56:49.306 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  解析Token信息成功: providerType=cos, tokenId=cos-*************************************************6926
+2025-10-23 17:56:49.306 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           D  获取有效共享Token: cos-signal-cos-signal-v2-1761213406926-3359-1761213406926
+2025-10-23 17:56:49.307 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  获取或创建通道: 原始ID=RecipientId::8, 规范化ID=********-****-****-****-*********973, provider=cos
+2025-10-23 17:56:49.308 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  创建通道元数据: normalizedId=********-****-****-****-*********973, originalId=RecipientId::8, providerType=cos
+2025-10-23 17:56:49.309 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  已存在共享Token，复用: tokenId=cos-*************************************************6926, originalRecipientId=RecipientId::8
+2025-10-23 17:56:49.310 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=053abb43f297ee1d, peerHashedId=a3adde1ba3b08264, mySendPath=/v2-channels/053abb43f297ee1d/outbox/, peerReceivePath=/v2-channels/a3adde1ba3b08264/outbox/
+2025-10-23 17:56:49.310 10156-10193 TransportChannelManager org.thoughtcrime.securesms           I  通道元数据创建成功: cos
+2025-10-23 17:56:49.311 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  建立通道: ch_********-****-****-****-*********973_cos_1761213409309, 接收者: ********-****-****-****-*********973, 提供者: cos
+2025-10-23 17:56:49.312 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  测试发送能力: recipientId=********-****-****-****-*********973
+2025-10-23 17:56:49.592 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  发送能力测试成功: 可访问发送目录 /v2-channels/053abb43f297ee1d/outbox/，包含 1 个文件
+2025-10-23 17:56:49.593 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道激活成功: SEND_READY, ch_********-****-****-****-*********973_cos_1761213409309
+2025-10-23 17:56:49.593 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道激活完成: ch_********-****-****-****-*********973_cos_1761213409309
+2025-10-23 17:56:49.597 10156-10193 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1761213409309
+2025-10-23 17:56:49.611 10156-10193 TransportChannelManager org.thoughtcrime.securesms           V  保存通道到独立数据库成功: ch_********-****-****-****-*********973_cos_1761213409309
+2025-10-23 17:56:49.611 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道创建成功: channelId=ch_********-****-****-****-*********973_cos_1761213409309
+2025-10-23 17:56:49.612 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  Tap v2模式通道创建成功: ch_********-****-****-****-*********973_cos_1761213409309, recipientId: RecipientId::8, 对方ACI: ********-****-****-****-*********973, 状态: 发送就绪（等待对方Token）
+2025-10-23 17:56:49.922 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=RecipientId::8, 规范化recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=null, taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-10-23 17:56:49.924 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  找到channelIds: [ch_********-****-****-****-*********973_cos_1761213409309]
+2025-10-23 17:56:49.925 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道详情: channelId=ch_********-****-****-****-*********973_cos_1761213409309, status=SEND_READY, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:49.925 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 规范化recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=null, taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
+2025-10-23 17:56:49.925 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  检测到已存在的轮询目标: taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, 现有Provider=cos, 新Provider=cos
+2025-10-23 17:56:49.928 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道活跃状态检查: channelId=ch_********-****-****-****-*********973_cos_1761213409309, isActive=true, status=SEND_READY
+2025-10-23 17:56:49.930 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  找到channelIds: [ch_********-****-****-****-*********973_cos_1761213409309]
+2025-10-23 17:56:49.930 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道详情: channelId=ch_********-****-****-****-*********973_cos_1761213409309, status=SEND_READY, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:49.932 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道活跃状态检查: channelId=ch_********-****-****-****-*********973_cos_1761213409309, isActive=true, status=SEND_READY
+2025-10-23 17:56:50.880 10156-13130 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=1000ms, errors=0, activity=INACTIVE, successRate=0.00%]
+2025-10-23 17:56:50.885 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:50.885 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:50.890 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-23 17:56:50.893 10156-13130 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=50.00%]
+2025-10-23 17:56:50.897 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:50.898 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:50.902 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-23 17:56:51.393 10156-13285 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=66.67%]
+2025-10-23 17:56:51.399 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:51.401 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:51.405 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-23 17:56:51.894 10156-13135 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=75.00%]
+2025-10-23 17:56:51.899 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:51.901 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:51.906 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-23 17:56:52.393 10156-13285 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=80.00%]
+2025-10-23 17:56:52.400 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:52.401 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:52.409 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-23 17:56:52.894 10156-13135 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=83.33%]
+2025-10-23 17:56:52.898 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
+2025-10-23 17:56:52.899 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
+2025-10-23 17:56:52.903 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos

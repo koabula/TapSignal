@@ -774,6 +774,32 @@ class TransportTokenPool private constructor(private val context: Context) {
     }
     
     /**
+     * 移除指定的共享Token
+     */
+    suspend fun removeSharedToken(recipientId: String, providerType: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            tokenLock.write {
+                try {
+                    val removed = sharedTokens[recipientId]?.remove(providerType)
+                    if (removed != null) {
+                        tokenMetadata.remove(removed.tokenId)
+                        cleanupEmptyMaps()
+                        saveTokensToStorage()
+                        Log.d(TAG, "移除共享Token成功: recipientId=$recipientId, providerType=$providerType, tokenId=${removed.tokenId}")
+                        true
+                    } else {
+                        Log.d(TAG, "未找到需要移除的共享Token: recipientId=$recipientId, providerType=$providerType")
+                        false
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "移除共享Token失败", e)
+                    false
+                }
+            }
+        }
+    }
+    
+    /**
      * 移除指定联系人的所有Token
      */
     suspend fun removeAllTokensForRecipient(recipientId: String): Int {
