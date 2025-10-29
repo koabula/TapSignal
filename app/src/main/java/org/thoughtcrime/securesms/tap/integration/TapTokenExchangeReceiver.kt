@@ -72,21 +72,21 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // ✅ 使用senderId（RecipientId格式）作为键，与其他代码保持一致
+                // 使用senderAci（ACI格式）作为键，与metadata构建保持一致
                 val senderAci = tokenExchangeMessage.senderAci
                 if (senderAci.isBlank()) {
                     Log.e(TAG, "Token交换消息中缺少senderAci")
                     return@launch
                 }
                 
-                // 保存到接收Token池（使用RecipientId格式）
-                val saved = tokenPool.addReceivedToken(senderId, receivedToken)
+                // 保存到接收Token池（使用ACI格式 - 关键修复）
+                val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
                 if (!saved) {
                     Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
                     return@launch
                 }
                 
-                Log.i(TAG, "接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
+                Log.i(TAG, "[Token交换] B端接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
                 
                 // 4. 执行对称操作 - 生成B的Token并发送给A
                 generateAndSendResponseToken(context, senderId, tokenExchangeMessage)
@@ -197,7 +197,36 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 return
             }
             
-            // 6. 为A生成专用Token
+            // 6. 清理旧的v2 mode状态（确保使用全新的Token和目录）
+            val senderAci = originalMessage.senderAci
+            Log.i(TAG, "B端清理旧的v2 mode状态: senderAci=$senderAci")
+            
+            // 6.1 清理旧sharedToken（receivedToken刚保存，保留它）
+            try {
+                val oldSharedRemoved = TransportTokenPool.getInstance(context).removeSharedToken(senderAci, originalMessage.providerType)
+                if (oldSharedRemoved) {
+                    Log.i(TAG, "B端已清理旧的sharedToken")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "B端清理旧sharedToken失败", e)
+            }
+            
+            // 6.2 清理旧Channel
+            try {
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val oldChannels = channelManager.getActiveChannels(senderAci)
+                if (oldChannels.isNotEmpty()) {
+                    Log.i(TAG, "B端发现${oldChannels.size}个旧通道，准备清理")
+                    oldChannels.forEach { oldChannel ->
+                        channelManager.closeChannel(oldChannel.channelId)
+                        Log.d(TAG, "B端已关闭旧通道: ${oldChannel.channelId}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "B端清理旧Channel失败", e)
+            }
+            
+            // 7. 为A生成专用Token
             val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
                 recipientId = originalMessage.senderAci,
                 providerType = originalMessage.providerType,
@@ -216,9 +245,9 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 return
             }
             
-            Log.i(TAG, "响应Token生成成功: tokenId=${generatedToken.tokenId}")
+            Log.i(TAG, "B端响应Token生成成功: tokenId=${generatedToken.tokenId}")
             
-            // 7. 保存生成的Token到共享Token池
+            // 8. 保存生成的Token到共享Token池
             val tokenPool = TransportTokenPool.getInstance(context)
             
             // 确保TokenPool已初始化
@@ -228,13 +257,16 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 return
             }
             
-            val tokenSaved = tokenPool.addSharedToken(senderId, generatedToken)
+            // 使用对方的ACI保存sharedToken（与receivedToken格式一致）
+            val tokenSaved = tokenPool.addSharedToken(senderAci, generatedToken)
             if (!tokenSaved) {
-                Log.e(TAG, "保存共享Token失败")
+                Log.e(TAG, "保存共享Token失败: senderAci=$senderAci")
                 return
             }
             
-            // 8. 建立传输通道 (B端为接收方建立通道，使用RecipientId格式)
+            Log.i(TAG, "[Token交换] B端新sharedToken保存成功: senderAci=$senderAci, tokenId=${generatedToken.tokenId}")
+            
+            // 9. 建立传输通道 (B端为接收方建立通道，使用RecipientId格式)
             try {
                 val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
                 
@@ -318,12 +350,13 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     Log.i(TAG, "B端响应发送后确认通道状态正常: senderId=$senderId, fullActiveChannels=${fullActiveChannels.size}")
                 }
                 
-                // 验证Token状态（使用RecipientId格式查询）
+                // 验证Token状态（使用ACI格式查询，与Token保存格式一致）
                 val tokenPool = TransportTokenPool.getInstance(context)
-                val receivedToken = tokenPool.getValidReceivedToken(senderId, originalMessage.providerType)
-                val sharedToken = tokenPool.getValidSharedToken(senderId, originalMessage.providerType)
+                val senderAci = originalMessage.senderAci
+                val receivedToken = tokenPool.getValidReceivedToken(senderAci, originalMessage.providerType)
+                val sharedToken = tokenPool.getValidSharedToken(senderAci, originalMessage.providerType)
                 
-                Log.d(TAG, "B端Token状态验证: senderId=$senderId, hasReceivedToken=${receivedToken != null}, hasSharedToken=${sharedToken != null}")
+                Log.d(TAG, "[Token交换] B端Token状态验证: senderId=$senderId, senderAci=$senderAci, hasReceivedToken=${receivedToken != null}, hasSharedToken=${sharedToken != null}")
                 
             } catch (verifyException: Exception) {
                 Log.w(TAG, "B端状态验证失败，但不影响主流程: senderId=$senderId", verifyException)

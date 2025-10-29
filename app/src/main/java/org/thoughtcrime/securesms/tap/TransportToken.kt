@@ -75,7 +75,9 @@ data class CosTransportToken(
     /** COS存储桶名称 */
     val bucketName: String,
     /** 云服务提供商类型 (AWS/TENCENT) */
-    val cloudProvider: String
+    val cloudProvider: String,
+    /** 通道目录路径（包含时间戳，避免目录复用） */
+    val channelPath: String? = null
 ) : TransportToken {
     
     override fun toMap(): Map<String, Any> {
@@ -93,6 +95,7 @@ data class CosTransportToken(
         )
         
         sessionToken?.let { map["sessionToken"] = it }
+        channelPath?.let { map["channelPath"] = it }
         
         return map
     }
@@ -128,6 +131,7 @@ data class CosTransportToken(
                 val region = data["region"] as? String ?: return null
                 val bucketName = data["bucketName"] as? String ?: return null
                 val cloudProvider = data["cloudProvider"] as? String ?: return null
+                val channelPath = data["channelPath"] as? String
                 
                 CosTransportToken(
                     tokenId = tokenId,
@@ -140,7 +144,8 @@ data class CosTransportToken(
                     sessionToken = sessionToken,
                     region = region,
                     bucketName = bucketName,
-                    cloudProvider = cloudProvider
+                    cloudProvider = cloudProvider,
+                    channelPath = channelPath
                 )
             } catch (e: Exception) {
                 null

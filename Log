@@ -1,72 +1,68 @@
-2025-10-23 17:56:46.906 10156-10193 DefaultTransportProvide org.thoughtcrime.securesms           D  创建Provider实例: cos
-2025-10-23 17:56:46.907 10156-10193 CosProviderRegistrar    org.thoughtcrime.securesms           I  创建COS Provider实例
-2025-10-23 17:56:46.908 10156-10193 CosProviderRegistrar    org.thoughtcrime.securesms           I  COS Provider实例创建成功
-2025-10-23 17:56:46.908 10156-10193 TransportProviderManage org.thoughtcrime.securesms           I  注册Provider: cos
-2025-10-23 17:56:46.908 10156-10193 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
-2025-10-23 17:56:46.909 10156-10193 ProviderRegistry        org.thoughtcrime.securesms           D  Provider注册中心验证通过，已注册Provider类型: [cos]
-2025-10-23 17:56:46.909 10156-10193 DefaultTransportProvide org.thoughtcrime.securesms           D  获取支持的Provider类型: [cos]
-2025-10-23 17:56:46.910 10156-10193 TapModuleInitializer    org.thoughtcrime.securesms           I  已注册Provider: cos - 云对象存储 (COS)
-2025-10-23 17:56:46.922 10156-10193 ConversationFragment    org.thoughtcrime.securesms           D  可用Provider: cos - 云对象存储 (COS)
-2025-10-23 17:56:46.922 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  COS Provider获取成功: 云对象存储 (COS)
-2025-10-23 17:56:46.924 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  开始生成COS传输Token: recipientId=********-****-****-****-*********973
-2025-10-23 17:56:46.929 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  生成子用户标识: userName=signal-cos-signal-v2-1761213406926-3359, directoryPath=/v2-channels/053abb43f297ee1d/outbox/, hashedId=053abb43f297ee1d
-2025-10-23 17:56:46.934 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  创建COS v2通道目录结构: /v2-channels/053abb43f297ee1d/
-2025-10-23 17:56:47.586 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  COS v2通道目录结构创建成功
-2025-10-23 17:56:47.586 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  开始创建AWS IAM子用户: signal-cos-signal-v2-1761213406926-3359
-2025-10-23 17:56:47.588 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  用户名: signal-cos-signal-v2-1761213406926-3359
-2025-10-23 17:56:48.673 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           D  ✓ 创建IAM用户成功: signal-cos-signal-v2-1761213406926-3359
-2025-10-23 17:56:49.293 10156-10193 AwsSubUserManager       org.thoughtcrime.securesms           I  AWS IAM子用户创建成功: signal-cos-signal-v2-1761213406926-3359
-2025-10-23 17:56:49.293 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  子用户创建成功: userName=sign*******************************3359, accessKeyId=AKIA************QDPE
-2025-10-23 17:56:49.293 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           I  COS传输Token生成成功: tokenId=cos-*************************************************6926, recipientId=c716****************************1973
-2025-10-23 17:56:49.294 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           D  开始添加共享Token: tokenId=cos-*************************************************6926, recipientId=RecipientId::8, providerType=cos
-2025-10-23 17:56:49.299 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           I  添加共享Token成功: tokenId=cos-*************************************************6926, recipientId=RecipientId::8, providerType=cos
-2025-10-23 17:56:49.300 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  为对方生成Token成功: tokenId=cos-signal-cos-signal-v2-1761213406926-3359-1761213406926
-2025-10-23 17:56:49.306 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  解析Token信息成功: providerType=cos, tokenId=cos-*************************************************6926
-2025-10-23 17:56:49.306 10156-13317 TransportTokenPool      org.thoughtcrime.securesms           D  获取有效共享Token: cos-signal-cos-signal-v2-1761213406926-3359-1761213406926
-2025-10-23 17:56:49.307 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  获取或创建通道: 原始ID=RecipientId::8, 规范化ID=********-****-****-****-*********973, provider=cos
-2025-10-23 17:56:49.308 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  创建通道元数据: normalizedId=********-****-****-****-*********973, originalId=RecipientId::8, providerType=cos
-2025-10-23 17:56:49.309 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  已存在共享Token，复用: tokenId=cos-*************************************************6926, originalRecipientId=RecipientId::8
-2025-10-23 17:56:49.310 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=053abb43f297ee1d, peerHashedId=a3adde1ba3b08264, mySendPath=/v2-channels/053abb43f297ee1d/outbox/, peerReceivePath=/v2-channels/a3adde1ba3b08264/outbox/
-2025-10-23 17:56:49.310 10156-10193 TransportChannelManager org.thoughtcrime.securesms           I  通道元数据创建成功: cos
-2025-10-23 17:56:49.311 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  建立通道: ch_********-****-****-****-*********973_cos_1761213409309, 接收者: ********-****-****-****-*********973, 提供者: cos
-2025-10-23 17:56:49.312 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  测试发送能力: recipientId=********-****-****-****-*********973
-2025-10-23 17:56:49.592 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  发送能力测试成功: 可访问发送目录 /v2-channels/053abb43f297ee1d/outbox/，包含 1 个文件
-2025-10-23 17:56:49.593 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道激活成功: SEND_READY, ch_********-****-****-****-*********973_cos_1761213409309
-2025-10-23 17:56:49.593 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道激活完成: ch_********-****-****-****-*********973_cos_1761213409309
-2025-10-23 17:56:49.597 10156-10193 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1761213409309
-2025-10-23 17:56:49.611 10156-10193 TransportChannelManager org.thoughtcrime.securesms           V  保存通道到独立数据库成功: ch_********-****-****-****-*********973_cos_1761213409309
-2025-10-23 17:56:49.611 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道创建成功: channelId=ch_********-****-****-****-*********973_cos_1761213409309
-2025-10-23 17:56:49.612 10156-10193 ConversationFragment    org.thoughtcrime.securesms           I  Tap v2模式通道创建成功: ch_********-****-****-****-*********973_cos_1761213409309, recipientId: RecipientId::8, 对方ACI: ********-****-****-****-*********973, 状态: 发送就绪（等待对方Token）
-2025-10-23 17:56:49.922 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=RecipientId::8, 规范化recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=null, taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-10-23 17:56:49.924 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  找到channelIds: [ch_********-****-****-****-*********973_cos_1761213409309]
-2025-10-23 17:56:49.925 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道详情: channelId=ch_********-****-****-****-*********973_cos_1761213409309, status=SEND_READY, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:49.925 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  添加轮询目标: 原始recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, 规范化recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, groupId=null, taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos
-2025-10-23 17:56:49.925 10156-13317 TapPollingService       org.thoughtcrime.securesms           D  检测到已存在的轮询目标: taskKey=c716a84d-2fbd-4598-8bc3-b12cbba41973, 现有Provider=cos, 新Provider=cos
-2025-10-23 17:56:49.928 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道活跃状态检查: channelId=ch_********-****-****-****-*********973_cos_1761213409309, isActive=true, status=SEND_READY
-2025-10-23 17:56:49.930 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  找到channelIds: [ch_********-****-****-****-*********973_cos_1761213409309]
-2025-10-23 17:56:49.930 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道详情: channelId=ch_********-****-****-****-*********973_cos_1761213409309, status=SEND_READY, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:49.932 10156-10193 TransportChannelManager org.thoughtcrime.securesms           D  通道活跃状态检查: channelId=ch_********-****-****-****-*********973_cos_1761213409309, isActive=true, status=SEND_READY
-2025-10-23 17:56:50.880 10156-13130 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=1000ms, errors=0, activity=INACTIVE, successRate=0.00%]
-2025-10-23 17:56:50.885 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:50.885 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:50.890 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
-2025-10-23 17:56:50.893 10156-13130 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=50.00%]
-2025-10-23 17:56:50.897 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:50.898 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:50.902 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
-2025-10-23 17:56:51.393 10156-13285 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=66.67%]
-2025-10-23 17:56:51.399 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:51.401 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:51.405 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
-2025-10-23 17:56:51.894 10156-13135 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=75.00%]
-2025-10-23 17:56:51.899 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:51.901 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:51.906 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
-2025-10-23 17:56:52.393 10156-13285 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=80.00%]
-2025-10-23 17:56:52.400 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:52.401 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:52.409 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
-2025-10-23 17:56:52.894 10156-13135 TapPollingService       org.thoughtcrime.securesms           V  执行轮询: PollingTask[recipient=c716a84d-2fbd-4598-8bc3-b12cbba41973, provider=cos, status=POLLING, interval=500ms, errors=0, activity=INACTIVE, successRate=83.33%]
-2025-10-23 17:56:52.898 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  增量列举文件: path=/v2-channels/a3adde1ba3b08264/outbox/, marker=null, recipientId=********-****-****-****-*********973
-2025-10-23 17:56:52.899 10156-10193 CosTransportProvider    org.thoughtcrime.securesms           D  接收操作跳过：缺少对端Token，当前为单向发送模式，recipientId=********-****-****-****-*********973
-2025-10-23 17:56:52.903 10156-10193 TransportPollingStateTa org.thoughtcrime.securesms           D  轮询状态更新成功: ********-****-****-****-*********973, cos
+2025-10-29 13:53:31.143 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218204888_5218775a-de3c-424a-bf56-328d14760c9d.dat | timestamp=1761717211143
+2025-10-29 13:53:31.143 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218212309_06b9c572-fccc-4388-a548-9e6390936791.dat | timestamp=1761717211143
+2025-10-29 13:53:31.144 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218214156_655f8ec7-ab13-453a-a2cf-618b4020a1a4.dat | timestamp=1761717211144
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218218022_c1a3dbfe-9b2d-4e90-82a1-59604db1f58b.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218219733_1a2c8e9b-f9f8-410b-ba2b-5e3708f4545b.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218221446_5c866da1-ae15-4f56-89f4-03e745878863.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218225170_17129c08-e3bc-4807-aa12-f00d228cbdd2.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218229255_064774b3-e9bd-4942-8064-5d13b8e724a8.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218230919_17c29605-7f77-42e2-86db-f61db0679009.dat | timestamp=1761717211145
+2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218232704_c790c43d-d008-46b8-af01-1db664716cfc.dat | timestamp=1761717211145
+2025-10-29 13:53:31.146 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218234383_afe02e50-3ad2-42bf-aa01-4fb4a849d2a9.dat | timestamp=1761717211146
+2025-10-29 13:53:31.146 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218236144_3db52365-3d02-403e-976d-a154d038bf97.dat | timestamp=1761717211146
+2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218243354_abffe154-6b4a-47ce-9fdb-eef0644dba5c.dat | timestamp=1761717211147
+2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218245054_3d8fc408-b93c-4f2f-a5ec-c719f33b0f0e.dat | timestamp=1761717211147
+2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218246524_7ce37c5a-51e1-4f77-b8ab-3f13dae241f2.dat | timestamp=1761717211147
+2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218248407_066f626a-65f6-46da-95c3-47ca3e3fc3aa.dat | timestamp=1761717211147
+2025-10-29 13:53:31.148 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218252568_100a7022-1a38-4db5-95a2-fd1f58ead3bf.dat | timestamp=1761717211148
+2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218254169_146efca6-9ed2-4958-9de9-8b98845940cf.dat | timestamp=1761717211149
+2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218255955_8ca15902-f7c2-451b-8034-7e7aa2de8c46.dat | timestamp=1761717211149
+2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218260133_ad4bbc10-ea57-4a57-86d8-3fb7f8c8e43e.dat | timestamp=1761717211149
+2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218261655_358b8495-711c-4cc6-961b-0ca240fe5770.dat | timestamp=1761717211150
+2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218263401_f7b91d05-35ed-4a8d-8842-cd7990fa01a6.dat | timestamp=1761717211150
+2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218265075_1b89df0a-c374-4ca4-b1ad-88187fab78a8.dat | timestamp=1761717211150
+2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218274402_8933996e-87d5-468c-870b-dc3d991bbf6b.dat | timestamp=1761717211150
+2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218276196_f5e25a35-8f3b-486b-b28c-c6841ee249f1.dat | timestamp=1761717211151
+2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218280215_c50950a8-7aa1-45ac-a9bb-3063d3add59e.dat | timestamp=1761717211151
+2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218290995_11081bdd-3a88-4b99-84e1-758a73c0edbc.dat | timestamp=1761717211151
+2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218300441_6962acb6-970e-4ac2-a298-be8db01d3f7b.dat | timestamp=1761717211151
+2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218301917_3c14df00-1491-4719-b5fd-ab545e53a3ac.dat | timestamp=1761717211152
+2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218309496_d2dbea80-e46a-4db1-99dc-fb2982a14893.dat | timestamp=1761717211152
+2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218311382_c17e291c-b9ae-4315-afca-327802ebef88.dat | timestamp=1761717211152
+2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761540543456_7cec251e-56a7-4338-bf51-56366b8f36f2.dat | timestamp=1761717211152
+2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713835199_896c4a19-9d77-49fd-9d44-94ef70c73286.dat | timestamp=1761717211153
+2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713848487_1656c3d7-3703-4e1e-b630-ad6c244e3bcc.dat | timestamp=1761717211153
+2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713946884_bfee4dde-1fb0-4bbb-aa22-5f5a91b8243c.dat | timestamp=1761717211154
+2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713950103_381d383a-f3dd-423e-8706-85180a082c30.dat | timestamp=1761717211154
+2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714937777_edb22f57-6c40-439a-a469-37ddbe3fde55.dat | timestamp=1761717211154
+2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714960810_86603aac-4c57-45cd-99f7-7ef6546780d2.dat | timestamp=1761717211154
+2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714976021_57762c4d-8164-4bc3-9f38-bd8ff4c25caf.dat | timestamp=1761717211154
+2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715007290_bd456f0b-424a-4f9f-b87f-f1871784f913.dat | timestamp=1761717211155
+2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715036035_4c8734b0-9fc6-49df-b5c2-c076492d7a6f.dat | timestamp=1761717211155
+2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715106773_5cfc5fd0-bbd9-4d5b-8b44-220d7c138def.dat | timestamp=1761717211155
+2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715302166_ae83bf45-521b-4f2f-925e-9914c4426814.dat | timestamp=1761717211155
+2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715426606_69988916-d9c7-4121-84b9-3b49ca7d4e5c.dat | timestamp=1761717211156
+2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761716197976_a1d86e55-a089-4438-95cb-27e4b35cf9c1.dat | timestamp=1761717211156
+2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761716199128_5d83ab71-9b7c-4173-9819-ad2dfaecb019.dat | timestamp=1761717211156
+2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717006877_e6be7cde-3129-48a6-8303-87749c8dd78b.dat | timestamp=1761717211157
+2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717033795_cfe631be-b1bb-4c31-8645-f197e2d86d17.dat | timestamp=1761717211157
+2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717058028_1b3b7e02-1741-460d-94a6-3817a9899c50.dat | timestamp=1761717211157
+2025-10-29 13:53:31.234 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-29 13:53:32.233 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973
+2025-10-29 13:53:32.946 10953-11203 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: 1761206797889_6c207efb-f65c-4fa9-9409-dffa199558aa.dat
+2025-10-29 13:53:32.947 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009556445 | timestamp=1761717212947
+2025-10-29 13:53:32.949 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009557049_86b16200-7386-4158-8905-bcdc6da14672.dat, error=消息验证失败
+2025-10-29 13:53:32.951 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009565691 | timestamp=1761717212951
+2025-10-29 13:53:32.951 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********672, type=TEXT_MESSAGE
+2025-10-29 13:53:32.953 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009566090_08ecdc50-c180-4cdd-ac91-b4de64cfda7f.dat, error=消息验证失败
+2025-10-29 13:53:32.953 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009556445, currentTime=1761717212949, diff=707656504ms
+2025-10-29 13:53:32.955 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********672
+2025-10-29 13:53:32.957 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009566835 | timestamp=1761717212957
+2025-10-29 13:53:32.961 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009567326_0fcbdc4e-13d4-4c32-8aee-50461de6b3e3.dat, error=消息验证失败
+2025-10-29 13:53:32.962 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********a7f, type=TEXT_MESSAGE
+2025-10-29 13:53:32.963 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009565691, currentTime=1761717212951, diff=707647260ms
+2025-10-29 13:53:32.965 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********a7f
+2025-10-29 13:53:32.969 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********3e3, type=TEXT_MESSAGE
+2025-10-29 13:53:32.970 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009566835, currentTime=1761717212958, diff=707646123ms
+2025-10-29 13:53:32.973 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********3e3
+2025-10-29 13:53:33.234 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973

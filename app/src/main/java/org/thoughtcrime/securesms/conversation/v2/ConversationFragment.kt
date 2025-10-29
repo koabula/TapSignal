@@ -1711,10 +1711,31 @@ class ConversationFragment :
           
           Log.i(TAG, "COS Provider获取成功: ${provider.displayName}")
           
-          // 6. 为对方生成专用的Token（供对方访问我们的存储）
+          // 6. 清理旧的v2 mode状态（确保使用全新的Token和目录）
           val recipientAci = recipient.requireAci().toString()
-          val recipientId = recipient.id.toString()  // ✅ 使用RecipientId格式，与Token查询保持一致
+          val recipientId = recipient.id.toString()
           
+          Log.i(TAG, "清理旧的v2 mode状态: recipientAci=$recipientAci")
+          
+          // 6.1 清理旧Token（使用协程执行异步操作）
+          lifecycleScope.launch(Dispatchers.IO) {
+            val oldTokenRemoved = tokenPool.removeToken(recipientAci, "cos")
+            if (oldTokenRemoved) {
+              Log.i(TAG, "已清理旧Token（包括shared和received）")
+            }
+          }.join() // 等待清理完成
+          
+          // 6.2 清理旧Channel
+          val oldChannels = channelManager.getActiveChannels(recipientAci)
+          if (oldChannels.isNotEmpty()) {
+            Log.i(TAG, "发现${oldChannels.size}个旧通道，准备清理")
+            oldChannels.forEach { oldChannel ->
+              channelManager.closeChannel(oldChannel.channelId)
+              Log.d(TAG, "已关闭旧通道: ${oldChannel.channelId}")
+            }
+          }
+          
+          // 7. 为对方生成专用的Token（供对方访问我们的存储）
           val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
             recipientId = recipientAci,
             providerType = "cos",
@@ -1735,9 +1756,9 @@ class ConversationFragment :
             return@launch
           }
           
-          // 7. 将生成的Token保存到共享Token池（供对方使用）
-          // ✅ 使用RecipientId格式保存，确保与发送时查询的格式一致
-          val tokenSaved = tokenPool.addSharedToken(recipientId, generatedToken)
+          // 8. 将生成的Token保存到共享Token池（供对方使用）
+          // 使用ACI格式保存，确保与后续查询的格式一致
+          val tokenSaved = tokenPool.addSharedToken(recipientAci, generatedToken)
           if (!tokenSaved) {
             requireActivity().runOnUiThread {
               Toast.makeText(requireContext(), "保存传输Token失败", Toast.LENGTH_LONG).show()
@@ -1745,12 +1766,12 @@ class ConversationFragment :
             return@launch
           }
           
-          Log.i(TAG, "为对方生成Token成功: tokenId=${generatedToken.tokenId}")
+          Log.i(TAG, "为对方生成新Token成功: tokenId=${generatedToken.tokenId}, recipientAci=$recipientAci")
           
-          // 8. 创建包含Token信息的JSON字符串（用于通道创建）
+          // 9. 创建包含Token信息的JSON字符串（用于通道创建）
           val tokenInfoJson = createTokenExchangeJson(generatedToken, providerConfig)
           
-          // 9. 尝试建立通道
+          // 10. 尝试建立通道
           // ✅ 使用RecipientId格式创建通道，确保与Token池的key格式一致
           val channelId = channelManager.createChannel(
             recipientId = recipientId,
@@ -1761,7 +1782,7 @@ class ConversationFragment :
           if (channelId != null) {
             Log.i(TAG, "Tap v2模式通道创建成功: $channelId, recipientId: $recipientId, 对方ACI: $recipientAci, 状态: 发送就绪（等待对方Token）")
             
-            // 10. 发送Token交换消息给对方
+            // 11. 发送Token交换消息给对方
             try {
               Log.i(TAG, "开始发送Token交换消息给对方")
               

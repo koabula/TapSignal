@@ -1,0 +1,18 @@
+2025-10-29 17:10:35.278  9402-9437  IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-10-29 17:10:35.283  9402-9437  Job                     org.thoughtcrime.securesms           I  [JOB::99145b8f-37ae-4eda-ad1e-63d3797a4c70][IndividualSendJob] onSubmit() (Time Since Submission: 9 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::8)
+--------- beginning of kernel
+
+
+2025-10-29 17:10:35.276  9402-9437  TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
+2025-10-29 17:10:35.278  9402-9437  IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-10-29 17:10:35.283  9402-9437  Job                     org.thoughtcrime.securesms           I  [JOB::99145b8f-37ae-4eda-ad1e-63d3797a4c70][IndividualSendJob] onSubmit() (Time Since Submission: 9 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::8)
+2025-10-29 17:10:35.283  1526-1526  GoogleInpu...hodService com...gle.android.inputmethod.latin  I  GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[mParcelledData.dataSize=240]}, true)
+2025-10-29 17:10:35.293  1526-1526  GoogleInpu...hodService com...gle.android.inputmethod.latin  I  GoogleInputMethodService.onStartInputView():1995 onStartInputView(EditorInfo{inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, android.support.text.emoji.emojiCompat_replaceAll=false}]}, true)
+2025-10-29 17:10:35.327  1526-1526  AndroidIME              com...gle.android.inputmethod.latin  I  AbstractIme.onActivate():86 LatinIme.onActivate() : EditorInfo = inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, android.support.text.emoji.emojiCompat_replaceAll=false}], IncognitoMode = false, DeviceLocked = false
+--------- beginning of kernel
+2025-10-29 17:10:38.445   382-10239 resolv                  netd                                 I  res_nsend: used send_dg 113 terrno: 0
+2025-10-29 17:10:39.843   382-10242 resolv                  netd                                 I  res_nsend: used send_dg 77 terrno: 0
+2025-10-29 17:10:54.544  9402-9437  SignalServ...sageSender org.thoughtcrime.securesms           W  [sendMessage][1761729033535] Pipe failed, falling back... (SocketException: Connection terminated unexpectedly)
+2025-10-29 17:10:54.552  9402-9437  SignalServ...sageSender org.thoughtcrime.securesms           W  [sendMessage][1761729034338] pipe failed, falling back... (SocketException: Connection terminated unexpectedly)
+2025-10-29 17:10:56.841  9402-9437  SealedSenderAccessUtil  org.thoughtcrime.securesms           I  Unidentified: 0, Other: 1
+2025-10-29 17:10:56.841  9402-9437  LibSignalChatConnection org.thoughtcrime.securesms           I  [sendRequest] Enqueuing request send for after connection

@@ -217,12 +217,11 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                     
                     // 使用Signal的SessionCipher进行加密
                     val protocolStore = org.thoughtcrime.securesms.dependencies.AppDependencies.protocolStore.aci()
-                    val localDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId
                     val sessionCipher = org.signal.libsignal.protocol.SessionCipher(
                         protocolStore,
                         org.signal.libsignal.protocol.SignalProtocolAddress(
                             address.serviceId.toString(),
-                            localDeviceId  // 使用真实的设备ID
+                            org.whispersystems.signalservice.api.push.SignalServiceAddress.DEFAULT_DEVICE_ID
                         )
                     )
                     
@@ -770,13 +769,45 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             Log.d(TAG, "活跃通道: ${channel.channelId}, status=${channel.status}, provider=${channel.providerType}")
         }
         
-        // 4. 检查Token状态
+        // 4. 检查Token状态（详细诊断）
         val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+        
+        Log.d(TAG, "===== Token状态详细检查开始 =====")
+        Log.d(TAG, "检查recipientAci: $recipientAci, 通道数: ${activeChannels.size}")
+        
         for (channel in activeChannels) {
-            val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
-            val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
-            Log.d(TAG, "Token状态检查: provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken")
+            Log.d(TAG, "检查通道: ${channel.channelId}, provider=${channel.providerType}")
+            
+            val receivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType)
+            val sharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType)
+            
+            if (receivedToken != null) {
+                Log.d(TAG, "  ✓ receivedToken存在: tokenId=${receivedToken.tokenId}, type=${receivedToken.javaClass.simpleName}")
+            } else {
+                Log.w(TAG, "  ✗ receivedToken不存在")
+                // 尝试用其他格式查询
+                val allReceivedTokens = tokenPool.getAllValidReceivedTokens()
+                Log.d(TAG, "  所有receivedToken数量: ${allReceivedTokens.size}")
+                allReceivedTokens.filter { (_, token) -> token.providerType == channel.providerType }.forEach { (recipientId, token) ->
+                    Log.d(TAG, "    - 其他receivedToken: recipientId=$recipientId, tokenId=${token.tokenId}")
+                }
+            }
+            
+            if (sharedToken != null) {
+                Log.d(TAG, "  ✓ sharedToken存在: tokenId=${sharedToken.tokenId}, type=${sharedToken.javaClass.simpleName}")
+            } else {
+                Log.w(TAG, "  ✗ sharedToken不存在")
+                // 尝试用其他格式查询
+                val allSharedTokens = tokenPool.getAllValidSharedTokens()
+                Log.d(TAG, "  所有sharedToken数量: ${allSharedTokens.size}")
+                allSharedTokens.filter { (_, token) -> token.providerType == channel.providerType }.forEach { (recipientId, token) ->
+                    Log.d(TAG, "    - 其他sharedToken: recipientId=$recipientId, tokenId=${token.tokenId}")
+                }
+            }
+            
+            Log.d(TAG, "Token状态检查: provider=${channel.providerType}, hasReceived=${receivedToken != null}, hasShared=${sharedToken != null}")
         }
+        Log.d(TAG, "===== Token状态详细检查结束 =====")
         
         // 5. 尝试路由
         val routeResult = transportManager.routeMessage(transportMessage, recipientAci)
@@ -943,24 +974,24 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 tapInitializer.initializeSync(true)
             }
             
-            // 2. 验证通道状态（使用RecipientId格式）
+            // 2. 验证通道状态（使用ACI格式，与Token保存格式一致）
             val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-            val activeChannels = channelManager.getActiveChannels(recipientId)
+            val activeChannels = channelManager.getActiveChannels(recipientAci)
             val fullActiveChannels = activeChannels.filter { it.status == org.thoughtcrime.securesms.tap.TransportChannelStatus.FULL_ACTIVE }
             
             if (fullActiveChannels.isEmpty()) {
-                Log.w(TAG, "发送前验证失败：没有FULL_ACTIVE状态的通道, recipientId=$recipientId")
+                Log.w(TAG, "发送前验证失败：没有FULL_ACTIVE状态的通道, recipientId=$recipientId, recipientAci=$recipientAci")
                 return false
             }
             
-            // 3. 验证Token状态（✅ 使用RecipientId格式查询，与Token保存格式一致）
+            // 3. 验证Token状态（使用ACI格式查询，与Token保存格式一致）
             val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
             for (channel in fullActiveChannels) {
-                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientId, channel.providerType) != null
-                val hasSharedToken = tokenPool.getValidSharedToken(recipientId, channel.providerType) != null
+                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
+                val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
                 
                 if (!hasReceivedToken || !hasSharedToken) {
-                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken, recipientId=$recipientId")
+                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken, recipientId=$recipientId, recipientAci=$recipientAci")
                     return false
                 }
             }

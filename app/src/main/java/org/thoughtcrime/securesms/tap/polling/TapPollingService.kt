@@ -752,34 +752,40 @@ class TapPollingService(private val context: Context) {
         
         serviceScope?.launch {
             try {
-                taskInfo.setStatus(PollingTaskStatus.POLLING)
-                taskInfo.updatePollTime()
-                
-                Log.v(TAG, "执行轮询: ${taskInfo.getSummary()}")
-                
-                // 检查是否应该跳过轮询
-                val channel = channelManager.getActiveChannel(
-                    taskInfo.recipientId, 
-                    taskInfo.metadata.providerType
-                )
-                
-                if (shouldSkipPolling(taskInfo.recipientId, taskInfo.metadata, channel)) {
-                    Log.d(TAG, "跳过轮询: ${taskInfo.recipientId}")
-                    taskInfo.setStatus(PollingTaskStatus.PAUSED)
-                    return@launch
+                // 添加超时保护，避免单次轮询卡住导致后续任务无法执行
+                withTimeout(30000L) {
+                    taskInfo.setStatus(PollingTaskStatus.POLLING)
+                    taskInfo.updatePollTime()
+                    
+                    Log.v(TAG, "执行轮询: ${taskInfo.getSummary()}")
+                    
+                    // 检查是否应该跳过轮询
+                    val channel = channelManager.getActiveChannel(
+                        taskInfo.recipientId, 
+                        taskInfo.metadata.providerType
+                    )
+                    
+                    if (shouldSkipPolling(taskInfo.recipientId, taskInfo.metadata, channel)) {
+                        Log.d(TAG, "跳过轮询: ${taskInfo.recipientId}")
+                        taskInfo.setStatus(PollingTaskStatus.PAUSED)
+                        return@withTimeout
+                    }
+                    
+                    // 执行实际轮询
+                    val result = performSinglePoll(taskInfo)
+                    
+                    // 处理轮询结果
+                    handlePollingResult(taskInfo, result)
+                    
+                    // 记录任务级别的响应时间
+                    taskInfo.statistics.recordResponseTime(result.responseTime)
+                    
+                    taskInfo.setStatus(PollingTaskStatus.RUNNING)
                 }
                 
-                // 执行实际轮询
-                val result = performSinglePoll(taskInfo)
-                
-                // 处理轮询结果
-                handlePollingResult(taskInfo, result)
-                
-                // 记录任务级别的响应时间
-                taskInfo.statistics.recordResponseTime(result.responseTime)
-                
-                taskInfo.setStatus(PollingTaskStatus.RUNNING)
-                
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.w(TAG, "轮询超时: ${taskInfo.recipientId}, 任务将被标记为失败并重新调度")
+                handlePollingError(taskInfo, e)
             } catch (e: Exception) {
                 Log.e(TAG, "轮询任务执行失败: ${taskInfo.recipientId}", e)
                 handlePollingError(taskInfo, e)

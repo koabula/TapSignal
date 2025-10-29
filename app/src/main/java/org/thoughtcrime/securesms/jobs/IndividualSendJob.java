@@ -111,9 +111,21 @@ public class IndividualSendJob extends PushSendJob {
         return;
       }
 
-      Set<String> attachmentUploadIds = enqueueCompressingAndUploadAttachmentsChains(jobManager, message);
-      boolean     hasMedia            = attachmentUploadIds.size() > 0;
-      boolean     addHardDependencies = hasMedia && !isScheduledSend;
+      // 检查是否为Tap模式
+      boolean isTapMode = TapMessageSendIntegrator.Companion.getInstance(context).canUseTapForSending(recipient.getId());
+      
+      Set<String> attachmentUploadIds;
+      if (isTapMode) {
+        // Tap模式：附件通过Tap层传输，不需要预先上传到Signal CDN
+        Log.i(TAG, "Tap模式：跳过附件CDN上传，附件将通过Tap层传输");
+        attachmentUploadIds = java.util.Collections.emptySet();
+      } else {
+        // 原生模式：正常上传到Signal CDN
+        attachmentUploadIds = enqueueCompressingAndUploadAttachmentsChains(jobManager, message);
+      }
+      
+      boolean hasMedia            = attachmentUploadIds.size() > 0;
+      boolean addHardDependencies = hasMedia && !isScheduledSend;
 
       jobManager.add(IndividualSendJob.create(messageId, recipient, hasMedia, isScheduledSend),
                      attachmentUploadIds,

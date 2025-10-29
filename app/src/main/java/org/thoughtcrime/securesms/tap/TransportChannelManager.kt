@@ -787,13 +787,33 @@ class TransportChannelManager private constructor(private val context: Context) 
                     saveChannelToDatabaseAsync(upgradedChannel)
                     Log.d(TAG, "通道数据库保存完成: channelId=${upgradedChannel.channelId}")
                     
-                    // 启动轮询（使用规范化ID）
-                    try {
-                        ensurePollingServiceRunning(normalizedRecipientId, upgradedChannel)
-                        Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}, recipientId=$normalizedRecipientId")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
-                        // 轮询启动失败不影响通道升级结果
+                    // 如果metadata被更新，需要重新启动轮询任务以使用新metadata
+                    if (updatedMetadata != null && upgradedChannel.metadata != null) {
+                        try {
+                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                            
+                            // 移除旧的轮询任务（使用旧metadata）
+                            pollingService.removePollingTarget(normalizedRecipientId, providerType)
+                            Log.d(TAG, "通道升级：移除旧轮询任务以更新metadata: recipientId=$normalizedRecipientId")
+                            
+                            // 用新metadata重新添加轮询任务
+                            val added = pollingService.addPollingTarget(normalizedRecipientId, upgradedChannel.metadata!!, upgradedChannel)
+                            if (added) {
+                                Log.i(TAG, "通道升级：轮询任务已更新为新metadata: recipientId=$normalizedRecipientId, newReceivePath=${upgradedChannel.metadata!!.getReceiveMetadata().path}")
+                            } else {
+                                Log.w(TAG, "通道升级：重新添加轮询任务失败: recipientId=$normalizedRecipientId")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "通道升级：更新轮询任务失败: channelId=${upgradedChannel.channelId}", e)
+                        }
+                    } else {
+                        // metadata未更新，使用原有的轮询确保逻辑
+                        try {
+                            ensurePollingServiceRunning(normalizedRecipientId, upgradedChannel)
+                            Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}, recipientId=$normalizedRecipientId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
+                        }
                     }
                     
                     return@withContext true
@@ -1597,50 +1617,52 @@ class TransportChannelManager private constructor(private val context: Context) 
         val peerRegion = peerTokenInfo?.region ?: myRegion // 回退到本端region
         val peerBucketName = peerTokenInfo?.bucketName ?: myBucketName // 回退到本端bucket
         
-        // 5. 生成本端Token供对方使用
-        // 私聊场景：每次都生成新Token，不复用（避免旧Token指向已失效的云端资源）
-        // 注意：此Token仅用于分享给对方，让对方能轮询我们的消息
+        // 5. 获取或复用已有的本端Token供对方使用
+        // 优先复用已有Token，避免在通道升级时重新生成导致路径不一致
         val sharedTokenForPeer = run {
-            Log.d(TAG, "私聊场景：生成新Token（不复用）: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
+            // 先检查是否已有有效的sharedToken
+            val existingToken = tokenPool.getValidSharedToken(recipientAci, "cos")
             
-            try {
-                // 先删除旧Token（如果存在）
-                val oldTokenRemoved = tokenPool.removeSharedToken(originalRecipientId, "cos")
-                if (oldTokenRemoved) {
-                    Log.d(TAG, "已删除旧的SharedToken: recipientId=$originalRecipientId")
-                }
+            if (existingToken != null) {
+                Log.d(TAG, "复用已有的sharedToken: recipientAci=$recipientAci, tokenId=${LogSanitizer.sanitize(existingToken.tokenId)}")
+                existingToken
+            } else {
+                Log.d(TAG, "生成新sharedToken: recipientAci=$recipientAci")
                 
-                // 创建Token请求：只读权限，供对方轮询我们的outbox
-                val tokenRequest = TransportTokenRequest(
-                    recipientId = recipientAci,
-                    providerType = "cos",
-                    requestedPermissions = setOf(
-                        TransportPermission.READ,
-                        TransportPermission.LIST
-                    ),
-                    validityDurationMs = 0L,
-                    providerConfig = myProviderConfig,
-                    purpose = "peer_polling_token"
-                )
-                
-                // 使用Provider生成Token
-                val generatedToken = provider.generateToken(tokenRequest)
-                if (generatedToken != null) {
-                    val saveSuccess = tokenPool.addSharedToken(originalRecipientId, generatedToken)
-                    if (saveSuccess) {
-                        Log.i(TAG, "对方轮询Token生成并保存成功: tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
-                        generatedToken
+                try {
+                    // 创建Token请求：只读权限，供对方轮询我们的outbox
+                    val tokenRequest = TransportTokenRequest(
+                        recipientId = recipientAci,
+                        providerType = "cos",
+                        requestedPermissions = setOf(
+                            TransportPermission.READ,
+                            TransportPermission.LIST
+                        ),
+                        validityDurationMs = 0L,
+                        providerConfig = myProviderConfig,
+                        purpose = "peer_polling_token"
+                    )
+                    
+                    // 使用Provider生成Token
+                    val generatedToken = provider.generateToken(tokenRequest)
+                    if (generatedToken != null) {
+                        // 使用ACI格式保存sharedToken（与Token查询格式一致）
+                        val saveSuccess = tokenPool.addSharedToken(recipientAci, generatedToken)
+                        if (saveSuccess) {
+                            Log.i(TAG, "新Token生成并保存成功: recipientAci=$recipientAci, tokenId=${LogSanitizer.sanitize(generatedToken.tokenId)}")
+                            generatedToken
+                        } else {
+                            Log.w(TAG, "新Token保存失败: recipientAci=$recipientAci")
+                            null
+                        }
                     } else {
-                        Log.w(TAG, "对方轮询Token保存失败")
+                        Log.w(TAG, "Provider生成Token失败")
                         null
                     }
-                } else {
-                    Log.w(TAG, "Provider生成对方轮询Token失败")
+                } catch (e: Exception) {
+                    Log.e(TAG, "生成Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
                     null
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "生成对方轮询Token异常: ${LogSanitizer.sanitizeThrowable(e)}")
-                null
             }
         }
         
@@ -1650,17 +1672,29 @@ class TransportChannelManager private constructor(private val context: Context) 
         // ✅ 使用 recipientAci（ACI格式）生成哈希ID
         val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(recipientAci)
         
-        // 7. 构建路径
-        // ✅ mySendPath: 我发送消息时上传到我自己的outbox
-        val mySendPath = provider.getSendPath(myHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
-        // ✅ peerReceivePath: 我轮询对方的outbox获取对方发送的消息
-        val peerReceivePath = provider.getReceivePath(peerHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        // 7. 构建路径（优先使用Token中的channelPath，避免目录复用）
+        // ✅ mySendPath: 从sharedToken中获取（包含时间戳的路径）
+        val mySendPath = if (sharedTokenForPeer is org.thoughtcrime.securesms.tap.CosTransportToken && sharedTokenForPeer.channelPath != null) {
+            sharedTokenForPeer.channelPath!!
+        } else {
+            // 回退到动态计算（兼容旧版本Token）
+            provider.getSendPath(myHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        }
+        
+        // ✅ peerReceivePath: 从peerToken中获取（包含对方的时间戳路径）
+        val peerReceivePath = if (peerTokenInfo?.token is org.thoughtcrime.securesms.tap.CosTransportToken && peerTokenInfo.token.channelPath != null) {
+            peerTokenInfo.token.channelPath!!
+        } else {
+            // 回退到动态计算（兼容旧版本Token或无peerToken的情况）
+            provider.getReceivePath(peerHashedId, org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE)
+        }
         
         Log.d(TAG, "COS元数据创建: " +
               "myAddress=${LogSanitizer.sanitize(myAddress, "address")}, " +
               "peerAddress=${LogSanitizer.sanitize(peerAddress, "address")}, " +
               "myHashedId=$myHashedId, peerHashedId=$peerHashedId, " +
-              "mySendPath=$mySendPath, peerReceivePath=$peerReceivePath")
+              "mySendPath=$mySendPath, peerReceivePath=$peerReceivePath, " +
+              "useTokenPath=${sharedTokenForPeer is org.thoughtcrime.securesms.tap.CosTransportToken && sharedTokenForPeer.channelPath != null}")
         
         return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
             recipientId = recipientAci,  // ✅ 使用规范化的ACI格式，与通道管理内部格式一致

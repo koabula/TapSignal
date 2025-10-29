@@ -327,10 +327,16 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     Log.i(TAG, "通道请求被接受: senderId=$senderId")
                     
                     if (responseInfo.token != null) {
-                        // 存储对方提供的Token
-                        val addResult = tokenPool.addReceivedToken(senderId.toString(), responseInfo.token)
+                        // 获取对方的ACI（用于Token保存）
+                        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+                        val peerAci = recipient.requireAci().toString()
+                        
+                        // 存储对方提供的Token（使用ACI格式）
+                        val addResult = tokenPool.addReceivedToken(peerAci, responseInfo.token)
                         if (!addResult) {
-                            Log.w(TAG, "添加接收Token失败: senderId=$senderId")
+                            Log.w(TAG, "添加接收Token失败: senderId=$senderId, peerAci=$peerAci")
+                        } else {
+                            Log.i(TAG, "[Token交换] 通道响应Token保存成功: peerAci=$peerAci")
                         }
                     }
                     
@@ -546,55 +552,104 @@ class TapMessageProcessor private constructor(private val context: Context) {
      * 处理Token接受回应（B发送给A的回应）
      */
     private suspend fun processTokenAccept(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
-        Log.i(TAG, "处理Token接受回应: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+        Log.i(TAG, "[Token交换] A端处理ACCEPT: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
         
         return try {
-            // 将对方的Token保存到TokenPool，使用RecipientId格式保持一致性
+            // 获取对方的ACI（用于Token保存）
+            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+            val peerAci = recipient.requireAci().toString()
+            Log.d(TAG, "[Token交换] A端: senderId=$senderId, peerAci=$peerAci")
+            
+            // 将对方的Token保存到TokenPool，使用ACI格式（与metadata构建时保持一致）
             val peerToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(tokenExchangeMessage.tokenData)
             if (peerToken == null) {
-                Log.w(TAG, "无法解析对方Token: senderId=$senderId")
+                Log.w(TAG, "[Token交换] 无法解析对方Token: senderId=$senderId")
                 return TapProcessResult.Failed("无法解析对方Token")
             }
             
-            val saved = tokenPool.addReceivedToken(senderId.toString(), peerToken)
+            Log.d(TAG, "[Token交换] 解析到Token: senderId=$senderId, tokenId=${peerToken.tokenId}, tokenType=${peerToken.javaClass.simpleName}")
+            
+            // 使用ACI格式保存Token（关键修复）
+            val saved = tokenPool.addReceivedToken(peerAci, peerToken)
             if (!saved) {
-                Log.w(TAG, "保存对方Token失败: senderId=$senderId")
+                Log.w(TAG, "[Token交换] 保存对方Token失败: peerAci=$peerAci")
                 return TapProcessResult.Failed("保存对方Token失败")
             }
             
-            Log.i(TAG, "已保存对方Token: senderId=$senderId, tokenId=${peerToken.tokenId}")
+            Log.i(TAG, "[Token交换] 已保存对方receivedToken: peerAci=$peerAci, tokenId=${peerToken.tokenId}")
+            
+            // 验证Token是否保存成功（使用ACI格式验证）
+            val verifyToken = tokenPool.getValidReceivedToken(peerAci, tokenExchangeMessage.providerType)
+            if (verifyToken == null) {
+                Log.e(TAG, "[Token交换] Token验证失败：保存后无法读取: peerAci=$peerAci, providerType=${tokenExchangeMessage.providerType}")
+                return TapProcessResult.Failed("Token验证失败")
+            }
+            Log.i(TAG, "[Token交换] Token验证通过: peerAci=$peerAci")
+            
+            // 验证是否有sharedToken（自己的token）
+            val sharedToken = tokenPool.getValidSharedToken(peerAci, tokenExchangeMessage.providerType)
+            if (sharedToken == null) {
+                Log.w(TAG, "[Token交换] 警告：没有找到sharedToken: peerAci=$peerAci, providerType=${tokenExchangeMessage.providerType}")
+            } else {
+                Log.i(TAG, "[Token交换] sharedToken存在: peerAci=$peerAci, tokenId=${sharedToken.tokenId}")
+            }
             
             // 更新通道状态为FULL_ACTIVE，使用RecipientId格式
             val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
             if (upgraded) {
-                Log.i(TAG, "A端通道成功升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+                Log.i(TAG, "[Token交换] A端通道成功升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                 
-                // 通道升级成功后，按顺序执行后续操作
-                // 1. 先处理轮询启动（upgradeChannelToFullActive已经处理了）
-                // 2. 再异步处理后续操作（发送确认消息和插入系统消息）
+                // 验证通道的metadata是否包含正确的Token信息
+                val channel = channelManager.getActiveChannel(senderId.toString(), tokenExchangeMessage.providerType)
+                if (channel?.metadata != null) {
+                    val receiveMetadata = channel.metadata!!.getReceiveMetadata()
+                    Log.i(TAG, "[Token交换] 通道metadata验证: receivePath=${receiveMetadata.path}, hasToken=${receiveMetadata.token != null}")
+                    
+                    // 启动轮询（在Token验证通过后）
+                    try {
+                        val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                        val pollingStarted = pollingService.startPolling()
+                        if (pollingStarted) {
+                            val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
+                            if (targetAdded) {
+                                Log.i(TAG, "[Token交换] A端轮询启动成功: senderId=$senderId")
+                            } else {
+                                Log.w(TAG, "[Token交换] A端轮询目标添加失败: senderId=$senderId")
+                            }
+                        } else {
+                            Log.w(TAG, "[Token交换] A端轮询服务启动失败: senderId=$senderId")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "[Token交换] A端启动轮询异常: senderId=$senderId", e)
+                    }
+                } else {
+                    Log.w(TAG, "[Token交换] 通道metadata为null，无法启动轮询: senderId=$senderId")
+                }
+                
+                // 异步处理后续操作（发送确认消息和插入系统消息）
                 processorScope.launch {
                     try {
                         handlePostUpgradeOperations(senderId, tokenExchangeMessage.providerType)
                     } catch (e: Exception) {
-                        Log.e(TAG, "A端后续操作处理异常: senderId=$senderId", e)
+                        Log.e(TAG, "[Token交换] A端后续操作处理异常: senderId=$senderId", e)
                     }
                 }
                 
             } else {
-                Log.w(TAG, "A端通道升级失败，检查通道状态: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+                Log.w(TAG, "[Token交换] A端通道升级失败，检查通道状态: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                 // 添加调试信息，检查当前通道状态
                 val channels = channelManager.getActiveChannels(senderId.toString())
                 channels.forEach { channel ->
-                    Log.d(TAG, "A端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
+                    Log.d(TAG, "[Token交换] A端通道状态: channelId=${channel.channelId}, status=${channel.status}, providerType=${channel.providerType}")
                 }
                 if (channels.isEmpty()) {
-                    Log.w(TAG, "A端未找到任何活跃通道: senderId=$senderId")
+                    Log.w(TAG, "[Token交换] A端未找到任何活跃通道: senderId=$senderId")
                 }
             }
             
             TapProcessResult.Success("Token交换完成，通道已升级")
         } catch (e: Exception) {
-            Log.e(TAG, "处理Token接受回应异常: senderId=$senderId", e)
+            Log.e(TAG, "[Token交换] 处理Token接受回应异常: senderId=$senderId", e)
             TapProcessResult.Failed("处理异常: ${e.message}")
         }
     }
@@ -1065,42 +1120,67 @@ private suspend fun sendTapConfirmationMessage(
  * 处理Token交换确认（A发送给B的确认）
  */
 private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
-    Log.i(TAG, "处理Token交换确认: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+    Log.i(TAG, "[Token交换] B端处理CONFIRM: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
     
     return try {
-        // ✅ 直接使用senderId（RecipientId格式），保持与其他流程的一致性
+        // 获取对方的ACI（用于Token查询）
+        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+        val peerAci = recipient.requireAci().toString()
+        Log.d(TAG, "[Token交换] B端: senderId=$senderId, peerAci=$peerAci")
+        
+        // B端收到A的确认消息前，先验证Token状态（使用ACI格式）
+        val receivedToken = tokenPool.getValidReceivedToken(peerAci, tokenExchangeMessage.providerType)
+        val sharedToken = tokenPool.getValidSharedToken(peerAci, tokenExchangeMessage.providerType)
+        
+        Log.d(TAG, "[Token交换] B端Token状态检查: receivedToken=${receivedToken != null}, sharedToken=${sharedToken != null}, peerAci=$peerAci")
+        
+        if (receivedToken == null) {
+            Log.e(TAG, "[Token交换] B端缺少receivedToken，无法升级通道: peerAci=$peerAci")
+            return TapProcessResult.Failed("缺少receivedToken")
+        }
+        
+        if (sharedToken == null) {
+            Log.w(TAG, "[Token交换] B端缺少sharedToken，但继续升级: peerAci=$peerAci")
+        } else {
+            Log.d(TAG, "[Token交换] B端Token完整: receivedTokenId=${receivedToken.tokenId}, sharedTokenId=${sharedToken.tokenId}")
+        }
+        
         // B端收到A的确认消息，将自己的通道升级为FULL_ACTIVE
         val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
         if (upgraded) {
-            Log.i(TAG, "收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+            Log.i(TAG, "[Token交换] B端收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
             
-            // 通道升级成功后立即启动轮询（使用RecipientId格式）
-            try {
-                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                val channel = channelManager.getActiveChannel(senderId.toString(), tokenExchangeMessage.providerType)
+            // 验证通道的metadata
+            val channel = channelManager.getActiveChannel(senderId.toString(), tokenExchangeMessage.providerType)
+            if (channel?.metadata != null) {
+                val receiveMetadata = channel.metadata!!.getReceiveMetadata()
+                Log.i(TAG, "[Token交换] B端通道metadata验证: receivePath=${receiveMetadata.path}, hasToken=${receiveMetadata.token != null}")
                 
-                                    if (channel?.metadata != null) {
-                        Log.d(TAG, "通道升级后启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
-                        val pollingStarted = pollingService.startPolling()
-                        if (pollingStarted) {
-                            val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
-                            if (targetAdded) {
-                                Log.i(TAG, "通道升级后轮询启动成功: senderId=$senderId")
-                            } else {
-                                Log.w(TAG, "通道升级后轮询目标添加失败: senderId=$senderId")
-                                // 增强诊断：详细分析轮询目标添加失败的原因
-                                diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
-                            }
+                // 通道升级成功后启动轮询（在Token验证通过后）
+                try {
+                    val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                    Log.d(TAG, "[Token交换] B端准备启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+                    
+                    val pollingStarted = pollingService.startPolling()
+                    if (pollingStarted) {
+                        val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
+                        if (targetAdded) {
+                            Log.i(TAG, "[Token交换] B端轮询启动成功: senderId=$senderId")
                         } else {
-                            Log.w(TAG, "通道升级后轮询服务启动失败: senderId=$senderId")
+                            Log.w(TAG, "[Token交换] B端轮询目标添加失败: senderId=$senderId")
+                            // 增强诊断：详细分析轮询目标添加失败的原因
+                            diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
                         }
                     } else {
-                        Log.w(TAG, "通道升级后无法获取metadata，跳过轮询启动: senderId=$senderId")
-                        // 诊断metadata为null的原因
-                        diagnosisChannelMetadataIssue(channel, senderId.toString(), tokenExchangeMessage.providerType)
+                        Log.w(TAG, "[Token交换] B端轮询服务启动失败: senderId=$senderId")
                     }
-            } catch (e: Exception) {
-                Log.e(TAG, "通道升级后启动轮询异常: senderId=$senderId", e)
+                } catch (e: Exception) {
+                    Log.e(TAG, "[Token交换] B端启动轮询异常: senderId=$senderId", e)
+                }
+            } else {
+                Log.w(TAG, "[Token交换] B端通道metadata为null，跳过轮询启动: senderId=$senderId")
+                // 诊断metadata为null的原因
+                diagnosisChannelMetadataIssue(channel, senderId.toString(), tokenExchangeMessage.providerType)
             }
             
             // B端插入v2 mode启用提示消息

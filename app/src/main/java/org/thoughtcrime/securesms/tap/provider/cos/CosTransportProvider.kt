@@ -601,18 +601,18 @@ class CosTransportProvider(
                     return@withContext null
                 }
                 
-                // 3. 生成目录名（使用hashedId确保与实际使用路径一致）
+                // 3. 生成目录名（添加时间戳避免复用旧目录）
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
                 val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
-                val channelDirectoryName = myHashedId
+                val timestamp = System.currentTimeMillis()
+                val channelDirectoryName = "${myHashedId}_${timestamp}"
                 val channelDirectoryPath = "/v2-channels/$channelDirectoryName/"
                 
                 // 生成子用户名（包含时间戳确保唯一性）
-                val timestamp = System.currentTimeMillis()
                 val randomSuffix = (1000..9999).random()
                 val subUserName = "signal-cos-signal-v2-${timestamp}-${randomSuffix}"
                 
-                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/, hashedId=$myHashedId")
+                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/, hashedId=$myHashedId, timestamp=$timestamp")
                 
                 // 4. 创建COS客户端和子用户管理器
                 val cosClient = CosClientFactory.createClient(tapCosConfig, context)
@@ -655,7 +655,7 @@ class CosTransportProvider(
                     Long.MAX_VALUE
                 }
                 
-                // 8. 创建TransportToken
+                // 8. 创建TransportToken（包含通道目录路径）
                 val token = org.thoughtcrime.securesms.tap.CosTransportToken(
                     tokenId = "cos-${subUserCredential.userName}-${timestamp}",
                     recipientId = request.recipientId,
@@ -666,7 +666,8 @@ class CosTransportProvider(
                     sessionToken = null, // 永久凭证不需要sessionToken
                     region = cosConfig.region,
                     bucketName = cosConfig.bucketName,
-                    cloudProvider = cosConfig.provider.name
+                    cloudProvider = cosConfig.provider.name,
+                    channelPath = "${channelDirectoryPath}outbox/" // 保存完整的通道路径（包含时间戳）
                 )
                 
                 Log.i(TAG, "COS传输Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(request.recipientId)}")
