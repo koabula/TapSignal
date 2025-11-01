@@ -18,7 +18,7 @@
 云函数 F_A (部署在A的账号)
   ↓ 读取配置
 COS_A: tap-state/contacts/{B_hash}.json
-  → webhookUrl_B, notifySecret
+  → webhookUrl_B, notifySecret(A ACI Hash)
   ↓ HTTP POST
 Webhook_B (部署在B的账号)
   ↓ 验证签名
@@ -220,6 +220,84 @@ data class WebhookResponse(
   - [ ] 编写 `aws-webhook.js`
   - [ ] 编写 `aws-f-a.js` (S3触发器)
   - [ ] 打包为 `.zip` 放入 `assets/`
+
+B发送消息后触发F_B,会给A的Webhook发送一个提醒信息,里面包含B的ACI的HASH和B保存的A的topicId_A. 然后A的Webhook会给IoT的tap/notifications/topicId_A,发送一个推送提醒,然后A会从A的IoT的websocket连接中获取该提醒
+
+```mermaid
+sequenceDiagram
+    participant A as 用户A
+    participant IoT as AWS IoT Core
+    participant Webhook as A的Webhook
+    participant F_B as B的云函数F_B
+    participant B as 用户B
+    
+    Note over A: 部署推送服务
+    A->>IoT: 生成topicId="abc123"
+    A->>IoT: 订阅 tap/notifications/abc123
+    A->>Webhook: 部署Webhook，环境变量TOPIC_ID=abc123
+    
+    Note over A,B: TAP握手
+    A->>B: 通过Signal Server发送Tap控制信息,增加 {webhookUrl, notifySecret, topicId}
+    
+    Note over B: B上传消息
+    B->>F_B: S3事件触发
+    F_B->>F_B: 读取A的配置 {webhookUrl, notifySecret, topicId}
+    F_B->>Webhook: POST webhook (metadata包含topicId)
+    Webhook->>Webhook: 从env读取TOPIC_ID或从metadata读取
+    Webhook->>IoT: 推送到 tap/notifications/abc123
+    IoT->>A: MQTT消息到达
+```
+
+```mermaid
+sequenceDiagram
+    participant A as 用户A
+    participant A_AWS as A的AWS服务<br/>(IoT + Lambda)
+    participant B as 用户B
+    participant B_S3 as B的S3存储
+    participant B_Lambda as B的云函数F_B
+    
+    rect rgb(240, 248, 255)
+        Note over A,A_AWS: 1. 部署推送服务
+        A->>A_AWS: 部署Webhook和IoT服务
+        A_AWS-->>A: 返回 webhookUrl, topicId
+        Note over A: A获得推送配置
+    end
+    
+    rect rgb(255, 250, 240)
+        Note over A,B: 2. TAP握手（交换配置）
+        A->>B: 发送 {webhookUrl_A, notifySecret_A, topicId_A}
+        Note over B: B保存A的webhook配置<br/>到 tap-state/contacts/A_hash.json
+        B->>A: 发送 {webhookUrl_B, notifySecret_B, topicId_B}
+        Note over A: A保存B的webhook配置
+    end
+    
+    rect rgb(240, 255, 240)
+        Note over A,A_AWS: 3. 建立MQTT连接
+        A->>A_AWS: 连接IoT Core
+        A->>A_AWS: 订阅 tap/notifications/{topicId_A}
+        Note over A: A开始监听推送
+    end
+    
+    rect rgb(255, 240, 245)
+        Note over B,A: 4. B发送消息触发推送
+        B->>B_S3: 上传密文消息
+        B_S3->>B_Lambda: 触发云函数F_B
+        B_Lambda->>B_S3: 读取A的webhook配置
+        Note over B_Lambda: 构造通知消息<br/>{senderId: B_hash,<br/>topicId: topicId_A}
+        B_Lambda->>A_AWS: POST webhook_A (带签名)
+        A_AWS->>A_AWS: 验证签名
+        A_AWS->>A_AWS: 推送到 tap/notifications/{topicId_A}
+        A_AWS-->>A: MQTT消息到达
+        Note over A: 收到推送通知
+    end
+    
+    rect rgb(255, 255, 240)
+        Note over A,B_S3: 5. 下载并处理消息
+        A->>B_S3: 使用token下载密文
+        B_S3-->>A: 返回密文
+        A->>A: Signal解密并显示
+    end
+```
 
 ### Phase 3: 腾讯云CloudBase实现
 

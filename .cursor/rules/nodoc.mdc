@@ -1,0 +1,5 @@
+---
+description: 请不要在用户没有要求的情况下,生成复杂的报告或总结文档
+globs:
+alwaysApply: false
+---

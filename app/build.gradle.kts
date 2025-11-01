@@ -613,6 +613,12 @@ dependencies {
   
   // AWS S3 SDK for Kotlin
   implementation(libs.aws.sdk.s3)
+  implementation(libs.aws.sdk.iot)
+  implementation(libs.aws.sdk.iotdataplane)
+  implementation(libs.aws.sdk.lambda)
+  
+  // Eclipse Paho MQTT Client for AWS IoT
+  implementation(libs.eclipse.paho.mqttv3)
 
   "playImplementation"(project(":billing"))
   "nightlyImplementation"(project(":billing"))

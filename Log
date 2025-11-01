@@ -1,68 +1,123 @@
-2025-10-29 13:53:31.143 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218204888_5218775a-de3c-424a-bf56-328d14760c9d.dat | timestamp=1761717211143
-2025-10-29 13:53:31.143 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218212309_06b9c572-fccc-4388-a548-9e6390936791.dat | timestamp=1761717211143
-2025-10-29 13:53:31.144 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218214156_655f8ec7-ab13-453a-a2cf-618b4020a1a4.dat | timestamp=1761717211144
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218218022_c1a3dbfe-9b2d-4e90-82a1-59604db1f58b.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218219733_1a2c8e9b-f9f8-410b-ba2b-5e3708f4545b.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218221446_5c866da1-ae15-4f56-89f4-03e745878863.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218225170_17129c08-e3bc-4807-aa12-f00d228cbdd2.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218229255_064774b3-e9bd-4942-8064-5d13b8e724a8.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218230919_17c29605-7f77-42e2-86db-f61db0679009.dat | timestamp=1761717211145
-2025-10-29 13:53:31.145 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218232704_c790c43d-d008-46b8-af01-1db664716cfc.dat | timestamp=1761717211145
-2025-10-29 13:53:31.146 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218234383_afe02e50-3ad2-42bf-aa01-4fb4a849d2a9.dat | timestamp=1761717211146
-2025-10-29 13:53:31.146 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218236144_3db52365-3d02-403e-976d-a154d038bf97.dat | timestamp=1761717211146
-2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218243354_abffe154-6b4a-47ce-9fdb-eef0644dba5c.dat | timestamp=1761717211147
-2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218245054_3d8fc408-b93c-4f2f-a5ec-c719f33b0f0e.dat | timestamp=1761717211147
-2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218246524_7ce37c5a-51e1-4f77-b8ab-3f13dae241f2.dat | timestamp=1761717211147
-2025-10-29 13:53:31.147 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218248407_066f626a-65f6-46da-95c3-47ca3e3fc3aa.dat | timestamp=1761717211147
-2025-10-29 13:53:31.148 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218252568_100a7022-1a38-4db5-95a2-fd1f58ead3bf.dat | timestamp=1761717211148
-2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218254169_146efca6-9ed2-4958-9de9-8b98845940cf.dat | timestamp=1761717211149
-2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218255955_8ca15902-f7c2-451b-8034-7e7aa2de8c46.dat | timestamp=1761717211149
-2025-10-29 13:53:31.149 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218260133_ad4bbc10-ea57-4a57-86d8-3fb7f8c8e43e.dat | timestamp=1761717211149
-2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218261655_358b8495-711c-4cc6-961b-0ca240fe5770.dat | timestamp=1761717211150
-2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218263401_f7b91d05-35ed-4a8d-8842-cd7990fa01a6.dat | timestamp=1761717211150
-2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218265075_1b89df0a-c374-4ca4-b1ad-88187fab78a8.dat | timestamp=1761717211150
-2025-10-29 13:53:31.150 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218274402_8933996e-87d5-468c-870b-dc3d991bbf6b.dat | timestamp=1761717211150
-2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218276196_f5e25a35-8f3b-486b-b28c-c6841ee249f1.dat | timestamp=1761717211151
-2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218280215_c50950a8-7aa1-45ac-a9bb-3063d3add59e.dat | timestamp=1761717211151
-2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218290995_11081bdd-3a88-4b99-84e1-758a73c0edbc.dat | timestamp=1761717211151
-2025-10-29 13:53:31.151 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218300441_6962acb6-970e-4ac2-a298-be8db01d3f7b.dat | timestamp=1761717211151
-2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218301917_3c14df00-1491-4719-b5fd-ab545e53a3ac.dat | timestamp=1761717211152
-2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218309496_d2dbea80-e46a-4db1-99dc-fb2982a14893.dat | timestamp=1761717211152
-2025-10-29 13:53:31.152 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761218311382_c17e291c-b9ae-4315-afca-327802ebef88.dat | timestamp=1761717211152
-2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761540543456_7cec251e-56a7-4338-bf51-56366b8f36f2.dat | timestamp=1761717211152
-2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713835199_896c4a19-9d77-49fd-9d44-94ef70c73286.dat | timestamp=1761717211153
-2025-10-29 13:53:31.153 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713848487_1656c3d7-3703-4e1e-b630-ad6c244e3bcc.dat | timestamp=1761717211153
-2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713946884_bfee4dde-1fb0-4bbb-aa22-5f5a91b8243c.dat | timestamp=1761717211154
-2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761713950103_381d383a-f3dd-423e-8706-85180a082c30.dat | timestamp=1761717211154
-2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714937777_edb22f57-6c40-439a-a469-37ddbe3fde55.dat | timestamp=1761717211154
-2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714960810_86603aac-4c57-45cd-99f7-7ef6546780d2.dat | timestamp=1761717211154
-2025-10-29 13:53:31.154 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761714976021_57762c4d-8164-4bc3-9f38-bd8ff4c25caf.dat | timestamp=1761717211154
-2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715007290_bd456f0b-424a-4f9f-b87f-f1871784f913.dat | timestamp=1761717211155
-2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715036035_4c8734b0-9fc6-49df-b5c2-c076492d7a6f.dat | timestamp=1761717211155
-2025-10-29 13:53:31.155 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715106773_5cfc5fd0-bbd9-4d5b-8b44-220d7c138def.dat | timestamp=1761717211155
-2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715302166_ae83bf45-521b-4f2f-925e-9914c4426814.dat | timestamp=1761717211155
-2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761715426606_69988916-d9c7-4121-84b9-3b49ca7d4e5c.dat | timestamp=1761717211156
-2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761716197976_a1d86e55-a089-4438-95cb-27e4b35cf9c1.dat | timestamp=1761717211156
-2025-10-29 13:53:31.156 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761716199128_5d83ab71-9b7c-4173-9819-ad2dfaecb019.dat | timestamp=1761717211156
-2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717006877_e6be7cde-3129-48a6-8303-87749c8dd78b.dat | timestamp=1761717211157
-2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717033795_cfe631be-b1bb-4c31-8645-f197e2d86d17.dat | timestamp=1761717211157
-2025-10-29 13:53:31.157 10953-11739 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T4_POLL_DETECT | msgId=1761717058028_1b3b7e02-1741-460d-94a6-3817a9899c50.dat | timestamp=1761717211157
-2025-10-29 13:53:31.234 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-29 13:53:32.233 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973
-2025-10-29 13:53:32.946 10953-11203 TapPollingService       org.thoughtcrime.securesms           V  附件文件已发现，无需解析: 1761206797889_6c207efb-f65c-4fa9-9409-dffa199558aa.dat
-2025-10-29 13:53:32.947 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009556445 | timestamp=1761717212947
-2025-10-29 13:53:32.949 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009557049_86b16200-7386-4158-8905-bcdc6da14672.dat, error=消息验证失败
-2025-10-29 13:53:32.951 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009565691 | timestamp=1761717212951
-2025-10-29 13:53:32.951 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********672, type=TEXT_MESSAGE
-2025-10-29 13:53:32.953 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009566090_08ecdc50-c180-4cdd-ac91-b4de64cfda7f.dat, error=消息验证失败
-2025-10-29 13:53:32.953 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009556445, currentTime=1761717212949, diff=707656504ms
-2025-10-29 13:53:32.955 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********672
-2025-10-29 13:53:32.957 10953-11203 TapPollingService       org.thoughtcrime.securesms           D  [TapTimeTest] T5_DOWNLOAD_END | msgId=1761009566835 | timestamp=1761717212957
-2025-10-29 13:53:32.961 10953-11203 TapPollingService       org.thoughtcrime.securesms           W  消息处理失败，将重试: 1761009567326_0fcbdc4e-13d4-4c32-8aee-50461de6b3e3.dat, error=消息验证失败
-2025-10-29 13:53:32.962 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********a7f, type=TEXT_MESSAGE
-2025-10-29 13:53:32.963 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009565691, currentTime=1761717212951, diff=707647260ms
-2025-10-29 13:53:32.965 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********a7f
-2025-10-29 13:53:32.969 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********3e3, type=TEXT_MESSAGE
-2025-10-29 13:53:32.970 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  消息时间戳偏差过大: messageTime=1761009566835, currentTime=1761717212958, diff=707646123ms
-2025-10-29 13:53:32.973 10953-10991 TapMessageProcessor     org.thoughtcrime.securesms           W  传输消息验证失败: messageId=********-****-****-****-*********3e3
-2025-10-29 13:53:33.234 10953-11487 TapPollingService       org.thoughtcrime.securesms           D  轮询任务已在执行中，跳过: c716a84d-2fbd-4598-8bc3-b12cbba41973
+Multiple build operations failed.
+    Dependency verification failed for configuration ':benchmark:benchmarkTestedApks'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':billing:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':contacts:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':contacts-app:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':core-ui:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':core-util:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':debuglogs-viewer:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':debuglogs-viewer-app:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':device-transfer:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    Dependency verification failed for configuration ':device-transfer-app:coreLibraryDesugaring'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
+    ...and 17 more failures.
+Dependency verification failed for configuration ':benchmark:benchmarkTestedApks'
+6 artifacts failed verification:
+  - iot-1.3.95.module (aws.sdk.kotlin:iot:1.3.95) from repository MavenRepo
+  - iot-jvm-1.3.95.module (aws.sdk.kotlin:iot-jvm:1.3.95) from repository MavenRepo
+  - iotdataplane-1.3.95.module (aws.sdk.kotlin:iotdataplane:1.3.95) from repository MavenRepo
+  - iotdataplane-jvm-1.3.95.module (aws.sdk.kotlin:iotdataplane-jvm:1.3.95) from repository MavenRepo
+  - lambda-1.3.95.module (aws.sdk.kotlin:lambda:1.3.95) from repository MavenRepo
+  - lambda-jvm-1.3.95.module (aws.sdk.kotlin:lambda-jvm:1.3.95) from repository MavenRepo
+If the artifacts are trustworthy, you will need to update the gradle/verification-metadata.xml file. For more on how to do this, please refer to https://docs.gradle.org/8.11.1/userguide/dependency_verification.html#sec:troubleshooting-verification in the Gradle documentation.
+
+Open this report for more details: file:///D:/Research/Signal/Signal-Android/build/reports/dependency-verification/at-1761989911588/dependency-verification-report.html
