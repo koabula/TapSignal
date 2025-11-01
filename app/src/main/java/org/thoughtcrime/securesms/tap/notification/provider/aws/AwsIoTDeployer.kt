@@ -939,7 +939,8 @@ class AwsIoTDeployer(
 
     private fun loadAssetOrGenerateZip(assetName: String, fallbackCode: String): ByteArray {
         return try {
-            context.assets.open(assetName).readBytes()
+            val assetPath = "lambda-functions/$assetName"
+            context.assets.open(assetPath).readBytes()
         } catch (e: Exception) {
             Log.w(TAG, "Asset $assetName not found, using generated code", e)
             createZipFromCode(fallbackCode)

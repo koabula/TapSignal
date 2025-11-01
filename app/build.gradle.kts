@@ -608,16 +608,19 @@ dependencies {
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.compat)
 
-  // Tencent Cloud COS SDK
+  // Tencent Cloud SDK
   implementation(libs.tencent.cos.android)
+  implementation(libs.tencent.sdk.java)
   
-  // AWS S3 SDK for Kotlin
+  // AWS SDK for Kotlin
   implementation(libs.aws.sdk.s3)
   implementation(libs.aws.sdk.iot)
   implementation(libs.aws.sdk.iotdataplane)
   implementation(libs.aws.sdk.lambda)
+  implementation(libs.aws.sdk.sts)
+  implementation(libs.aws.sdk.iam)
   
-  // Eclipse Paho MQTT Client for AWS IoT
+  // Eclipse Paho MQTT Client (for AWS IoT and Tencent IoT Hub)
   implementation(libs.eclipse.paho.mqttv3)
 
   "playImplementation"(project(":billing"))

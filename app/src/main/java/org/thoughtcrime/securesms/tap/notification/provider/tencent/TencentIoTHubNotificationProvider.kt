@@ -1,4 +1,4 @@
-package org.thoughtcrime.securesms.tap.notification.provider.aws
+package org.thoughtcrime.securesms.tap.notification.provider.tencent
 
 import android.content.Context
 import android.util.Log
@@ -7,25 +7,25 @@ import org.thoughtcrime.securesms.tap.notification.*
 import java.util.UUID
 
 /**
- * AWS IoT Core推送服务提供者实现
+ * 腾讯云IoT Hub推送服务提供者实现
  */
-class AwsIoTNotificationProvider(
+class TencentIoTHubNotificationProvider(
     private val context: Context,
-    private val accessKeyId: String,
-    private val secretAccessKey: String,
-    private val defaultRegion: String = "us-east-1"
+    private val secretId: String,
+    private val secretKey: String,
+    private val defaultRegion: String = "ap-guangzhou"
 ) : NotificationProvider {
 
     companion object {
-        private const val TAG = "AwsIoTNotificationProvider"
-        const val PROVIDER_TYPE = "aws-iot"
+        private const val TAG = "TencentIoTHubProvider"
+        const val PROVIDER_TYPE = "tencent-iot"
         private const val TOPIC_PREFIX = "tap/notifications"
     }
 
     override val providerType: String = PROVIDER_TYPE
 
-    private var iotClient: AwsIoTClient? = null
-    private var deployer: AwsIoTDeployer? = null
+    private var iotClient: TencentIoTHubClient? = null
+    private var deployer: TencentIoTHubDeployer? = null
     private var webhookConfig: WebhookConfig? = null
     private var currentUserId: String? = null
     private var notificationCallback: ((NotificationMessage) -> Unit)? = null
@@ -37,23 +37,23 @@ class AwsIoTNotificationProvider(
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
             
-            val awsDeployer = AwsIoTDeployer(context, accessKeyId, secretAccessKey, effectiveRegion)
-            deployer = awsDeployer
+            val tencentDeployer = TencentIoTHubDeployer(context, secretId, secretKey, effectiveRegion)
+            deployer = tencentDeployer
 
-            val webhookUrl = awsDeployer.deployWebhook()
+            val webhookUrl = tencentDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
-            val pushServiceInfo = awsDeployer.deployPushService()
+            val pushServiceInfo = tencentDeployer.deployPushService()
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
 
-            val triggerInfo = awsDeployer.setupEventTrigger()
+            val triggerInfo = tencentDeployer.setupEventTrigger()
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
 
             val secret = generateNotifySecret()
             val topicId = pushServiceInfo.credentials["topicId"] 
                 ?: throw Exception("Topic ID not found in push service info")
             
-            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret, topicId)
+            val envUpdateResult = tencentDeployer.updateWebhookEnvironment(secret, topicId)
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")
@@ -72,7 +72,7 @@ class AwsIoTNotificationProvider(
                 pushServiceInfo = pushServiceInfo,
                 deployedAt = System.currentTimeMillis()
             )
-            awsDeployer.saveConfiguration(config)
+            tencentDeployer.saveConfiguration(config)
 
             Log.i(TAG, "Deployment completed successfully")
             DeployResult.success(webhookUrl, pushServiceInfo)
@@ -113,28 +113,33 @@ class AwsIoTNotificationProvider(
             val config = deployer?.loadConfiguration()
                 ?: return ConnectionResult.failure("Configuration not found. Please deploy first.")
 
-            val clientId = "tap-client-${userId.take(8)}-${UUID.randomUUID().toString().take(8)}"
+            val productId = config.pushServiceInfo.credentials["productId"]
+                ?: return ConnectionResult.failure("Product ID not found in configuration")
             
-            val certificatePem = config.pushServiceInfo.credentials["certificatePem"]
-                ?: return ConnectionResult.failure("Certificate not found in configuration")
+            val deviceName = config.pushServiceInfo.credentials["deviceName"]
+                ?: return ConnectionResult.failure("Device name not found in configuration")
             
-            val privateKeyPem = config.pushServiceInfo.credentials["privateKeyPem"]
-                ?: return ConnectionResult.failure("Private key not found in configuration")
+            val deviceSecret = config.pushServiceInfo.credentials["deviceSecret"]
+                ?: return ConnectionResult.failure("Device secret not found in configuration")
 
             val topicId = config.pushServiceInfo.credentials["topicId"]
                 ?: return ConnectionResult.failure("Topic ID not found in configuration")
             
-            val client = AwsIoTClient(
+            val certificatePem = config.pushServiceInfo.credentials["certificatePem"]
+            val privateKeyPem = config.pushServiceInfo.credentials["privateKeyPem"]
+            
+            val client = TencentIoTHubClient(
                 context = context,
                 endpoint = config.pushServiceInfo.endpoint,
-                region = config.pushServiceInfo.region,
-                clientId = clientId,
+                productId = productId,
+                deviceName = deviceName,
+                deviceSecret = deviceSecret,
                 certificatePem = certificatePem,
                 privateKeyPem = privateKeyPem
             )
             iotClient = client
 
-            Log.i(TAG, "Connecting to AWS IoT Core...")
+            Log.i(TAG, "Connecting to Tencent IoT Hub...")
             val connectResult = client.connect()
             if (connectResult.isFailure) {
                 return ConnectionResult.failure(connectResult.exceptionOrNull()?.message ?: "Connection failed")
@@ -150,8 +155,8 @@ class AwsIoTNotificationProvider(
 
             startMessageListener(client)
 
-            Log.i(TAG, "Connected successfully with client ID: $clientId")
-            ConnectionResult.success(clientId)
+            Log.i(TAG, "Connected successfully")
+            ConnectionResult.success("$productId$deviceName")
 
         } catch (e: Exception) {
             Log.e(TAG, "Connection failed", e)
@@ -161,7 +166,7 @@ class AwsIoTNotificationProvider(
 
     override suspend fun disconnect() {
         try {
-            Log.i(TAG, "Disconnecting from AWS IoT Core")
+            Log.i(TAG, "Disconnecting from Tencent IoT Hub")
             
             messageListenerJob?.cancel()
             messageListenerJob = null
@@ -205,7 +210,7 @@ class AwsIoTNotificationProvider(
         }
     }
 
-    private fun startMessageListener(client: AwsIoTClient) {
+    private fun startMessageListener(client: TencentIoTHubClient) {
         messageListenerJob?.cancel()
         messageListenerJob = scope.launch {
             val messageChannel = client.getMessageChannel()
