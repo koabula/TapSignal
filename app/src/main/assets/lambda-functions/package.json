@@ -1,0 +1,19 @@
+{
+  "name": "tap-notification-lambdas",
+  "version": "1.0.0",
+  "description": "Lambda functions for TAP notification system",
+  "main": "index.js",
+  "scripts": {
+    "package": "npm run package:webhook && npm run package:trigger",
+    "package:webhook": "zip -j aws-webhook.zip aws-webhook.js package.json",
+    "package:trigger": "zip -j aws-f-a.zip aws-f-a.js package.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-iot-data-plane": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+
