@@ -1,5 +1,6 @@
 package org.thoughtcrime.securesms.tap.notification
 
+import android.content.Context
 import kotlinx.coroutines.*
 import org.signal.core.util.logging.Log
 import java.util.concurrent.atomic.AtomicBoolean
@@ -7,7 +8,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * 推送连接管理器
  */
-class NotificationConnectionManager {
+class NotificationConnectionManager private constructor(
+    private val context: Context
+) {
     
     companion object {
         private val TAG = Log.tag(NotificationConnectionManager::class.java)
@@ -16,9 +19,20 @@ class NotificationConnectionManager {
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 60 * 1000L
         private const val MAX_RECONNECT_ATTEMPTS = 10
+        
+        @Volatile
+        private var instance: NotificationConnectionManager? = null
+        
+        fun getInstance(context: Context): NotificationConnectionManager {
+            return instance ?: synchronized(this) {
+                instance ?: NotificationConnectionManager(context.applicationContext).also {
+                    instance = it
+                }
+            }
+        }
     }
     
-    private val notificationManager = NotificationManager.getInstance()
+    private val notificationManager = NotificationManager.getInstance(context)
     
     private val isInForeground = AtomicBoolean(false)
     private val shouldMaintainConnection = AtomicBoolean(false)

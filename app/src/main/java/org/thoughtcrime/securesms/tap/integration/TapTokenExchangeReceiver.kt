@@ -319,17 +319,42 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             
             // 9. 创建响应消息
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-            val responseMessage = TapTokenExchangeMessage(
-                senderAci = myAci,
-                providerType = originalMessage.providerType,
-                tokenData = generatedToken.toMap(),
-                metadata = mapOf(
-                    "providerConfig" to providerConfig,
-                    "recipientAci" to originalMessage.senderAci,
-                    "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
-                ),
-                requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT
-            )
+            
+            val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+            val localNotificationConfig = notificationConfigManager.getLocalConfig()
+            
+            val responseMessage = if (localNotificationConfig != null && localNotificationConfig.validate()) {
+                Log.d(TAG, "包含Webhook配置到Token交换响应消息")
+                val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
+                    ?: java.util.UUID.randomUUID().toString()
+                TapTokenExchangeMessage.createWithWebhook(
+                    senderAci = myAci,
+                    providerType = originalMessage.providerType,
+                    tokenData = generatedToken.toMap(),
+                    metadata = mapOf(
+                        "providerConfig" to providerConfig,
+                        "recipientAci" to originalMessage.senderAci,
+                        "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
+                    ),
+                    requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
+                    webhookUrl = localNotificationConfig.webhookUrl,
+                    notifySecret = localNotificationConfig.notifySecret,
+                    userId = userId
+                )
+            } else {
+                Log.d(TAG, "未配置推送服务，发送普通Token交换响应消息")
+                TapTokenExchangeMessage(
+                    senderAci = myAci,
+                    providerType = originalMessage.providerType,
+                    tokenData = generatedToken.toMap(),
+                    metadata = mapOf(
+                        "providerConfig" to providerConfig,
+                        "recipientAci" to originalMessage.senderAci,
+                        "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
+                    ),
+                    requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT
+                )
+            }
             
             // 10. 发送响应消息
             sendTokenExchangeResponse(context, senderId, responseMessage)

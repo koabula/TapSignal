@@ -9,7 +9,7 @@ interface NotificationDeployer {
     
     suspend fun deployPushService(): PushServiceInfo
     
-    suspend fun setupEventTrigger(): TriggerInfo
+    suspend fun setupEventTrigger(userBucketName: String? = null): TriggerInfo
     
     suspend fun testDeployment(): TestResult
     

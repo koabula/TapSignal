@@ -1789,17 +1789,43 @@ class ConversationFragment :
               val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
               Log.d(TAG, "获取自己的ACI成功: ${myAci.take(10)}...")
               
-              val tokenExchangeMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
-                senderAci = myAci,
-                providerType = "cos",
-                tokenData = generatedToken.toMap(),
-                metadata = mapOf(
-                  "providerConfig" to providerConfig,
-                  "channelId" to channelId,
-                  "recipientAci" to recipientAci
-                ),
-                requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER
-              )
+              val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(requireContext())
+              val localNotificationConfig = kotlinx.coroutines.runBlocking { 
+                notificationConfigManager.getLocalConfig() 
+              }
+              
+              val tokenExchangeMessage = if (localNotificationConfig != null && localNotificationConfig.validate()) {
+                Log.d(TAG, "包含Webhook配置到Token交换消息")
+                val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
+                  ?: java.util.UUID.randomUUID().toString()
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.createWithWebhook(
+                  senderAci = myAci,
+                  providerType = "cos",
+                  tokenData = generatedToken.toMap(),
+                  metadata = mapOf(
+                    "providerConfig" to providerConfig,
+                    "channelId" to channelId,
+                    "recipientAci" to recipientAci
+                  ),
+                  requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER,
+                  webhookUrl = localNotificationConfig.webhookUrl,
+                  notifySecret = localNotificationConfig.notifySecret,
+                  userId = userId
+                )
+              } else {
+                Log.d(TAG, "未配置推送服务，发送普通Token交换消息")
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
+                  senderAci = myAci,
+                  providerType = "cos",
+                  tokenData = generatedToken.toMap(),
+                  metadata = mapOf(
+                    "providerConfig" to providerConfig,
+                    "channelId" to channelId,
+                    "recipientAci" to recipientAci
+                  ),
+                  requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER
+                )
+              }
               Log.d(TAG, "Token交换消息对象创建成功")
               
               val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(tokenExchangeMessage)

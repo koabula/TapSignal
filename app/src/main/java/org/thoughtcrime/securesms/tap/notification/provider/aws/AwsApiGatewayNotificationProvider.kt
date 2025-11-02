@@ -46,20 +46,39 @@ class AwsApiGatewayNotificationProvider(
             val webhookUrl = awsDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
-            val triggerInfo = awsDeployer.setupEventTrigger()
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val cosConfig = configManager.getProviderConfig("cos")
+            val bucketName = cosConfig?["bucketName"] as? String
+
+            val triggerInfo = awsDeployer.setupEventTrigger(userBucketName = bucketName)
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
 
+            if (bucketName != null && triggerInfo.triggerArn != null) {
+                Log.i(TAG, "Configuring S3 event notification for bucket: $bucketName")
+                val s3EventConfigured = awsDeployer.configureS3EventNotification(
+                    userBucketName = bucketName,
+                    triggerFunctionArn = triggerInfo.triggerArn,
+                    filterPrefix = "v2-channels/"
+                )
+                if (s3EventConfigured) {
+                    Log.i(TAG, "S3 event notification configured successfully")
+                } else {
+                    Log.w(TAG, "Failed to configure S3 event notification - manual setup may be required")
+                }
+            } else {
+                Log.w(TAG, "Bucket name or trigger ARN missing, S3 event not configured automatically")
+            }
+
             val secret = generateNotifySecret()
+            val userId = generateUserId()
             val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 
                 ?: throw Exception("API Gateway ID not found in push service info")
             
-            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret)
+            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret, userId)
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")
             }
-            
-            val userId = generateUserId()
             webhookConfig = WebhookConfig(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,

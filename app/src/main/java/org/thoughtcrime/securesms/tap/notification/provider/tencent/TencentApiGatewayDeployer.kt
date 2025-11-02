@@ -180,18 +180,29 @@ class TencentApiGatewayDeployer(
         }
     }
 
-    override suspend fun setupEventTrigger(): TriggerInfo {
+    override suspend fun setupEventTrigger(userBucketName: String?): TriggerInfo {
         return try {
             Log.i(TAG, "Setting up COS event trigger...")
 
             val functionName = "$TRIGGER_FUNCTION_NAME-${UUID.randomUUID().toString().take(8)}"
             val zipData = loadAsset(TRIGGER_ASSET_NAME)
             
-            val envVars = mapOf(
-                "CONFIG_BUCKET" to getOrCreateConfigBucket(),
+            val configBucket = if (!userBucketName.isNullOrEmpty()) {
+                Log.d(TAG, "Using user bucket for CONFIG_BUCKET: $userBucketName")
+                userBucketName
+            } else {
+                Log.w(TAG, "User bucket not provided, F_A will read from event bucket as fallback")
+                ""
+            }
+            
+            val envVars = mutableMapOf<String, String>(
                 "CONFIG_KEY" to CONFIG_KEY,
                 "REGION" to region
-            )
+            ).apply {
+                if (configBucket.isNotEmpty()) {
+                    this["CONFIG_BUCKET"] = configBucket
+                }
+            }
             
             val functionArn = createCloudFunction(
                 functionName = functionName,

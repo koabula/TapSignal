@@ -109,11 +109,72 @@ class NotificationConfigManager private constructor(private val context: Context
                     return@withLock false
                 }
                 
-                configManager.saveContactNotificationConfig(contactAci, config)
+                val saved = configManager.saveContactNotificationConfig(contactAci, config)
+                
+                if (saved) {
+                    uploadContactConfigToCOS(contactAci, config)
+                }
+                
+                saved
             } catch (e: Exception) {
                 Log.e(TAG, "保存联系人推送配置失败: contactAci=$contactAci", e)
                 false
             }
+        }
+    }
+    
+    private suspend fun uploadContactConfigToCOS(contactAci: String, config: ContactNotificationConfig) {
+        try {
+            val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+            val provider = transportManager.getProvider("cos")
+            
+            if (provider == null) {
+                Log.w(TAG, "COS Provider未找到，无法上传联系人配置")
+                return
+            }
+            
+            val contactHash = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(contactAci.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+                .take(16)
+            
+            val configJson = org.json.JSONObject().apply {
+                put("webhookUrl", config.webhookUrl)
+                put("notifySecret", config.notifySecret)
+                put("userId", config.userId)
+                put("platform", config.platform)
+                put("lastUpdated", config.lastUpdated)
+                put("version", "2.0")
+            }.toString()
+            
+            val uploadPath = "tap-state/contacts/${contactHash}.json"
+            
+            val configManagerInstance = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val cosConfig = configManagerInstance.getProviderConfig("cos")
+            if (cosConfig == null) {
+                Log.w(TAG, "COS配置未找到，无法上传联系人配置")
+                return
+            }
+            
+            val metadata = org.thoughtcrime.securesms.tap.TransportMetadata(
+                providerType = "cos",
+                config = cosConfig
+            )
+            
+            val uploadResult = provider.uploadFile(
+                data = configJson.toByteArray(),
+                fileName = uploadPath,
+                metadata = metadata
+            )
+            
+            if (uploadResult is org.thoughtcrime.securesms.tap.TransportResult.Success) {
+                Log.i(TAG, "联系人配置已上传到COS: $uploadPath")
+            } else {
+                Log.w(TAG, "联系人配置上传失败: $uploadResult")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "上传联系人配置到COS失败: contactAci=$contactAci", e)
         }
     }
     

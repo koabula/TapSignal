@@ -41,7 +41,7 @@ class TapNotificationService private constructor(
     private val mutex = Mutex()
     
     // 核心组件
-    private val notificationManager = NotificationManager.getInstance()
+    private val notificationManager = NotificationManager.getInstance(context)
     private val configManager = NotificationConfigManager.getInstance(context)
     private val lifecycleIntegrator = TapLifecycleIntegrator.getInstance(context)
     private val offlineHandler = NotificationOfflineHandler.getInstance(context)

@@ -34,6 +34,13 @@ class TapPollingService(private val context: Context) {
     companion object {
         private const val TAG = "TapPollingService"
         
+        /**
+         * 轮询服务全局开关
+         * 设置为 false 时，轮询服务将被完全禁用，但代码保留
+         * 注意：禁用轮询后，消息获取将完全依赖推送通知机制
+         */
+        private const val ENABLE_POLLING = false
+        
         @Volatile
         private var INSTANCE: TapPollingService? = null
         
@@ -93,10 +100,20 @@ class TapPollingService(private val context: Context) {
      * 
      * 注意：在推送通知模式下，轮询会被禁用
      * 推送通知模式下，消息下载由NotificationDownloadExecutor负责
+     * 
+     * 轮询服务已通过全局开关禁用，但代码保留以供未来使用
      */
     fun startPolling(): Boolean {
         return pollingLock.write {
             try {
+                // 检查全局开关
+                if (!ENABLE_POLLING) {
+                    Log.i(TAG, "轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动")
+                    // 标记为运行状态，但不启动实际的轮询任务，保持兼容性
+                    isRunning.set(true)
+                    return@write true
+                }
+                
                 if (isRunning.get()) {
                     Log.w(TAG, "轮询服务已经运行")
                     return@write true
@@ -370,6 +387,8 @@ class TapPollingService(private val context: Context) {
      * 
      * 注意：在推送通知模式下，此方法不会实际创建轮询任务
      * 
+     * 轮询服务已通过全局开关禁用，但代码保留以供未来使用
+     * 
      * @param groupId 群组 ID
      * @param memberMetadatas 成员 metadata 映射 (memberAci -> TransportMetadata)
      * @return 成功添加的成员数量
@@ -378,6 +397,13 @@ class TapPollingService(private val context: Context) {
         groupId: String,
         memberMetadatas: Map<String, TransportMetadata>
     ): Int {
+        // 检查全局开关
+        if (!ENABLE_POLLING) {
+            Log.d(TAG, "轮询服务已禁用（全局开关），跳过群组轮询目标添加: groupId=$groupId")
+            // 返回成员数量表示成功，但不创建实际的轮询任务，保持兼容性
+            return memberMetadatas.size
+        }
+        
         if (!isRunning.get()) {
             Log.w(TAG, "轮询服务未运行，无法添加群组轮询目标")
             return 0
@@ -490,8 +516,17 @@ class TapPollingService(private val context: Context) {
      * 
      * 注意：在推送通知模式下，此方法不会实际创建轮询任务
      * 但仍会保存必要的元数据，供下载器使用
+     * 
+     * 轮询服务已通过全局开关禁用，但代码保留以供未来使用
      */
     fun addPollingTarget(recipientId: String, metadata: TransportMetadata, channel: TransportChannel? = null): Boolean {
+        // 检查全局开关
+        if (!ENABLE_POLLING) {
+            Log.d(TAG, "轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=$recipientId")
+            // 返回true表示成功，但不创建实际的轮询任务，保持兼容性
+            return true
+        }
+        
         if (!isRunning.get()) {
             Log.w(TAG, "轮询服务未运行，无法添加轮询目标")
             return false

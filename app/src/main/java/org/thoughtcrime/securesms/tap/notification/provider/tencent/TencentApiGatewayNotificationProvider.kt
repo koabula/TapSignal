@@ -46,8 +46,29 @@ class TencentApiGatewayNotificationProvider(
             val webhookUrl = tencentDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
-            val triggerInfo = tencentDeployer.setupEventTrigger()
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val cosConfig = configManager.getProviderConfig("cos")
+            val bucketName = cosConfig?["bucketName"] as? String
+
+            val triggerInfo = tencentDeployer.setupEventTrigger(userBucketName = bucketName)
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
+
+            if (bucketName != null && triggerInfo.triggerArn != null) {
+                Log.i(TAG, "Configuring COS event notification for bucket: $bucketName")
+                val cosEventConfigured = tencentDeployer.configureCosEventNotification(
+                    userBucketName = bucketName,
+                    userBucketRegion = effectiveRegion,
+                    triggerFunctionName = triggerInfo.triggerName,
+                    filterPrefix = "v2-channels/"
+                )
+                if (cosEventConfigured) {
+                    Log.i(TAG, "COS event notification configured successfully")
+                } else {
+                    Log.w(TAG, "Failed to configure COS event notification - manual setup may be required")
+                }
+            } else {
+                Log.w(TAG, "Bucket name or trigger ARN missing, COS event not configured automatically")
+            }
 
             val secret = generateNotifySecret()
             val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 

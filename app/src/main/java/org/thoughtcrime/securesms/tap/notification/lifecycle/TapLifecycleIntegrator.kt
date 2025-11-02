@@ -35,7 +35,7 @@ class TapLifecycleIntegrator private constructor(
     }
     
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val connectionManager = NotificationConnectionManager()
+    private val connectionManager = NotificationConnectionManager.getInstance(context)
     private val offlineHandler = NotificationOfflineHandler.getInstance(context)
     private val networkMonitor = NotificationNetworkMonitor.getInstance(context)
     

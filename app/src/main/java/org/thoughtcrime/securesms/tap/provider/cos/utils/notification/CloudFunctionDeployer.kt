@@ -39,7 +39,7 @@ class CloudFunctionDeployer(
                 val notificationDeployer = getOrCreateDeployer()
                     ?: throw Exception("无法创建Deployer: 不支持的provider ${cosConfig.provider}")
                 
-                val triggerInfo = notificationDeployer.setupEventTrigger()
+                val triggerInfo = notificationDeployer.setupEventTrigger(userBucketName = cosConfig.bucketName)
                 
                 if (triggerInfo.validate()) {
                     Log.i(TAG, "云函数F_A部署成功: ${triggerInfo.triggerName}")
@@ -193,7 +193,7 @@ class CloudFunctionDeployer(
                     )
                 )
                 
-                val triggerInfo = notificationDeployer.setupEventTrigger()
+                val triggerInfo = notificationDeployer.setupEventTrigger(userBucketName = cosConfig.bucketName)
                 Log.d(TAG, "事件触发器部署完成: ${triggerInfo.triggerName}")
                 
                 tracker.recordCheckpoint(

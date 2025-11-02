@@ -182,6 +182,11 @@ class TapConfigFragment : DSLSettingsFragment(
         fieldConfigs.forEach { fieldConfig ->
             fieldConfig()
         }
+        
+        dividerPref()
+        
+        // 推送服务部署状态和按钮
+        showNotificationDeploymentUI(state)
 
         // 测试按钮（如果支持）
         if (descriptor.supportsConfigTest) {
@@ -263,5 +268,135 @@ class TapConfigFragment : DSLSettingsFragment(
             }
             .setNegativeButton(getString(R.string.TapConfigFragment__cancel), null)
             .show()
+    }
+    
+    /**
+     * 显示推送服务部署UI
+     */
+    private fun DSLConfiguration.showNotificationDeploymentUI(state: TapConfigState) {
+        // 部署状态标题
+        sectionHeaderPref(DSLSettingsText.from("推送通知服务"))
+        
+        // 显示当前部署状态
+        val deploymentStatusText = when (state.notificationDeploymentState) {
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.NOT_DEPLOYED -> "未部署"
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> "部署中..."
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> "已部署"
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> "部署失败"
+        }
+        
+        val deploymentStatusSummary = when (state.notificationDeploymentState) {
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.NOT_DEPLOYED -> 
+                "推送服务未部署，消息将使用轮询方式获取"
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> 
+                "正在部署推送服务，请稍候..."
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> 
+                "推送服务已就绪，将实时接收消息通知"
+            org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> {
+                state.deploymentErrorMessage ?: "推送服务部署失败，请检查配置后重试"
+            }
+        }
+        
+        textPref(
+            title = DSLSettingsText.from("部署状态: $deploymentStatusText"),
+            summary = DSLSettingsText.from(
+                deploymentStatusSummary,
+                when (state.notificationDeploymentState) {
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> 
+                        DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_colorPrimary))
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> 
+                        DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_colorError))
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> 
+                        DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_accent_primary))
+                    else -> null
+                }
+            )
+        )
+        
+        // 如果部署失败，显示详细错误信息（参考测试按钮的显示方式）
+        if (state.notificationDeploymentState == org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED) {
+            val errorDetails = state.deploymentErrorDetails?.takeIf { it.isNotEmpty() } 
+                ?: state.deploymentErrorMessage?.takeIf { it.isNotEmpty() }
+            
+            if (errorDetails != null) {
+                textPref(
+                    title = DSLSettingsText.from(""),
+                    summary = DSLSettingsText.from(
+                        "错误详情: $errorDetails",
+                        DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_colorError))
+                    )
+                )
+            }
+        }
+        
+        // 显示推送服务配置信息（如果已部署）
+        if (state.notificationDeploymentState == org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED 
+            && state.notificationConfig != null) {
+            textPref(
+                title = DSLSettingsText.from("Webhook URL"),
+                summary = DSLSettingsText.from(state.notificationConfig.webhookUrl)
+            )
+            
+            textPref(
+                title = DSLSettingsText.from("推送服务端点"),
+                summary = DSLSettingsText.from(state.notificationConfig.pushServiceInfo.endpoint)
+            )
+            
+            textPref(
+                title = DSLSettingsText.from("部署时间"),
+                summary = DSLSettingsText.from(
+                    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                        .format(java.util.Date(state.notificationConfig.deployedAt))
+                )
+            )
+        }
+        
+        dividerPref()
+        
+        // 部署按钮
+        val deployButtonEnabled = state.isConfigValid && 
+            state.notificationDeploymentState != org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING
+        
+        clickPref(
+            title = DSLSettingsText.from(
+                when (state.notificationDeploymentState) {
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.NOT_DEPLOYED,
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> "部署推送服务"
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> "重新部署推送服务"
+                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> "正在部署..."
+                }
+            ),
+            summary = DSLSettingsText.from(
+                when {
+                    !state.isConfigValid -> "请先完成配置并保存"
+                    state.notificationDeploymentState == org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.NOT_DEPLOYED -> 
+                        "点击部署云函数和WebSocket服务"
+                    state.notificationDeploymentState == org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> 
+                        "重新部署将更新云端配置"
+                    state.notificationDeploymentState == org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> 
+                        "部署失败，点击重试"
+                    else -> ""
+                }
+            ),
+            isEnabled = deployButtonEnabled,
+            onClick = {
+                if (deployButtonEnabled) {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("部署推送服务")
+                        .setMessage(
+                            "将自动部署以下组件:\n\n" +
+                            "1. Webhook云函数\n" +
+                            "2. WebSocket推送服务\n" +
+                            "3. 事件触发器\n\n" +
+                            "部署过程需要1-3分钟，请确保网络连接正常。"
+                        )
+                        .setPositiveButton("开始部署") { _, _ ->
+                            viewModel.deployNotificationService()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                }
+            }
+        )
     }
 } 

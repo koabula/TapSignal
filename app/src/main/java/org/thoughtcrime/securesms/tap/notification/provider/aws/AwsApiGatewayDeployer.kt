@@ -212,7 +212,7 @@ class AwsApiGatewayDeployer(
         }
     }
 
-    override suspend fun setupEventTrigger(): TriggerInfo {
+    override suspend fun setupEventTrigger(userBucketName: String?): TriggerInfo {
         return try {
             Log.i(TAG, "Setting up S3 event trigger...")
 
@@ -220,6 +220,14 @@ class AwsApiGatewayDeployer(
             val functionName = "$TRIGGER_FUNCTION_NAME-${UUID.randomUUID().toString().take(8)}"
 
             val zipData = loadAsset(TRIGGER_ASSET_NAME)
+            
+            val configBucket = if (!userBucketName.isNullOrEmpty()) {
+                Log.d(TAG, "Using user bucket for CONFIG_BUCKET: $userBucketName")
+                userBucketName
+            } else {
+                Log.w(TAG, "User bucket not provided, F_A will read from event bucket as fallback")
+                ""
+            }
             
             val createRequest = CreateFunctionRequest {
                 this.functionName = functionName
@@ -232,10 +240,12 @@ class AwsApiGatewayDeployer(
                 this.timeout = 60
                 this.memorySize = 256
                 this.environment = Environment {
-                    variables = mapOf(
-                        "CONFIG_BUCKET" to getOrCreateConfigBucket(),
-                        "CONFIG_KEY" to CONFIG_KEY
-                    )
+                    variables = buildMap {
+                        put("CONFIG_KEY", CONFIG_KEY)
+                        if (configBucket.isNotEmpty()) {
+                            put("CONFIG_BUCKET", configBucket)
+                        }
+                    }
                 }
             }
 

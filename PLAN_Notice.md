@@ -4,6 +4,13 @@
 
 **架构**: 去中心化 + 云函数触发 + WebSocket推送
 
+**当前状态** (2025-11-02):
+- ✅ **Phase 1-9: 已完成** - 推送通知机制已实现并集成到主程序
+- 🔄 **运行模式**: 推送(主) + 轮询(辅) 混合架构
+  - 前台: WebSocket推送实时通知 → 触发即时下载
+  - 后台: 保留轮询作为后备机制（推送失败/离线补齐）
+- 📍 **下一步**: Phase 10-11 状态存储和监控日志（可选）
+
 ---
 
 ## 一、整体架构
@@ -449,21 +456,28 @@ sequenceDiagram
 
 **目标**: 完善从推送通知到消息显示的完整链路
 
-- [ ] 通知处理器实现
-  - [ ] 解析推送通知中的senderId
-  - [ ] 查询本地数据库获取sender的COS配置
-  - [ ] 构造下载路径
+- [x] 通知处理器实现
+  - [x] 解析推送通知中的senderId
+  - [x] 查询本地数据库获取sender的COS配置
+  - [x] 构造下载路径
   
-- [ ] 下载调度
-  - [ ] 调用polling模块的下载方法
-  - [ ] 传入正确的metadata和token
-  - [ ] 处理下载失败情况
+- [x] 下载调度
+  - [x] 调用polling模块的下载方法
+  - [x] 传入正确的metadata和token
+  - [x] 处理下载失败情况
   
-- [ ] 消息处理
-  - [ ] 复用 `TapMessageProcessor`
-  - [ ] 解密和验证
-  - [ ] 存储到Signal数据库
-  - [ ] 触发UI更新
+- [x] 消息处理
+  - [x] 复用 `TapMessageProcessor`
+  - [x] 解密和验证
+  - [x] 存储到Signal数据库
+  - [x] 触发UI更新
+
+**实现说明**:
+- 已实现: `NotificationDownloadExecutor.kt` - 完整的下载流程
+- 已实现: `NotificationManager.kt` - 推送通知处理和下载触发
+- 已集成: `TapModuleInitializer.kt` - 启动时自动初始化推送服务
+- 复用: `TapMessageProcessor.processTapTransportMessage()` - 消息解密和入库
+- 状态: **已完成并集成到主程序**
 
 ### Phase 10: 状态存储设计
 
