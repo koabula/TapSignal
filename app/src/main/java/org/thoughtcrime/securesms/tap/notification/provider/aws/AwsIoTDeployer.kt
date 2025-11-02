@@ -262,6 +262,30 @@ class AwsIoTDeployer(
         return try {
             Log.i(TAG, "Configuring S3 event notification on bucket: $userBucketName")
             
+            // Step 1: Add Lambda permission to allow S3 to invoke it
+            val lambda = getLambdaClient()
+            val functionName = triggerFunctionArn.substringAfterLast(":")
+            val accountId = getAccountId()
+            val statementId = "tap-s3-invoke-${System.currentTimeMillis()}"
+            
+            try {
+                lambda.addPermission(
+                    AddPermissionRequest {
+                        this.functionName = functionName
+                        this.statementId = statementId
+                        this.action = "lambda:InvokeFunction"
+                        this.principal = "s3.amazonaws.com"
+                        this.sourceArn = "arn:aws:s3:::$userBucketName"
+                        this.sourceAccount = accountId
+                    }
+                )
+                Log.d(TAG, "Added Lambda permission for S3 to invoke function")
+            } catch (e: Exception) {
+                // Permission might already exist, log and continue
+                Log.w(TAG, "Lambda permission may already exist or add failed, continuing...", e)
+            }
+            
+            // Step 2: Configure S3 bucket notification
             val s3 = getS3Client()
             
             val existingConfig = try {

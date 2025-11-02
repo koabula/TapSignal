@@ -11,6 +11,8 @@ import com.tencentcloudapi.scf.v20180416.ScfClient
 import com.tencentcloudapi.scf.v20180416.models.*
 import com.tencentcloudapi.cos.v20180517.CosClient
 import com.tencentcloudapi.cos.v20180517.models.*
+import com.tencentcloudapi.cam.v20190116.CamClient
+import com.tencentcloudapi.cam.v20190116.models.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -48,10 +50,12 @@ class TencentIoTHubDeployer(
     private var scfClient: ScfClient? = null
     private var iotClient: IotcloudClient? = null
     private var cosClient: CosClient? = null
+    private var camClient: CamClient? = null
     private var configBucketName: String? = null
     private var deploymentInfo: NotificationDeployment? = null
     private var cachedProductId: String? = null
     private var cachedDeviceName: String? = null
+    private var cachedRoleName: String? = null
 
     override suspend fun deployWebhook(): String {
         return try {
@@ -701,6 +705,124 @@ class TencentIoTHubDeployer(
         return cosClient!!
     }
 
+    private fun getCamClient(): CamClient {
+        if (camClient == null) {
+            val httpProfile = HttpProfile().apply {
+                endpoint = "cam.tencentcloudapi.com"
+            }
+            val clientProfile = ClientProfile().apply {
+                this.httpProfile = httpProfile
+            }
+            camClient = CamClient(credential, "", clientProfile)
+        }
+        return camClient!!
+    }
+    
+    private suspend fun createOrGetScfExecutionRole(): String {
+        if (cachedRoleName != null) {
+            return cachedRoleName!!
+        }
+        
+        return withContext(Dispatchers.IO) {
+            try {
+                val cam = getCamClient()
+                val roleName = "TapNotificationScfRole"
+                
+                // Check if role already exists
+                try {
+                    val getRoleRequest = GetRoleRequest().apply {
+                        this.roleName = roleName
+                    }
+                    val roleResponse = cam.GetRole(getRoleRequest)
+                    Log.d(TAG, "SCF execution role already exists: $roleName")
+                    cachedRoleName = roleName
+                    return@withContext roleName
+                } catch (e: Exception) {
+                    Log.d(TAG, "SCF execution role does not exist, creating new role")
+                }
+                
+                // Create new role
+                val policyDocument = org.json.JSONObject().apply {
+                    put("version", "2.0")
+                    put("statement", org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply {
+                            put("action", "name/sts:AssumeRole")
+                            put("effect", "allow")
+                            put("principal", org.json.JSONObject().apply {
+                                put("service", "scf.qcloud.com")
+                            })
+                        })
+                    })
+                }.toString()
+                
+                val createRoleRequest = CreateRoleRequest().apply {
+                    this.roleName = roleName
+                    this.policyDocument = policyDocument
+                    this.description = "Role for TAP notification cloud functions"
+                }
+                
+                cam.CreateRole(createRoleRequest)
+                Log.i(TAG, "SCF execution role created: $roleName")
+                
+                // Attach QcloudCOSReadOnlyAccess policy
+                try {
+                    val attachPolicyRequest = AttachRolePolicyRequest().apply {
+                        this.roleName = roleName
+                        this.policyId = "4" // QcloudCOSReadOnlyAccess
+                    }
+                    cam.AttachRolePolicy(attachPolicyRequest)
+                    Log.d(TAG, "Attached QcloudCOSReadOnlyAccess policy")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to attach COS read policy", e)
+                }
+                
+                // Create custom policy for IoT Hub
+                val customPolicyDocument = org.json.JSONObject().apply {
+                    put("version", "2.0")
+                    put("statement", org.json.JSONArray().apply {
+                        put(org.json.JSONObject().apply {
+                            put("effect", "allow")
+                            put("action", org.json.JSONArray().apply {
+                                put("iotcloud:Publish")
+                                put("iotcloud:Subscribe")
+                            })
+                            put("resource", "*")
+                        })
+                    })
+                }.toString()
+                
+                try {
+                    val createPolicyRequest = CreatePolicyRequest().apply {
+                        this.policyName = "TapNotificationIoTPolicy"
+                        this.policyDocument = customPolicyDocument
+                        this.description = "Policy for TAP notification IoT Hub access"
+                    }
+                    
+                    val policyResponse = cam.CreatePolicy(createPolicyRequest)
+                    val policyId = policyResponse.policyId
+                    
+                    val attachCustomPolicyRequest = AttachRolePolicyRequest().apply {
+                        this.roleName = roleName
+                        this.policyId = policyId.toString()
+                    }
+                    cam.AttachRolePolicy(attachCustomPolicyRequest)
+                    Log.d(TAG, "Attached custom IoT Hub policy")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Custom IoT policy may already exist or attachment failed", e)
+                }
+                
+                delay(5000)
+                
+                cachedRoleName = roleName
+                roleName
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to create or get SCF execution role", e)
+                throw Exception("SCF role setup failed: ${e.message}", e)
+            }
+        }
+    }
+
     private suspend fun getOrCreateConfigBucket(): String {
         if (configBucketName != null) {
             return configBucketName!!
@@ -931,6 +1053,7 @@ class TencentIoTHubDeployer(
         scfClient = null
         iotClient = null
         cosClient = null
+        camClient = null
     }
 }
 

@@ -12,6 +12,8 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosPermission
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.GroupTransportManager.GroupTransportMetadata
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
+import org.thoughtcrime.securesms.tap.notification.*
+import org.thoughtcrime.securesms.tap.provider.cos.utils.notification.*
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.withContext
@@ -31,6 +33,8 @@ class CosTransportProvider(
 
     companion object {
         private val TAG = Log.tag(CosTransportProvider::class.java)
+        private const val PREF_NAME = "cos_transport_provider"
+        private const val KEY_NOTIFICATION_ENABLED = "notification_enabled"
         
         // 已移除硬编码配置，改为使用可配置的 CosProviderConfig
     }
@@ -58,6 +62,29 @@ class CosTransportProvider(
     private val providerConfig: CosProviderConfig by lazy {
         config["providerConfig"] as? CosProviderConfig ?: CosProviderConfig()
     }
+    
+    // 推送通知相关组件
+    private val notificationManager: NotificationManager by lazy {
+        NotificationManager.getInstance()
+    }
+    private val notificationPrefs by lazy {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    }
+    private var notificationProvider: NotificationProvider? = null
+    private var contactWebhookManager: ContactWebhookManager? = null
+    private var eventTriggerConfigurator: CosEventTriggerConfigurator? = null
+    private var cloudFunctionDeployer: CloudFunctionDeployer? = null
+    private var notificationEnabled: Boolean = false
+        get() {
+            if (!field && notificationPrefs.getBoolean(KEY_NOTIFICATION_ENABLED, false)) {
+                field = true
+            }
+            return field
+        }
+        set(value) {
+            field = value
+            notificationPrefs.edit().putBoolean(KEY_NOTIFICATION_ENABLED, value).apply()
+        }
 
     /**
      * 推送消息到COS
@@ -114,12 +141,25 @@ class CosTransportProvider(
                     
                     Log.d(TAG, "v2-channels路径: messageType=${message.messageType}, path=$fullPath")
                     
-                    // 上传文件
+                    // 上传文件到COS/S3
                     val uploadSuccess = cosClient.uploadFile(tempFile, remotePath)
                     
                     if (uploadSuccess) {
                         Log.i(TAG, "消息推送成功: messageId=${message.messageId}")
                         Log.d(TAG, "[TapTimeTest] T3_UPLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
+                        
+                        // 推送通知触发机制：
+                        // 1. 文件上传到v2-channels/路径会触发预配置的S3/COS事件通知
+                        // 2. 事件自动调用云函数F_A (无需此处代码触发)
+                        // 3. F_A从tap-state/contacts/读取接收方的webhook配置并发送HTTP通知
+                        // 4. 接收方的Webhook将通知发布到IoT服务的MQTT topic
+                        // 5. 接收方客户端通过WebSocket订阅接收推送
+                        // 
+                        // 注意：此处仅异步检查webhook配置完整性，不参与实际推送流程
+                        if (notificationEnabled) {
+                            ensureNotificationChannelReady(metadata.recipientId, cosMetadata)
+                        }
+                        
                         TransportResult.Success(
                             message = null,
                             metadata = mapOf(
@@ -1928,5 +1968,493 @@ class CosTransportProvider(
             Log.e(TAG, "获取真实COS客户端失败: ${LogSanitizer.sanitizeThrowable(e)}")
             null
         }
+    }
+    
+    // ============== 推送通知集成 ==============
+    
+    /**
+     * 设置推送通知触发器
+     * 
+     * 配置S3/COS事件触发器，当有新消息上传时自动发送推送通知
+     * 
+     * @return 设置是否成功
+     */
+    suspend fun setupNotificationTrigger(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始设置推送通知触发器")
+                
+                // 1. 初始化组件
+                initializeNotificationComponents()
+                
+                // 2. 部署云函数F_A（如果尚未部署）
+                val deployer = getCloudFunctionDeployer()
+                val config = deployer.loadConfiguration()
+                
+                val triggerInfo = if (config == null) {
+                    Log.i(TAG, "首次部署，开始部署云函数F_A")
+                    deployer.deployTriggerFunction()
+                } else {
+                    Log.d(TAG, "云函数已部署，跳过部署步骤")
+                    null
+                }
+                
+                if (triggerInfo == null && config == null) {
+                    Log.e(TAG, "云函数F_A部署失败")
+                    return@withContext false
+                }
+                
+                // 3. 配置事件触发器
+                val configurator = getEventTriggerConfigurator()
+                val functionIdentifier = triggerInfo?.triggerArn ?: config?.pushServiceInfo?.metadata?.get("triggerArn") as? String
+                
+                if (functionIdentifier != null) {
+                    val eventConfigured = configurator.configureEventTrigger(functionIdentifier)
+                    
+                    if (eventConfigured) {
+                        Log.i(TAG, "事件触发器配置成功")
+                        notificationEnabled = true
+                        true
+                    } else {
+                        Log.e(TAG, "事件触发器配置失败")
+                        false
+                    }
+                } else {
+                    Log.w(TAG, "无法获取函数标识，跳过事件触发器配置")
+                    false
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "设置推送通知触发器失败", e)
+                false
+            }
+        }
+    }
+    
+    /**
+     * 部署完整的推送服务
+     * 
+     * @return NotificationConfig 部署后的配置
+     */
+    suspend fun deployNotificationService(): NotificationConfig? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始部署完整推送服务")
+                
+                initializeNotificationComponents()
+                
+                val deployer = getCloudFunctionDeployer()
+                val config = deployer.deployFullNotificationService()
+                
+                if (config != null) {
+                    Log.i(TAG, "完整推送服务部署成功")
+                    
+                    // 初始化NotificationManager
+                    val initSuccess = initializeNotificationManager(config)
+                    if (initSuccess) {
+                        notificationEnabled = true
+                        Log.i(TAG, "NotificationManager初始化成功")
+                    } else {
+                        Log.w(TAG, "NotificationManager初始化失败，但部署成功")
+                    }
+                } else {
+                    Log.e(TAG, "完整推送服务部署失败")
+                }
+                
+                config
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "部署完整推送服务失败", e)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 初始化NotificationManager
+     * 
+     * @param config 推送服务配置
+     * @return 初始化是否成功
+     */
+    private suspend fun initializeNotificationManager(config: NotificationConfig): Boolean {
+        return try {
+            Log.i(TAG, "初始化NotificationManager: provider=${config.provider}")
+            
+            // 创建对应的NotificationProvider实例
+            val factory = NotificationProviderFactory.getInstance()
+            val provider = factory.createProvider(
+                providerType = config.provider,
+                config = mapOf(
+                    "apiKey" to cosConfig.secretId,
+                    "secretKey" to cosConfig.secretKey,
+                    "region" to cosConfig.region
+                ),
+                context = context
+            )
+            
+            if (provider == null) {
+                Log.e(TAG, "无法创建NotificationProvider: ${config.provider}")
+                return false
+            }
+            
+            notificationProvider = provider
+            
+            // 初始化NotificationManager
+            val success = notificationManager.initialize(provider, config)
+            
+            if (success) {
+                Log.i(TAG, "NotificationManager初始化成功")
+            } else {
+                Log.e(TAG, "NotificationManager初始化失败")
+            }
+            
+            success
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "初始化NotificationManager失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 保存联系人的webhook配置
+     * 
+     * 当用户与联系人建立tap连接后，交换webhook配置并保存到COS
+     * 
+     * @param contactConfig 联系人的webhook配置
+     * @return 保存是否成功
+     */
+    suspend fun saveContactWebhookConfig(contactConfig: ContactNotificationConfig): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "保存联系人webhook配置: contactId=${LogSanitizer.sanitize(contactConfig.contactId)}")
+                
+                initializeNotificationComponents()
+                
+                val webhookManager = getContactWebhookManager()
+                val success = webhookManager.saveContactConfig(contactConfig)
+                
+                if (success) {
+                    Log.i(TAG, "联系人webhook配置保存成功")
+                } else {
+                    Log.e(TAG, "联系人webhook配置保存失败")
+                }
+                
+                success
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "保存联系人webhook配置失败", e)
+                false
+            }
+        }
+    }
+    
+    /**
+     * 加载联系人的webhook配置
+     * 
+     * @param contactId 联系人ID
+     * @return ContactNotificationConfig 配置信息
+     */
+    suspend fun loadContactWebhookConfig(contactId: String): ContactNotificationConfig? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "加载联系人webhook配置: contactId=${LogSanitizer.sanitize(contactId)}")
+                
+                initializeNotificationComponents()
+                
+                val webhookManager = getContactWebhookManager()
+                webhookManager.loadContactConfig(contactId)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "加载联系人webhook配置失败", e)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 批量保存联系人webhook配置
+     * 
+     * @param configs 联系人配置列表
+     * @return 成功保存的数量
+     */
+    suspend fun batchSaveContactWebhookConfigs(configs: List<ContactNotificationConfig>): Int {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "批量保存联系人webhook配置: 共${configs.size}个")
+                
+                initializeNotificationComponents()
+                
+                val webhookManager = getContactWebhookManager()
+                webhookManager.batchSaveContactConfigs(configs)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "批量保存联系人webhook配置失败", e)
+                0
+            }
+        }
+    }
+    
+    /**
+     * 获取当前的推送服务配置
+     * 
+     * @return NotificationConfig 配置信息
+     */
+    suspend fun getNotificationConfig(): NotificationConfig? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "获取推送服务配置")
+                
+                initializeNotificationComponents()
+                
+                val deployer = getCloudFunctionDeployer()
+                deployer.loadConfiguration()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "获取推送服务配置失败", e)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 检查推送通知是否已启用
+     */
+    fun isNotificationEnabled(): Boolean {
+        return notificationEnabled
+    }
+    
+    /**
+     * 获取NotificationManager实例
+     */
+    fun getNotificationManager(): NotificationManager {
+        return notificationManager
+    }
+    
+    /**
+     * 连接到推送服务
+     * 
+     * @param userId 用户ID
+     * @param onNotification 通知回调
+     * @return ConnectionResult 连接结果
+     */
+    suspend fun connectNotificationService(
+        userId: String,
+        onNotification: (NotificationMessage) -> Unit
+    ): ConnectionResult {
+        return try {
+            if (!notificationEnabled) {
+                Log.w(TAG, "推送服务未启用")
+                return ConnectionResult.failure("推送服务未启用")
+            }
+            
+            if (notificationManager.isConnected()) {
+                Log.d(TAG, "推送服务已连接")
+                return ConnectionResult.success("already_connected")
+            }
+            
+            Log.i(TAG, "开始连接推送服务: userId=$userId")
+            val result = notificationManager.connect(userId, onNotification)
+            
+            if (result.success) {
+                Log.i(TAG, "推送服务连接成功")
+            } else {
+                Log.e(TAG, "推送服务连接失败: ${result.errorMessage}")
+            }
+            
+            result
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "连接推送服务失败", e)
+            ConnectionResult.failure(e.message ?: "连接异常")
+        }
+    }
+    
+    /**
+     * 断开推送服务连接
+     */
+    suspend fun disconnectNotificationService() {
+        try {
+            if (notificationManager.isConnected()) {
+                Log.i(TAG, "断开推送服务连接")
+                notificationManager.disconnect()
+            } else {
+                Log.d(TAG, "推送服务未连接")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "断开推送服务失败", e)
+        }
+    }
+    
+    /**
+     * 检查推送服务健康状态
+     */
+    suspend fun checkNotificationHealth(): HealthStatus {
+        return try {
+            notificationManager.healthCheck()
+        } catch (e: Exception) {
+            Log.e(TAG, "检查推送服务健康状态失败", e)
+            HealthStatus.unhealthy(e.message ?: "健康检查异常")
+        }
+    }
+    
+    /**
+     * 交换并验证Webhook配置（TAP握手阶段调用）
+     * 
+     * 在TAP握手时同步交换webhook配置，确保双方都保存了对方的推送配置
+     * 
+     * @param recipientId 接收方ID
+     * @param myWebhookConfig 本地的webhook配置
+     * @return 交换是否成功
+     */
+    suspend fun exchangeWebhookConfiguration(
+        recipientId: String,
+        myWebhookConfig: ContactNotificationConfig
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "开始交换webhook配置: recipientId=$recipientId")
+                
+                // 保存本地的webhook配置供对方读取
+                val webhookManager = getContactWebhookManager()
+                val saveSuccess = webhookManager.saveContactConfig(myWebhookConfig)
+                
+                if (!saveSuccess) {
+                    Log.e(TAG, "保存本地webhook配置失败")
+                    return@withContext false
+                }
+                
+                // 验证配置是否可用
+                val verifySuccess = verifyWebhookConfiguration(myWebhookConfig)
+                if (!verifySuccess) {
+                    Log.w(TAG, "webhook配置验证失败，但已保存")
+                }
+                
+                Log.i(TAG, "Webhook配置交换完成: recipientId=$recipientId, verified=$verifySuccess")
+                true
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "交换webhook配置失败: recipientId=$recipientId", e)
+                false
+            }
+        }
+    }
+    
+    /**
+     * 验证Webhook配置
+     * 
+     * @param config webhook配置
+     * @return 验证是否成功
+     */
+    private suspend fun verifyWebhookConfiguration(config: ContactNotificationConfig): Boolean {
+        return try {
+            // 简单验证：检查配置字段是否完整
+            val isValid = config.webhookUrl.isNotBlank() &&
+                         config.notifySecret.isNotBlank() &&
+                         config.topicId.isNotBlank()
+            
+            if (!isValid) {
+                Log.w(TAG, "Webhook配置字段不完整")
+                return false
+            }
+            
+            Log.d(TAG, "Webhook配置验证通过")
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "验证webhook配置失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 确保推送通知通道就绪（消息发送后异步检查）
+     * 
+     * 检查对方的webhook配置是否存在，如果不存在则记录警告
+     * 注意：这是消息发送后的异步检查，不阻塞发送流程
+     * 真正的配置交换应该在TAP握手时通过exchangeWebhookConfiguration()完成
+     * 
+     * @param recipientId 接收方ID
+     * @param metadata COS传输元数据
+     */
+    private fun ensureNotificationChannelReady(
+        recipientId: String,
+        metadata: CosTransportMetadata
+    ) {
+        try {
+            Log.d(TAG, "异步检查推送通知通道: recipientId=$recipientId")
+            
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    val webhookManager = getContactWebhookManager()
+                    val config = webhookManager.loadContactConfig(recipientId)
+                    
+                    if (config == null) {
+                        Log.w(TAG, "推送通知通道未配置: recipientId=$recipientId，对方可能无法收到实时推送")
+                        Log.d(TAG, "提示：应在TAP握手阶段调用exchangeWebhookConfiguration()交换配置")
+                    } else if (!config.verified) {
+                        Log.d(TAG, "推送通知通道已配置但未验证: recipientId=$recipientId")
+                    } else {
+                        Log.d(TAG, "推送通知通道已就绪: recipientId=$recipientId, platform=${config.platform}")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "检查推送通知通道失败: recipientId=$recipientId", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.w(TAG, "启动推送通知通道检查失败", e)
+        }
+    }
+    
+    /**
+     * 初始化推送通知相关组件
+     */
+    private fun initializeNotificationComponents() {
+        if (contactWebhookManager == null) {
+            val cosClient = CosClientFactory.createClient(cosConfig, context)
+            contactWebhookManager = ContactWebhookManager(context, cosClient)
+            Log.d(TAG, "ContactWebhookManager已初始化")
+        }
+        
+        if (eventTriggerConfigurator == null) {
+            eventTriggerConfigurator = CosEventTriggerConfigurator(context, cosConfig)
+            Log.d(TAG, "CosEventTriggerConfigurator已初始化")
+        }
+        
+        if (cloudFunctionDeployer == null) {
+            cloudFunctionDeployer = CloudFunctionDeployer(context, cosConfig)
+            Log.d(TAG, "CloudFunctionDeployer已初始化")
+        }
+    }
+    
+    /**
+     * 获取ContactWebhookManager实例
+     */
+    private fun getContactWebhookManager(): ContactWebhookManager {
+        if (contactWebhookManager == null) {
+            initializeNotificationComponents()
+        }
+        return contactWebhookManager!!
+    }
+    
+    /**
+     * 获取CosEventTriggerConfigurator实例
+     */
+    private fun getEventTriggerConfigurator(): CosEventTriggerConfigurator {
+        if (eventTriggerConfigurator == null) {
+            initializeNotificationComponents()
+        }
+        return eventTriggerConfigurator!!
+    }
+    
+    /**
+     * 获取CloudFunctionDeployer实例
+     */
+    private fun getCloudFunctionDeployer(): CloudFunctionDeployer {
+        if (cloudFunctionDeployer == null) {
+            initializeNotificationComponents()
+        }
+        return cloudFunctionDeployer!!
     }
 } 
