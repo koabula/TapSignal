@@ -1,13 +1,18 @@
 package org.thoughtcrime.securesms.tap.notification
 
+import android.content.Context
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.signal.core.util.logging.Log
 
 /**
  * 推送服务管理器
  */
-class NotificationManager {
+class NotificationManager private constructor(private val context: Context) {
     
     companion object {
         private val TAG = Log.tag(NotificationManager::class.java)
@@ -15,9 +20,9 @@ class NotificationManager {
         @Volatile
         private var instance: NotificationManager? = null
         
-        fun getInstance(): NotificationManager {
+        fun getInstance(context: Context): NotificationManager {
             return instance ?: synchronized(this) {
-                instance ?: NotificationManager().also { instance = it }
+                instance ?: NotificationManager(context.applicationContext).also { instance = it }
             }
         }
     }
@@ -27,6 +32,12 @@ class NotificationManager {
     private var currentConfig: NotificationConfig? = null
     private var connectionState: ConnectionState = ConnectionState.DISCONNECTED
     private var onNotificationCallback: ((NotificationMessage) -> Unit)? = null
+    
+    // 下载执行器
+    private val downloadExecutor = NotificationDownloadExecutor.getInstance(context)
+    
+    // 协程作用域
+    private val notificationScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     suspend fun initialize(provider: NotificationProvider, config: NotificationConfig): Boolean {
         return mutex.withLock {
@@ -134,10 +145,65 @@ class NotificationManager {
             
             Log.d(TAG, "收到推送通知: type=${notification.type}, senderId=${notification.senderId}")
             
+            // 先触发回调（如果有）
             onNotificationCallback?.invoke(notification)
+            
+            // 处理不同类型的通知
+            when (notification.type) {
+                NotificationMessage.TYPE_NEW_MESSAGE -> {
+                    handleNewMessageNotification(notification)
+                }
+                NotificationMessage.TYPE_HEARTBEAT -> {
+                    handleHeartbeatNotification(notification)
+                }
+                else -> {
+                    Log.w(TAG, "未知的通知类型: ${notification.type}")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "处理推送通知异常", e)
         }
+    }
+    
+    /**
+     * 处理新消息通知
+     * 收到推送后触发下载
+     */
+    private fun handleNewMessageNotification(notification: NotificationMessage) {
+        try {
+            val senderId = notification.senderId
+            
+            Log.i(TAG, "处理新消息通知，触发下载: senderId=$senderId")
+            
+            // 异步执行下载任务
+            notificationScope.launch {
+                try {
+                    val result = downloadExecutor.executeNotificationDownload(senderId)
+                    
+                    if (result.isSuccess) {
+                        Log.i(TAG, "推送触发下载成功: senderId=$senderId, " +
+                            "messagesProcessed=${result.messagesProcessed}, " +
+                            "filesProcessed=${result.filesProcessed}, " +
+                            "responseTime=${result.responseTime}ms")
+                    } else {
+                        Log.w(TAG, "推送触发下载失败: senderId=$senderId, " +
+                            "error=${result.error}, " +
+                            "responseTime=${result.responseTime}ms")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "推送触发下载异常: senderId=$senderId", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "处理新消息通知失败: senderId=${notification.senderId}", e)
+        }
+    }
+    
+    /**
+     * 处理心跳通知
+     */
+    private fun handleHeartbeatNotification(notification: NotificationMessage) {
+        Log.d(TAG, "收到心跳通知: senderId=${notification.senderId}")
     }
 }
 

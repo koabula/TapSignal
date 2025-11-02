@@ -42,14 +42,14 @@ data class WebhookResponse(
 data class WebhookConfig(
     val webhookUrl: String,
     val notifySecret: String,
-    val topicId: String,
-    val version: String = "1.0"
+    val userId: String,
+    val version: String = "2.0"
 ) {
     fun validate(): Boolean {
         return webhookUrl.isNotEmpty() && 
                webhookUrl.startsWith("https://") && 
                notifySecret.isNotEmpty() &&
-               topicId.isNotEmpty()
+               userId.isNotEmpty()
     }
 }
 

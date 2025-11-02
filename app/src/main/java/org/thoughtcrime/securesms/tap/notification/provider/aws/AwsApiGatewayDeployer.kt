@@ -3,8 +3,10 @@ package org.thoughtcrime.securesms.tap.notification.provider.aws
 import android.content.Context
 import android.util.Log
 import aws.sdk.kotlin.runtime.auth.credentials.StaticCredentialsProvider
-import aws.sdk.kotlin.services.iot.IotClient
-import aws.sdk.kotlin.services.iot.model.*
+import aws.sdk.kotlin.services.apigatewayv2.ApiGatewayV2Client
+import aws.sdk.kotlin.services.apigatewayv2.model.*
+import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
+import aws.sdk.kotlin.services.dynamodb.model.*
 import aws.sdk.kotlin.services.iam.IamClient
 import aws.sdk.kotlin.services.iam.model.*
 import aws.sdk.kotlin.services.lambda.LambdaClient
@@ -18,14 +20,13 @@ import aws.smithy.kotlin.runtime.content.toByteArray
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import org.thoughtcrime.securesms.tap.notification.*
-import java.io.File
 import java.util.UUID
 
 /**
- * AWS IoT Core推送服务部署器
- * 负责自动化部署Lambda函数、IoT Core配置和事件触发器
+ * AWS API Gateway推送服务部署器
+ * 负责自动化部署Lambda函数、API Gateway WebSocket、DynamoDB和事件触发器
  */
-class AwsIoTDeployer(
+class AwsApiGatewayDeployer(
     private val context: Context,
     private val accessKeyId: String,
     private val secretAccessKey: String,
@@ -33,31 +34,42 @@ class AwsIoTDeployer(
 ) : NotificationDeployer {
 
     companion object {
-        private const val TAG = "AwsIoTDeployer"
+        private const val TAG = "AwsApiGatewayDeployer"
         private const val WEBHOOK_FUNCTION_NAME = "tap-notification-webhook"
         private const val TRIGGER_FUNCTION_NAME = "tap-notification-trigger"
-        private const val IOT_POLICY_NAME = "tap-iot-policy"
-        private const val WEBHOOK_ASSET_NAME = "aws-webhook.zip"
-        private const val TRIGGER_ASSET_NAME = "aws-f-a.zip"
+        private const val CONNECT_FUNCTION_NAME = "tap-ws-connect"
+        private const val DISCONNECT_FUNCTION_NAME = "tap-ws-disconnect"
+        private const val DEFAULT_FUNCTION_NAME = "tap-ws-default"
+        private const val TABLE_NAME = "tap-ws-connections"
         private const val CONFIG_BUCKET_PREFIX = "tap-notification-config"
         private const val CONFIG_KEY = "notification-config.json"
         private const val MAX_DEPLOYMENT_WAIT_SECONDS = 120
+        
+        private const val WEBHOOK_ASSET_NAME = "aws-webhook.zip"
+        private const val TRIGGER_ASSET_NAME = "aws-f-a.zip"
+        private const val CONNECT_ASSET_NAME = "aws-ws-connect.zip"
+        private const val DISCONNECT_ASSET_NAME = "aws-ws-disconnect.zip"
+        private const val DEFAULT_ASSET_NAME = "aws-ws-default.zip"
     }
 
     private val credentialsProvider = StaticCredentialsProvider {
-        accessKeyId = this@AwsIoTDeployer.accessKeyId
-        secretAccessKey = this@AwsIoTDeployer.secretAccessKey
+        accessKeyId = this@AwsApiGatewayDeployer.accessKeyId
+        secretAccessKey = this@AwsApiGatewayDeployer.secretAccessKey
     }
 
     private var lambdaClient: LambdaClient? = null
-    private var iotClient: IotClient? = null
+    private var dynamoDbClient: DynamoDbClient? = null
+    private var apiGatewayClient: ApiGatewayV2Client? = null
     private var s3Client: S3Client? = null
     private var iamClient: IamClient? = null
     private var stsClient: StsClient? = null
+    
     private var configBucketName: String? = null
     private var deploymentInfo: NotificationDeployment? = null
     private var cachedAccountId: String? = null
     private var cachedRoleArn: String? = null
+    private var apiGatewayId: String? = null
+    private var apiGatewayEndpoint: String? = null
 
     override suspend fun deployWebhook(): String {
         return try {
@@ -66,7 +78,11 @@ class AwsIoTDeployer(
             val lambda = getLambdaClient()
             val functionName = "$WEBHOOK_FUNCTION_NAME-${UUID.randomUUID().toString().take(8)}"
 
-            val zipData = loadAssetOrGenerateZip(WEBHOOK_ASSET_NAME, generateWebhookCode())
+            val zipData = loadAsset(WEBHOOK_ASSET_NAME)
+            
+            if (apiGatewayEndpoint == null) {
+                throw Exception("Must deploy push service before webhook")
+            }
             
             val createRequest = CreateFunctionRequest {
                 this.functionName = functionName
@@ -80,7 +96,9 @@ class AwsIoTDeployer(
                 this.memorySize = 256
                 this.environment = Environment {
                     variables = mapOf(
-                        "LOG_LEVEL" to "INFO"
+                        "LOG_LEVEL" to "INFO",
+                        "CONNECTIONS_TABLE" to TABLE_NAME,
+                        "API_GATEWAY_ENDPOINT" to apiGatewayEndpoint!!
                     )
                 }
             }
@@ -121,49 +139,54 @@ class AwsIoTDeployer(
 
     override suspend fun deployPushService(): PushServiceInfo {
         return try {
-            Log.i(TAG, "Deploying AWS IoT Core push service...")
+            Log.i(TAG, "Deploying AWS API Gateway WebSocket push service...")
 
-            val iot = getIotClient()
+            createDynamoDBTable()
             
-            val thingName = "tap-device-${UUID.randomUUID().toString().take(8)}"
-            iot.createThing(
-                CreateThingRequest {
-                    this.thingName = thingName
-                }
-            )
-            Log.d(TAG, "IoT Thing created: $thingName")
-
-            val (certificatePem, privateKeyPem, certificateArn) = createIoTCertificate(iot)
-            Log.d(TAG, "IoT Certificate created: $certificateArn")
-
-            createIoTPolicy(iot)
+            val roleArn = createOrGetLambdaExecutionRole()
             
-            iot.attachPolicy(
-                AttachPolicyRequest {
-                    this.policyName = IOT_POLICY_NAME
-                    this.target = certificateArn
-                }
+            val connectFunctionArn = deployLambdaFunction(
+                name = CONNECT_FUNCTION_NAME,
+                assetName = CONNECT_ASSET_NAME,
+                handler = "index.handler",
+                envVars = mapOf(
+                    "LOG_LEVEL" to "INFO",
+                    "CONNECTIONS_TABLE" to TABLE_NAME
+                ),
+                roleArn = roleArn
             )
-            Log.d(TAG, "Policy attached to certificate")
-
-            iot.attachThingPrincipal(
-                AttachThingPrincipalRequest {
-                    this.thingName = thingName
-                    this.principal = certificateArn
-                }
+            
+            val disconnectFunctionArn = deployLambdaFunction(
+                name = DISCONNECT_FUNCTION_NAME,
+                assetName = DISCONNECT_ASSET_NAME,
+                handler = "index.handler",
+                envVars = mapOf(
+                    "LOG_LEVEL" to "INFO",
+                    "CONNECTIONS_TABLE" to TABLE_NAME
+                ),
+                roleArn = roleArn
             )
-            Log.d(TAG, "Certificate attached to thing")
-
-            val endpointResponse = iot.describeEndpoint(
-                DescribeEndpointRequest {
-                    this.endpointType = "iot:Data-ATS"
-                }
+            
+            val defaultFunctionArn = deployLambdaFunction(
+                name = DEFAULT_FUNCTION_NAME,
+                assetName = DEFAULT_ASSET_NAME,
+                handler = "index.handler",
+                envVars = mapOf(
+                    "LOG_LEVEL" to "INFO"
+                ),
+                roleArn = roleArn
             )
-            val endpoint = endpointResponse.endpointAddress ?: throw Exception("Failed to get IoT endpoint")
-            Log.i(TAG, "IoT endpoint: $endpoint")
-
-            val topicId = UUID.randomUUID().toString().replace("-", "")
-            Log.i(TAG, "Generated topic ID: $topicId")
+            
+            val (apiId, endpoint) = createWebSocketAPI(
+                connectFunctionArn,
+                disconnectFunctionArn,
+                defaultFunctionArn
+            )
+            
+            apiGatewayId = apiId
+            apiGatewayEndpoint = endpoint
+            
+            Log.i(TAG, "API Gateway WebSocket deployed: $endpoint")
 
             deploymentInfo = (deploymentInfo ?: createEmptyDeployment()).copy(
                 deployedComponents = (deploymentInfo?.deployedComponents ?: emptyList()) + "push-service"
@@ -173,14 +196,13 @@ class AwsIoTDeployer(
                 endpoint = endpoint,
                 region = region,
                 credentials = mapOf(
-                    "thingName" to thingName,
-                    "certificatePem" to certificatePem,
-                    "privateKeyPem" to privateKeyPem,
-                    "certificateArn" to certificateArn,
-                    "topicId" to topicId
+                    "apiGatewayId" to apiId,
+                    "tableName" to TABLE_NAME
                 ),
                 metadata = mapOf(
-                    "provider" to "aws-iot"
+                    "provider" to "aws-api-gateway",
+                    "connectFunction" to connectFunctionArn,
+                    "disconnectFunction" to disconnectFunctionArn
                 )
             )
 
@@ -197,7 +219,7 @@ class AwsIoTDeployer(
             val lambda = getLambdaClient()
             val functionName = "$TRIGGER_FUNCTION_NAME-${UUID.randomUUID().toString().take(8)}"
 
-            val zipData = loadAssetOrGenerateZip(TRIGGER_ASSET_NAME, generateTriggerCode())
+            val zipData = loadAsset(TRIGGER_ASSET_NAME)
             
             val createRequest = CreateFunctionRequest {
                 this.functionName = functionName
@@ -262,7 +284,6 @@ class AwsIoTDeployer(
         return try {
             Log.i(TAG, "Configuring S3 event notification on bucket: $userBucketName")
             
-            // Step 1: Add Lambda permission to allow S3 to invoke it
             val lambda = getLambdaClient()
             val functionName = triggerFunctionArn.substringAfterLast(":")
             val accountId = getAccountId()
@@ -281,11 +302,9 @@ class AwsIoTDeployer(
                 )
                 Log.d(TAG, "Added Lambda permission for S3 to invoke function")
             } catch (e: Exception) {
-                // Permission might already exist, log and continue
-                Log.w(TAG, "Lambda permission may already exist or add failed, continuing...", e)
+                Log.w(TAG, "Lambda permission may already exist, continuing...", e)
             }
             
-            // Step 2: Configure S3 bucket notification
             val s3 = getS3Client()
             
             val existingConfig = try {
@@ -357,7 +376,7 @@ class AwsIoTDeployer(
                 val config = loadConfiguration()
                 if (config != null) {
                     webhookReachable = testWebhookReachability(config.webhookUrl)
-                    pushServiceConnected = testIoTConnection(config.pushServiceInfo)
+                    pushServiceConnected = testWebSocketConnection(config.pushServiceInfo)
                     eventTriggerWorking = testEventTriggerFunction()
                 }
             } catch (e: Exception) {
@@ -376,7 +395,7 @@ class AwsIoTDeployer(
         }
     }
 
-    suspend fun updateWebhookEnvironment(notifySecret: String, topicId: String): Boolean {
+    suspend fun updateWebhookEnvironment(secret: String, userId: String): Boolean {
         return try {
             val webhookFunctionName = deploymentInfo?.webhookFunctionName
             if (webhookFunctionName == null) {
@@ -394,8 +413,9 @@ class AwsIoTDeployer(
                     this.environment = Environment {
                         variables = mapOf(
                             "LOG_LEVEL" to "INFO",
-                            "NOTIFY_SECRET" to notifySecret,
-                            "TOPIC_ID" to topicId
+                            "CONNECTIONS_TABLE" to TABLE_NAME,
+                            "API_GATEWAY_ENDPOINT" to (apiGatewayEndpoint ?: ""),
+                            "NOTIFY_SECRET" to secret
                         )
                     }
                 }
@@ -503,7 +523,7 @@ class AwsIoTDeployer(
                     metadata = metadata
                 ),
                 deployedAt = json.getLong("deployedAt"),
-                version = json.optString("version", "1.0")
+                version = json.optString("version", "2.0")
             )
 
         } catch (e: Exception) {
@@ -512,54 +532,198 @@ class AwsIoTDeployer(
         }
     }
 
-    private suspend fun createIoTCertificate(iot: IotClient): Triple<String, String, String> {
-        val response = iot.createKeysAndCertificate(
-            CreateKeysAndCertificateRequest {
-                setAsActive = true
+    private suspend fun createDynamoDBTable() {
+        try {
+            Log.i(TAG, "Creating DynamoDB table: $TABLE_NAME")
+            
+            val dynamoDB = getDynamoDbClient()
+            
+            try {
+                dynamoDB.describeTable(
+                    DescribeTableRequest {
+                        tableName = TABLE_NAME
+                    }
+                )
+                Log.d(TAG, "DynamoDB table already exists: $TABLE_NAME")
+                return
+            } catch (e: Exception) {
+                Log.d(TAG, "Table does not exist, creating...")
             }
-        )
-        
-        return Triple(
-            response.certificatePem ?: throw Exception("Certificate PEM not returned"),
-            response.keyPair?.privateKey ?: throw Exception("Private key not returned"),
-            response.certificateArn ?: throw Exception("Certificate ARN not returned")
-        )
+            
+            dynamoDB.createTable(
+                CreateTableRequest {
+                    tableName = TABLE_NAME
+                    keySchema = listOf(
+                        KeySchemaElement {
+                            attributeName = "userId"
+                            keyType = KeyType.Hash
+                        }
+                    )
+                    attributeDefinitions = listOf(
+                        AttributeDefinition {
+                            attributeName = "userId"
+                            attributeType = ScalarAttributeType.S
+                        }
+                    )
+                    billingMode = BillingMode.PayPerRequest
+                    timeToLiveSpecification = TimeToLiveSpecification {
+                        enabled = true
+                        attributeName = "ttl"
+                    }
+                }
+            )
+            
+            Log.i(TAG, "DynamoDB table created successfully")
+            
+            var attempts = 0
+            while (attempts < 30) {
+                try {
+                    val desc = dynamoDB.describeTable(
+                        DescribeTableRequest {
+                            tableName = TABLE_NAME
+                        }
+                    )
+                    if (desc.table?.tableStatus == TableStatus.Active) {
+                        Log.d(TAG, "Table is active")
+                        return
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Waiting for table to become active...")
+                }
+                delay(2000)
+                attempts++
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create DynamoDB table", e)
+            throw Exception("DynamoDB table creation failed: ${e.message}", e)
+        }
     }
 
-    private suspend fun createIoTPolicy(iot: IotClient) {
+    private suspend fun deployLambdaFunction(
+        name: String,
+        assetName: String,
+        handler: String,
+        envVars: Map<String, String>,
+        roleArn: String
+    ): String {
         try {
-            iot.getPolicy(
-                GetPolicyRequest {
-                    policyName = IOT_POLICY_NAME
+            val fullName = "$name-${UUID.randomUUID().toString().take(8)}"
+            Log.i(TAG, "Deploying Lambda function: $fullName")
+            
+            val lambda = getLambdaClient()
+            val zipData = loadAsset(assetName)
+            
+            val createRequest = CreateFunctionRequest {
+                this.functionName = fullName
+                this.runtime = Runtime.Nodejs20X
+                this.role = roleArn
+                this.handler = handler
+                this.code = FunctionCode {
+                    this.zipFile = zipData
                 }
-            )
-            Log.d(TAG, "IoT policy already exists: $IOT_POLICY_NAME")
+                this.timeout = 30
+                this.memorySize = 256
+                this.environment = Environment {
+                    variables = envVars
+                }
+            }
+            
+            val createResponse = lambda.createFunction(createRequest)
+            val functionArn = createResponse.functionArn ?: throw Exception("Failed to get function ARN")
+            
+            waitForFunctionActive(lambda, fullName)
+            
+            Log.i(TAG, "Lambda function deployed: $functionArn")
+            return functionArn
+            
         } catch (e: Exception) {
-            val policyDocument = """
-                {
-                  "Version": "2012-10-17",
-                  "Statement": [
-                    {
-                      "Effect": "Allow",
-                      "Action": [
-                        "iot:Connect",
-                        "iot:Publish",
-                        "iot:Subscribe",
-                        "iot:Receive"
-                      ],
-                      "Resource": "*"
-                    }
-                  ]
-                }
-            """.trimIndent()
+            Log.e(TAG, "Failed to deploy Lambda function: $name", e)
+            throw Exception("Lambda deployment failed: ${e.message}", e)
+        }
+    }
 
-            iot.createPolicy(
-                CreatePolicyRequest {
-                    this.policyName = IOT_POLICY_NAME
-                    this.policyDocument = policyDocument
+    private suspend fun createWebSocketAPI(
+        connectFunctionArn: String,
+        disconnectFunctionArn: String,
+        defaultFunctionArn: String
+    ): Pair<String, String> {
+        try {
+            Log.i(TAG, "Creating API Gateway WebSocket API...")
+            
+            val apiGateway = getApiGatewayClient()
+            val accountId = getAccountId()
+            
+            val createApiResponse = apiGateway.createApi(
+                CreateApiRequest {
+                    name = "tap-notification-ws-${UUID.randomUUID().toString().take(8)}"
+                    protocolType = ProtocolType.Websocket
+                    routeSelectionExpression = "\$request.body.action"
+                    description = "TAP Notification WebSocket API"
                 }
             )
-            Log.d(TAG, "IoT policy created: $IOT_POLICY_NAME")
+            
+            val apiId = createApiResponse.apiId ?: throw Exception("Failed to get API ID")
+            Log.d(TAG, "API created: $apiId")
+            
+            val lambda = getLambdaClient()
+            
+            listOf(
+                Triple("\$connect", connectFunctionArn, "AllowApiGatewayConnect"),
+                Triple("\$disconnect", disconnectFunctionArn, "AllowApiGatewayDisconnect"),
+                Triple("\$default", defaultFunctionArn, "AllowApiGatewayDefault")
+            ).forEach { (route, functionArn, statementId) ->
+                val functionName = functionArn.substringAfterLast(":")
+                
+                lambda.addPermission(
+                    AddPermissionRequest {
+                        this.functionName = functionName
+                        this.statementId = "$statementId-${System.currentTimeMillis()}"
+                        this.action = "lambda:InvokeFunction"
+                        this.principal = "apigateway.amazonaws.com"
+                        this.sourceArn = "arn:aws:execute-api:$region:$accountId:$apiId/*/$route"
+                    }
+                )
+                
+                val integrationResponse = apiGateway.createIntegration(
+                    CreateIntegrationRequest {
+                        this.apiId = apiId
+                        this.integrationType = IntegrationType.AwsProxy
+                        this.integrationUri = "arn:aws:apigateway:$region:lambda:path/2015-03-31/functions/$functionArn/invocations"
+                    }
+                )
+                
+                val integrationId = integrationResponse.integrationId ?: throw Exception("Failed to get integration ID")
+                
+                apiGateway.createRoute(
+                    CreateRouteRequest {
+                        this.apiId = apiId
+                        this.routeKey = route
+                        this.target = "integrations/$integrationId"
+                    }
+                )
+                
+                Log.d(TAG, "Route created: $route")
+            }
+            
+            apiGateway.createStage(
+                CreateStageRequest {
+                    this.apiId = apiId
+                    this.stageName = "prod"
+                    this.autoDeploy = true
+                }
+            )
+            
+            Log.d(TAG, "Stage created: prod")
+            
+            val endpoint = "wss://$apiId.execute-api.$region.amazonaws.com/prod"
+            Log.i(TAG, "WebSocket API created: $endpoint")
+            
+            return Pair(apiId, endpoint)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create WebSocket API", e)
+            throw Exception("WebSocket API creation failed: ${e.message}", e)
         }
     }
 
@@ -663,7 +827,17 @@ class AwsIoTDeployer(
                         {
                           "Effect": "Allow",
                           "Action": [
-                            "iot:Publish"
+                            "dynamodb:PutItem",
+                            "dynamodb:GetItem",
+                            "dynamodb:DeleteItem",
+                            "dynamodb:Query"
+                          ],
+                          "Resource": "arn:aws:dynamodb:$region:$accountId:table/$TABLE_NAME"
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "execute-api:ManageConnections"
                           ],
                           "Resource": "*"
                         }
@@ -688,7 +862,7 @@ class AwsIoTDeployer(
                     )
                     Log.d(TAG, "Attached custom TAP policy")
                 } catch (policyError: Exception) {
-                    Log.w(TAG, "Custom policy may already exist or attachment failed", policyError)
+                    Log.w(TAG, "Custom policy may already exist, trying to attach", policyError)
                     try {
                         iam.attachRolePolicy(
                             AttachRolePolicyRequest {
@@ -739,9 +913,9 @@ class AwsIoTDeployer(
         return try {
             Log.d(TAG, "Testing webhook reachability: $webhookUrl")
             
-            val testPayload = org.json.JSONObject().apply {
+            val testPayload = JSONObject().apply {
                 put("version", "1.0")
-                put("notification", org.json.JSONObject().apply {
+                put("notification", JSONObject().apply {
                     put("type", "test")
                     put("senderId", "test-sender")
                     put("timestamp", System.currentTimeMillis())
@@ -778,30 +952,31 @@ class AwsIoTDeployer(
         }
     }
 
-    private suspend fun testIoTConnection(pushServiceInfo: PushServiceInfo): Boolean {
+    private suspend fun testWebSocketConnection(pushServiceInfo: PushServiceInfo): Boolean {
         return try {
-            Log.d(TAG, "Testing IoT connection to: ${pushServiceInfo.endpoint}")
+            Log.d(TAG, "Testing WebSocket connection to: ${pushServiceInfo.endpoint}")
             
-            val iot = getIotClient()
+            val apiGateway = getApiGatewayClient()
+            val apiId = pushServiceInfo.credentials["apiGatewayId"] ?: return false
             
-            val endpoint = iot.describeEndpoint(
-                DescribeEndpointRequest {
-                    endpointType = "iot:Data-ATS"
+            val response = apiGateway.getApi(
+                GetApiRequest {
+                    this.apiId = apiId
                 }
             )
             
-            val isReachable = endpoint.endpointAddress == pushServiceInfo.endpoint
+            val isActive = response.apiEndpoint != null
             
-            if (isReachable) {
-                Log.d(TAG, "IoT endpoint verified: ${pushServiceInfo.endpoint}")
+            if (isActive) {
+                Log.d(TAG, "API Gateway verified: ${response.apiEndpoint}")
             } else {
-                Log.w(TAG, "IoT endpoint mismatch")
+                Log.w(TAG, "API Gateway endpoint not found")
             }
             
-            isReachable
+            isActive
             
         } catch (e: Exception) {
-            Log.w(TAG, "IoT connection test failed", e)
+            Log.w(TAG, "WebSocket connection test failed", e)
             false
         }
     }
@@ -843,28 +1018,38 @@ class AwsIoTDeployer(
     private fun getLambdaClient(): LambdaClient {
         if (lambdaClient == null) {
             lambdaClient = LambdaClient {
-                region = this@AwsIoTDeployer.region
-                credentialsProvider = this@AwsIoTDeployer.credentialsProvider
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
             }
         }
         return lambdaClient!!
     }
 
-    private fun getIotClient(): IotClient {
-        if (iotClient == null) {
-            iotClient = IotClient {
-                region = this@AwsIoTDeployer.region
-                credentialsProvider = this@AwsIoTDeployer.credentialsProvider
+    private fun getDynamoDbClient(): DynamoDbClient {
+        if (dynamoDbClient == null) {
+            dynamoDbClient = DynamoDbClient {
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
             }
         }
-        return iotClient!!
+        return dynamoDbClient!!
+    }
+
+    private fun getApiGatewayClient(): ApiGatewayV2Client {
+        if (apiGatewayClient == null) {
+            apiGatewayClient = ApiGatewayV2Client {
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
+            }
+        }
+        return apiGatewayClient!!
     }
 
     private fun getS3Client(): S3Client {
         if (s3Client == null) {
             s3Client = S3Client {
-                region = this@AwsIoTDeployer.region
-                credentialsProvider = this@AwsIoTDeployer.credentialsProvider
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
             }
         }
         return s3Client!!
@@ -873,8 +1058,8 @@ class AwsIoTDeployer(
     private fun getIamClient(): IamClient {
         if (iamClient == null) {
             iamClient = IamClient {
-                region = this@AwsIoTDeployer.region
-                credentialsProvider = this@AwsIoTDeployer.credentialsProvider
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
             }
         }
         return iamClient!!
@@ -883,8 +1068,8 @@ class AwsIoTDeployer(
     private fun getStsClient(): StsClient {
         if (stsClient == null) {
             stsClient = StsClient {
-                region = this@AwsIoTDeployer.region
-                credentialsProvider = this@AwsIoTDeployer.credentialsProvider
+                region = this@AwsApiGatewayDeployer.region
+                credentialsProvider = this@AwsApiGatewayDeployer.credentialsProvider
             }
         }
         return stsClient!!
@@ -955,58 +1140,15 @@ class AwsIoTDeployer(
             throw Exception("S3 bucket creation failed: ${e.message}", e)
         }
     }
-    
-    @Deprecated("Use getOrCreateConfigBucket() instead")
-    private fun getConfigBucketName(): String {
-        return configBucketName ?: "$CONFIG_BUCKET_PREFIX-${UUID.randomUUID().toString().take(8)}"
-    }
 
-    private fun loadAssetOrGenerateZip(assetName: String, fallbackCode: String): ByteArray {
+    private fun loadAsset(assetName: String): ByteArray {
         return try {
             val assetPath = "lambda-functions/$assetName"
             context.assets.open(assetPath).readBytes()
         } catch (e: Exception) {
-            Log.w(TAG, "Asset $assetName not found, using generated code", e)
-            createZipFromCode(fallbackCode)
+            Log.e(TAG, "Failed to load asset: $assetName", e)
+            throw Exception("Asset load failed: ${e.message}", e)
         }
-    }
-
-    private fun createZipFromCode(code: String): ByteArray {
-        val tempFile = File.createTempFile("lambda", ".zip")
-        try {
-            java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zip ->
-                zip.putNextEntry(java.util.zip.ZipEntry("index.js"))
-                zip.write(code.toByteArray())
-                zip.closeEntry()
-            }
-            return tempFile.readBytes()
-        } finally {
-            tempFile.delete()
-        }
-    }
-
-    private fun generateWebhookCode(): String {
-        return """
-            exports.handler = async (event) => {
-                console.log('Received event:', JSON.stringify(event));
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({ message: 'Webhook received' })
-                };
-            };
-        """.trimIndent()
-    }
-
-    private fun generateTriggerCode(): String {
-        return """
-            exports.handler = async (event) => {
-                console.log('S3 event:', JSON.stringify(event));
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({ message: 'Event processed' })
-                };
-            };
-        """.trimIndent()
     }
 
     private fun createEmptyDeployment(): NotificationDeployment {
@@ -1021,17 +1163,157 @@ class AwsIoTDeployer(
         )
     }
 
-    fun cleanup() {
+    override suspend fun deleteFunction(identifier: String, name: String): Boolean {
+        return try {
+            Log.i(TAG, "Deleting Lambda function: $name (ARN: $identifier)")
+            
+            val lambda = getLambdaClient()
+            
+            val deleteRequest = DeleteFunctionRequest {
+                functionName = identifier
+            }
+            
+            lambda.deleteFunction(deleteRequest)
+            Log.i(TAG, "Lambda function deleted successfully: $name")
+            
+            delay(2000)
+            
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete Lambda function: $name", e)
+            false
+        }
+    }
+    
+    override suspend fun deleteRole(identifier: String, name: String): Boolean {
+        return try {
+            Log.i(TAG, "Deleting IAM role: $name")
+            
+            val iam = getIamClient()
+            
+            try {
+                val listPoliciesRequest = ListAttachedRolePoliciesRequest {
+                    roleName = name
+                }
+                val policiesResponse = iam.listAttachedRolePolicies(listPoliciesRequest)
+                
+                policiesResponse.attachedPolicies?.forEach { policy ->
+                    val detachRequest = DetachRolePolicyRequest {
+                        roleName = name
+                        policyArn = policy.policyArn
+                    }
+                    iam.detachRolePolicy(detachRequest)
+                    Log.d(TAG, "Detached policy: ${policy.policyName}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to detach policies from role: $name", e)
+            }
+            
+            try {
+                val listInlinePoliciesRequest = ListRolePoliciesRequest {
+                    roleName = name
+                }
+                val inlinePoliciesResponse = iam.listRolePolicies(listInlinePoliciesRequest)
+                
+                inlinePoliciesResponse.policyNames?.forEach { policyName ->
+                    val deleteInlinePolicyRequest = DeleteRolePolicyRequest {
+                        roleName = name
+                        policyName = policyName
+                    }
+                    iam.deleteRolePolicy(deleteInlinePolicyRequest)
+                    Log.d(TAG, "Deleted inline policy: $policyName")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to delete inline policies from role: $name", e)
+            }
+            
+            val deleteRoleRequest = DeleteRoleRequest {
+                roleName = name
+            }
+            iam.deleteRole(deleteRoleRequest)
+            
+            Log.i(TAG, "IAM role deleted successfully: $name")
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete IAM role: $name", e)
+            false
+        }
+    }
+
+    override suspend fun deleteApiGateway(identifier: String, name: String): Boolean {
+        return try {
+            Log.i(TAG, "Deleting API Gateway: id=$identifier, name=$name")
+            
+            val apiGateway = getApiGatewayClient()
+            
+            val deleteRequest = aws.sdk.kotlin.services.apigatewayv2.model.DeleteApiRequest {
+                apiId = identifier
+            }
+            
+            apiGateway.deleteApi(deleteRequest)
+            
+            Log.i(TAG, "API Gateway deleted successfully: $name")
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete API Gateway: $name", e)
+            false
+        }
+    }
+    
+    override suspend fun deleteDynamoDBTable(identifier: String, name: String): Boolean {
+        return try {
+            Log.i(TAG, "Deleting DynamoDB table: $name")
+            
+            val dynamodb = getDynamoDbClient()
+            
+            val deleteRequest = aws.sdk.kotlin.services.dynamodb.model.DeleteTableRequest {
+                tableName = name
+            }
+            
+            dynamodb.deleteTable(deleteRequest)
+            
+            Log.i(TAG, "DynamoDB table deletion initiated: $name")
+            
+            var attempts = 0
+            val maxAttempts = 30
+            while (attempts < maxAttempts) {
+                try {
+                    val describeRequest = DescribeTableRequest {
+                        tableName = name
+                    }
+                    dynamodb.describeTable(describeRequest)
+                    delay(2000)
+                    attempts++
+                } catch (e: Exception) {
+                    Log.i(TAG, "DynamoDB table deleted successfully: $name")
+                    return@try true
+                }
+            }
+            
+            Log.w(TAG, "DynamoDB table deletion timeout: $name")
+            true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete DynamoDB table: $name", e)
+            false
+        }
+    }
+
+    override fun cleanup() {
         lambdaClient?.close()
-        iotClient?.close()
+        dynamoDbClient?.close()
+        apiGatewayClient?.close()
         s3Client?.close()
         iamClient?.close()
         stsClient?.close()
         lambdaClient = null
-        iotClient = null
+        dynamoDbClient = null
+        apiGatewayClient = null
         s3Client = null
         iamClient = null
         stsClient = null
     }
 }
-

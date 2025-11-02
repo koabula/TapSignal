@@ -614,14 +614,11 @@ dependencies {
   
   // AWS SDK for Kotlin
   implementation(libs.aws.sdk.s3)
-  implementation(libs.aws.sdk.iot)
-  implementation(libs.aws.sdk.iotdataplane)
   implementation(libs.aws.sdk.lambda)
   implementation(libs.aws.sdk.sts)
   implementation(libs.aws.sdk.iam)
-  
-  // Eclipse Paho MQTT Client (for AWS IoT and Tencent IoT Hub)
-  implementation(libs.eclipse.paho.mqttv3)
+  implementation(libs.aws.sdk.apigatewayv2)
+  implementation(libs.aws.sdk.dynamodb)
 
   "playImplementation"(project(":billing"))
   "nightlyImplementation"(project(":billing"))

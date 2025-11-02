@@ -44,7 +44,7 @@ class ContactWebhookManager(
                     put("platform", config.platform)
                     put("webhookUrl", config.webhookUrl)
                     put("notifySecret", config.notifySecret)
-                    put("topicId", config.topicId)
+                    put("userId", config.userId)
                     put("lastUpdated", config.lastUpdated)
                     put("verified", config.verified)
                 }.toString()
@@ -105,7 +105,7 @@ class ContactWebhookManager(
                         platform = jsonConfig.getString("platform"),
                         webhookUrl = jsonConfig.getString("webhookUrl"),
                         notifySecret = jsonConfig.getString("notifySecret"),
-                        topicId = jsonConfig.getString("topicId"),
+                        userId = jsonConfig.getString("userId"),
                         lastUpdated = jsonConfig.getLong("lastUpdated"),
                         verified = jsonConfig.optBoolean("verified", false)
                     )
@@ -156,7 +156,7 @@ class ContactWebhookManager(
                                     platform = jsonConfig.getString("platform"),
                                     webhookUrl = jsonConfig.getString("webhookUrl"),
                                     notifySecret = jsonConfig.getString("notifySecret"),
-                                    topicId = jsonConfig.getString("topicId"),
+                                    userId = jsonConfig.getString("userId"),
                                     lastUpdated = jsonConfig.getLong("lastUpdated"),
                                     verified = jsonConfig.optBoolean("verified", false)
                                 )

@@ -5,8 +5,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.notification.*
-import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsIoTDeployer
-import org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentIoTHubDeployer
+import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayDeployer
+import org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 
 /**
@@ -163,10 +163,10 @@ class CloudFunctionDeployer(
                     )
                 )
                 
-                // Step 2: Deploy Push Service (IoT)
+                // Step 2: Deploy Push Service (API Gateway)
                 tracker.recordCheckpoint(
                     DeploymentTracker.DeploymentCheckpoint(
-                        step = DeploymentTracker.DeploymentStep.DEPLOYING_IOT,
+                        step = DeploymentTracker.DeploymentStep.DEPLOYING_API_GATEWAY,
                         timestamp = System.currentTimeMillis(),
                         success = true
                     )
@@ -177,7 +177,7 @@ class CloudFunctionDeployer(
                 
                 tracker.recordCheckpoint(
                     DeploymentTracker.DeploymentCheckpoint(
-                        step = DeploymentTracker.DeploymentStep.IOT_DEPLOYED,
+                        step = DeploymentTracker.DeploymentStep.API_GATEWAY_DEPLOYED,
                         timestamp = System.currentTimeMillis(),
                         success = true,
                         data = mapOf("endpoint" to pushServiceInfo.endpoint)
@@ -229,13 +229,13 @@ class CloudFunctionDeployer(
                 Log.i(TAG, "推送服务配置已保存")
                 
                 // Update webhook environment variables
-                if (cosConfig.provider == CosConfig.Provider.AWS && deployer is AwsIoTDeployer) {
-                    val awsDeployer = deployer as AwsIoTDeployer
+                if (cosConfig.provider == CosConfig.Provider.AWS && deployer is AwsApiGatewayDeployer) {
+                    val awsDeployer = deployer as AwsApiGatewayDeployer
                     val topicId = pushServiceInfo.credentials["topicId"] ?: ""
                     awsDeployer.updateWebhookEnvironment(notifySecret, topicId)
                     Log.d(TAG, "Webhook环境变量已更新")
-                } else if (cosConfig.provider == CosConfig.Provider.TENCENT && deployer is TencentIoTHubDeployer) {
-                    val tencentDeployer = deployer as TencentIoTHubDeployer
+                } else if (cosConfig.provider == CosConfig.Provider.TENCENT && deployer is TencentApiGatewayDeployer) {
+                    val tencentDeployer = deployer as TencentApiGatewayDeployer
                     val topicId = pushServiceInfo.credentials["topicId"] ?: ""
                     tencentDeployer.updateWebhookEnvironment(notifySecret, topicId)
                     Log.d(TAG, "Webhook环境变量已更新")
@@ -345,7 +345,7 @@ class CloudFunctionDeployer(
         
         deployer = when (cosConfig.provider) {
             CosConfig.Provider.AWS -> {
-                AwsIoTDeployer(
+                AwsApiGatewayDeployer(
                     context = context,
                     accessKeyId = cosConfig.secretId,
                     secretAccessKey = cosConfig.secretKey,
@@ -353,7 +353,7 @@ class CloudFunctionDeployer(
                 )
             }
             CosConfig.Provider.TENCENT -> {
-                TencentIoTHubDeployer(
+                TencentApiGatewayDeployer(
                     context = context,
                     secretId = cosConfig.secretId,
                     secretKey = cosConfig.secretKey,
@@ -374,8 +374,8 @@ class CloudFunctionDeployer(
      */
     private fun getProviderType(): String {
         return when (cosConfig.provider) {
-            CosConfig.Provider.AWS -> "aws-iot"
-            CosConfig.Provider.TENCENT -> "tencent-iot"
+            CosConfig.Provider.AWS -> "aws-api-gateway"
+            CosConfig.Provider.TENCENT -> "tencent-api-gateway"
             else -> "unknown"
         }
     }
@@ -412,12 +412,12 @@ class CloudFunctionDeployer(
         return try {
             Log.i(TAG, "配置腾讯云云函数环境变量")
             
-            if (deployer !is TencentIoTHubDeployer) {
-                Log.w(TAG, "Deployer不是TencentIoTHubDeployer类型")
+            if (deployer !is TencentApiGatewayDeployer) {
+                Log.w(TAG, "Deployer不是TencentApiGatewayDeployer类型")
                 return false
             }
             
-            val tencentDeployer = deployer as TencentIoTHubDeployer
+            val tencentDeployer = deployer as TencentApiGatewayDeployer
             
             // 获取当前配置以获取notifySecret和topicId
             val config = tencentDeployer.loadConfiguration()
@@ -553,11 +553,11 @@ class CloudFunctionDeployer(
     fun cleanup() {
         try {
             when (deployer) {
-                is AwsIoTDeployer -> {
-                    (deployer as AwsIoTDeployer).cleanup()
+                is AwsApiGatewayDeployer -> {
+                    (deployer as AwsApiGatewayDeployer).cleanup()
                 }
-                is TencentIoTHubDeployer -> {
-                    (deployer as TencentIoTHubDeployer).cleanup()
+                is TencentApiGatewayDeployer -> {
+                    (deployer as TencentApiGatewayDeployer).cleanup()
                 }
             }
             deployer = null

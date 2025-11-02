@@ -90,6 +90,9 @@ class TapPollingService(private val context: Context) {
     
     /**
      * 启动轮询服务
+     * 
+     * 注意：在推送通知模式下，轮询会被禁用
+     * 推送通知模式下，消息下载由NotificationDownloadExecutor负责
      */
     fun startPolling(): Boolean {
         return pollingLock.write {
@@ -99,7 +102,16 @@ class TapPollingService(private val context: Context) {
                     return@write true
                 }
                 
-                Log.i(TAG, "启动Tap轮询服务...")
+                // 检查是否启用推送通知模式
+                val isNotificationEnabled = isNotificationModeEnabled()
+                if (isNotificationEnabled) {
+                    Log.i(TAG, "推送通知模式已启用，跳过轮询服务启动")
+                    // 标记为运行状态，但不启动实际的轮询任务
+                    isRunning.set(true)
+                    return@write true
+                }
+                
+                Log.i(TAG, "启动Tap轮询服务（轮询模式）...")
                 
                 // 根据设备性能计算最优线程池配置
                 val threadPoolConfig = deviceCapabilityProvider.calculateOptimalThreadPoolSize()
@@ -291,6 +303,29 @@ class TapPollingService(private val context: Context) {
     }
     
     /**
+     * 检查是否启用推送通知模式
+     * 
+     * 如果启用了推送通知，轮询将被禁用
+     * 推送通知由NotificationManager和NotificationDownloadExecutor负责
+     */
+    private fun isNotificationModeEnabled(): Boolean {
+        return try {
+            // 检查推送通知配置
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val notificationEnabled = configManager.isNotificationEnabled()
+            
+            if (notificationEnabled) {
+                Log.d(TAG, "推送通知模式已启用")
+            }
+            
+            notificationEnabled
+        } catch (e: Exception) {
+            Log.w(TAG, "检查推送通知模式时出错，默认为未启用", e)
+            false
+        }
+    }
+    
+    /**
      * 规范化RecipientId格式
      * 统一将各种格式的RecipientId转换为ACI格式，确保轮询任务key的一致性
      * 
@@ -333,6 +368,8 @@ class TapPollingService(private val context: Context) {
      * 
      * 为群组的所有其他成员创建轮询任务，支持批量添加
      * 
+     * 注意：在推送通知模式下，此方法不会实际创建轮询任务
+     * 
      * @param groupId 群组 ID
      * @param memberMetadatas 成员 metadata 映射 (memberAci -> TransportMetadata)
      * @return 成功添加的成员数量
@@ -349,6 +386,14 @@ class TapPollingService(private val context: Context) {
         if (memberMetadatas.isEmpty()) {
             Log.w(TAG, "群组成员列表为空: groupId=$groupId")
             return 0
+        }
+        
+        // 检查是否启用推送通知模式
+        val isNotificationEnabled = isNotificationModeEnabled()
+        if (isNotificationEnabled) {
+            Log.d(TAG, "推送通知模式已启用，跳过群组轮询目标添加: groupId=$groupId")
+            // 在推送模式下，返回成员数量表示成功，但不创建实际的轮询任务
+            return memberMetadatas.size
         }
         
         return try {
@@ -442,11 +487,22 @@ class TapPollingService(private val context: Context) {
     
     /**
      * 添加轮询目标
+     * 
+     * 注意：在推送通知模式下，此方法不会实际创建轮询任务
+     * 但仍会保存必要的元数据，供下载器使用
      */
     fun addPollingTarget(recipientId: String, metadata: TransportMetadata, channel: TransportChannel? = null): Boolean {
         if (!isRunning.get()) {
             Log.w(TAG, "轮询服务未运行，无法添加轮询目标")
             return false
+        }
+        
+        // 检查是否启用推送通知模式
+        val isNotificationEnabled = isNotificationModeEnabled()
+        if (isNotificationEnabled) {
+            Log.d(TAG, "推送通知模式已启用，跳过轮询目标添加: recipientId=$recipientId")
+            // 在推送模式下，返回true表示成功，但不创建实际的轮询任务
+            return true
         }
         
         // ✅ 统一规范化 recipientId 为 ACI 格式，确保轮询任务 key 的一致性

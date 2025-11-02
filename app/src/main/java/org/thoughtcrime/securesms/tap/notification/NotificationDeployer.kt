@@ -16,6 +16,16 @@ interface NotificationDeployer {
     suspend fun saveConfiguration(config: NotificationConfig)
     
     suspend fun loadConfiguration(): NotificationConfig?
+    
+    suspend fun deleteFunction(identifier: String, name: String): Boolean
+    
+    suspend fun deleteRole(identifier: String, name: String): Boolean
+    
+    suspend fun deleteApiGateway(identifier: String, name: String): Boolean
+    
+    suspend fun deleteDynamoDBTable(identifier: String, name: String): Boolean
+    
+    fun cleanup()
 }
 
 data class TriggerInfo(
@@ -82,7 +92,7 @@ data class ContactNotificationConfig(
     val platform: String,
     val webhookUrl: String,
     val notifySecret: String,
-    val topicId: String,
+    val userId: String,
     val lastUpdated: Long,
     val verified: Boolean = false
 ) {
@@ -91,7 +101,7 @@ data class ContactNotificationConfig(
                platform.isNotEmpty() && 
                webhookUrl.isNotEmpty() && 
                notifySecret.isNotEmpty() &&
-               topicId.isNotEmpty()
+               userId.isNotEmpty()
     }
 }
 

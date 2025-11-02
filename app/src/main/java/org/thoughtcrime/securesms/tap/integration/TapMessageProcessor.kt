@@ -519,6 +519,10 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     // 处理群组V2禁用
                     processGroupDisable(senderId, tokenExchangeMessage)
                 }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_WEBHOOK_UPDATE -> {
+                    // 处理Webhook配置更新
+                    processWebhookUpdate(senderId, tokenExchangeMessage)
+                }
                 else -> {
                     Log.w(TAG, "未知的Token交换类型: ${tokenExchangeMessage.requestType}")
                     TapProcessResult.Failed("未知的Token交换类型")
@@ -538,6 +542,17 @@ class TapMessageProcessor private constructor(private val context: Context) {
         
         return withContext(Dispatchers.Main) {
             try {
+                // 如果包含Webhook配置,先保存
+                if (tokenExchangeMessage.hasWebhookConfig()) {
+                    val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
+                    if (webhookConfigData != null) {
+                        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+                        val senderAci = recipient.requireAci().toString()
+                        saveContactWebhookConfig(senderAci, webhookConfigData, tokenExchangeMessage.providerType)
+                        Log.i(TAG, "已保存Token Offer中的Webhook配置: senderAci=$senderAci")
+                    }
+                }
+                
                 // 显示确认对话框给用户
                 showTokenExchangeConfirmDialog(senderId, tokenExchangeMessage)
                 TapProcessResult.Success("Token交换确认对话框已显示")
@@ -559,6 +574,15 @@ class TapMessageProcessor private constructor(private val context: Context) {
             val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
             val peerAci = recipient.requireAci().toString()
             Log.d(TAG, "[Token交换] A端: senderId=$senderId, peerAci=$peerAci")
+            
+            // 如果包含Webhook配置,先保存
+            if (tokenExchangeMessage.hasWebhookConfig()) {
+                val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
+                if (webhookConfigData != null) {
+                    saveContactWebhookConfig(peerAci, webhookConfigData, tokenExchangeMessage.providerType)
+                    Log.i(TAG, "已保存Token Accept中的Webhook配置: peerAci=$peerAci")
+                }
+            }
             
             // 将对方的Token保存到TokenPool，使用ACI格式（与metadata构建时保持一致）
             val peerToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(tokenExchangeMessage.tokenData)
@@ -1895,6 +1919,92 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             Log.e(TAG, "显示群组 Token 交换通知失败", e)
         }
     }
+
+/**
+ * 处理Webhook配置更新
+ */
+private suspend fun processWebhookUpdate(
+    senderId: org.thoughtcrime.securesms.recipients.RecipientId,
+    tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
+): TapProcessResult {
+    Log.i(TAG, "处理Webhook配置更新: senderId=$senderId")
+    
+    return try {
+        // 提取Webhook配置
+        val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
+        if (webhookConfigData == null) {
+            Log.w(TAG, "Webhook更新消息缺少有效配置")
+            return TapProcessResult.Failed("缺少有效的Webhook配置")
+        }
+        
+        if (!webhookConfigData.validate()) {
+            Log.w(TAG, "Webhook配置验证失败")
+            return TapProcessResult.Failed("Webhook配置验证失败")
+        }
+        
+        // 获取发送者的ACI
+        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+        val senderAci = recipient.requireAci().toString()
+        
+        // 创建ContactNotificationConfig
+        val contactConfig = org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig(
+            contactId = senderAci,
+            platform = tokenExchangeMessage.providerType,
+            webhookUrl = webhookConfigData.webhookUrl,
+            notifySecret = webhookConfigData.notifySecret,
+            userId = webhookConfigData.userId,
+            lastUpdated = System.currentTimeMillis(),
+            verified = false
+        )
+        
+        // 保存到配置管理器
+        val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+        val saved = configManager.saveContactNotificationConfig(senderAci, contactConfig)
+        
+        if (saved) {
+            Log.i(TAG, "Webhook配置更新成功: senderAci=$senderAci")
+            TapProcessResult.Success("Webhook配置已更新")
+        } else {
+            Log.w(TAG, "Webhook配置保存失败: senderAci=$senderAci")
+            TapProcessResult.Failed("Webhook配置保存失败")
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "处理Webhook更新异常: senderId=$senderId", e)
+        TapProcessResult.Failed("处理异常: ${e.message}")
+    }
+}
+
+/**
+ * 保存联系人的Webhook配置(在Token交换过程中)
+ */
+private fun saveContactWebhookConfig(
+    senderAci: String,
+    webhookConfigData: org.thoughtcrime.securesms.tap.WebhookConfigData,
+    providerType: String
+) {
+    try {
+        val contactConfig = org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig(
+            contactId = senderAci,
+            platform = providerType,
+            webhookUrl = webhookConfigData.webhookUrl,
+            notifySecret = webhookConfigData.notifySecret,
+            userId = webhookConfigData.userId,
+            lastUpdated = System.currentTimeMillis(),
+            verified = false
+        )
+        
+        val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+        val saved = configManager.saveContactNotificationConfig(senderAci, contactConfig)
+        
+        if (saved) {
+            Log.i(TAG, "联系人Webhook配置已保存: senderAci=$senderAci")
+        } else {
+            Log.w(TAG, "联系人Webhook配置保存失败: senderAci=$senderAci")
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "保存联系人Webhook配置异常: senderAci=$senderAci", e)
+    }
+}
 
 /**
  * 诊断轮询目标添加失败的原因

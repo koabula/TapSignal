@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.keyvalue.SignalStore
+import org.thoughtcrime.securesms.tap.notification.NotificationConfig
+import org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -22,6 +24,8 @@ class TransportProviderConfigManager private constructor(private val context: Co
         private const val KEY_PROVIDER_CONFIGS = "tap.provider_configs"
         private const val KEY_ENABLED_PROVIDERS = "tap.enabled_providers"
         private const val KEY_CONFIG_VERSION = "tap.config_version"
+        private const val KEY_NOTIFICATION_CONFIG = "tap.notification_config"
+        private const val KEY_CONTACT_NOTIFICATION_CONFIGS = "tap.contact_notification_configs"
         private const val CURRENT_CONFIG_VERSION = 1
         
         // 单例实例
@@ -403,6 +407,304 @@ class TransportProviderConfigManager private constructor(private val context: Co
     private fun updateCache(configs: Map<String, Map<String, Any>>) {
         configCache.clear()
         configCache.putAll(configs)
+    }
+    
+    // ====================================
+    // 推送服务配置管理
+    // ====================================
+    
+    /**
+     * 保存推送服务配置
+     * 
+     * @param config 推送服务配置
+     * @return 保存是否成功
+     */
+    fun saveNotificationConfig(config: NotificationConfig): Boolean {
+        return try {
+            Log.i(TAG, "保存推送服务配置: provider=${config.provider}")
+            
+            if (!config.validate()) {
+                Log.w(TAG, "推送服务配置验证失败")
+                return false
+            }
+            
+            // 将NotificationConfig转换为Map存储
+            val configMap = mapOf(
+                "provider" to config.provider,
+                "webhookUrl" to config.webhookUrl,
+                "notifySecret" to config.notifySecret,
+                "pushServiceInfo" to mapOf(
+                    "endpoint" to config.pushServiceInfo.endpoint,
+                    "region" to config.pushServiceInfo.region,
+                    "credentials" to config.pushServiceInfo.credentials,
+                    "metadata" to config.pushServiceInfo.metadata
+                ),
+                "deployedAt" to config.deployedAt,
+                "version" to config.version
+            )
+            
+            tapValues.setNotificationConfig(configMap)
+            
+            Log.i(TAG, "推送服务配置保存成功")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "保存推送服务配置失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 获取推送服务配置
+     * 
+     * @return 推送服务配置，如果不存在则返回null
+     */
+    fun getNotificationConfig(): NotificationConfig? {
+        return try {
+            val configMap = tapValues.getNotificationConfig() ?: return null
+            
+            // 从Map转换为NotificationConfig
+            val provider = configMap["provider"] as? String ?: return null
+            val webhookUrl = configMap["webhookUrl"] as? String ?: return null
+            val notifySecret = configMap["notifySecret"] as? String ?: return null
+            val deployedAt = (configMap["deployedAt"] as? Number)?.toLong() ?: return null
+            val version = configMap["version"] as? String ?: "1.0"
+            
+            @Suppress("UNCHECKED_CAST")
+            val pushServiceInfoMap = configMap["pushServiceInfo"] as? Map<String, Any> ?: return null
+            val endpoint = pushServiceInfoMap["endpoint"] as? String ?: return null
+            val region = pushServiceInfoMap["region"] as? String ?: return null
+            val credentials = pushServiceInfoMap["credentials"] as? Map<String, String> ?: emptyMap()
+            val metadata = pushServiceInfoMap["metadata"] as? Map<String, Any> ?: emptyMap()
+            
+            val pushServiceInfo = org.thoughtcrime.securesms.tap.notification.PushServiceInfo(
+                endpoint = endpoint,
+                region = region,
+                credentials = credentials,
+                metadata = metadata
+            )
+            
+            NotificationConfig(
+                provider = provider,
+                webhookUrl = webhookUrl,
+                notifySecret = notifySecret,
+                pushServiceInfo = pushServiceInfo,
+                deployedAt = deployedAt,
+                version = version
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "获取推送服务配置失败", e)
+            null
+        }
+    }
+    
+    /**
+     * 删除推送服务配置
+     * 
+     * @return 删除是否成功
+     */
+    fun deleteNotificationConfig(): Boolean {
+        return try {
+            Log.i(TAG, "删除推送服务配置")
+            tapValues.clearNotificationConfig()
+            Log.i(TAG, "推送服务配置删除成功")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "删除推送服务配置失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 检查是否启用推送通知模式
+     * 
+     * @return 如果有有效的推送服务配置则返回true，否则返回false
+     */
+    fun isNotificationEnabled(): Boolean {
+        return try {
+            val config = getNotificationConfig()
+            val enabled = config != null && config.validate()
+            
+            if (enabled) {
+                Log.d(TAG, "推送通知模式已启用: provider=${config?.provider}")
+            } else {
+                Log.v(TAG, "推送通知模式未启用")
+            }
+            
+            enabled
+        } catch (e: Exception) {
+            Log.w(TAG, "检查推送通知模式时出错", e)
+            false
+        }
+    }
+    
+    /**
+     * 保存联系人的推送服务配置
+     * 
+     * @param contactId 联系人ID (ACI)
+     * @param config 联系人推送服务配置
+     * @return 保存是否成功
+     */
+    fun saveContactNotificationConfig(contactId: String, config: ContactNotificationConfig): Boolean {
+        return try {
+            Log.i(TAG, "保存联系人推送配置: contactId=$contactId")
+            
+            if (!config.validate()) {
+                Log.w(TAG, "联系人推送配置验证失败")
+                return false
+            }
+            
+            // 获取所有联系人配置并更新
+            val allConfigs = getAllContactNotificationConfigs().toMutableMap()
+            
+            // 将ContactNotificationConfig转换为Map存储
+            val configMap = mapOf(
+                "contactId" to config.contactId,
+                "platform" to config.platform,
+                "webhookUrl" to config.webhookUrl,
+                "notifySecret" to config.notifySecret,
+                "userId" to config.userId,
+                "lastUpdated" to config.lastUpdated,
+                "verified" to config.verified
+            )
+            
+            allConfigs[contactId] = configMap
+            tapValues.setContactNotificationConfigs(allConfigs)
+            
+            Log.i(TAG, "联系人推送配置保存成功: contactId=$contactId")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "保存联系人推送配置失败: contactId=$contactId", e)
+            false
+        }
+    }
+    
+    /**
+     * 获取联系人的推送服务配置
+     * 
+     * @param contactId 联系人ID (ACI)
+     * @return 联系人推送服务配置，如果不存在则返回null
+     */
+    fun getContactNotificationConfig(contactId: String): ContactNotificationConfig? {
+        return try {
+            val allConfigs = getAllContactNotificationConfigs()
+            val configMap = allConfigs[contactId] ?: return null
+            
+            // 从Map转换为ContactNotificationConfig
+            val contactIdValue = configMap["contactId"] as? String ?: return null
+            val platform = configMap["platform"] as? String ?: return null
+            val webhookUrl = configMap["webhookUrl"] as? String ?: return null
+            val notifySecret = configMap["notifySecret"] as? String ?: return null
+            val userId = configMap["userId"] as? String ?: return null
+            val lastUpdated = (configMap["lastUpdated"] as? Number)?.toLong() ?: return null
+            val verified = configMap["verified"] as? Boolean ?: false
+            
+            ContactNotificationConfig(
+                contactId = contactIdValue,
+                platform = platform,
+                webhookUrl = webhookUrl,
+                notifySecret = notifySecret,
+                userId = userId,
+                lastUpdated = lastUpdated,
+                verified = verified
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "获取联系人推送配置失败: contactId=$contactId", e)
+            null
+        }
+    }
+    
+    /**
+     * 获取所有联系人的推送服务配置
+     * 
+     * @return 联系人ID到配置Map的映射
+     */
+    private fun getAllContactNotificationConfigs(): Map<String, Map<String, Any>> {
+        return try {
+            tapValues.getContactNotificationConfigs()
+        } catch (e: Exception) {
+            Log.e(TAG, "获取所有联系人推送配置失败", e)
+            emptyMap()
+        }
+    }
+    
+    /**
+     * 获取所有联系人的推送服务配置列表
+     * 
+     * @return 联系人推送服务配置列表
+     */
+    fun getContactNotificationConfigList(): List<ContactNotificationConfig> {
+        return try {
+            val allConfigs = getAllContactNotificationConfigs()
+            allConfigs.mapNotNull { (contactId, _) ->
+                getContactNotificationConfig(contactId)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取联系人推送配置列表失败", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * 删除联系人的推送服务配置
+     * 
+     * @param contactId 联系人ID (ACI)
+     * @return 删除是否成功
+     */
+    fun deleteContactNotificationConfig(contactId: String): Boolean {
+        return try {
+            Log.i(TAG, "删除联系人推送配置: contactId=$contactId")
+            
+            val allConfigs = getAllContactNotificationConfigs().toMutableMap()
+            val removed = allConfigs.remove(contactId)
+            
+            if (removed != null) {
+                tapValues.setContactNotificationConfigs(allConfigs)
+                Log.i(TAG, "联系人推送配置删除成功: contactId=$contactId")
+                true
+            } else {
+                Log.w(TAG, "要删除的联系人推送配置不存在: contactId=$contactId")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "删除联系人推送配置失败: contactId=$contactId", e)
+            false
+        }
+    }
+    
+    /**
+     * 清空所有联系人的推送服务配置
+     * 
+     * @return 清空是否成功
+     */
+    fun clearAllContactNotificationConfigs(): Boolean {
+        return try {
+            Log.w(TAG, "清空所有联系人推送配置")
+            tapValues.clearContactNotificationConfigs()
+            Log.i(TAG, "所有联系人推送配置已清空")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "清空联系人推送配置失败", e)
+            false
+        }
+    }
+    
+    /**
+     * 检查是否已配置推送服务
+     * 
+     * @return 是否已配置推送服务
+     */
+    fun hasNotificationConfig(): Boolean {
+        return getNotificationConfig() != null
+    }
+    
+    /**
+     * 检查联系人是否已配置推送服务
+     * 
+     * @param contactId 联系人ID (ACI)
+     * @return 联系人是否已配置推送服务
+     */
+    fun hasContactNotificationConfig(contactId: String): Boolean {
+        return getContactNotificationConfig(contactId) != null
     }
 }
 

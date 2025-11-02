@@ -42,7 +42,7 @@ class WebhookSignatureValidator {
             val isValid = secureCompare(expectedSignature, signature)
             
             if (!isValid) {
-                Log.w(TAG, "签名验证失败")
+                Log.w(TAG, "签名验证失败: expected=${expectedSignature.take(16)}..., received=${signature.take(16)}..., bodyLength=${body.length}")
             }
             
             isValid
@@ -57,7 +57,7 @@ class WebhookSignatureValidator {
         val diff = Math.abs(currentTime - timestamp)
         
         return if (diff > MAX_TIMESTAMP_DIFF_MS) {
-            Log.w(TAG, "时间戳验证失败: diff=${diff}ms")
+            Log.w(TAG, "时间戳验证失败: diff=${diff}ms, maxAllowed=${MAX_TIMESTAMP_DIFF_MS}ms, timestamp=$timestamp, current=$currentTime")
             false
         } else {
             true

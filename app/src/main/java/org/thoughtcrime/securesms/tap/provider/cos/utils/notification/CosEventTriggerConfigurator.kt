@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsIoTDeployer
+import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayDeployer
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
@@ -52,8 +52,8 @@ class CosEventTriggerConfigurator(
                     return@withContext false
                 }
                 
-                // 使用AwsIoTDeployer的configureS3EventNotification方法
-                val deployer = AwsIoTDeployer(
+                // 使用AwsApiGatewayDeployer的configureS3EventNotification方法
+                val deployer = AwsApiGatewayDeployer(
                     context = context,
                     accessKeyId = cosConfig.secretId,
                     secretAccessKey = cosConfig.secretKey,
@@ -305,7 +305,7 @@ class CosEventTriggerConfigurator(
      */
     private suspend fun checkAwsLambdaExecution(testFilePath: String): Boolean {
         return try {
-            val deployer = AwsIoTDeployer(
+            val deployer = AwsApiGatewayDeployer(
                 context = context,
                 accessKeyId = cosConfig.secretId,
                 secretAccessKey = cosConfig.secretKey,
@@ -334,7 +334,7 @@ class CosEventTriggerConfigurator(
      */
     private suspend fun checkTencentScfExecution(testFilePath: String): Boolean {
         return try {
-            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentIoTHubDeployer(
+            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
                 context = context,
                 secretId = cosConfig.secretId,
                 secretKey = cosConfig.secretKey,
@@ -400,8 +400,8 @@ class CosEventTriggerConfigurator(
         return try {
             Log.i(TAG, "配置腾讯云COS触发器: bucket=$bucketName, function=$functionName, prefix=$filterPrefix")
             
-            // 使用TencentIoTHubDeployer的configureCosEventNotification方法
-            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentIoTHubDeployer(
+            // 使用TencentApiGatewayDeployer的configureCosEventNotification方法
+            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
                 context = context,
                 secretId = cosConfig.secretId,
                 secretKey = cosConfig.secretKey,
@@ -437,7 +437,7 @@ class CosEventTriggerConfigurator(
         return try {
             Log.i(TAG, "移除S3事件触发器: bucket=$bucketName")
             
-            val deployer = AwsIoTDeployer(
+            val deployer = AwsApiGatewayDeployer(
                 context = context,
                 accessKeyId = cosConfig.secretId,
                 secretAccessKey = cosConfig.secretKey,
@@ -471,7 +471,7 @@ class CosEventTriggerConfigurator(
         return try {
             Log.i(TAG, "移除腾讯云COS事件触发器: bucket=$bucketName")
             
-            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentIoTHubDeployer(
+            val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
                 context = context,
                 secretId = cosConfig.secretId,
                 secretKey = cosConfig.secretKey,

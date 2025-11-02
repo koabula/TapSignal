@@ -1,19 +1,27 @@
 {
   "name": "tap-notification-lambdas",
-  "version": "1.0.0",
-  "description": "Lambda functions for TAP notification system",
+  "version": "2.0.0",
+  "description": "Lambda functions for TAP notification system (API Gateway版本)",
   "main": "index.js",
   "scripts": {
     "package": "npm run package:aws && npm run package:tencent",
-    "package:aws": "npm run package:aws-webhook && npm run package:aws-trigger",
+    "package:aws": "npm run package:aws-ws && npm run package:aws-webhook && npm run package:aws-trigger",
+    "package:aws-ws": "npm run package:aws-ws-connect && npm run package:aws-ws-disconnect && npm run package:aws-ws-default",
+    "package:aws-ws-connect": "zip -j aws-ws-connect.zip aws-ws-connect.js package.json",
+    "package:aws-ws-disconnect": "zip -j aws-ws-disconnect.zip aws-ws-disconnect.js package.json",
+    "package:aws-ws-default": "zip -j aws-ws-default.zip aws-ws-default.js package.json",
     "package:aws-webhook": "zip -j aws-webhook.zip aws-webhook.js package.json",
     "package:aws-trigger": "zip -j aws-f-a.zip aws-f-a.js package.json",
-    "package:tencent": "npm run package:tencent-webhook && npm run package:tencent-trigger",
+    "package:tencent": "npm run package:tencent-ws && npm run package:tencent-webhook && npm run package:tencent-trigger",
+    "package:tencent-ws": "npm run package:tencent-ws-register && npm run package:tencent-ws-cleanup",
+    "package:tencent-ws-register": "zip -j tencent-ws-register.zip tencent-ws-register.js package.json",
+    "package:tencent-ws-cleanup": "zip -j tencent-ws-cleanup.zip tencent-ws-cleanup.js package.json",
     "package:tencent-webhook": "zip -j tencent-webhook.zip tencent-webhook.js package.json",
     "package:tencent-trigger": "zip -j tencent-f-a.zip tencent-f-a.js package.json"
   },
   "dependencies": {
-    "@aws-sdk/client-iot-data-plane": "^3.0.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.0.0",
+    "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/client-s3": "^3.0.0",
     "cos-nodejs-sdk-v5": "^2.12.0"
   },

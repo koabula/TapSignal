@@ -46,15 +46,12 @@ class DeploymentRollback(
                     DeploymentTracker.ResourceType.CLOUD_FUNCTION -> {
                         deleteFunction(resource, deployer)
                     }
-                    DeploymentTracker.ResourceType.IOT_THING,
-                    DeploymentTracker.ResourceType.IOT_DEVICE -> {
-                        deleteIoTDevice(resource, deployer)
+                    DeploymentTracker.ResourceType.API_GATEWAY,
+                    DeploymentTracker.ResourceType.WEBSOCKET_API -> {
+                        deleteApiGateway(resource, deployer)
                     }
-                    DeploymentTracker.ResourceType.IOT_CERTIFICATE -> {
-                        deleteIoTCertificate(resource, deployer)
-                    }
-                    DeploymentTracker.ResourceType.IOT_POLICY -> {
-                        deleteIoTPolicy(resource, deployer)
+                    DeploymentTracker.ResourceType.DYNAMODB_TABLE -> {
+                        deleteDynamoDBTable(resource, deployer)
                     }
                     DeploymentTracker.ResourceType.IAM_ROLE,
                     DeploymentTracker.ResourceType.CAM_ROLE -> {
@@ -127,62 +124,42 @@ class DeploymentRollback(
         }
     }
     
-    private suspend fun deleteIoTDevice(resource: DeploymentTracker.CreatedResource, deployer: NotificationDeployer): Boolean {
+    private suspend fun deleteApiGateway(resource: DeploymentTracker.CreatedResource, deployer: NotificationDeployer): Boolean {
         return try {
-            Log.i(TAG, "删除IoT设备: ${resource.name}, identifier=${resource.identifier}")
+            Log.i(TAG, "删除API Gateway: ${resource.name}, identifier=${resource.identifier}")
             
-            val deleted = deployer.deleteIoTDevice(resource.identifier, resource.name)
+            val deleted = deployer.deleteApiGateway(resource.identifier, resource.name)
             
             if (deleted) {
-                Log.i(TAG, "IoT设备删除成功: ${resource.name}")
+                Log.i(TAG, "API Gateway删除成功: ${resource.name}")
             } else {
-                Log.w(TAG, "IoT设备删除失败或不存在: ${resource.name}")
+                Log.w(TAG, "API Gateway删除失败或不存在: ${resource.name}")
             }
             
             deleted
             
         } catch (e: Exception) {
-            Log.e(TAG, "删除IoT设备异常: ${resource.name}", e)
+            Log.e(TAG, "删除API Gateway异常: ${resource.name}", e)
             false
         }
     }
     
-    private suspend fun deleteIoTCertificate(resource: DeploymentTracker.CreatedResource, deployer: NotificationDeployer): Boolean {
+    private suspend fun deleteDynamoDBTable(resource: DeploymentTracker.CreatedResource, deployer: NotificationDeployer): Boolean {
         return try {
-            Log.i(TAG, "删除IoT证书: ${resource.name}, identifier=${resource.identifier}")
+            Log.i(TAG, "删除DynamoDB表/云数据库: ${resource.name}, identifier=${resource.identifier}")
             
-            val deleted = deployer.deleteIoTCertificate(resource.identifier, resource.name)
+            val deleted = deployer.deleteDynamoDBTable(resource.identifier, resource.name)
             
             if (deleted) {
-                Log.i(TAG, "IoT证书删除成功: ${resource.name}")
+                Log.i(TAG, "DynamoDB表/云数据库删除成功: ${resource.name}")
             } else {
-                Log.w(TAG, "IoT证书删除失败或不存在: ${resource.name}")
+                Log.w(TAG, "DynamoDB表/云数据库删除失败或不存在: ${resource.name}")
             }
             
             deleted
             
         } catch (e: Exception) {
-            Log.e(TAG, "删除IoT证书异常: ${resource.name}", e)
-            false
-        }
-    }
-    
-    private suspend fun deleteIoTPolicy(resource: DeploymentTracker.CreatedResource, deployer: NotificationDeployer): Boolean {
-        return try {
-            Log.i(TAG, "删除IoT策略: ${resource.name}, identifier=${resource.identifier}")
-            
-            val deleted = deployer.deleteIoTPolicy(resource.identifier, resource.name)
-            
-            if (deleted) {
-                Log.i(TAG, "IoT策略删除成功: ${resource.name}")
-            } else {
-                Log.w(TAG, "IoT策略删除失败或不存在: ${resource.name}")
-            }
-            
-            deleted
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "删除IoT策略异常: ${resource.name}", e)
+            Log.e(TAG, "删除DynamoDB表/云数据库异常: ${resource.name}", e)
             false
         }
     }

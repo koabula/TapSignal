@@ -7,9 +7,10 @@ import org.thoughtcrime.securesms.tap.notification.*
 import java.util.UUID
 
 /**
- * AWS IoT Core推送服务提供者实现
+ * AWS API Gateway推送服务提供者实现
+ * 使用WebSocket实现实时推送通知
  */
-class AwsIoTNotificationProvider(
+class AwsApiGatewayNotificationProvider(
     private val context: Context,
     private val accessKeyId: String,
     private val secretAccessKey: String,
@@ -17,15 +18,14 @@ class AwsIoTNotificationProvider(
 ) : NotificationProvider {
 
     companion object {
-        private const val TAG = "AwsIoTNotificationProvider"
-        const val PROVIDER_TYPE = "aws-iot"
-        private const val TOPIC_PREFIX = "tap/notifications"
+        private const val TAG = "AwsApiGatewayProvider"
+        const val PROVIDER_TYPE = "aws-api-gateway"
     }
 
     override val providerType: String = PROVIDER_TYPE
 
-    private var iotClient: AwsIoTClient? = null
-    private var deployer: AwsIoTDeployer? = null
+    private var wsClient: AwsWebSocketClient? = null
+    private var deployer: AwsApiGatewayDeployer? = null
     private var webhookConfig: WebhookConfig? = null
     private var currentUserId: String? = null
     private var notificationCallback: ((NotificationMessage) -> Unit)? = null
@@ -37,32 +37,34 @@ class AwsIoTNotificationProvider(
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
             
-            val awsDeployer = AwsIoTDeployer(context, accessKeyId, secretAccessKey, effectiveRegion)
+            val awsDeployer = AwsApiGatewayDeployer(context, accessKeyId, secretAccessKey, effectiveRegion)
             deployer = awsDeployer
-
-            val webhookUrl = awsDeployer.deployWebhook()
-            Log.d(TAG, "Webhook deployed: $webhookUrl")
 
             val pushServiceInfo = awsDeployer.deployPushService()
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
+
+            val webhookUrl = awsDeployer.deployWebhook()
+            Log.d(TAG, "Webhook deployed: $webhookUrl")
 
             val triggerInfo = awsDeployer.setupEventTrigger()
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
 
             val secret = generateNotifySecret()
-            val topicId = pushServiceInfo.credentials["topicId"] 
-                ?: throw Exception("Topic ID not found in push service info")
+            val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 
+                ?: throw Exception("API Gateway ID not found in push service info")
             
-            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret, topicId)
+            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret)
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")
             }
             
+            val userId = generateUserId()
             webhookConfig = WebhookConfig(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
-                topicId = topicId
+                userId = userId,
+                version = "2.0"
             )
 
             val config = NotificationConfig(
@@ -70,7 +72,8 @@ class AwsIoTNotificationProvider(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
                 pushServiceInfo = pushServiceInfo,
-                deployedAt = System.currentTimeMillis()
+                deployedAt = System.currentTimeMillis(),
+                version = "2.0"
             )
             awsDeployer.saveConfiguration(config)
 
@@ -89,12 +92,12 @@ class AwsIoTNotificationProvider(
                 deployer?.loadConfiguration()
             }
             webhookConfig = config?.let {
-                val topicId = it.pushServiceInfo.credentials["topicId"]
-                    ?: throw IllegalStateException("Topic ID not found in configuration")
+                val userId = it.pushServiceInfo.metadata["userId"] as? String
+                    ?: generateUserId()
                 WebhookConfig(
                     webhookUrl = it.webhookUrl,
                     notifySecret = it.notifySecret,
-                    topicId = topicId,
+                    userId = userId,
                     version = it.version
                 )
             }
@@ -113,45 +116,27 @@ class AwsIoTNotificationProvider(
             val config = deployer?.loadConfiguration()
                 ?: return ConnectionResult.failure("Configuration not found. Please deploy first.")
 
-            val clientId = "tap-client-${userId.take(8)}-${UUID.randomUUID().toString().take(8)}"
+            val wsEndpoint = config.pushServiceInfo.endpoint
+            if (!wsEndpoint.startsWith("wss://")) {
+                return ConnectionResult.failure("Invalid WebSocket endpoint: $wsEndpoint")
+            }
             
-            val certificatePem = config.pushServiceInfo.credentials["certificatePem"]
-                ?: return ConnectionResult.failure("Certificate not found in configuration")
-            
-            val privateKeyPem = config.pushServiceInfo.credentials["privateKeyPem"]
-                ?: return ConnectionResult.failure("Private key not found in configuration")
-
-            val topicId = config.pushServiceInfo.credentials["topicId"]
-                ?: return ConnectionResult.failure("Topic ID not found in configuration")
-            
-            val client = AwsIoTClient(
-                context = context,
-                endpoint = config.pushServiceInfo.endpoint,
-                region = config.pushServiceInfo.region,
-                clientId = clientId,
-                certificatePem = certificatePem,
-                privateKeyPem = privateKeyPem
+            val client = AwsWebSocketClient(
+                endpoint = wsEndpoint,
+                userId = userId
             )
-            iotClient = client
+            wsClient = client
 
-            Log.i(TAG, "Connecting to AWS IoT Core...")
+            Log.i(TAG, "Connecting to AWS API Gateway WebSocket...")
             val connectResult = client.connect()
             if (connectResult.isFailure) {
                 return ConnectionResult.failure(connectResult.exceptionOrNull()?.message ?: "Connection failed")
             }
 
-            val topic = getNotificationTopic(topicId)
-            Log.i(TAG, "Subscribing to topic: $topic")
-            val subscribeResult = client.subscribe(topic)
-            if (subscribeResult.isFailure) {
-                client.disconnect()
-                return ConnectionResult.failure(subscribeResult.exceptionOrNull()?.message ?: "Subscribe failed")
-            }
-
             startMessageListener(client)
 
-            Log.i(TAG, "Connected successfully with client ID: $clientId")
-            ConnectionResult.success(clientId)
+            Log.i(TAG, "Connected successfully with user ID: $userId")
+            ConnectionResult.success(userId)
 
         } catch (e: Exception) {
             Log.e(TAG, "Connection failed", e)
@@ -161,14 +146,14 @@ class AwsIoTNotificationProvider(
 
     override suspend fun disconnect() {
         try {
-            Log.i(TAG, "Disconnecting from AWS IoT Core")
+            Log.i(TAG, "Disconnecting from AWS API Gateway")
             
             messageListenerJob?.cancel()
             messageListenerJob = null
             
-            iotClient?.disconnect()
-            iotClient?.cleanup()
-            iotClient = null
+            wsClient?.disconnect()
+            wsClient?.cleanup()
+            wsClient = null
             
             currentUserId = null
             notificationCallback = null
@@ -181,22 +166,21 @@ class AwsIoTNotificationProvider(
 
     override suspend fun healthCheck(): HealthStatus {
         return try {
-            val client = iotClient
+            val client = wsClient
             if (client == null) {
                 return HealthStatus.unhealthy("Not connected")
             }
 
             val startTime = System.currentTimeMillis()
-            val testTopic = "$TOPIC_PREFIX/health/${UUID.randomUUID()}"
-            val testPayload = """{"type":"heartbeat","timestamp":${System.currentTimeMillis()}}""".toByteArray()
+            val heartbeatPayload = """{"type":"heartbeat","timestamp":${System.currentTimeMillis()}}"""
 
-            val publishResult = client.publish(testTopic, testPayload)
+            val sendResult = client.sendMessage(heartbeatPayload)
             val latency = System.currentTimeMillis() - startTime
 
-            if (publishResult.isSuccess) {
+            if (sendResult.isSuccess) {
                 HealthStatus.healthy(latency)
             } else {
-                HealthStatus.unhealthy(publishResult.exceptionOrNull()?.message ?: "Health check failed")
+                HealthStatus.unhealthy(sendResult.exceptionOrNull()?.message ?: "Health check failed")
             }
 
         } catch (e: Exception) {
@@ -205,7 +189,7 @@ class AwsIoTNotificationProvider(
         }
     }
 
-    private fun startMessageListener(client: AwsIoTClient) {
+    private fun startMessageListener(client: AwsWebSocketClient) {
         messageListenerJob?.cancel()
         messageListenerJob = scope.launch {
             val messageChannel = client.getMessageChannel()
@@ -223,12 +207,12 @@ class AwsIoTNotificationProvider(
         }
     }
 
-    private fun getNotificationTopic(topicId: String): String {
-        return "$TOPIC_PREFIX/$topicId"
-    }
-
     private fun generateNotifySecret(): String {
         return UUID.randomUUID().toString().replace("-", "")
+    }
+
+    private fun generateUserId(): String {
+        return UUID.randomUUID().toString().replace("-", "").take(16)
     }
 
     fun cleanup() {

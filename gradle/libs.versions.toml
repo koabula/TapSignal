@@ -18,7 +18,6 @@ mp4parser = "1.9.39"
 android-gradle-plugin = "8.7.2"
 accompanist = "0.28.0"
 nanohttpd = "2.3.1"
-eclipse-paho = "1.2.5"
 navigation-safe-args-gradle-plugin = "2.8.5"
 protobuf-gradle-plugin = "0.9.0"
 ktlint = "12.1.1"
@@ -196,14 +195,11 @@ tencent-sdk-java = { module = "com.tencentcloudapi:tencentcloud-sdk-java", versi
 
 # AWS SDK for Kotlin
 aws-sdk-s3 = { module = "aws.sdk.kotlin:s3", version.ref = "aws-sdk-kotlin" }
-aws-sdk-iot = { module = "aws.sdk.kotlin:iot", version.ref = "aws-sdk-kotlin" }
-aws-sdk-iotdataplane = { module = "aws.sdk.kotlin:iotdataplane", version.ref = "aws-sdk-kotlin" }
 aws-sdk-lambda = { module = "aws.sdk.kotlin:lambda", version.ref = "aws-sdk-kotlin" }
 aws-sdk-sts = { module = "aws.sdk.kotlin:sts", version.ref = "aws-sdk-kotlin" }
 aws-sdk-iam = { module = "aws.sdk.kotlin:iam", version.ref = "aws-sdk-kotlin" }
-
-# Eclipse Paho MQTT Client
-eclipse-paho-mqttv3 = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "eclipse-paho" }
+aws-sdk-apigatewayv2 = { module = "aws.sdk.kotlin:apigatewayv2", version.ref = "aws-sdk-kotlin" }
+aws-sdk-dynamodb = { module = "aws.sdk.kotlin:dynamodb", version.ref = "aws-sdk-kotlin" }
 
 [bundles]
 media3 = ["androidx-media3-exoplayer", "androidx-media3-session", "androidx-media3-ui"]

@@ -7,9 +7,10 @@ import org.thoughtcrime.securesms.tap.notification.*
 import java.util.UUID
 
 /**
- * 腾讯云IoT Hub推送服务提供者实现
+ * 腾讯云API网关推送服务提供者实现
+ * 使用WebSocket实现实时推送通知
  */
-class TencentIoTHubNotificationProvider(
+class TencentApiGatewayNotificationProvider(
     private val context: Context,
     private val secretId: String,
     private val secretKey: String,
@@ -17,15 +18,14 @@ class TencentIoTHubNotificationProvider(
 ) : NotificationProvider {
 
     companion object {
-        private const val TAG = "TencentIoTHubProvider"
-        const val PROVIDER_TYPE = "tencent-iot"
-        private const val TOPIC_PREFIX = "tap/notifications"
+        private const val TAG = "TencentApiGatewayProvider"
+        const val PROVIDER_TYPE = "tencent-api-gateway"
     }
 
     override val providerType: String = PROVIDER_TYPE
 
-    private var iotClient: TencentIoTHubClient? = null
-    private var deployer: TencentIoTHubDeployer? = null
+    private var wsClient: TencentWebSocketClient? = null
+    private var deployer: TencentApiGatewayDeployer? = null
     private var webhookConfig: WebhookConfig? = null
     private var currentUserId: String? = null
     private var notificationCallback: ((NotificationMessage) -> Unit)? = null
@@ -37,32 +37,34 @@ class TencentIoTHubNotificationProvider(
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
             
-            val tencentDeployer = TencentIoTHubDeployer(context, secretId, secretKey, effectiveRegion)
+            val tencentDeployer = TencentApiGatewayDeployer(context, secretId, secretKey, effectiveRegion)
             deployer = tencentDeployer
-
-            val webhookUrl = tencentDeployer.deployWebhook()
-            Log.d(TAG, "Webhook deployed: $webhookUrl")
 
             val pushServiceInfo = tencentDeployer.deployPushService()
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
+
+            val webhookUrl = tencentDeployer.deployWebhook()
+            Log.d(TAG, "Webhook deployed: $webhookUrl")
 
             val triggerInfo = tencentDeployer.setupEventTrigger()
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
 
             val secret = generateNotifySecret()
-            val topicId = pushServiceInfo.credentials["topicId"] 
-                ?: throw Exception("Topic ID not found in push service info")
+            val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 
+                ?: throw Exception("API Gateway ID not found in push service info")
             
-            val envUpdateResult = tencentDeployer.updateWebhookEnvironment(secret, topicId)
+            val envUpdateResult = tencentDeployer.updateWebhookEnvironment(secret)
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")
             }
             
+            val userId = generateUserId()
             webhookConfig = WebhookConfig(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
-                topicId = topicId
+                userId = userId,
+                version = "2.0"
             )
 
             val config = NotificationConfig(
@@ -70,7 +72,8 @@ class TencentIoTHubNotificationProvider(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
                 pushServiceInfo = pushServiceInfo,
-                deployedAt = System.currentTimeMillis()
+                deployedAt = System.currentTimeMillis(),
+                version = "2.0"
             )
             tencentDeployer.saveConfiguration(config)
 
@@ -89,12 +92,12 @@ class TencentIoTHubNotificationProvider(
                 deployer?.loadConfiguration()
             }
             webhookConfig = config?.let {
-                val topicId = it.pushServiceInfo.credentials["topicId"]
-                    ?: throw IllegalStateException("Topic ID not found in configuration")
+                val userId = it.pushServiceInfo.metadata["userId"] as? String
+                    ?: generateUserId()
                 WebhookConfig(
                     webhookUrl = it.webhookUrl,
                     notifySecret = it.notifySecret,
-                    topicId = topicId,
+                    userId = userId,
                     version = it.version
                 )
             }
@@ -113,50 +116,27 @@ class TencentIoTHubNotificationProvider(
             val config = deployer?.loadConfiguration()
                 ?: return ConnectionResult.failure("Configuration not found. Please deploy first.")
 
-            val productId = config.pushServiceInfo.credentials["productId"]
-                ?: return ConnectionResult.failure("Product ID not found in configuration")
+            val wsEndpoint = config.pushServiceInfo.endpoint
+            if (!wsEndpoint.startsWith("wss://")) {
+                return ConnectionResult.failure("Invalid WebSocket endpoint: $wsEndpoint")
+            }
             
-            val deviceName = config.pushServiceInfo.credentials["deviceName"]
-                ?: return ConnectionResult.failure("Device name not found in configuration")
-            
-            val deviceSecret = config.pushServiceInfo.credentials["deviceSecret"]
-                ?: return ConnectionResult.failure("Device secret not found in configuration")
-
-            val topicId = config.pushServiceInfo.credentials["topicId"]
-                ?: return ConnectionResult.failure("Topic ID not found in configuration")
-            
-            val certificatePem = config.pushServiceInfo.credentials["certificatePem"]
-            val privateKeyPem = config.pushServiceInfo.credentials["privateKeyPem"]
-            
-            val client = TencentIoTHubClient(
-                context = context,
-                endpoint = config.pushServiceInfo.endpoint,
-                productId = productId,
-                deviceName = deviceName,
-                deviceSecret = deviceSecret,
-                certificatePem = certificatePem,
-                privateKeyPem = privateKeyPem
+            val client = TencentWebSocketClient(
+                endpoint = wsEndpoint,
+                userId = userId
             )
-            iotClient = client
+            wsClient = client
 
-            Log.i(TAG, "Connecting to Tencent IoT Hub...")
+            Log.i(TAG, "Connecting to Tencent API Gateway WebSocket...")
             val connectResult = client.connect()
             if (connectResult.isFailure) {
                 return ConnectionResult.failure(connectResult.exceptionOrNull()?.message ?: "Connection failed")
             }
 
-            val topic = getNotificationTopic(topicId)
-            Log.i(TAG, "Subscribing to topic: $topic")
-            val subscribeResult = client.subscribe(topic)
-            if (subscribeResult.isFailure) {
-                client.disconnect()
-                return ConnectionResult.failure(subscribeResult.exceptionOrNull()?.message ?: "Subscribe failed")
-            }
-
             startMessageListener(client)
 
-            Log.i(TAG, "Connected successfully")
-            ConnectionResult.success("$productId$deviceName")
+            Log.i(TAG, "Connected successfully with user ID: $userId")
+            ConnectionResult.success(userId)
 
         } catch (e: Exception) {
             Log.e(TAG, "Connection failed", e)
@@ -166,14 +146,14 @@ class TencentIoTHubNotificationProvider(
 
     override suspend fun disconnect() {
         try {
-            Log.i(TAG, "Disconnecting from Tencent IoT Hub")
+            Log.i(TAG, "Disconnecting from Tencent API Gateway")
             
             messageListenerJob?.cancel()
             messageListenerJob = null
             
-            iotClient?.disconnect()
-            iotClient?.cleanup()
-            iotClient = null
+            wsClient?.disconnect()
+            wsClient?.cleanup()
+            wsClient = null
             
             currentUserId = null
             notificationCallback = null
@@ -186,22 +166,21 @@ class TencentIoTHubNotificationProvider(
 
     override suspend fun healthCheck(): HealthStatus {
         return try {
-            val client = iotClient
+            val client = wsClient
             if (client == null) {
                 return HealthStatus.unhealthy("Not connected")
             }
 
             val startTime = System.currentTimeMillis()
-            val testTopic = "$TOPIC_PREFIX/health/${UUID.randomUUID()}"
-            val testPayload = """{"type":"heartbeat","timestamp":${System.currentTimeMillis()}}""".toByteArray()
+            val heartbeatPayload = """{"type":"heartbeat","timestamp":${System.currentTimeMillis()}}"""
 
-            val publishResult = client.publish(testTopic, testPayload)
+            val sendResult = client.sendMessage(heartbeatPayload)
             val latency = System.currentTimeMillis() - startTime
 
-            if (publishResult.isSuccess) {
+            if (sendResult.isSuccess) {
                 HealthStatus.healthy(latency)
             } else {
-                HealthStatus.unhealthy(publishResult.exceptionOrNull()?.message ?: "Health check failed")
+                HealthStatus.unhealthy(sendResult.exceptionOrNull()?.message ?: "Health check failed")
             }
 
         } catch (e: Exception) {
@@ -210,7 +189,7 @@ class TencentIoTHubNotificationProvider(
         }
     }
 
-    private fun startMessageListener(client: TencentIoTHubClient) {
+    private fun startMessageListener(client: TencentWebSocketClient) {
         messageListenerJob?.cancel()
         messageListenerJob = scope.launch {
             val messageChannel = client.getMessageChannel()
@@ -228,12 +207,12 @@ class TencentIoTHubNotificationProvider(
         }
     }
 
-    private fun getNotificationTopic(topicId: String): String {
-        return "$TOPIC_PREFIX/$topicId"
-    }
-
     private fun generateNotifySecret(): String {
         return UUID.randomUUID().toString().replace("-", "")
+    }
+
+    private fun generateUserId(): String {
+        return UUID.randomUUID().toString().replace("-", "").take(16)
     }
 
     fun cleanup() {

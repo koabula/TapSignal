@@ -73,6 +73,9 @@ class TapModuleInitializer private constructor(private val context: Context) {
                 // 启动轮询服务
                 startPollingService()
                 
+                // 启动推送服务（Phase 6新增）
+                startNotificationService()
+                
                 // 标记初始化完成
                 try {
                     tapValues.markInitializationComplete()
@@ -121,6 +124,9 @@ class TapModuleInitializer private constructor(private val context: Context) {
                 
                 // 启动轮询服务
                 startPollingService()
+                
+                // 启动推送服务（Phase 6新增）
+                startNotificationService()
                 
                 // 标记初始化完成
                 try {
@@ -325,6 +331,63 @@ class TapModuleInitializer private constructor(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Provider注册失败: ${LogSanitizer.sanitizeThrowable(e)}")
             throw e
+        }
+    }
+    
+    /**
+     * 启动推送服务
+     */
+    private suspend fun startNotificationService() {
+        Log.d(TAG, "启动推送服务...")
+        
+        try {
+            val notificationService = org.thoughtcrime.securesms.tap.notification.lifecycle.TapNotificationService.getInstance(context)
+            
+            // 初始化推送服务
+            val initResult = notificationService.initialize()
+            
+            if (initResult) {
+                Log.i(TAG, "推送服务初始化成功，启动服务")
+                
+                // 启动推送服务
+                notificationService.start { notification ->
+                    handlePushNotification(notification)
+                }
+                
+                Log.i(TAG, "推送服务启动成功")
+            } else {
+                Log.w(TAG, "推送服务初始化失败，可能未配置推送服务")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "启动推送服务失败: ${LogSanitizer.sanitizeThrowable(e)}")
+            // 推送服务启动失败不应影响应用运行
+        }
+    }
+    
+    /**
+     * 处理推送通知
+     */
+    private fun handlePushNotification(notification: org.thoughtcrime.securesms.tap.notification.NotificationMessage) {
+        try {
+            Log.d(TAG, "收到推送通知: type=${notification.type}, senderId=${notification.senderId}")
+            
+            when (notification.type) {
+                org.thoughtcrime.securesms.tap.notification.NotificationMessage.TYPE_NEW_MESSAGE -> {
+                    // 推送通知会触发离线消息处理器自动下载消息
+                    Log.i(TAG, "收到新消息推送通知: senderId=${notification.senderId}")
+                    // 离线消息处理器会在前台模式下自动处理
+                }
+                org.thoughtcrime.securesms.tap.notification.NotificationMessage.TYPE_HEARTBEAT -> {
+                    Log.v(TAG, "收到心跳推送")
+                }
+                else -> {
+                    Log.w(TAG, "收到未知类型的推送通知: ${notification.type}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "处理推送通知失败", e)
         }
     }
     

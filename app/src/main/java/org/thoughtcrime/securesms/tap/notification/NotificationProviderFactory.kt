@@ -2,7 +2,8 @@ package org.thoughtcrime.securesms.tap.notification
 
 import android.content.Context
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsIoTNotificationProvider
+import org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayNotificationProvider
+import org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayNotificationProvider
 
 /**
  * 推送服务提供商工厂
@@ -12,8 +13,8 @@ class NotificationProviderFactory {
     companion object {
         private val TAG = Log.tag(NotificationProviderFactory::class.java)
         
-        const val PROVIDER_AWS_IOT = "aws-iot"
-        const val PROVIDER_TENCENT_CLOUDBASE = "tencent-cloudbase"
+        const val PROVIDER_AWS_API_GATEWAY = "aws-api-gateway"
+        const val PROVIDER_TENCENT_API_GATEWAY = "tencent-api-gateway"
         
         @Volatile
         private var instance: NotificationProviderFactory? = null
@@ -28,26 +29,33 @@ class NotificationProviderFactory {
     private val providers = mutableMapOf<String, NotificationProvider>()
     
     fun createProvider(
-        providerType: String, 
-        config: Map<String, Any>,
-        context: Context
+        context: Context,
+        providerType: String,
+        credentials: Map<String, String> = emptyMap()
     ): NotificationProvider? {
         return try {
             when (providerType) {
-                PROVIDER_AWS_IOT -> {
-                    val accessKeyId = config["apiKey"] as? String 
-                        ?: return null.also { Log.w(TAG, "AWS IoT Provider 缺少 apiKey") }
-                    val secretAccessKey = config["secretKey"] as? String
-                        ?: return null.also { Log.w(TAG, "AWS IoT Provider 缺少 secretKey") }
-                    val region = config["region"] as? String ?: "us-east-1"
+                PROVIDER_AWS_API_GATEWAY -> {
+                    val accessKeyId = credentials["apiKey"] ?: credentials["accessKeyId"]
+                        ?: return null.also { Log.w(TAG, "AWS API Gateway Provider 缺少 apiKey/accessKeyId") }
+                    val secretAccessKey = credentials["secretKey"] ?: credentials["secretAccessKey"]
+                        ?: return null.also { Log.w(TAG, "AWS API Gateway Provider 缺少 secretKey/secretAccessKey") }
+                    val region = credentials["region"] ?: "us-east-1"
                     
-                    AwsIoTNotificationProvider(context, accessKeyId, secretAccessKey, region).also {
-                        Log.i(TAG, "AWS IoT Provider 创建成功")
+                    AwsApiGatewayNotificationProvider(context, accessKeyId, secretAccessKey, region).also {
+                        Log.i(TAG, "AWS API Gateway Provider 创建成功")
                     }
                 }
-                PROVIDER_TENCENT_CLOUDBASE -> {
-                    Log.w(TAG, "腾讯云 CloudBase Provider 尚未实现")
-                    null
+                PROVIDER_TENCENT_API_GATEWAY -> {
+                    val secretId = credentials["apiKey"] ?: credentials["secretId"]
+                        ?: return null.also { Log.w(TAG, "腾讯云 API Gateway Provider 缺少 apiKey/secretId") }
+                    val secretKey = credentials["secretKey"]
+                        ?: return null.also { Log.w(TAG, "腾讯云 API Gateway Provider 缺少 secretKey") }
+                    val region = credentials["region"] ?: "ap-guangzhou"
+                    
+                    TencentApiGatewayNotificationProvider(context, secretId, secretKey, region).also {
+                        Log.i(TAG, "腾讯云 API Gateway Provider 创建成功")
+                    }
                 }
                 else -> {
                     Log.w(TAG, "不支持的推送服务类型: $providerType")
@@ -87,7 +95,10 @@ class NotificationProviderFactory {
     }
     
     fun getSupportedProviders(): Set<String> {
-        return setOf(PROVIDER_AWS_IOT, PROVIDER_TENCENT_CLOUDBASE)
+        return setOf(
+            PROVIDER_AWS_API_GATEWAY,
+            PROVIDER_TENCENT_API_GATEWAY
+        )
     }
     
     fun isProviderSupported(providerType: String): Boolean {
@@ -96,10 +107,12 @@ class NotificationProviderFactory {
     
     fun detectProviderType(apiKey: String): String? {
         return when {
-            apiKey.startsWith("AKIA") || apiKey.contains("aws") -> PROVIDER_AWS_IOT
-            apiKey.contains("tencent") || apiKey.contains("cloudbase") -> PROVIDER_TENCENT_CLOUDBASE
+            // AWS AccessKeyId: AKIA(长期凭证)或ASIA(临时凭证)开头
+            apiKey.startsWith("AKIA") || apiKey.startsWith("ASIA") -> PROVIDER_AWS_API_GATEWAY
+            // 腾讯云SecretId: AKID开头
+            apiKey.startsWith("AKID") && apiKey.length >= 30 -> PROVIDER_TENCENT_API_GATEWAY
             else -> {
-                Log.w(TAG, "无法检测API Key类型")
+                Log.w(TAG, "无法检测API Key类型: ${apiKey.take(4)}...")
                 null
             }
         }

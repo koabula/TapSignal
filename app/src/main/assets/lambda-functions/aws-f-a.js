@@ -241,13 +241,13 @@ exports.handler = async (event) => {
                 
                 for (const contactConfig of contactConfigs) {
                     try {
-                        if (!contactConfig.webhookUrl || !contactConfig.notifySecret || !contactConfig.topicId) {
+                        if (!contactConfig.webhookUrl || !contactConfig.notifySecret || !contactConfig.userId) {
                             log('WARN', 'Invalid contact config', {
                                 contactId: contactConfig.contactId,
                                 missingFields: {
                                     webhookUrl: !contactConfig.webhookUrl,
                                     notifySecret: !contactConfig.notifySecret,
-                                    topicId: !contactConfig.topicId
+                                    userId: !contactConfig.userId
                                 }
                             });
                             continue;
@@ -261,7 +261,7 @@ exports.handler = async (event) => {
                                 bucket: bucket,
                                 key: key,
                                 eventTime: record.eventTime,
-                                topicId: contactConfig.topicId
+                                userId: contactConfig.userId
                             }
                         };
                         

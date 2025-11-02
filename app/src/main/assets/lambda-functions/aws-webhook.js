@@ -1,21 +1,23 @@
 /**
- * AWS Lambda Webhook Handler
+ * AWS Lambda Webhook Handler (API Gateway版本)
  * 
- * 功能：接收来自其他用户的通知请求，验证签名后推送到AWS IoT Core
+ * 功能：接收来自其他用户的通知请求，验证签名后通过API Gateway推送WebSocket消息
  * 
  * 触发方式：Lambda Function URL (HTTPS POST)
  * 输入：WebhookRequest { version, notification, signature }
  * 输出：WebhookResponse { statusCode, delivered, message }
  */
 
-const { IoTDataPlaneClient, PublishCommand } = require('@aws-sdk/client-iot-data-plane');
+const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require('@aws-sdk/client-apigatewaymanagementapi');
+const { DynamoDBClient, GetItemCommand } = require('@aws-sdk/client-dynamodb');
 const crypto = require('crypto');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TOPIC_PREFIX = 'tap/notifications';
-const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000; // 5分钟
+const TABLE_NAME = process.env.CONNECTIONS_TABLE || 'tap-ws-connections';
+const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
+const API_GATEWAY_ENDPOINT = process.env.API_GATEWAY_ENDPOINT;
 
-const iotClient = new IoTDataPlaneClient({
+const dynamodbClient = new DynamoDBClient({
     region: process.env.AWS_REGION
 });
 
@@ -48,20 +50,55 @@ function validateTimestamp(timestamp) {
     return age < SIGNATURE_MAX_AGE_MS;
 }
 
-async function publishToIoT(topicId, notification) {
-    const topic = `${TOPIC_PREFIX}/${topicId}`;
-    const payload = JSON.stringify(notification);
+async function getConnectionId(userId) {
+    log('DEBUG', 'Querying connectionId from DynamoDB', { userId });
     
-    log('DEBUG', 'Publishing to IoT', { topic, payloadSize: payload.length });
-    
-    const command = new PublishCommand({
-        topic: topic,
-        qos: 1,
-        payload: Buffer.from(payload)
+    const command = new GetItemCommand({
+        TableName: TABLE_NAME,
+        Key: {
+            userId: { S: userId }
+        },
+        ProjectionExpression: 'connectionId, connectedAt'
     });
     
-    await iotClient.send(command);
-    log('INFO', 'Published to IoT successfully', { topic });
+    const response = await dynamodbClient.send(command);
+    
+    if (!response.Item) {
+        log('WARN', 'Connection not found for user', { userId });
+        return null;
+    }
+    
+    return response.Item.connectionId.S;
+}
+
+async function pushToWebSocket(connectionId, notification) {
+    if (!API_GATEWAY_ENDPOINT) {
+        throw new Error('API_GATEWAY_ENDPOINT not configured');
+    }
+    
+    log('DEBUG', 'Pushing to WebSocket', { connectionId, endpoint: API_GATEWAY_ENDPOINT });
+    
+    const apiGatewayClient = new ApiGatewayManagementApiClient({
+        endpoint: API_GATEWAY_ENDPOINT
+    });
+    
+    const payload = JSON.stringify(notification);
+    
+    const command = new PostToConnectionCommand({
+        ConnectionId: connectionId,
+        Data: Buffer.from(payload)
+    });
+    
+    try {
+        await apiGatewayClient.send(command);
+        log('INFO', 'WebSocket message sent successfully', { connectionId });
+    } catch (error) {
+        if (error.statusCode === 410) {
+            log('WARN', 'Connection gone (stale), should cleanup', { connectionId });
+            throw new Error('Connection gone');
+        }
+        throw error;
+    }
 }
 
 exports.handler = async (event) => {
@@ -136,7 +173,15 @@ exports.handler = async (event) => {
         };
         
         if (!verifySignature(bodyForSignature, request.signature, notifySecret)) {
-            log('WARN', 'Invalid signature', { requestId });
+            const expectedSig = crypto.createHmac('sha256', notifySecret)
+                .update(JSON.stringify(bodyForSignature))
+                .digest('hex');
+            log('WARN', 'Invalid signature', { 
+                requestId,
+                expected: expectedSig.substring(0, 16) + '...',
+                received: request.signature.substring(0, 16) + '...',
+                bodyLength: JSON.stringify(bodyForSignature).length
+            });
             return {
                 statusCode: 403,
                 body: JSON.stringify({
@@ -147,24 +192,38 @@ exports.handler = async (event) => {
             };
         }
         
-        const topicId = process.env.TOPIC_ID || request.notification.metadata?.topicId;
-        if (!topicId) {
-            log('ERROR', 'Topic ID not configured', { requestId });
+        const userId = request.notification.metadata?.userId;
+        if (!userId) {
+            log('ERROR', 'No userId in notification metadata', { requestId });
             return {
-                statusCode: 500,
+                statusCode: 400,
                 body: JSON.stringify({
-                    statusCode: 500,
+                    statusCode: 400,
                     delivered: 0,
-                    message: 'Server configuration error'
+                    message: 'Missing userId in metadata'
                 })
             };
         }
         
-        await publishToIoT(topicId, request.notification);
+        const connectionId = await getConnectionId(userId);
+        if (!connectionId) {
+            log('WARN', 'User not connected', { requestId, userId });
+            return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    statusCode: 200,
+                    delivered: 0,
+                    message: 'User not connected (offline)'
+                })
+            };
+        }
+        
+        await pushToWebSocket(connectionId, request.notification);
         
         log('INFO', 'Notification delivered successfully', { 
             requestId,
-            topicId,
+            userId,
+            connectionId,
             senderId: request.notification.senderId
         });
         
@@ -194,5 +253,3 @@ exports.handler = async (event) => {
         };
     }
 };
-
-

@@ -155,6 +155,13 @@ class NotificationConnectionManager {
         return minOf(delay, RECONNECT_MAX_DELAY_MS)
     }
     
+    /**
+     * 检查是否已连接
+     */
+    fun isConnected(): Boolean {
+        return notificationManager.isConnected()
+    }
+    
     fun cleanup() {
         try {
             shouldMaintainConnection.set(false)

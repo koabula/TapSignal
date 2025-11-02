@@ -22,8 +22,8 @@ COS_A: tap-state/contacts/{B_hash}.json
   ↓ HTTP POST
 Webhook_B (部署在B的账号)
   ↓ 验证签名
-推送服务 (AWS IoT Core / 腾讯云IoT Hub)
-  ↓ MQTT over WebSocket
+推送服务 (AWS API Gateway / 腾讯云API网关)
+  ↓ WebSocket
 接收方B Client
   ↓ 收到通知
 下载密文从 COS_A (复用polling模块的下载逻辑)
@@ -51,15 +51,15 @@ tap/notification/
 ├── WebhookProtocol.kt                # Webhook协议定义
 │
 ├── provider/                         # 推送服务提供商实现
-│   ├── aws/                          # AWS IoT Core实现
-│   │   ├── AwsIoTNotificationProvider.kt
-│   │   ├── AwsIoTDeployer.kt
-│   │   └── AwsIoTClient.kt
+│   ├── aws/                          # AWS API Gateway实现
+│   │   ├── AwsApiGatewayNotificationProvider.kt
+│   │   ├── AwsApiGatewayDeployer.kt
+│   │   └── AwsWebSocketClient.kt
 │   │
-│   └── tencent/                      # 腾讯云IoT Hub实现
-│       ├── TencentIoTHubNotificationProvider.kt
-│       ├── TencentIoTHubDeployer.kt
-│       └── TencentIoTHubClient.kt
+│   └── tencent/                      # 腾讯云API网关实现
+│       ├── TencentApiGatewayNotificationProvider.kt
+│       ├── TencentApiGatewayDeployer.kt
+│       └── TencentWebSocketClient.kt
 │
 ├── webhook/                          # Webhook通用代码
 │   ├── WebhookSignatureValidator.kt  # 签名验证
@@ -110,7 +110,7 @@ polling/
 ```kotlin
 interface NotificationProvider {
     // 提供商标识
-    val providerType: String  // "aws-iot" | "tencent-cloudbase"
+    val providerType: String  // "aws-api-gateway" | "tencent-api-gateway"
     
     // 部署推送服务
     suspend fun deploy(apiKey: String, region: String): DeployResult
@@ -200,60 +200,66 @@ data class WebhookResponse(
 - [ ] 定义标准 `WebhookProtocol` 规范
 - [ ] 实现 `WebhookSignatureValidator` 签名验证
 
-### Phase 2: AWS IoT Core实现
+### Phase 2: AWS API Gateway实现
 
 **目标**: 实现AWS平台的推送服务
 
-- [ ] 实现 `AwsIoTNotificationProvider`
-  - [ ] IoT Policy创建
-  - [ ] 设备证书管理
-  - [ ] MQTT连接管理
-  - [ ] Topic订阅/发布
+- [x] 实现 `AwsApiGatewayNotificationProvider`
+  - [x] WebSocket连接管理
+  - [x] 消息监听器
+  - [x] 自动重连机制
+  - [x] 健康检查
   
-- [ ] 实现 `AwsIoTDeployer`
-  - [ ] Lambda Webhook部署 (Function URL)
-  - [ ] IoT Core配置
-  - [ ] 权限设置 (IAM)
-  - [ ] 配置保存到S3
+- [x] 实现 `AwsApiGatewayDeployer`
+  - [x] Lambda Webhook部署 (Function URL)
+  - [x] API Gateway WebSocket API创建
+  - [x] DynamoDB表创建 (connectionId存储)
+  - [x] 权限设置 (IAM)
+  - [x] 配置保存到S3
   
-- [ ] 准备Lambda函数代码
-  - [ ] 编写 `aws-webhook.js`
-  - [ ] 编写 `aws-f-a.js` (S3触发器)
-  - [ ] 打包为 `.zip` 放入 `assets/`
+- [x] 准备Lambda函数代码
+  - [x] 编写 `aws-webhook.js` (推送消息)
+  - [x] 编写 `aws-ws-connect.js` (保存connectionId)
+  - [x] 编写 `aws-ws-disconnect.js` (清理connectionId)
+  - [x] 编写 `aws-ws-default.js` (心跳处理)
+  - [x] 编写 `aws-f-a.js` (S3触发器)
+  - [x] 打包为 `.zip` 放入 `assets/`
 
 **推送流程说明**:
 
-B发送消息后触发F_B，会给A的Webhook发送一个提醒信息，里面包含B的ACI的HASH和B保存的A的topicId_A。然后A的Webhook会向IoT的`tap/notifications/{topicId_A}`发布消息，A通过MQTT over WebSocket连接接收该推送。
+B发送消息后触发F_B，会给A的Webhook发送一个提醒信息，里面包含B的ACI的HASH和B保存的A的userId_A。然后A的Webhook查询DynamoDB获取connectionId，通过API Gateway Management API推送WebSocket消息给A。
 
-**AWS和腾讯云统一使用MQTT协议**:
-- AWS: AWS IoT Core
-- 腾讯云: 腾讯云IoT Hub
-- 协议: MQTT 3.1.1 over WebSocket
-- Topic格式: `tap/notifications/{topicId}`
+**AWS和腾讯云统一使用WebSocket协议**:
+- AWS: AWS API Gateway WebSocket
+- 腾讯云: 腾讯云API网关WebSocket
+- 协议: 原生WebSocket (wss://)
+- 连接标识: userId (查询DynamoDB/云数据库获取connectionId)
 
 ```mermaid
 sequenceDiagram
     participant A as 用户A
-    participant IoT as IoT服务<br/>(AWS IoT Core<br/>或腾讯云IoT Hub)
+    participant APIGW as API Gateway<br/>(AWS API Gateway<br/>或腾讯云API网关)
     participant Webhook as A的Webhook
     participant F_B as B的云函数F_B
     participant B as 用户B
     
     Note over A: 部署推送服务
-    A->>IoT: 创建设备/生成topicId="abc123"
-    A->>IoT: 订阅 tap/notifications/abc123
-    A->>Webhook: 部署Webhook，环境变量TOPIC_ID=abc123
+    A->>APIGW: 创建WebSocket API
+    A->>APIGW: 连接WebSocket (userId="abc123")
+    APIGW->>APIGW: 保存userId→connectionId到DynamoDB
+    A->>Webhook: 部署Webhook
     
     Note over A,B: TAP握手
-    A->>B: 通过Signal发送Tap控制消息<br/>{webhookUrl, notifySecret, topicId}
+    A->>B: 通过Signal发送Tap控制消息<br/>{webhookUrl, notifySecret, userId}
     
     Note over B: B上传消息
     B->>F_B: COS事件触发
-    F_B->>F_B: 读取A的配置<br/>{webhookUrl, notifySecret, topicId}
-    F_B->>Webhook: POST webhook (带topicId和签名)
+    F_B->>F_B: 读取A的配置<br/>{webhookUrl, notifySecret, userId}
+    F_B->>Webhook: POST webhook (带userId和签名)
     Webhook->>Webhook: 验证签名
-    Webhook->>IoT: 发布到 tap/notifications/abc123
-    IoT->>A: MQTT消息到达
+    Webhook->>APIGW: 查询userId获取connectionId
+    Webhook->>APIGW: 推送消息到connectionId
+    APIGW->>A: WebSocket消息到达
     Note over A: 收到推送，下载密文
 ```
 
@@ -262,31 +268,31 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as 用户A<br/>(AWS/腾讯云)
-    participant A_IoT as A的IoT服务<br/>(AWS IoT Core<br/>或腾讯云IoT Hub)
+    participant A_APIGW as A的API Gateway<br/>(AWS API Gateway<br/>或腾讯云API网关)
     participant B as 用户B<br/>(AWS/腾讯云)
     participant B_COS as B的对象存储<br/>(S3或COS)
     participant B_Lambda as B的云函数F_B
     
     rect rgb(240, 248, 255)
-        Note over A,A_IoT: 1. 部署推送服务
-        A->>A_IoT: 部署Webhook和IoT服务
-        A_IoT-->>A: 返回 webhookUrl, topicId
+        Note over A,A_APIGW: 1. 部署推送服务
+        A->>A_APIGW: 部署Webhook和WebSocket API
+        A_APIGW-->>A: 返回 webhookUrl, userId
         Note over A: A获得推送配置
     end
     
     rect rgb(255, 250, 240)
         Note over A,B: 2. TAP握手（交换配置）
-        A->>B: Signal发送 {webhookUrl_A, notifySecret_A, topicId_A}
+        A->>B: Signal发送 {webhookUrl_A, notifySecret_A, userId_A}
         Note over B: B保存A的webhook配置<br/>到 tap-state/contacts/A_hash.json
-        B->>A: Signal发送 {webhookUrl_B, notifySecret_B, topicId_B}
+        B->>A: Signal发送 {webhookUrl_B, notifySecret_B, userId_B}
         Note over A: A保存B的webhook配置<br/>（可能不同云平台）
     end
     
     rect rgb(240, 255, 240)
-        Note over A,A_IoT: 3. 建立MQTT连接
-        A->>A_IoT: 连接IoT服务
-        A->>A_IoT: 订阅 tap/notifications/{topicId_A}
-        Note over A: A开始监听推送<br/>(MQTT over WebSocket)
+        Note over A,A_APIGW: 3. 建立WebSocket连接
+        A->>A_APIGW: 连接WebSocket API (userId=userId_A)
+        A_APIGW->>A_APIGW: 保存userId→connectionId到DynamoDB
+        Note over A: A开始监听推送<br/>(原生WebSocket)
     end
     
     rect rgb(255, 240, 245)
@@ -294,11 +300,12 @@ sequenceDiagram
         B->>B_COS: 上传密文消息
         B_COS->>B_Lambda: 触发云函数F_B
         B_Lambda->>B_COS: 读取A的webhook配置
-        Note over B_Lambda: 构造通知消息<br/>{senderId: B_hash,<br/>topicId: topicId_A}
-        B_Lambda->>A_IoT: POST webhook_A (带HMAC签名)
-        A_IoT->>A_IoT: 验证签名
-        A_IoT->>A_IoT: 发布到 tap/notifications/{topicId_A}
-        A_IoT-->>A: MQTT消息到达
+        Note over B_Lambda: 构造通知消息<br/>{senderId: B_hash,<br/>userId: userId_A}
+        B_Lambda->>A_APIGW: POST webhook_A (带HMAC签名)
+        A_APIGW->>A_APIGW: 验证签名
+        A_APIGW->>A_APIGW: 查询userId获取connectionId
+        A_APIGW->>A_APIGW: 推送到connectionId
+        A_APIGW-->>A: WebSocket消息到达
         Note over A: 收到推送通知
     end
     
@@ -311,30 +318,33 @@ sequenceDiagram
 ```
 
 **跨平台示例**:
-- A使用AWS (IoT Core + S3 + Lambda)
-- B使用腾讯云 (IoT Hub + COS + 云函数)
-- 双向通信完全兼容（通过标准HTTP Webhook协议）
+- A使用AWS (API Gateway + DynamoDB + S3 + Lambda)
+- B使用腾讯云 (API网关 + 云数据库 + COS + 云函数)
+- 双向通信完全兼容（通过标准HTTP Webhook协议 + WebSocket）
 
-### Phase 3: 腾讯云IoT Hub实现
+### Phase 3: 腾讯云API网关实现
 
 **目标**: 实现腾讯云平台的推送服务
 
-- [ ] 实现 `TencentIoTHubNotificationProvider`
-  - [ ] IoT Hub设备注册
-  - [ ] MQTT连接管理
-  - [ ] Topic订阅/发布
-  - [ ] 设备认证配置
+- [x] 实现 `TencentApiGatewayNotificationProvider`
+  - [x] WebSocket连接管理
+  - [x] 消息监听器
+  - [x] 自动重连机制
+  - [x] 健康检查
   
-- [ ] 实现 `TencentIoTHubDeployer`
-  - [ ] 云函数Webhook部署
-  - [ ] IoT Hub产品/设备创建
-  - [ ] 权限策略配置
-  - [ ] HTTP触发器配置
+- [x] 实现 `TencentApiGatewayDeployer`
+  - [x] 云函数Webhook部署
+  - [x] API网关WebSocket服务创建
+  - [x] 云数据库集合创建 (connectionId存储)
+  - [x] 权限策略配置
+  - [x] HTTP触发器配置
   
-- [ ] 准备云函数代码
-  - [ ] 编写 `tencent-webhook.js` (发布到IoT Hub)
-  - [ ] 编写 `tencent-f-a.js` (COS触发器)
-  - [ ] 打包为 `.zip` 放入 `assets/`
+- [x] 准备云函数代码
+  - [x] 编写 `tencent-webhook.js` (推送消息)
+  - [x] 编写 `tencent-ws-register.js` (保存connectionId)
+  - [x] 编写 `tencent-ws-cleanup.js` (清理connectionId)
+  - [x] 编写 `tencent-f-a.js` (COS触发器)
+  - [x] 打包为 `.zip` 放入 `assets/`
 
 ### Phase 4: COS Provider集成
 
@@ -383,8 +393,8 @@ sequenceDiagram
 **目标**: 实现智能的前后台切换
 
 - [ ] 实现 `NotificationConnectionManager`
-  - [ ] 前台模式: 维持WebSocket/MQTT连接
-  - [ ] 后台模式: 断开连接，依赖离线队列
+  - [ ] 前台模式: 维持WebSocket连接
+  - [ ] 后台模式: 被动被断开连接，依赖离线队列
   - [ ] 网络变化处理
   - [ ] 重连逻辑 (指数退避)
   
@@ -394,9 +404,9 @@ sequenceDiagram
   - [ ] Doze模式处理
   
 - [ ] 离线消息处理
-  - [ ] AWS: 利用IoT设备影子
-  - [ ] 腾讯云: 利用IoT Hub规则引擎持久化
-  - [ ] 重连后拉取离线通知
+  - [ ] 离线时消息存储在发送方COS
+  - [ ] 重连后通过轮询补齐消息
+  - [ ] 或使用推送失败重试队列
 
 ### Phase 7: 消息下载集成
 
@@ -421,18 +431,19 @@ sequenceDiagram
 
 **目标**: 确保AWS和腾讯云用户可互通
 
-- [ ] 实现 `NotificationProviderFactory`
-  - [ ] 自动检测API Key类型
-  - [ ] 创建对应Provider实例
+- [x] 实现 `NotificationProviderFactory`
+  - [x] 自动检测API Key类型 (改进了检测逻辑，支持AKIA/ASIA/AKID前缀)
+  - [x] 创建对应Provider实例
   
-- [ ] Webhook协议验证
-  - [ ] 跨平台请求格式测试
-  - [ ] 签名验证兼容性测试
+- [x] Webhook协议验证
+  - [x] 修复JSON序列化顺序问题 (P0: 与Lambda函数保持一致)
+  - [x] 签名验证兼容性测试 (添加了详细日志)
   
-- [ ] 集成测试
-  - [ ] AWS → 腾讯云通知测试
-  - [ ] 腾讯云 → AWS通知测试
-  - [ ] 同平台通知测试
+- [x] 代码优化
+  - [x] 修复JsonSerializer的JSON序列化顺序，与Lambda保持一致
+  - [x] 改进detectProviderType的API Key检测逻辑
+  - [x] 确保metadata字段顺序一致
+  - [x] 添加签名验证失败的详细日志
 
 ### Phase 9: 推送触发后的下载流程
 
@@ -500,19 +511,18 @@ sequenceDiagram
 ```kotlin
 // 保存在 COS: tap-state/webhook-config.json
 data class NotificationConfig(
-    val provider: String,           // "aws-iot" | "tencent-cloudbase"
+    val provider: String,           // "aws-api-gateway" | "tencent-api-gateway"
     val webhookUrl: String,
     val notifySecret: String,
     val pushServiceInfo: PushServiceInfo,
     val deployedAt: Long,
-    val version: String = "1.0"
+    val version: String = "2.0"
 )
 
 data class PushServiceInfo(
-    val endpoint: String,           // IoT endpoint (AWS/腾讯云通用)
+    val endpoint: String,           // WebSocket API endpoint (AWS/腾讯云通用)
     val region: String,
     val credentials: Map<String, String>,
-    val topicId: String,            // MQTT Topic标识
     val metadata: Map<String, Any> = emptyMap()
 )
 ```
@@ -523,10 +533,10 @@ data class PushServiceInfo(
 // 保存在 COS: tap-state/contacts/{contactHash}.json
 data class ContactNotificationConfig(
     val contactId: String,
-    val platform: String,           // "aws-iot" | "tencent-iot"
+    val platform: String,           // "aws-api-gateway" | "tencent-api-gateway"
     val webhookUrl: String,
     val notifySecret: String,
-    val topicId: String,            // 联系人的MQTT Topic ID
+    val userId: String,             // 联系人的userId (用于查询connectionId)
     val lastUpdated: Long,
     val verified: Boolean = false
 )
@@ -571,7 +581,7 @@ enum class DeploymentStatus {
 - **Webhook签名**: HMAC-SHA256，防伪造
 - **时间戳验证**: 5分钟有效期，防重放
 - **HTTPS强制**: 所有通信必须加密
-- **证书管理**: AWS IoT设备证书，CloudBase密钥
+- **连接安全**: WebSocket使用wss://协议
 
 ### 6.3 成本优化
 
@@ -639,7 +649,7 @@ enum class DeploymentStatus {
 | 风险 | 影响 | 缓解措施 |
 |------|------|---------|
 | 云函数调用超额 | 意外费用 | 免费额度监控 |
-| IoT连接费用 | 成本增加 | 后台自动断开 |
+| WebSocket连接费用 | 成本增加 | 后台自动断开 |
 | 数据传输费用 | 成本增加 | 通知内容最小化 |
 
 ---
@@ -652,6 +662,7 @@ enum class DeploymentStatus {
 - [x] 跨平台通知成功率 >99%
 - [x] 复用polling模块的下载和处理逻辑
 - [x] 一键部署，用户只需提供API Key
+- [x] 使用API Gateway替代IoT服务，降低复杂度和成本
 
 ### 10.2 性能指标
 
@@ -674,35 +685,42 @@ enum class DeploymentStatus {
 ### A. 预编译云函数代码清单
 
 **AWS Lambda函数**:
-- `aws-webhook.zip`: 接收通知并推送到IoT Core
+- `aws-webhook.zip`: 接收通知并通过API Gateway推送WebSocket消息
+- `aws-ws-connect.zip`: WebSocket连接处理，保存connectionId到DynamoDB
+- `aws-ws-disconnect.zip`: WebSocket断开处理，清理connectionId
+- `aws-ws-default.zip`: WebSocket默认路由，处理心跳等
 - `aws-f-a.zip`: S3事件触发器，发送通知到联系人webhook
 
 **腾讯云函数**:
-- `tencent-webhook.zip`: 接收通知并发布到IoT Hub
+- `tencent-webhook.zip`: 接收通知并通过API网关推送WebSocket消息
+- `tencent-ws-register.zip`: WebSocket连接处理，保存connectionId到云数据库
+- `tencent-ws-cleanup.zip`: WebSocket断开处理，清理connectionId
 - `tencent-f-a.zip`: COS事件触发器，发送通知到联系人webhook
 
 ### B. 关键依赖库
 
 **Android**:
-- AWS IoT SDK: `com.amazonaws:aws-android-sdk-iot`
-- 腾讯云IoT SDK: `com.tencent.iot.hub:hub-device-android`
-- Eclipse Paho MQTT (通用): `org.eclipse.paho:org.eclipse.paho.client.mqttv3`
+- OkHttp WebSocket: `com.squareup.okhttp3:okhttp` (已包含在Signal项目中)
+- AWS SDK: `aws.sdk.kotlin.services.*` (API Gateway, DynamoDB, Lambda等)
+- 标准Kotlin协程库
 
 **云函数**:
-- AWS SDK (Node.js): `@aws-sdk/client-iot-data-plane`
-- 腾讯云SDK (Node.js): `tencentcloud-sdk-nodejs` (IoTHub)
+- AWS SDK (Node.js): `@aws-sdk/client-apigatewaymanagementapi`, `@aws-sdk/client-dynamodb`
+- 腾讯云: 使用标准HTTPS API调用（无需额外SDK）
+- COS SDK: `cos-nodejs-sdk-v5`
 
 ### C. 相关文档链接
 
-- AWS IoT Core文档: https://docs.aws.amazon.com/iot/
-- 腾讯云IoT Hub文档: https://cloud.tencent.com/document/product/634
+- AWS API Gateway WebSocket文档: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api.html
+- 腾讯云API网关WebSocket文档: https://cloud.tencent.com/document/product/628
+- API Gateway架构修改方案: `PLAN_Notice_APIGateway.md`
 - Tap现有架构文档: `tap/ARCHITECTURE_OVERVIEW.md`
 - Polling机制文档: `tap/polling/README.md`
 
 ---
 
-**文档版本**: 1.0  
+**文档版本**: 2.0  
 **创建日期**: 2024-01-15  
-**最后更新**: 2024-01-15  
-**状态**: 待实施
+**最后更新**: 2025-11-02  
+**状态**: 已部分实施 (API Gateway版本)
 

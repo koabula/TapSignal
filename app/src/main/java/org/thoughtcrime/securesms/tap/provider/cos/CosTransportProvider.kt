@@ -2082,14 +2082,15 @@ class CosTransportProvider(
             
             // 创建对应的NotificationProvider实例
             val factory = NotificationProviderFactory.getInstance()
+            val credentials = mapOf(
+                "apiKey" to cosConfig.secretId,
+                "secretKey" to cosConfig.secretKey,
+                "region" to cosConfig.region
+            )
             val provider = factory.createProvider(
+                context = context,
                 providerType = config.provider,
-                config = mapOf(
-                    "apiKey" to cosConfig.secretId,
-                    "secretKey" to cosConfig.secretKey,
-                    "region" to cosConfig.region
-                ),
-                context = context
+                credentials = credentials
             )
             
             if (provider == null) {

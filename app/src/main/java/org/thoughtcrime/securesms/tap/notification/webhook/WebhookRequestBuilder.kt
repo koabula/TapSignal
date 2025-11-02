@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms.tap.notification.webhook
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.notification.NotificationMessage
 import org.thoughtcrime.securesms.tap.notification.WebhookRequest
+import org.thoughtcrime.securesms.tap.notification.utils.JsonSerializer
 import org.json.JSONObject
 
 /**
@@ -22,8 +23,17 @@ class WebhookRequestBuilder {
         version: String = "1.0"
     ): WebhookRequest? {
         return try {
-            val bodyJson = buildNotificationJson(notification)
-            val signature = validator.generateSignature(bodyJson, secret)
+            // 使用JsonSerializer确保JSON序列化顺序一致
+            val notificationMap = JsonSerializer.buildNotificationMap(
+                type = notification.type,
+                senderId = notification.senderId,
+                timestamp = notification.timestamp,
+                metadata = notification.metadata
+            )
+            
+            val bodyForSignature = JsonSerializer.buildSignatureBody(version, notificationMap)
+            
+            val signature = validator.generateSignature(bodyForSignature, secret)
             
             if (signature.isEmpty()) {
                 Log.e(TAG, "生成签名失败")
@@ -47,39 +57,36 @@ class WebhookRequestBuilder {
         version: String = "1.0"
     ): String? {
         return try {
-            val notificationJson = buildNotificationJson(notification)
-            val signature = validator.generateSignature(notificationJson, secret)
+            // 使用JsonSerializer确保JSON序列化顺序一致
+            val notificationMap = JsonSerializer.buildNotificationMap(
+                type = notification.type,
+                senderId = notification.senderId,
+                timestamp = notification.timestamp,
+                metadata = notification.metadata
+            )
+            
+            val bodyForSignature = JsonSerializer.buildSignatureBody(version, notificationMap)
+            
+            val signature = validator.generateSignature(bodyForSignature, secret)
             
             if (signature.isEmpty()) {
                 Log.e(TAG, "生成签名失败")
                 return null
             }
             
-            JSONObject().apply {
-                put("version", version)
-                put("notification", JSONObject(notificationJson))
-                put("signature", signature)
-            }.toString()
+            // 构建完整的请求JSON（包含signature）
+            // 按字典序：notification, signature, version
+            val fullRequest = mapOf(
+                "notification" to notificationMap,
+                "signature" to signature,
+                "version" to version
+            )
+            
+            JsonSerializer.toSortedJson(fullRequest)
         } catch (e: Exception) {
             Log.e(TAG, "构建Webhook请求JSON失败", e)
             null
         }
-    }
-    
-    private fun buildNotificationJson(notification: NotificationMessage): String {
-        return JSONObject().apply {
-            put("type", notification.type)
-            put("senderId", notification.senderId)
-            put("timestamp", notification.timestamp)
-            
-            if (notification.metadata.isNotEmpty()) {
-                val metadataJson = JSONObject()
-                notification.metadata.forEach { (key, value) ->
-                    metadataJson.put(key, value)
-                }
-                put("metadata", metadataJson)
-            }
-        }.toString()
     }
     
     fun parseRequest(requestBody: String): WebhookRequest? {

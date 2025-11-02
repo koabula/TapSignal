@@ -1,7 +1,7 @@
 /**
- * 腾讯云云函数 Webhook Handler
+ * 腾讯云云函数 Webhook Handler (API网关版本)
  * 
- * 功能：接收来自其他用户的通知请求，验证签名后推送到腾讯云IoT Hub
+ * 功能：接收来自其他用户的通知请求，验证签名后通过API网关推送WebSocket消息
  * 
  * 触发方式：HTTP触发器 (HTTPS POST)
  * 输入：WebhookRequest { version, notification, signature }
@@ -12,8 +12,11 @@ const crypto = require('crypto');
 const https = require('https');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TOPIC_PREFIX = 'tap/notifications';
+const DATABASE_ENV = process.env.DATABASE_ENV;
+const COLLECTION_NAME = 'tap-ws-connections';
 const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
+const API_GATEWAY_SERVICE_ID = process.env.API_GATEWAY_SERVICE_ID;
+const API_GATEWAY_REGION = process.env.API_GATEWAY_REGION || 'ap-guangzhou';
 
 function log(level, message, data = {}) {
     const levels = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
@@ -44,17 +47,17 @@ function validateTimestamp(timestamp) {
     return age < SIGNATURE_MAX_AGE_MS;
 }
 
-function generateTencentCloudSignature(secretId, secretKey, action, params, region, service = 'iotcloud') {
+function generateCloudBaseSignature(secretId, secretKey, action, params, region) {
     const timestamp = Math.floor(Date.now() / 1000);
     const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+    const service = 'tcb';
     
-    const canonicalQueryString = '';
     const canonicalHeaders = `content-type:application/json\nhost:${service}.tencentcloudapi.com\n`;
     const signedHeaders = 'content-type;host';
     const payload = JSON.stringify(params);
     const hashedPayload = crypto.createHash('sha256').update(payload).digest('hex');
     
-    const canonicalRequest = `POST\n/\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayload}`;
+    const canonicalRequest = `POST\n/\n\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayload}`;
     const hashedCanonicalRequest = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
     
     const credentialScope = `${date}/${service}/tc3_request`;
@@ -67,56 +70,47 @@ function generateTencentCloudSignature(secretId, secretKey, action, params, regi
     
     const authorization = `TC3-HMAC-SHA256 Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
     
-    return {
-        authorization,
-        timestamp,
-        payload
-    };
+    return { authorization, timestamp, payload };
 }
 
-async function publishToIoTHub(productId, deviceName, topicId, notification) {
-    const topic = `${TOPIC_PREFIX}/${topicId}`;
-    const payload = JSON.stringify(notification);
-    
-    log('DEBUG', 'Publishing to IoT Hub via REST API', { topic, payloadSize: payload.length });
-    
+async function getConnectionId(userId) {
     const secretId = process.env.TENCENTCLOUD_SECRETID;
     const secretKey = process.env.TENCENTCLOUD_SECRETKEY;
     const region = process.env.REGION || 'ap-guangzhou';
     
-    if (!secretId || !secretKey) {
-        throw new Error('Tencent Cloud credentials not configured');
+    if (!secretId || !secretKey || !DATABASE_ENV) {
+        throw new Error('CloudBase credentials not configured');
     }
     
+    log('DEBUG', 'Querying connectionId from database', { userId });
+    
+    const query = `db.collection('${COLLECTION_NAME}').doc('${userId}').get()`;
+    
     const params = {
-        ProductId: productId,
-        DeviceName: deviceName,
-        Topic: topic,
-        Payload: Buffer.from(payload).toString('base64'),
-        Qos: 1
+        EnvId: DATABASE_ENV,
+        Query: query
     };
     
-    const { authorization, timestamp, payload: requestPayload } = generateTencentCloudSignature(
+    const { authorization, timestamp, payload } = generateCloudBaseSignature(
         secretId,
         secretKey,
-        'PublishMessage',
+        'ExecuteCloudFunction',
         params,
-        region,
-        'iotcloud'
+        region
     );
     
     return new Promise((resolve, reject) => {
         const options = {
-            hostname: 'iotcloud.tencentcloudapi.com',
+            hostname: 'tcb.tencentcloudapi.com',
             port: 443,
             path: '/',
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(requestPayload),
+                'Content-Length': Buffer.byteLength(payload),
                 'Authorization': authorization,
-                'X-TC-Action': 'PublishMessage',
-                'X-TC-Version': '2021-04-08',
+                'X-TC-Action': 'ExecuteCloudFunction',
+                'X-TC-Version': '2018-06-08',
                 'X-TC-Timestamp': timestamp.toString(),
                 'X-TC-Region': region
             },
@@ -135,35 +129,143 @@ async function publishToIoTHub(productId, deviceName, topicId, notification) {
                     const response = JSON.parse(data);
                     
                     if (response.Response && response.Response.Error) {
-                        const error = response.Response.Error;
-                        log('ERROR', 'IoT Hub API error', {
-                            code: error.Code,
-                            message: error.Message
-                        });
-                        reject(new Error(`IoT Hub API error: ${error.Code} - ${error.Message}`));
+                        log('WARN', 'User connection not found', { userId });
+                        resolve(null);
+                    } else if (response.Response && response.Response.Data) {
+                        const result = JSON.parse(response.Response.Data);
+                        if (result.data && result.data.length > 0) {
+                            const connectionId = result.data[0].connectionId;
+                            log('DEBUG', 'Found connectionId', { userId, connectionId });
+                            resolve(connectionId);
+                        } else {
+                            log('WARN', 'No connection data for user', { userId });
+                            resolve(null);
+                        }
                     } else {
-                        log('INFO', 'Published to IoT Hub successfully', { topic });
-                        resolve();
+                        log('WARN', 'Unexpected response format', { userId });
+                        resolve(null);
                     }
                 } catch (parseErr) {
-                    log('ERROR', 'Failed to parse IoT Hub response', { data, error: parseErr.message });
+                    log('ERROR', 'Failed to parse response', { data, error: parseErr.message });
                     reject(parseErr);
                 }
             });
         });
         
         req.on('error', (error) => {
-            log('ERROR', 'IoT Hub request failed', { error: error.message });
+            log('ERROR', 'Request failed', { error: error.message });
             reject(error);
         });
         
         req.on('timeout', () => {
             req.destroy();
-            log('ERROR', 'IoT Hub request timeout');
+            log('ERROR', 'Request timeout');
             reject(new Error('Request timeout'));
         });
         
-        req.write(requestPayload);
+        req.write(payload);
+        req.end();
+    });
+}
+
+function generateApiGatewaySignature(secretId, secretKey, serviceId, connectionId, data, region) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+    const service = 'apigw';
+    
+    const host = `${serviceId}.${region}.apigatewayserviceapi.tencentcloudapi.com`;
+    const path = `/push/${connectionId}`;
+    
+    const canonicalHeaders = `content-type:application/json\nhost:${host}\n`;
+    const signedHeaders = 'content-type;host';
+    const payload = JSON.stringify(data);
+    const hashedPayload = crypto.createHash('sha256').update(payload).digest('hex');
+    
+    const canonicalRequest = `POST\n${path}\n\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayload}`;
+    const hashedCanonicalRequest = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+    
+    const credentialScope = `${date}/${service}/tc3_request`;
+    const stringToSign = `TC3-HMAC-SHA256\n${timestamp}\n${credentialScope}\n${hashedCanonicalRequest}`;
+    
+    const kDate = crypto.createHmac('sha256', `TC3${secretKey}`).update(date).digest();
+    const kService = crypto.createHmac('sha256', kDate).update(service).digest();
+    const kSigning = crypto.createHmac('sha256', kService).update('tc3_request').digest();
+    const signature = crypto.createHmac('sha256', kSigning).update(stringToSign).digest('hex');
+    
+    const authorization = `TC3-HMAC-SHA256 Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    
+    return { authorization, timestamp, payload, host, path };
+}
+
+async function pushToWebSocket(connectionId, notification) {
+    const secretId = process.env.TENCENTCLOUD_SECRETID;
+    const secretKey = process.env.TENCENTCLOUD_SECRETKEY;
+    
+    if (!secretId || !secretKey || !API_GATEWAY_SERVICE_ID) {
+        throw new Error('API Gateway credentials not configured');
+    }
+    
+    log('DEBUG', 'Pushing to WebSocket via API Gateway', { connectionId });
+    
+    const { authorization, timestamp, payload, host, path } = generateApiGatewaySignature(
+        secretId,
+        secretKey,
+        API_GATEWAY_SERVICE_ID,
+        connectionId,
+        notification,
+        API_GATEWAY_REGION
+    );
+    
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: host,
+            port: 443,
+            path: path,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload),
+                'Authorization': authorization,
+                'X-TC-Timestamp': timestamp.toString(),
+                'X-TC-Region': API_GATEWAY_REGION
+            },
+            timeout: 10000
+        };
+        
+        const req = https.request(options, (res) => {
+            let data = '';
+            
+            res.on('data', chunk => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    log('INFO', 'WebSocket message sent successfully', { connectionId });
+                    resolve();
+                } else {
+                    log('ERROR', 'Failed to push WebSocket message', {
+                        connectionId,
+                        statusCode: res.statusCode,
+                        response: data
+                    });
+                    reject(new Error(`Push failed with status ${res.statusCode}`));
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            log('ERROR', 'Push request failed', { error: error.message });
+            reject(error);
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            log('ERROR', 'Push request timeout');
+            reject(new Error('Request timeout'));
+        });
+        
+        req.write(payload);
         req.end();
     });
 }
@@ -245,7 +347,15 @@ exports.main_handler = async (event) => {
         };
         
         if (!verifySignature(bodyForSignature, request.signature, notifySecret)) {
-            log('WARN', 'Invalid signature', { requestId });
+            const expectedSig = crypto.createHmac('sha256', notifySecret)
+                .update(JSON.stringify(bodyForSignature))
+                .digest('hex');
+            log('WARN', 'Invalid signature', { 
+                requestId,
+                expected: expectedSig.substring(0, 16) + '...',
+                received: request.signature.substring(0, 16) + '...',
+                bodyLength: JSON.stringify(bodyForSignature).length
+            });
             return {
                 statusCode: 403,
                 body: JSON.stringify({
@@ -256,39 +366,38 @@ exports.main_handler = async (event) => {
             };
         }
         
-        const topicId = process.env.TOPIC_ID || request.notification.metadata?.topicId;
-        if (!topicId) {
-            log('ERROR', 'Topic ID not configured', { requestId });
+        const userId = request.notification.metadata?.userId;
+        if (!userId) {
+            log('ERROR', 'No userId in notification metadata', { requestId });
             return {
-                statusCode: 500,
+                statusCode: 400,
                 body: JSON.stringify({
-                    statusCode: 500,
+                    statusCode: 400,
                     delivered: 0,
-                    message: 'Server configuration error'
+                    message: 'Missing userId in metadata'
                 })
             };
         }
         
-        const productId = process.env.PRODUCT_ID;
-        const deviceName = process.env.DEVICE_NAME;
-        
-        if (!productId || !deviceName) {
-            log('ERROR', 'IoT Hub credentials not configured', { requestId });
+        const connectionId = await getConnectionId(userId);
+        if (!connectionId) {
+            log('WARN', 'User not connected', { requestId, userId });
             return {
-                statusCode: 500,
+                statusCode: 200,
                 body: JSON.stringify({
-                    statusCode: 500,
+                    statusCode: 200,
                     delivered: 0,
-                    message: 'Server configuration error'
+                    message: 'User not connected (offline)'
                 })
             };
         }
         
-        await publishToIoTHub(productId, deviceName, topicId, request.notification);
+        await pushToWebSocket(connectionId, request.notification);
         
         log('INFO', 'Notification delivered successfully', { 
             requestId,
-            topicId,
+            userId,
+            connectionId,
             senderId: request.notification.senderId
         });
         
@@ -318,4 +427,3 @@ exports.main_handler = async (event) => {
         };
     }
 };
-

@@ -40,6 +40,10 @@ class TapValues internal constructor(store: KeyValueStore) : SignalStoreValues(s
         private const val KEY_LAST_SAVE_TIME = "tap.last_save_time"
         private const val KEY_TOKEN_METADATA = "tap.token_metadata"
         
+        // 推送服务配置相关键
+        private const val KEY_NOTIFICATION_CONFIG = "tap.notification_config"
+        private const val KEY_CONTACT_NOTIFICATION_CONFIGS = "tap.contact_notification_configs"
+        
         // 初始化状态相关键
         private const val KEY_TAP_INITIALIZED = "tap.initialized"
         private const val KEY_INIT_VERSION = "tap.init_version"
@@ -163,6 +167,67 @@ class TapValues internal constructor(store: KeyValueStore) : SignalStoreValues(s
             .remove(KEY_SHARED_TOKENS)
             .remove(KEY_TOKEN_METADATA)
             .putLong(KEY_LAST_CLEANUP_TIME, 0)
+            .apply()
+    }
+    
+    // 推送服务配置相关方法
+    fun getNotificationConfig(): Map<String, Any>? {
+        val configJson = store.getString(KEY_NOTIFICATION_CONFIG, null)
+        return if (configJson.isNullOrEmpty()) {
+            null
+        } else {
+            try {
+                objectMapper.readValue(configJson, object : TypeReference<Map<String, Any>>() {})
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+    
+    fun setNotificationConfig(config: Map<String, Any>) {
+        try {
+            val configJson = objectMapper.writeValueAsString(config)
+            store.beginWrite()
+                .putString(KEY_NOTIFICATION_CONFIG, configJson)
+                .apply()
+        } catch (e: Exception) {
+            // Log error but don't throw
+        }
+    }
+    
+    fun clearNotificationConfig() {
+        store.beginWrite()
+            .remove(KEY_NOTIFICATION_CONFIG)
+            .apply()
+    }
+    
+    fun getContactNotificationConfigs(): Map<String, Map<String, Any>> {
+        val configsJson = store.getString(KEY_CONTACT_NOTIFICATION_CONFIGS, null)
+        return if (configsJson.isNullOrEmpty()) {
+            emptyMap()
+        } else {
+            try {
+                objectMapper.readValue(configsJson, object : TypeReference<Map<String, Map<String, Any>>>() {})
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        }
+    }
+    
+    fun setContactNotificationConfigs(configs: Map<String, Map<String, Any>>) {
+        try {
+            val configsJson = objectMapper.writeValueAsString(configs)
+            store.beginWrite()
+                .putString(KEY_CONTACT_NOTIFICATION_CONFIGS, configsJson)
+                .apply()
+        } catch (e: Exception) {
+            // Log error but don't throw
+        }
+    }
+    
+    fun clearContactNotificationConfigs() {
+        store.beginWrite()
+            .remove(KEY_CONTACT_NOTIFICATION_CONFIGS)
             .apply()
     }
     
