@@ -80,19 +80,84 @@ class TapNotificationService private constructor(
                     return@withLock false
                 }
                 
-                // 从pushServiceInfo提取credentials
+                // 从pushServiceInfo提取credentials（P0修复：改进凭证提取逻辑）
                 val credentials = config.pushServiceInfo.credentials.mapValues { it.value.toString() }.toMutableMap()
                 credentials["region"] = config.pushServiceInfo.region
                 
+                // 检查必需的凭证是否存在，如果不存在则尝试从COS配置中读取（fallback）
+                val factory = NotificationProviderFactory.getInstance()
+                val providerType = config.provider
+                
+                when (providerType) {
+                    NotificationProviderFactory.PROVIDER_TENCENT_API_GATEWAY -> {
+                        if (!credentials.containsKey("apiKey") && !credentials.containsKey("secretId")) {
+                            Log.w(TAG, "credentials中缺少apiKey/secretId，尝试从COS配置读取")
+                            // 尝试从COS配置中读取
+                            val cosConfigManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                            val cosConfig = cosConfigManager.getProviderConfig("cos")
+                            val secretId = cosConfig?.get("secretId") as? String
+                            val secretKey = cosConfig?.get("secretKey") as? String
+                            
+                            if (secretId != null && secretKey != null) {
+                                credentials["apiKey"] = secretId
+                                credentials["secretId"] = secretId
+                                credentials["secretKey"] = secretKey
+                                Log.i(TAG, "已从COS配置补充腾讯云凭证")
+                            } else {
+                                Log.e(TAG, "credentials和COS配置中都缺少必需的凭证: apiKey/secretId, secretKey")
+                                Log.e(TAG, "配置中的credentials keys: ${credentials.keys}")
+                                return@withLock false
+                            }
+                        }
+                        if (!credentials.containsKey("secretKey")) {
+                            Log.e(TAG, "credentials中缺少secretKey")
+                            Log.e(TAG, "配置中的credentials keys: ${credentials.keys}")
+                            return@withLock false
+                        }
+                    }
+                    NotificationProviderFactory.PROVIDER_AWS_API_GATEWAY -> {
+                        if (!credentials.containsKey("apiKey") && !credentials.containsKey("accessKeyId")) {
+                            Log.w(TAG, "credentials中缺少apiKey/accessKeyId，尝试从COS配置读取")
+                            // 尝试从COS配置中读取
+                            val cosConfigManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                            val cosConfig = cosConfigManager.getProviderConfig("cos")
+                            val accessKeyId = cosConfig?.get("accessKeyId") as? String
+                            val secretAccessKey = cosConfig?.get("secretAccessKey") as? String
+                            
+                            if (accessKeyId != null && secretAccessKey != null) {
+                                credentials["apiKey"] = accessKeyId
+                                credentials["accessKeyId"] = accessKeyId
+                                credentials["secretKey"] = secretAccessKey
+                                credentials["secretAccessKey"] = secretAccessKey
+                                Log.i(TAG, "已从COS配置补充AWS凭证")
+                            } else {
+                                Log.e(TAG, "credentials和COS配置中都缺少必需的凭证: apiKey/accessKeyId, secretKey/secretAccessKey")
+                                Log.e(TAG, "配置中的credentials keys: ${credentials.keys}")
+                                return@withLock false
+                            }
+                        }
+                        if (!credentials.containsKey("secretKey") && !credentials.containsKey("secretAccessKey")) {
+                            Log.e(TAG, "credentials中缺少secretKey/secretAccessKey")
+                            Log.e(TAG, "配置中的credentials keys: ${credentials.keys}")
+                            return@withLock false
+                        }
+                    }
+                }
+                
+                // 记录凭证摘要（脱敏）用于调试
+                val credentialKeys = credentials.keys.toList()
+                Log.d(TAG, "创建Provider使用的凭证keys: $credentialKeys")
+                
                 // 创建Provider
-                val provider = NotificationProviderFactory.getInstance().createProvider(
+                val provider = factory.createProvider(
                     context,
-                    config.provider,
+                    providerType,
                     credentials
                 )
                 
                 if (provider == null) {
                     Log.e(TAG, "创建推送服务提供商失败: ${config.provider}")
+                    Log.e(TAG, "请检查credentials是否包含必需的凭证: apiKey/secretId/accessKeyId, secretKey/secretAccessKey")
                     return@withLock false
                 }
                 

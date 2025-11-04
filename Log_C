@@ -1,0 +1,64 @@
+2025-11-04T01:29:37.457Z
+INIT_START Runtime Version: nodejs:20.v82	Runtime Version ARN: arn:aws:lambda:ap-southeast-1::runtime:dd206d5c0479b082438417cc6b87731a870d3c7d4c6f2375bbacade0b935398d
+
+INIT_START Runtime Version: nodejs:20.v82 Runtime Version ARN: arn:aws:lambda:ap-southeast-1::runtime:dd206d5c0479b082438417cc6b87731a870d3c7d4c6f2375bbacade0b935398d
+2025-11-04T01:29:37.853Z
+START RequestId: d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 Version: $LATEST
+
+START RequestId: d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 Version: $LATEST
+2025-11-04T01:29:37.857Z
+2025-11-04T01:29:37.857Z	d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437	INFO	
+{
+    "level": "INFO",
+    "message": "S3 event trigger activated",
+    "timestamp": "2025-11-04T01:29:37.855Z",
+    "requestId": "unknown",
+    "recordCount": 1
+}
+
+
+2025-11-04T01:29:37.857Z d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 INFO {"level":"INFO","message":"S3 event trigger activated","timestamp":"2025-11-04T01:29:37.855Z","requestId":"unknown","recordCount":1}
+2025-11-04T01:29:38.431Z
+2025-11-04T01:29:38.431Z	d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437	INFO	
+{
+    "level": "INFO",
+    "message": "Sending notifications to contacts",
+    "timestamp": "2025-11-04T01:29:38.431Z",
+    "senderId": "053abb43f297ee1d_1762219772796",
+    "contactCount": 1
+}
+
+
+2025-11-04T01:29:38.431Z d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 INFO {"level":"INFO","message":"Sending notifications to contacts","timestamp":"2025-11-04T01:29:38.431Z","senderId":"053abb43f297ee1d_1762219772796","contactCount":1}
+2025-11-04T01:29:38.511Z
+2025-11-04T01:29:38.511Z	d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437	INFO	
+{
+    "level": "WARN",
+    "message": "Webhook returned error status",
+    "timestamp": "2025-11-04T01:29:38.511Z",
+    "webhookUrl": "https://gmvmf736nbsgsjowswfz5fliiq0tlgxw.lambda-url.ap-southeast-1.on.aws/",
+    "statusCode": 403,
+    "response": "{\"Message\":null}"
+}
+
+
+2025-11-04T01:29:38.511Z d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 INFO {"level":"WARN","message":"Webhook returned error status","timestamp":"2025-11-04T01:29:38.511Z","webhookUrl":"https://gmvmf736nbsgsjowswfz5fliiq0tlgxw.lambda-url.ap-southeast-1.on.aws/","statusCode":403,"response":"{\"Message\":null}"}
+2025-11-04T01:29:38.512Z
+2025-11-04T01:29:38.512Z	d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437	INFO	
+{
+    "level": "INFO",
+    "message": "Event processing completed",
+    "timestamp": "2025-11-04T01:29:38.512Z",
+    "requestId": "unknown",
+    "totalResults": 1,
+    "deliveredCount": 0
+}
+
+
+2025-11-04T01:29:38.512Z d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437 INFO {"level":"INFO","message":"Event processing completed","timestamp":"2025-11-04T01:29:38.512Z","requestId":"unknown","totalResults":1,"deliveredCount":0}
+2025-11-04T01:29:38.514Z
+END RequestId: d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437
+
+END RequestId: d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437
+2025-11-04T01:29:38.514Z
+REPORT RequestId: d7fc83af-b9a1-4d6d-bfdc-8d0fa12a9437	Duration: 660.79 ms	Billed Duration: 1054 ms	Memory Size: 256 MB	Max Memory Used: 99 MB	Init Duration: 392.54 ms	

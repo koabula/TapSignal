@@ -310,7 +310,9 @@ class AwsSubUserManager(private val config: CosConfig) : CosSubUserManager {
         val bucketActionsStr = bucketActions.joinToString(",") { "\"$it\"" }
         val objectActionsStr = objectActions.joinToString(",") { "\"$it\"" }
         
-        val bucketStatement = """{"Effect":"Allow","Action":[$bucketActionsStr],"Resource":"$bucketArn"}"""
+        // P0修复：ListBucket权限需要添加Condition限制prefix
+        // 参考：https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-actions.html
+        val bucketStatement = """{"Effect":"Allow","Action":[$bucketActionsStr],"Resource":"$bucketArn","Condition":{"StringLike":{"s3:prefix":["$pathWithWildcard"]}}}"""
         val objectStatement = """{"Effect":"Allow","Action":[$objectActionsStr],"Resource":"$objectArn"}"""
 
         return """{"Version":"2012-10-17","Statement":[$bucketStatement,$objectStatement]}"""

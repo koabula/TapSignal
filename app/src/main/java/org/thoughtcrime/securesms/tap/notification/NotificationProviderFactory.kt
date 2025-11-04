@@ -37,24 +37,40 @@ class NotificationProviderFactory {
             when (providerType) {
                 PROVIDER_AWS_API_GATEWAY -> {
                     val accessKeyId = credentials["apiKey"] ?: credentials["accessKeyId"]
-                        ?: return null.also { Log.w(TAG, "AWS API Gateway Provider 缺少 apiKey/accessKeyId") }
+                    if (accessKeyId == null) {
+                        Log.e(TAG, "AWS API Gateway Provider 缺少必需的凭证: apiKey/accessKeyId")
+                        Log.e(TAG, "当前credentials中的keys: ${credentials.keys}")
+                        return null
+                    }
                     val secretAccessKey = credentials["secretKey"] ?: credentials["secretAccessKey"]
-                        ?: return null.also { Log.w(TAG, "AWS API Gateway Provider 缺少 secretKey/secretAccessKey") }
+                    if (secretAccessKey == null) {
+                        Log.e(TAG, "AWS API Gateway Provider 缺少必需的凭证: secretKey/secretAccessKey")
+                        Log.e(TAG, "当前credentials中的keys: ${credentials.keys}")
+                        return null
+                    }
                     val region = credentials["region"] ?: "us-east-1"
                     
                     AwsApiGatewayNotificationProvider(context, accessKeyId, secretAccessKey, region).also {
-                        Log.i(TAG, "AWS API Gateway Provider 创建成功")
+                        Log.i(TAG, "AWS API Gateway Provider 创建成功: region=$region")
                     }
                 }
                 PROVIDER_TENCENT_API_GATEWAY -> {
                     val secretId = credentials["apiKey"] ?: credentials["secretId"]
-                        ?: return null.also { Log.w(TAG, "腾讯云 API Gateway Provider 缺少 apiKey/secretId") }
+                    if (secretId == null) {
+                        Log.e(TAG, "腾讯云 API Gateway Provider 缺少必需的凭证: apiKey/secretId")
+                        Log.e(TAG, "当前credentials中的keys: ${credentials.keys}")
+                        return null
+                    }
                     val secretKey = credentials["secretKey"]
-                        ?: return null.also { Log.w(TAG, "腾讯云 API Gateway Provider 缺少 secretKey") }
+                    if (secretKey == null) {
+                        Log.e(TAG, "腾讯云 API Gateway Provider 缺少必需的凭证: secretKey")
+                        Log.e(TAG, "当前credentials中的keys: ${credentials.keys}")
+                        return null
+                    }
                     val region = credentials["region"] ?: "ap-guangzhou"
                     
                     TencentApiGatewayNotificationProvider(context, secretId, secretKey, region).also {
-                        Log.i(TAG, "腾讯云 API Gateway Provider 创建成功")
+                        Log.i(TAG, "腾讯云 API Gateway Provider 创建成功: region=$region")
                     }
                 }
                 else -> {

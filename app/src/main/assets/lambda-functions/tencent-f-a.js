@@ -21,8 +21,8 @@ const CONTACTS_PREFIX = 'tap-state/contacts/';
 const CHANNEL_PREFIX = 'v2-channels/';
 
 const cos = new COS({
-    SecretId: process.env.TENCENTCLOUD_SECRETID,
-    SecretKey: process.env.TENCENTCLOUD_SECRETKEY
+    SecretId: process.env.TAP_SECRET_ID,
+    SecretKey: process.env.TAP_SECRET_KEY
 });
 
 function log(level, message, data = {}) {

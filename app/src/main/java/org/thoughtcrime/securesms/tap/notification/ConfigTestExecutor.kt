@@ -93,7 +93,7 @@ class ConfigTestExecutor(private val context: Context) {
                     )
                 }
                 
-                withTimeout(TEST_TIMEOUT_MS) {
+                val testResult = withTimeout(TEST_TIMEOUT_MS) {
                     // 构造测试通知消息
                     val testNotification = NotificationMessage(
                         type = "test",
@@ -113,43 +113,47 @@ class ConfigTestExecutor(private val context: Context) {
                     )
                     
                     if (requestJson == null) {
-                        return@withContext ConfigTestResult.failure(
+                        ConfigTestResult.failure(
                             "webhook",
                             "构造请求失败"
                         )
-                    }
-                    
-                    // 发送HTTP请求
-                    val jsonMediaType = "application/json; charset=utf-8".toMediaType()
-                    val requestBody = requestJson.toRequestBody(jsonMediaType)
-                    
-                    val request = Request.Builder()
-                        .url(webhookConfig.webhookUrl)
-                        .post(requestBody)
-                        .addHeader("Content-Type", "application/json")
-                        .addHeader("User-Agent", "Signal-Tap-Test/2.0")
-                        .build()
-                    
-                    val response = httpClient.newCall(request).execute()
-                    
-                    if (response.isSuccessful) {
-                        Log.i(TAG, "Webhook连通性测试成功: ${response.code}")
-                        ConfigTestResult.success(
-                            "webhook",
-                            "Webhook连接成功",
-                            mapOf(
-                                "statusCode" to response.code,
-                                "responseTime" to System.currentTimeMillis()
-                            )
-                        )
                     } else {
-                        Log.w(TAG, "Webhook连通性测试失败: ${response.code} ${response.message}")
-                        ConfigTestResult.failure(
-                            "webhook",
-                            "Webhook返回错误: ${response.code}"
-                        )
+                        // 发送HTTP请求
+                        val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+                        val requestBody = requestJson.toRequestBody(jsonMediaType)
+                        
+                        val request = Request.Builder()
+                            .url(webhookConfig.webhookUrl)
+                            .post(requestBody)
+                            .addHeader("Content-Type", "application/json")
+                            .addHeader("User-Agent", "Signal-Tap-Test/2.0")
+                            .build()
+                        
+                        val response = httpClient.newCall(request).execute()
+                        
+                        if (response.isSuccessful) {
+                            Log.i(TAG, "Webhook连通性测试成功: ${response.code}")
+                            ConfigTestResult.success(
+                                "webhook",
+                                "Webhook连接成功",
+                                mapOf(
+                                    "statusCode" to response.code,
+                                    "responseTime" to System.currentTimeMillis()
+                                )
+                            )
+                        } else {
+                            // 3) 记录4xx响应体用于诊断
+                            val bodyText = try { response.body?.string() } catch (_: Throwable) { null }
+                            Log.w(TAG, "Webhook连通性测试失败: ${response.code} ${response.message} body=${bodyText}")
+                            ConfigTestResult.failure(
+                                "webhook",
+                                "Webhook返回错误: ${response.code}"
+                            )
+                        }
                     }
                 }
+                
+                testResult
             } catch (e: Exception) {
                 Log.e(TAG, "Webhook连通性测试异常", e)
                 ConfigTestResult.failure("webhook", "连接失败: ${e.message}")

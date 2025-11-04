@@ -156,14 +156,41 @@ class NotificationConfigManager private constructor(private val context: Context
                 return
             }
             
-            val metadata = org.thoughtcrime.securesms.tap.TransportMetadata(
+            // 创建一个简化的CosTransportMetadata用于内部配置上传
+            // 由于这只是内部配置上传，使用最小化的metadata
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+            val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+            
+            // 从cosConfig提取必要信息
+            val bucketName = cosConfig["bucketName"] as? String ?: return
+            val region = cosConfig["region"] as? String ?: return
+            val myAddress = when (cosConfig["provider"] as? String) {
+                "aws" -> "https://${bucketName}.s3.${region}.amazonaws.com"
+                "tencent" -> "https://${bucketName}.cos.${region}.myqcloud.com"
+                else -> return
+            }
+            
+            // 创建最小化的CosTransportMetadata
+            val metadata = org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+                recipientId = contactAci,
                 providerType = "cos",
-                config = cosConfig
+                myAddress = myAddress,
+                myToken = null, // 内部上传使用provider自身的凭证
+                myRegion = region,
+                myBucketName = bucketName,
+                mySendPath = "tap-state/contacts/",
+                peerAddress = myAddress,
+                peerToken = null,
+                peerRegion = region,
+                peerBucketName = bucketName,
+                peerReceivePath = "tap-state/contacts/",
+                myHashedId = myHashedId,
+                peerHashedId = contactHash
             )
             
             val uploadResult = provider.uploadFile(
                 data = configJson.toByteArray(),
-                fileName = uploadPath,
+                path = uploadPath,
                 metadata = metadata
             )
             

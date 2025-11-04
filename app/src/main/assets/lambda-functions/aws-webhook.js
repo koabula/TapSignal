@@ -9,16 +9,17 @@
  */
 
 const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require('@aws-sdk/client-apigatewaymanagementapi');
-const { DynamoDBClient, GetItemCommand } = require('@aws-sdk/client-dynamodb');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TABLE_NAME = process.env.CONNECTIONS_TABLE || 'tap-ws-connections';
+const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
+const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
 const API_GATEWAY_ENDPOINT = process.env.API_GATEWAY_ENDPOINT;
 
-const dynamodbClient = new DynamoDBClient({
-    region: process.env.AWS_REGION
+const s3Client = new S3Client({
+    region: AWS_REGION
 });
 
 function log(level, message, data = {}) {
@@ -51,24 +52,55 @@ function validateTimestamp(timestamp) {
 }
 
 async function getConnectionId(userId) {
-    log('DEBUG', 'Querying connectionId from DynamoDB', { userId });
-    
-    const command = new GetItemCommand({
-        TableName: TABLE_NAME,
-        Key: {
-            userId: { S: userId }
-        },
-        ProjectionExpression: 'connectionId, connectedAt'
-    });
-    
-    const response = await dynamodbClient.send(command);
-    
-    if (!response.Item) {
-        log('WARN', 'Connection not found for user', { userId });
+    if (!BUCKET_NAME) {
+        log('ERROR', 'CONNECTIONS_BUCKET not configured');
         return null;
     }
     
-    return response.Item.connectionId.S;
+    log('DEBUG', 'Querying connectionId from S3', { userId });
+    
+    try {
+        const key = `tap-ws-connections/${userId}.json`;
+        
+        const command = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key
+        });
+        
+        const response = await s3Client.send(command);
+        
+        const data = JSON.parse(await streamToString(response.Body));
+        
+        // 检查TTL
+        const now = Math.floor(Date.now() / 1000);
+        if (data.ttl && data.ttl < now) {
+            log('WARN', 'Connection expired', { userId, ttl: data.ttl, now });
+            return null;
+        }
+        
+        log('DEBUG', 'Found connectionId', { userId, connectionId: data.connectionId });
+        return data.connectionId;
+        
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            log('WARN', 'Connection not found for user', { userId });
+        } else {
+            log('ERROR', 'Failed to get connectionId from S3', {
+                userId,
+                error: error.message
+            });
+        }
+        return null;
+    }
+}
+
+async function streamToString(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    });
 }
 
 async function pushToWebSocket(connectionId, notification) {

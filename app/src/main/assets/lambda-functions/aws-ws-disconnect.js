@@ -1,20 +1,21 @@
 /**
  * AWS Lambda WebSocket $disconnect Handler
  * 
- * 功能：处理WebSocket断开事件，删除DynamoDB中的connectionId
+ * 功能：处理WebSocket断开事件，删除S3中的connectionId
  * 
  * 触发方式：API Gateway WebSocket $disconnect 路由
  * 输入：event.requestContext.connectionId
  * 输出：{ statusCode: 200 } 或错误响应
  */
 
-const { DynamoDBClient, ScanCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
+const { S3Client, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TABLE_NAME = process.env.CONNECTIONS_TABLE || 'tap-ws-connections';
+const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
+const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 
-const dynamodbClient = new DynamoDBClient({
-    region: process.env.AWS_REGION
+const s3Client = new S3Client({
+    region: AWS_REGION
 });
 
 function log(level, message, data = {}) {
@@ -30,22 +31,54 @@ function log(level, message, data = {}) {
 }
 
 async function findUserIdByConnectionId(connectionId) {
-    const command = new ScanCommand({
-        TableName: TABLE_NAME,
-        FilterExpression: 'connectionId = :connId',
-        ExpressionAttributeValues: {
-            ':connId': { S: connectionId }
-        },
-        ProjectionExpression: 'userId'
-    });
-    
-    const response = await dynamodbClient.send(command);
-    
-    if (response.Items && response.Items.length > 0) {
-        return response.Items[0].userId.S;
+    if (!BUCKET_NAME) {
+        return null;
     }
     
-    return null;
+    try {
+        const prefix = 'tap-ws-connections/';
+        const command = new ListObjectsV2Command({
+            Bucket: BUCKET_NAME,
+            Prefix: prefix
+        });
+        
+        const response = await s3Client.send(command);
+        
+        if (!response.Contents || response.Contents.length === 0) {
+            return null;
+        }
+        
+        for (const object of response.Contents) {
+            const getCommand = new GetObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: object.Key
+            });
+            
+            const getResponse = await s3Client.send(getCommand);
+            const data = JSON.parse(await streamToString(getResponse.Body));
+            
+            if (data.connectionId === connectionId) {
+                return data.userId;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        log('ERROR', 'Failed to find userId by connectionId', {
+            connectionId,
+            error: error.message
+        });
+        return null;
+    }
+}
+
+async function streamToString(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    });
 }
 
 exports.handler = async (event) => {
@@ -63,29 +96,39 @@ exports.handler = async (event) => {
             };
         }
         
+        if (!BUCKET_NAME) {
+            log('ERROR', 'CONNECTIONS_BUCKET not configured', { requestId });
+            return {
+                statusCode: 500,
+                body: 'Server configuration error'
+            };
+        }
+        
         const userId = await findUserIdByConnectionId(connectionId);
         
         if (!userId) {
-            log('WARN', 'Connection not found in DynamoDB', { requestId, connectionId });
+            log('WARN', 'Connection not found in S3', { requestId, connectionId });
             return {
                 statusCode: 200,
                 body: 'Connection not found (already cleaned)'
             };
         }
         
-        const command = new DeleteItemCommand({
-            TableName: TABLE_NAME,
-            Key: {
-                userId: { S: userId }
-            }
+        const key = `tap-ws-connections/${userId}.json`;
+        
+        const command = new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key
         });
         
-        await dynamodbClient.send(command);
+        await s3Client.send(command);
         
-        log('INFO', 'Connection deleted from DynamoDB', {
+        log('INFO', 'Connection deleted from S3', {
             requestId,
             userId,
-            connectionId
+            connectionId,
+            bucket: BUCKET_NAME,
+            key: key
         });
         
         return {

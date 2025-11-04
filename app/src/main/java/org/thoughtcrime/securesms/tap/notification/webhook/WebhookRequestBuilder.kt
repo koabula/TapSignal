@@ -20,7 +20,7 @@ class WebhookRequestBuilder {
     fun buildRequest(
         notification: NotificationMessage,
         secret: String,
-        version: String = "1.0"
+        version: String = "2.0"
     ): WebhookRequest? {
         return try {
             // 使用JsonSerializer确保JSON序列化顺序一致
@@ -54,35 +54,30 @@ class WebhookRequestBuilder {
     fun buildRequestJson(
         notification: NotificationMessage,
         secret: String,
-        version: String = "1.0"
+        version: String = "2.0"
     ): String? {
         return try {
-            // 使用JsonSerializer确保JSON序列化顺序一致
+            // 1) 使用稳定序列化构造用于签名的主体（仅一次），确保与最终请求体完全一致
             val notificationMap = JsonSerializer.buildNotificationMap(
                 type = notification.type,
                 senderId = notification.senderId,
                 timestamp = notification.timestamp,
                 metadata = notification.metadata
             )
-            
-            val bodyForSignature = JsonSerializer.buildSignatureBody(version, notificationMap)
-            
-            val signature = validator.generateSignature(bodyForSignature, secret)
-            
+
+            val signatureBodyJson = JsonSerializer.buildSignatureBody(version, notificationMap)
+
+            val signature = validator.generateSignature(signatureBodyJson, secret)
+
             if (signature.isEmpty()) {
                 Log.e(TAG, "生成签名失败")
                 return null
             }
-            
-            // 构建完整的请求JSON（包含signature）
-            // 按字典序：notification, signature, version
-            val fullRequest = mapOf(
-                "notification" to notificationMap,
-                "signature" to signature,
-                "version" to version
-            )
-            
-            JsonSerializer.toSortedJson(fullRequest)
+
+            // 2) 复用 signatureBodyJson，直接追加 signature 字段，避免二次序列化差异
+            val signatureBodyObj = JSONObject(signatureBodyJson)
+            signatureBodyObj.put("signature", signature)
+            signatureBodyObj.toString()
         } catch (e: Exception) {
             Log.e(TAG, "构建Webhook请求JSON失败", e)
             null

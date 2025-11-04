@@ -44,7 +44,7 @@ class TapDozeHandler private constructor(
     }
     
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    private val alarmManager = context.getSystemService(Context.ALARM_MANAGER) as AlarmManager
+    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     
     private val isStarted = AtomicBoolean(false)
     private val isInDozeMode = AtomicBoolean(false)

@@ -327,6 +327,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 Log.d(TAG, "包含Webhook配置到Token交换响应消息")
                 val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
                     ?: java.util.UUID.randomUUID().toString()
+                Log.d(TAG, "[notifySecret调试] B端发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$userId")
                 TapTokenExchangeMessage.createWithWebhook(
                     senderAci = myAci,
                     providerType = originalMessage.providerType,

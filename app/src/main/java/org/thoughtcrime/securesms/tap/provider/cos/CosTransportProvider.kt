@@ -18,7 +18,11 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * COS传输提供者实现
@@ -65,7 +69,7 @@ class CosTransportProvider(
     
     // 推送通知相关组件
     private val notificationManager: NotificationManager by lazy {
-        NotificationManager.getInstance()
+        NotificationManager.getInstance(context)
     }
     private val notificationPrefs by lazy {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -148,16 +152,35 @@ class CosTransportProvider(
                         Log.i(TAG, "消息推送成功: messageId=${message.messageId}")
                         Log.d(TAG, "[TapTimeTest] T3_UPLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
                         
-                        // 推送通知触发机制：
-                        // 1. 文件上传到v2-channels/路径会触发预配置的S3/COS事件通知
-                        // 2. 事件自动调用云函数F_A (无需此处代码触发)
-                        // 3. F_A从tap-state/contacts/读取接收方的webhook配置并发送HTTP通知
-                        // 4. 接收方的Webhook将通知发布到IoT服务的MQTT topic
-                        // 5. 接收方客户端通过WebSocket订阅接收推送
+                        // 推送通知触发机制（方案二：客户端直接触发）：
+                        // 1. 文件上传成功后，客户端直接调用云函数触发器
+                        // 2. 云函数从tap-state/contacts/读取接收方的webhook配置并发送HTTP通知
+                        // 3. 接收方的Webhook将通知推送到WebSocket服务
+                        // 4. 接收方客户端通过WebSocket接收推送
                         // 
-                        // 注意：此处仅异步检查webhook配置完整性，不参与实际推送流程
+                        // 注意：触发器调用失败不影响主流程，仅记录错误
+                        // 动态检测全局推送配置，必要时开启客户端触发
+                        if (!notificationEnabled) {
+                            try {
+                                val cfgMgr = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                                if (cfgMgr.isNotificationEnabled()) {
+                                    notificationEnabled = true
+                                    Log.i(TAG, "检测到全局推送配置有效，启用客户端触发通知模式")
+                                }
+                            } catch (_: Exception) { /* ignore */ }
+                        }
+
                         if (notificationEnabled) {
+                            // 异步触发推送通知（不阻塞主流程）
+                            // 使用COS元数据中的bucketName
+                            val bucketName = cosMetadata.myBucketName
+                            Log.d(TAG, "推送通知已启用，触发推送: remotePath=$remotePath")
+                            triggerNotificationAfterUpload(remotePath, cosMetadata, bucketName)
+                            // 同时检查webhook配置完整性
                             ensureNotificationChannelReady(metadata.recipientId, cosMetadata)
+                        } else {
+                            Log.w(TAG, "推送通知未启用（notificationEnabled=false），消息已上传但不会触发推送")
+                            Log.w(TAG, "请确保推送服务已成功部署和初始化")
                         }
                         
                         TransportResult.Success(
@@ -2053,9 +2076,12 @@ class CosTransportProvider(
                     val initSuccess = initializeNotificationManager(config)
                     if (initSuccess) {
                         notificationEnabled = true
-                        Log.i(TAG, "NotificationManager初始化成功")
+                        Log.i(TAG, "NotificationManager初始化成功，推送通知已启用")
                     } else {
                         Log.w(TAG, "NotificationManager初始化失败，但部署成功")
+                        // 即使初始化失败，如果部署成功也应该启用，因为可以使用事件触发
+                        notificationEnabled = true
+                        Log.i(TAG, "推送通知已启用（基于部署状态）")
                     }
                 } else {
                     Log.e(TAG, "完整推送服务部署失败")
@@ -2224,12 +2250,181 @@ class CosTransportProvider(
     fun isNotificationEnabled(): Boolean {
         return notificationEnabled
     }
-    
+
     /**
-     * 获取NotificationManager实例
+     * 上传成功后触发推送通知（方案二：客户端直接调用云函数）
+     * 
+     * @param remotePath 上传文件的远程路径
+     * @param metadata 传输元数据
+     * @param bucketName COS bucket名称
      */
-    fun getNotificationManager(): NotificationManager {
-        return notificationManager
+    private suspend fun triggerNotificationAfterUpload(
+        remotePath: String,
+        metadata: CosTransportMetadata,
+        bucketName: String
+    ) {
+        try {
+            // P0修复: 添加详细日志以诊断recipientId解析问题
+            Log.d(TAG, "[Webhook调试] 开始触发推送: recipientId原始值=${metadata.recipientId}, peerHashedId=${metadata.peerHashedId}")
+            
+            // 新主路径：客户端直连对方Webhook发送提醒
+            // 始终使用对方 ACI 作为本地配置主键，避免将已哈希ID再作为key
+            val aciContactId = resolveAciFromAnyId(metadata.recipientId)
+            if (aciContactId == null) {
+                Log.w(TAG, "无法解析对端标识（peerHashedId/recipientId均不可用），跳过本地直连webhook，依赖 F_A 事件触发")
+                return
+            }
+            
+            Log.d(TAG, "[Webhook调试] 解析得到ACI: $aciContactId")
+            
+            // 仅从本地数据库读取对方 webhook 配置；COS 上的同名文件仅供 F_A 使用
+            val cfgMgr = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val contactConfig = cfgMgr.getContactNotificationConfig(aciContactId)
+            
+            if (contactConfig == null) {
+                Log.w(TAG, "[Webhook调试] 未找到联系人配置: contactId=$aciContactId")
+                // P0修复: 尝试列出部分配置帮助诊断（如果API可用）
+                try {
+                    // 由于getAllContactNotificationConfigs是私有方法，我们只能记录查询失败
+                    Log.d(TAG, "[Webhook调试] 无法查询到联系人配置，可能的原因:")
+                    Log.d(TAG, "  1. 该联系人的webhook配置尚未保存")
+                    Log.d(TAG, "  2. TAP握手时未正确交换webhook配置")
+                    Log.d(TAG, "  3. contactId格式不匹配（查询key: $aciContactId）")
+                } catch (e: Exception) {
+                    Log.w(TAG, "[Webhook调试] 诊断信息获取失败", e)
+                }
+                return
+            }
+            
+            // P0修复: 验证配置的contactId与查询key是否一致
+            if (contactConfig.contactId != aciContactId) {
+                Log.e(TAG, "[Webhook调试] 严重错误：查询到的配置contactId不匹配！查询key=$aciContactId, 配置中的contactId=${contactConfig.contactId}")
+                Log.e(TAG, "这表明配置管理器返回了错误的配置，将不会发送webhook通知")
+                return
+            }
+
+            if (contactConfig.webhookUrl.isNotBlank() && contactConfig.notifySecret.isNotBlank()) {
+                // 发送前详细日志（不打印明文secret）
+                Log.i(TAG, "准备通知对方Webhook: contactId=${aciContactId}, url=${contactConfig.webhookUrl}, userId=${contactConfig.userId}, platform=${contactConfig.platform}, verified=${contactConfig.verified}")
+                Log.d(TAG, "[notifySecret调试] 发送端调用Webhook: notifySecret=${contactConfig.notifySecret.take(4)}...${contactConfig.notifySecret.takeLast(4)}, webhookUrl=${contactConfig.webhookUrl}")
+                if (!contactConfig.verified) {
+                    Log.w(TAG, "联系人Webhook配置未验证(verified=false)，可能导致对方拒绝。将继续尝试发送。")
+                }
+                // 构造通知消息
+                val notification = org.thoughtcrime.securesms.tap.notification.NotificationMessage(
+                    type = org.thoughtcrime.securesms.tap.notification.NotificationMessage.TYPE_NEW_MESSAGE,
+                    senderId = metadata.myHashedId,
+                    timestamp = System.currentTimeMillis(),
+                    metadata = mapOf(
+                        "userId" to contactConfig.userId,
+                        "remotePath" to remotePath,
+                        "bucketName" to bucketName,
+                        "provider" to "cos"
+                    )
+                )
+
+                val builder = org.thoughtcrime.securesms.tap.notification.webhook.WebhookRequestBuilder()
+                val bodyJson = builder.buildRequestJson(notification, contactConfig.notifySecret, "2.0")
+
+                if (bodyJson != null) {
+                    Log.d(TAG, "Webhook请求体长度: ${bodyJson.length} 字节")
+                    val okHttpClient = okhttp3.OkHttpClient()
+                    val request = okhttp3.Request.Builder()
+                        .url(contactConfig.webhookUrl)
+                        .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                        .build()
+
+                    // 简单一次短重试，随后兜底触发器
+                    var success = false
+                    var lastCode = -1
+                    repeat(2) { attempt ->
+                        okHttpClient.newCall(request).execute().use { resp ->
+                            lastCode = resp.code
+                            if (lastCode in 200..299) {
+                                Log.d(TAG, "Webhook notified successfully: ${contactConfig.webhookUrl}")
+                                success = true
+                                return@use
+                            }
+                            // 3) 记录4xx响应体以便诊断
+                            try {
+                                val bodyStr = resp.body?.string()
+                                if (!bodyStr.isNullOrEmpty()) {
+                                    Log.w(TAG, "Webhook non-2xx response: code=${resp.code}, body=${bodyStr}")
+                                }
+                            } catch (_: Throwable) { }
+                        }
+                        if (!success) {
+                            try {
+                                Thread.sleep(if (attempt == 0) 150L else 0L)
+                            } catch (_: InterruptedException) { }
+                        }
+                    }
+                    if (!success) {
+                        Log.w(TAG, "Webhook notify failed: code=${lastCode}, url=${contactConfig.webhookUrl}; falling back to trigger function")
+                        // 兜底：直接调用触发器云函数，模拟S3事件通知
+                        try {
+                            when (cosConfig.provider) {
+                                org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.AWS -> {
+                                    val deployer = org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayDeployer(
+                                        context,
+                                        cosConfig.secretId,
+                                        cosConfig.secretKey,
+                                        cosConfig.region
+                                    )
+                                    val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
+                                    Log.i(TAG, "Fallback trigger invoked (AWS): $invoked")
+                                }
+                                org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.TENCENT -> {
+                                    val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
+                                        context,
+                                        cosConfig.secretId,
+                                        cosConfig.secretKey,
+                                        cosConfig.region
+                                    )
+                                    val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
+                                    Log.i(TAG, "Fallback trigger invoked (TENCENT): $invoked")
+                                }
+                                else -> {
+                                    Log.w(TAG, "Fallback trigger not supported for provider: ${cosConfig.provider}")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Fallback trigger invocation failed", e)
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "Failed to build webhook request JSON for contactId=$aciContactId")
+                }
+            } else {
+                // 明确不再回退到本地Provider触发，避免触达自身；依赖 F_A 事件触发链路
+                Log.w(TAG, "Local contact webhook config missing/invalid for contactId=$aciContactId; skip direct webhook, rely on F_A. detail: hasConfig=${contactConfig!=null}")
+                return
+            }
+        } catch (t: Throwable) {
+            // 触发失败不影响主流程，仅记录错误
+            Log.e(TAG, "Error triggering notification after upload", t)
+        }
+    }
+
+    /**
+     * 将任意标识（RecipientId::N / UUID ACI / e164）解析为对方的 ACI 字符串。
+     * 解析失败返回 null。
+     */
+    private fun resolveAciFromAnyId(idStr: String): String? {
+        return try {
+            val recipient = if (idStr.startsWith("RecipientId::")) {
+                val numeric = idStr.substringAfter("RecipientId::")
+                val rid = org.thoughtcrime.securesms.recipients.RecipientId.from(numeric)
+                org.thoughtcrime.securesms.recipients.Recipient.resolved(rid)
+            } else {
+                val rid = org.thoughtcrime.securesms.recipients.RecipientId.fromSidOrE164(idStr)
+                org.thoughtcrime.securesms.recipients.Recipient.resolved(rid)
+            }
+            recipient.requireAci().toString()
+        } catch (t: Throwable) {
+            Log.w(TAG, "解析ACI失败: $idStr", t)
+            null
+        }
     }
     
     /**
@@ -2352,7 +2547,7 @@ class CosTransportProvider(
             // 简单验证：检查配置字段是否完整
             val isValid = config.webhookUrl.isNotBlank() &&
                          config.notifySecret.isNotBlank() &&
-                         config.topicId.isNotBlank()
+                         config.userId.isNotBlank()
             
             if (!isValid) {
                 Log.w(TAG, "Webhook配置字段不完整")
@@ -2385,14 +2580,32 @@ class CosTransportProvider(
         try {
             Log.d(TAG, "异步检查推送通知通道: recipientId=$recipientId")
             
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
                 try {
-                    val webhookManager = getContactWebhookManager()
-                    val config = webhookManager.loadContactConfig(recipientId)
+                    val cfgManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                    val aciContactId = resolveAciFromAnyId(recipientId) ?: recipientId
+                    val config = cfgManager.getContactNotificationConfig(aciContactId)
                     
                     if (config == null) {
                         Log.w(TAG, "推送通知通道未配置: recipientId=$recipientId，对方可能无法收到实时推送")
-                        Log.d(TAG, "提示：应在TAP握手阶段调用exchangeWebhookConfiguration()交换配置")
+                        Log.d(TAG, "提示：应在TAP握手阶段交换配置；尝试从本地DB补偿发布到COS")
+                        try {
+                            val cfgManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                            val localConfig = cfgManager.getContactNotificationConfig(recipientId)
+                            if (localConfig != null && localConfig.validate()) {
+                                Log.i(TAG, "发现本地联系人Webhook配置，尝试补偿写入COS: recipientId=$recipientId")
+                                val deployed = getCloudFunctionDeployer().saveContactWebhookConfig(localConfig)
+                                if (deployed) {
+                                    Log.i(TAG, "补偿发布联系人Webhook配置到COS成功: recipientId=$recipientId")
+                                } else {
+                                    Log.w(TAG, "补偿发布联系人Webhook配置到COS失败: recipientId=$recipientId")
+                                }
+                            } else {
+                                Log.d(TAG, "本地未找到可用联系人Webhook配置，跳过补偿发布")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "补偿发布联系人Webhook配置到COS时异常: recipientId=$recipientId", e)
+                        }
                     } else if (!config.verified) {
                         Log.d(TAG, "推送通知通道已配置但未验证: recipientId=$recipientId")
                     } else {

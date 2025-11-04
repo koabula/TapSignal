@@ -430,12 +430,15 @@ class TapConfigViewModel : ViewModel() {
             }
             
             // 获取API Key用于检测provider类型
-            val apiKey = currentState.configValues["apiKey"] as? String
+            // 注意：配置界面保存的键名是secretId，因此优先从secretId读取，也兼容apiKey键名
+            val apiKey = (currentState.configValues["apiKey"] as? String)
+                ?: (currentState.configValues["secretId"] as? String)
+                ?: (currentState.configValues["accessKeyId"] as? String)
             if (apiKey.isNullOrEmpty()) {
                 return DeploymentExecutionResult(
                     success = false,
                     errorMessage = "API Key为空",
-                    errorDetails = "无法检测Provider类型，请检查API Key配置"
+                    errorDetails = "无法检测Provider类型，请检查API Key配置（secretId/accessKeyId字段）"
                 )
             }
             
@@ -459,10 +462,12 @@ class TapConfigViewModel : ViewModel() {
             )
             
             // 创建NotificationProvider
+            val secretKeyValue: String = currentState.configValues["secretKey"] as? String ?: ""
+            val regionValue: String = currentState.configValues["region"] as? String ?: ""
             val credentials = mapOf(
                 "apiKey" to apiKey,
-                "secretKey" to (currentState.configValues["secretKey"] as? String ?: ""),
-                "region" to (currentState.configValues["region"] as? String ?: "")
+                "secretKey" to secretKeyValue,
+                "region" to regionValue
             )
             
             val notificationProvider = notificationProviderFactory.createProvider(
@@ -525,9 +530,11 @@ class TapConfigViewModel : ViewModel() {
                 )
             }
             
-            // 保存配置
+            // 方案三：确保配置保存到本地数据库成功后才返回成功
+            Log.i(TAG, "开始保存推送服务配置到本地数据库...")
             val saveSuccess = notificationConfigManager.saveLocalConfig(notificationConfig)
             if (!saveSuccess) {
+                Log.e(TAG, "保存配置到本地数据库失败，部署失败")
                 return DeploymentExecutionResult(
                     success = false,
                     errorMessage = "保存配置失败",
@@ -535,7 +542,70 @@ class TapConfigViewModel : ViewModel() {
                 )
             }
             
-            Log.i(TAG, "推送服务部署成功: providerType=$detectedProviderType")
+            // 验证配置是否已保存到本地数据库
+            val savedConfig = notificationConfigManager.getLocalConfig()
+            if (savedConfig == null) {
+                Log.e(TAG, "配置保存后验证失败，本地数据库中未找到配置")
+                return DeploymentExecutionResult(
+                    success = false,
+                    errorMessage = "配置验证失败",
+                    errorDetails = "配置保存后验证失败，本地数据库中未找到配置记录"
+                )
+            }
+            
+            Log.i(TAG, "推送服务部署成功: providerType=$detectedProviderType, 配置已保存到本地数据库")
+            
+            // 重新连接WebSocket：断开旧连接，使用新配置重新初始化
+            try {
+                Log.i(TAG, "部署成功后重新初始化推送服务连接...")
+                val notificationManager = org.thoughtcrime.securesms.tap.notification.NotificationManager.getInstance(context)
+                
+                // 断开旧的WebSocket连接
+                notificationManager.disconnect()
+                Log.i(TAG, "已断开旧的WebSocket连接")
+                
+                // 创建新的NotificationProvider
+                val factory = org.thoughtcrime.securesms.tap.notification.NotificationProviderFactory.getInstance()
+                val newProvider = factory.createProvider(
+                    context = context,
+                    providerType = detectedProviderType,
+                    credentials = mapOf(
+                        "apiKey" to apiKey,
+                        "secretKey" to secretKeyValue,
+                        "region" to regionValue
+                    )
+                )
+                
+                if (newProvider != null) {
+                    // 重新初始化NotificationManager
+                    val initSuccess = notificationManager.initialize(newProvider, notificationConfig)
+                    if (initSuccess) {
+                        Log.i(TAG, "NotificationManager重新初始化成功")
+                        
+                        // 重新连接WebSocket
+                        val userId = pushServiceInfo.metadata["userId"] as? String ?: ""
+                        if (userId.isNotEmpty()) {
+                            val connectResult = notificationManager.connect(userId) { notification ->
+                                Log.d(TAG, "收到推送通知: ${notification.type}")
+                            }
+                            if (connectResult.success) {
+                                Log.i(TAG, "WebSocket重新连接成功")
+                            } else {
+                                Log.w(TAG, "WebSocket重新连接失败: ${connectResult.errorMessage}")
+                            }
+                        } else {
+                            Log.w(TAG, "无法获取userId，跳过WebSocket连接")
+                        }
+                    } else {
+                        Log.w(TAG, "NotificationManager重新初始化失败")
+                    }
+                } else {
+                    Log.w(TAG, "创建新的NotificationProvider失败，无法重新连接")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "重新连接WebSocket异常（不影响部署成功）", e)
+            }
+            
             DeploymentExecutionResult(
                 success = true,
                 config = notificationConfig

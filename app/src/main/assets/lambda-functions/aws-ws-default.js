@@ -9,13 +9,14 @@
  */
 
 const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require('@aws-sdk/client-apigatewaymanagementapi');
-const { DynamoDBClient, UpdateItemCommand } = require('@aws-sdk/client-dynamodb');
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TABLE_NAME = process.env.CONNECTIONS_TABLE || 'tap-ws-connections';
+const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
+const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 
-const dynamodbClient = new DynamoDBClient({
-    region: process.env.AWS_REGION
+const s3Client = new S3Client({
+    region: AWS_REGION
 });
 
 function log(level, message, data = {}) {
@@ -31,20 +32,56 @@ function log(level, message, data = {}) {
 }
 
 async function updateLastActivity(userId) {
-    const now = Math.floor(Date.now() / 1000);
+    if (!BUCKET_NAME) {
+        return; // 如果 bucket 未配置，跳过更新
+    }
     
-    const command = new UpdateItemCommand({
-        TableName: TABLE_NAME,
-        Key: {
-            userId: { S: userId }
-        },
-        UpdateExpression: 'SET lastActivity = :now',
-        ExpressionAttributeValues: {
-            ':now': { N: now.toString() }
+    try {
+        const key = `tap-ws-connections/${userId}.json`;
+        
+        // 读取现有数据
+        let connectionData;
+        try {
+            const getCommand = new GetObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: key
+            });
+            const response = await s3Client.send(getCommand);
+            const data = JSON.parse(await streamToString(response.Body));
+            connectionData = data;
+        } catch (e) {
+            // 如果文件不存在，跳过更新
+            return;
         }
+        
+        // 更新 lastActivity
+        connectionData.lastActivity = Math.floor(Date.now() / 1000);
+        
+        // 写回 S3
+        const putCommand = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            Body: JSON.stringify(connectionData),
+            ContentType: 'application/json'
+        });
+        
+        await s3Client.send(putCommand);
+    } catch (error) {
+        log('WARN', 'Failed to update last activity', {
+            userId,
+            error: error.message
+        });
+        // 不抛出错误，因为这是可选功能
+    }
+}
+
+async function streamToString(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
     });
-    
-    await dynamodbClient.send(command);
 }
 
 async function sendToConnection(connectionId, message, endpoint) {

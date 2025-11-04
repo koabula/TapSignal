@@ -579,6 +579,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
             if (tokenExchangeMessage.hasWebhookConfig()) {
                 val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
                 if (webhookConfigData != null) {
+                    Log.d(TAG, "[notifySecret调试] A端接收ACCEPT: notifySecret=${webhookConfigData.notifySecret.take(4)}...${webhookConfigData.notifySecret.takeLast(4)}, webhookUrl=${webhookConfigData.webhookUrl}, userId=${webhookConfigData.userId}")
                     saveContactWebhookConfig(peerAci, webhookConfigData, tokenExchangeMessage.providerType)
                     Log.i(TAG, "已保存Token Accept中的Webhook配置: peerAci=$peerAci")
                 }
@@ -1993,11 +1994,69 @@ private fun saveContactWebhookConfig(
             verified = false
         )
         
+        // P0修复: 添加更详细的保存日志
+        Log.i(TAG, "[Webhook配置保存] 开始保存联系人webhook配置")
+        Log.d(TAG, "  - contactId(senderAci): $senderAci")
+        Log.d(TAG, "  - webhookUrl: ${webhookConfigData.webhookUrl}")
+        Log.d(TAG, "  - userId: ${webhookConfigData.userId}")
+        Log.d(TAG, "  - notifySecret: ${webhookConfigData.notifySecret.take(4)}...${webhookConfigData.notifySecret.takeLast(4)}")
+        Log.d(TAG, "  - platform: $providerType")
+        
         val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
         val saved = configManager.saveContactNotificationConfig(senderAci, contactConfig)
         
         if (saved) {
-            Log.i(TAG, "联系人Webhook配置已保存: senderAci=$senderAci")
+            Log.i(TAG, "[Webhook配置保存] 联系人Webhook配置已成功保存到本地数据库: senderAci=$senderAci")
+            // 追加：将对方的Webhook配置发布到本用户的COS，供触发器读取
+            try {
+                val cosProviderConfig = configManager.getProviderConfig("cos")
+                if (cosProviderConfig == null) {
+                    Log.w(TAG, "未找到COS Provider配置，跳过将联系人Webhook配置写入COS")
+                } else {
+                    // 构建 CosConfig（兼容AWS/Tencent两种命名）
+                    val providerRaw = (cosProviderConfig["provider"] as? String)?.lowercase() ?: ""
+                    val cosProvider = when {
+                        providerRaw.contains("aws") -> org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.AWS
+                        providerRaw.contains("tencent") || providerRaw.contains("qcloud") -> org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.TENCENT
+                        else -> org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.AWS
+                    }
+
+                    val region = (cosProviderConfig["region"] as? String) ?: ""
+                    val bucketName = (cosProviderConfig["bucketName"] as? String) ?: (cosProviderConfig["bucket"] as? String ?: "")
+                    val accessKeyId = (cosProviderConfig["accessKeyId"] as? String)
+                        ?: (cosProviderConfig["secretId"] as? String)
+                        ?: (cosProviderConfig["apiKey"] as? String)
+                        ?: ""
+                    val secretKey = (cosProviderConfig["secretAccessKey"] as? String)
+                        ?: (cosProviderConfig["secretKey"] as? String)
+                        ?: ""
+                    val sessionToken = (cosProviderConfig["sessionToken"] as? String)
+
+                    if (region.isBlank() || bucketName.isBlank() || accessKeyId.isBlank() || secretKey.isBlank()) {
+                        Log.w(TAG, "COS配置不完整，跳过写入：region/bucket/keys 缺失")
+                    } else {
+                        val cosConfig = org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig(
+                            provider = cosProvider,
+                            secretId = accessKeyId,
+                            secretKey = secretKey,
+                            region = region,
+                            bucketName = bucketName,
+                            sessionToken = sessionToken
+                        )
+                        val deployer = org.thoughtcrime.securesms.tap.provider.cos.utils.notification.CloudFunctionDeployer(context, cosConfig)
+                        val uploaded = kotlinx.coroutines.runBlocking {
+                            deployer.saveContactWebhookConfig(contactConfig)
+                        }
+                        if (uploaded) {
+                            Log.i(TAG, "已将联系人Webhook配置发布到COS: contactId=$senderAci")
+                        } else {
+                            Log.w(TAG, "将联系人Webhook配置发布到COS失败: contactId=$senderAci")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "发布联系人Webhook配置到COS时发生异常", e)
+            }
         } else {
             Log.w(TAG, "联系人Webhook配置保存失败: senderAci=$senderAci")
         }

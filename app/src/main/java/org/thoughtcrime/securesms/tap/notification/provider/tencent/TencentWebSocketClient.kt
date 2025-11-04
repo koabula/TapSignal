@@ -13,8 +13,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 /**
- * 腾讯云API网关WebSocket客户端
+ * 腾讯云函数URL WebSocket客户端
  * 负责管理WebSocket连接和接收推送消息
+ * 连接到启用WebSocket支持的函数URL（WSS地址）
  */
 class TencentWebSocketClient(
     private val endpoint: String,
@@ -117,7 +118,11 @@ class TencentWebSocketClient(
     fun getMessageChannel(): Channel<NotificationMessage> = messageChannel
 
     private fun buildWebSocketUrl(): String {
-        return "$endpoint?userId=$userId"
+        val url = "$endpoint?userId=$userId"
+        // P2修复：记录构建的URL（脱敏处理）
+        val maskedUrl = url.replace(Regex("userId=[^&]+"), "userId=***")
+        Log.d(TAG, "Building WebSocket URL: $maskedUrl")
+        return url
     }
 
     private fun createWebSocketListener(): WebSocketListener {
@@ -152,9 +157,45 @@ class TencentWebSocketClient(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket failure", t)
+                // P2修复：详细记录错误信息和HTTP响应
+                val errorDetails = buildString {
+                    append("WebSocket failure: ${t.message}")
+                    if (response != null) {
+                        append("\nHTTP Status: ${response.code}")
+                        append("\nHTTP Message: ${response.message}")
+                        try {
+                            val responseBody = response.peekBody(1024).string()
+                            append("\nResponse Body: $responseBody")
+                        } catch (e: Exception) {
+                            append("\nResponse Body: (unable to read)")
+                        }
+                        // OkHttp Headers 不是 Map 的 forEach(K,V)，用索引遍历
+                        for (i in 0 until response.headers.size) {
+                            val name = response.headers.name(i)
+                            val value = response.headers.value(i)
+                            append("\nHeader $name: $value")
+                        }
+                    }
+                }
+                
+                Log.e(TAG, errorDetails, t)
+                
                 isConnected.set(false)
                 _connectionState.value = ConnectionState.Error(t.message ?: "Connection failed")
+                
+                // P2修复：记录失败原因，帮助诊断问题
+                val failureReason = when {
+                    response?.code == 400 -> "Bad Request - 可能是WebSocket未启用或URL格式错误"
+                    response?.code == 401 -> "Unauthorized - 认证失败"
+                    response?.code == 403 -> "Forbidden - 权限不足"
+                    response?.code == 404 -> "Not Found - URL不存在"
+                    response?.code == 500 -> "Internal Server Error - 服务器错误"
+                    t is javax.net.ssl.SSLHandshakeException -> "SSL握手失败 - 可能是证书或协议问题"
+                    t is java.net.ProtocolException -> "协议错误 - 可能不支持WebSocket协议升级"
+                    else -> "未知错误: ${t.javaClass.simpleName}"
+                }
+                
+                Log.w(TAG, "Connection failure reason: $failureReason")
                 
                 connectionContinuation?.resume(Result.failure(t))
                 connectionContinuation = null
@@ -198,27 +239,45 @@ class TencentWebSocketClient(
 
     private fun scheduleReconnect() {
         if (reconnectJob?.isActive == true) {
+            Log.d(TAG, "Reconnect already scheduled, skipping")
             return
         }
 
         reconnectJob = scope.launch {
             var delay = BASE_RECONNECT_DELAY_MS
             var attempts = 0
+            val maxAttempts = 15  // P0修复：增加最大重试次数到15次
 
-            while (isActive && !isConnected.get()) {
+            while (isActive && !isConnected.get() && attempts < maxAttempts) {
                 attempts++
-                Log.i(TAG, "Reconnect attempt #$attempts in ${delay}ms")
+                Log.i(TAG, "Reconnect attempt #$attempts in ${delay}ms (max: $maxAttempts)")
                 
                 delay(delay)
                 
                 try {
-                    connect().getOrThrow()
-                    Log.i(TAG, "Reconnected successfully")
-                    break
+                    val result = connect()
+                    if (result.isSuccess) {
+                        Log.i(TAG, "Reconnected successfully after $attempts attempts")
+                        break
+                    } else {
+                        val error = result.exceptionOrNull()
+                        Log.w(TAG, "Reconnect attempt #$attempts failed", error)
+                        // P2修复：记录失败原因
+                        error?.let {
+                            Log.d(TAG, "Reconnect error type: ${it.javaClass.simpleName}, message: ${it.message}")
+                        }
+                        delay = (delay * 2).coerceAtMost(MAX_RECONNECT_DELAY_MS)
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Reconnect attempt #$attempts failed", e)
+                    Log.w(TAG, "Reconnect attempt #$attempts failed with exception", e)
                     delay = (delay * 2).coerceAtMost(MAX_RECONNECT_DELAY_MS)
                 }
+            }
+            
+            // P0修复：到达最大重连次数后设置错误状态
+            if (attempts >= maxAttempts && !isConnected.get()) {
+                Log.e(TAG, "Max reconnect attempts ($maxAttempts) reached. Giving up.")
+                _connectionState.value = ConnectionState.Error("Failed to reconnect after $maxAttempts attempts")
             }
         }
     }

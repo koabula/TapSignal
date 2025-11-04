@@ -7,8 +7,8 @@ import org.thoughtcrime.securesms.tap.notification.*
 import java.util.UUID
 
 /**
- * 腾讯云API网关推送服务提供者实现
- * 使用WebSocket实现实时推送通知
+ * 腾讯云函数URL推送服务提供者实现
+ * 使用函数URL WebSocket实现实时推送通知（替代API网关）
  */
 class TencentApiGatewayNotificationProvider(
     private val context: Context,
@@ -28,59 +28,90 @@ class TencentApiGatewayNotificationProvider(
     private var deployer: TencentApiGatewayDeployer? = null
     private var webhookConfig: WebhookConfig? = null
     private var currentUserId: String? = null
+    private var currentEndpoint: String? = null
     private var notificationCallback: ((NotificationMessage) -> Unit)? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var messageListenerJob: Job? = null
+
+    /**
+     * 获取deployer实例（用于触发云函数）
+     */
+    fun getDeployer(): TencentApiGatewayDeployer? {
+        return deployer
+    }
+
+    /**
+     * 触发推送通知（客户端直接调用云函数）
+     * 
+     * @param remotePath 上传文件的路径
+     * @param bucketName COS bucket名称
+     * @return 是否成功触发
+     */
+    suspend fun triggerNotification(remotePath: String, bucketName: String): Boolean {
+        return try {
+            val deployerInstance = deployer
+            if (deployerInstance == null) {
+                Log.w(TAG, "Deployer not initialized, cannot trigger notification")
+                return false
+            }
+            
+            deployerInstance.invokeTriggerFunction(remotePath, bucketName)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to trigger notification", e)
+            false
+        }
+    }
 
     override suspend fun deploy(apiKey: String, region: String): DeployResult {
         return try {
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
             
+            // P0修复：部署前先断开所有旧的WebSocket连接
+            try {
+                Log.i(TAG, "Cleaning up old WebSocket connections before deployment...")
+                disconnect()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error cleaning up old connections", e)
+            }
+            
             val tencentDeployer = TencentApiGatewayDeployer(context, secretId, secretKey, effectiveRegion)
             deployer = tencentDeployer
 
-            val pushServiceInfo = tencentDeployer.deployPushService()
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val cosConfig = configManager.getProviderConfig("cos")
+            val bucketName: String? = cosConfig?.get("bucketName") as? String
+            
+            // 设置用户bucket名称（用于配置存储）
+            tencentDeployer.setUserBucketName(bucketName)
+            
+            val pushServiceInfo = tencentDeployer.deployPushService(userBucketName = bucketName)
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
 
             val webhookUrl = tencentDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
-            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            val cosConfig = configManager.getProviderConfig("cos")
-            val bucketName = cosConfig?["bucketName"] as? String
-
+            // 部署触发器函数（客户端直调用作推送触发），不再配置COS事件通知
             val triggerInfo = tencentDeployer.setupEventTrigger(userBucketName = bucketName)
-            Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
-
-            if (bucketName != null && triggerInfo.triggerArn != null) {
-                Log.i(TAG, "Configuring COS event notification for bucket: $bucketName")
-                val cosEventConfigured = tencentDeployer.configureCosEventNotification(
-                    userBucketName = bucketName,
-                    userBucketRegion = effectiveRegion,
-                    triggerFunctionName = triggerInfo.triggerName,
-                    filterPrefix = "v2-channels/"
-                )
-                if (cosEventConfigured) {
-                    Log.i(TAG, "COS event notification configured successfully")
-                } else {
-                    Log.w(TAG, "Failed to configure COS event notification - manual setup may be required")
-                }
-            } else {
-                Log.w(TAG, "Bucket name or trigger ARN missing, COS event not configured automatically")
-            }
+            Log.d(TAG, "Trigger function deployed (client-invocation mode): ${triggerInfo.triggerName}")
 
             val secret = generateNotifySecret()
-            val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 
-                ?: throw Exception("API Gateway ID not found in push service info")
+            val userId = generateUserId()
             
-            val envUpdateResult = tencentDeployer.updateWebhookEnvironment(secret)
+            // 获取WebSocket函数URL（用于推送）
+            val wsFunctionUrl = pushServiceInfo.endpoint.replace("wss://", "https://") // WebSocket函数URL的HTTP版本
+            
+            val envUpdateResult = tencentDeployer.updateWebhookEnvironment(
+                secret, 
+                userId, 
+                bucketName,
+                wsFunctionUrl // 传入WebSocket函数URL用于推送
+            )
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")
             }
             
-            val userId = generateUserId()
             webhookConfig = WebhookConfig(
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
@@ -88,15 +119,34 @@ class TencentApiGatewayNotificationProvider(
                 version = "2.0"
             )
 
+            // 将 userId 持久化到 pushServiceInfo.metadata，确保重启后一致
+            val pushServiceInfoWithUser = pushServiceInfo.copy(
+                metadata = pushServiceInfo.metadata + mapOf("userId" to userId)
+            )
+
             val config = NotificationConfig(
                 provider = PROVIDER_TYPE,
                 webhookUrl = webhookUrl,
                 notifySecret = secret,
-                pushServiceInfo = pushServiceInfo,
+                pushServiceInfo = pushServiceInfoWithUser,
                 deployedAt = System.currentTimeMillis(),
                 version = "2.0"
             )
             tencentDeployer.saveConfiguration(config)
+
+            // 方案一：部署成功后同时保存到本地数据库，确保初始化时能找到配置
+            try {
+                val notificationConfigManager = NotificationConfigManager.getInstance(context)
+                val saveLocalSuccess = notificationConfigManager.saveLocalConfig(config)
+                if (saveLocalSuccess) {
+                    Log.i(TAG, "配置已保存到本地数据库: provider=${config.provider}")
+                } else {
+                    Log.w(TAG, "配置保存到COS成功，但保存到本地数据库失败")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "保存配置到本地数据库异常", e)
+                // 不影响部署结果，因为配置已保存到COS
+            }
 
             Log.i(TAG, "Deployment completed successfully")
             DeployResult.success(webhookUrl, pushServiceInfo)
@@ -109,9 +159,12 @@ class TencentApiGatewayNotificationProvider(
 
     override fun getWebhookConfig(): WebhookConfig {
         if (webhookConfig == null) {
+            // 方案1修复：优先从NotificationConfigManager加载配置（不依赖deployer）
+            val configManager = NotificationConfigManager.getInstance(context)
             val config = runBlocking {
-                deployer?.loadConfiguration()
+                configManager.getLocalConfig()
             }
+            
             webhookConfig = config?.let {
                 val userId = it.pushServiceInfo.metadata["userId"] as? String
                     ?: generateUserId()
@@ -121,6 +174,23 @@ class TencentApiGatewayNotificationProvider(
                     userId = userId,
                     version = it.version
                 )
+            }
+            
+            // Fallback：如果仍然没有配置，尝试从deployer加载（向后兼容）
+            if (webhookConfig == null && deployer != null) {
+                val deployerConfig = runBlocking {
+                    deployer?.loadConfiguration()
+                }
+                webhookConfig = deployerConfig?.let {
+                    val userId = it.pushServiceInfo.metadata["userId"] as? String
+                        ?: generateUserId()
+                    WebhookConfig(
+                        webhookUrl = it.webhookUrl,
+                        notifySecret = it.notifySecret,
+                        userId = userId,
+                        version = it.version
+                    )
+                }
             }
         }
         return webhookConfig ?: throw IllegalStateException("Webhook not configured. Please deploy first.")
@@ -134,13 +204,45 @@ class TencentApiGatewayNotificationProvider(
             currentUserId = userId
             notificationCallback = onNotification
 
-            val config = deployer?.loadConfiguration()
-                ?: return ConnectionResult.failure("Configuration not found. Please deploy first.")
+            // 方案1修复：优先从NotificationConfigManager加载配置（不依赖deployer）
+            val configManager = NotificationConfigManager.getInstance(context)
+            var config = configManager.getLocalConfig()
+            
+            // Fallback：如果仍然没有配置，尝试从deployer加载（向后兼容）
+            if (config == null) {
+                val deployerInstance = deployer
+                if (deployerInstance != null) {
+                    config = deployerInstance.loadConfiguration()
+                }
+            }
+            
+            if (config == null) {
+                return ConnectionResult.failure("Configuration not found. Please deploy first.")
+            }
 
             val wsEndpoint = config.pushServiceInfo.endpoint
             if (!wsEndpoint.startsWith("wss://")) {
                 return ConnectionResult.failure("Invalid WebSocket endpoint: $wsEndpoint")
             }
+            
+            // P0修复：总是先断开旧连接，确保只有一个活跃连接
+            if (wsClient != null) {
+                try {
+                    val oldEndpoint = currentEndpoint ?: "unknown"
+                    Log.i(TAG, "Disconnecting existing WebSocket connection: $oldEndpoint")
+                    disconnect()
+                    // 短暂延迟，确保旧连接完全清理
+                    delay(500)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error disconnecting old endpoint", e)
+                }
+            }
+            
+            // 若端点变更，记录日志
+            if (currentEndpoint != null && currentEndpoint != wsEndpoint) {
+                Log.i(TAG, "WebSocket endpoint changed: ${currentEndpoint} -> $wsEndpoint")
+            }
+            currentEndpoint = wsEndpoint
             
             val client = TencentWebSocketClient(
                 endpoint = wsEndpoint,
@@ -148,10 +250,32 @@ class TencentApiGatewayNotificationProvider(
             )
             wsClient = client
 
-            Log.i(TAG, "Connecting to Tencent API Gateway WebSocket...")
-            val connectResult = client.connect()
-            if (connectResult.isFailure) {
-                return ConnectionResult.failure(connectResult.exceptionOrNull()?.message ?: "Connection failed")
+            Log.i(TAG, "Connecting to Tencent Function URL WebSocket...")
+            Log.d(TAG, "WebSocket endpoint: ${wsEndpoint.substringBefore("?")}...")
+            
+            // P2修复：详细记录连接尝试信息
+            try {
+                val connectResult = client.connect()
+                if (connectResult.isFailure) {
+                    val exception = connectResult.exceptionOrNull()
+                    val errorMessage = exception?.message ?: "Connection failed"
+                    val errorType = exception?.javaClass?.simpleName ?: "Unknown"
+                    
+                    Log.e(TAG, "WebSocket connection failed", exception)
+                    Log.e(TAG, "Error type: $errorType, Message: $errorMessage")
+                    
+                    // P2修复：提供更详细的错误信息
+                    val detailedError = when {
+                        errorMessage.contains("400") -> "$errorMessage (Bad Request - 请检查WebSocket是否已启用)"
+                        errorMessage.contains("101") -> "$errorMessage (协议升级失败 - 请确认函数URL支持WebSocket)"
+                        else -> errorMessage
+                    }
+                    
+                    return ConnectionResult.failure(detailedError)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during WebSocket connection", e)
+                return ConnectionResult.failure("Connection exception: ${e.message}")
             }
 
             startMessageListener(client)
@@ -167,17 +291,27 @@ class TencentApiGatewayNotificationProvider(
 
     override suspend fun disconnect() {
         try {
-            Log.i(TAG, "Disconnecting from Tencent API Gateway")
+            Log.i(TAG, "Disconnecting from Tencent Function URL WebSocket")
             
+            // 取消消息监听
             messageListenerJob?.cancel()
             messageListenerJob = null
             
-            wsClient?.disconnect()
-            wsClient?.cleanup()
+            // 断开并清理WebSocket客户端
+            wsClient?.let { client ->
+                try {
+                    client.disconnect()
+                    client.cleanup()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error during WebSocket cleanup", e)
+                }
+            }
             wsClient = null
             
+            // 清理状态
             currentUserId = null
             notificationCallback = null
+            currentEndpoint = null
             
             Log.i(TAG, "Disconnected successfully")
         } catch (e: Exception) {

@@ -299,18 +299,24 @@ class TapConfigFragment : DSLSettingsFragment(
         
         textPref(
             title = DSLSettingsText.from("部署状态: $deploymentStatusText"),
-            summary = DSLSettingsText.from(
-                deploymentStatusSummary,
-                when (state.notificationDeploymentState) {
-                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> 
+            summary = when (state.notificationDeploymentState) {
+                org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYED -> 
+                    DSLSettingsText.from(
+                        deploymentStatusSummary,
                         DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_colorPrimary))
-                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> 
+                    )
+                org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.FAILED -> 
+                    DSLSettingsText.from(
+                        deploymentStatusSummary,
                         DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_colorError))
-                    org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> 
+                    )
+                org.thoughtcrime.securesms.tap.ui.NotificationDeploymentState.DEPLOYING -> 
+                    DSLSettingsText.from(
+                        deploymentStatusSummary,
                         DSLSettingsText.ColorModifier(requireContext().getColor(R.color.signal_accent_primary))
-                    else -> null
-                }
-            )
+                    )
+                else -> DSLSettingsText.from(deploymentStatusSummary)
+            }
         )
         
         // 如果部署失败，显示详细错误信息（参考测试按钮的显示方式）

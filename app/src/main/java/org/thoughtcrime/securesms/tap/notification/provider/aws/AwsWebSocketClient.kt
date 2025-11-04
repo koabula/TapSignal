@@ -28,6 +28,7 @@ class AwsWebSocketClient(
         private const val PING_INTERVAL_SEC = 30L
         private const val MAX_RECONNECT_DELAY_MS = 60000L
         private const val BASE_RECONNECT_DELAY_MS = 1000L
+        private const val MAX_RECONNECT_ATTEMPTS = 15
     }
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -42,6 +43,7 @@ class AwsWebSocketClient(
     private val messageChannel = Channel<NotificationMessage>(Channel.BUFFERED)
     private var reconnectJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val sessionId: String = java.util.UUID.randomUUID().toString()
     
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState
@@ -201,11 +203,17 @@ class AwsWebSocketClient(
             return
         }
 
+        val currentSession = sessionId
         reconnectJob = scope.launch {
             var delay = BASE_RECONNECT_DELAY_MS
             var attempts = 0
 
-            while (isActive && !isConnected.get()) {
+            while (isActive && !isConnected.get() && attempts < MAX_RECONNECT_ATTEMPTS) {
+                // 若会话已被替换（上层断开并创建了新实例），立即停止重连
+                if (currentSession != sessionId) {
+                    Log.i(TAG, "Reconnect aborted due to session change")
+                    break
+                }
                 attempts++
                 Log.i(TAG, "Reconnect attempt #$attempts in ${delay}ms")
                 
@@ -219,6 +227,11 @@ class AwsWebSocketClient(
                     Log.w(TAG, "Reconnect attempt #$attempts failed", e)
                     delay = (delay * 2).coerceAtMost(MAX_RECONNECT_DELAY_MS)
                 }
+            }
+            
+            if (attempts >= MAX_RECONNECT_ATTEMPTS) {
+                Log.e(TAG, "Max reconnect attempts ($MAX_RECONNECT_ATTEMPTS) reached. Giving up.")
+                _connectionState.value = ConnectionState.Error("Max reconnect attempts reached")
             }
         }
     }

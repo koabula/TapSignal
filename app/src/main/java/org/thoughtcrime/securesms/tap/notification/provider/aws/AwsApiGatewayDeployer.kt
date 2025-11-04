@@ -11,6 +11,7 @@ import aws.sdk.kotlin.services.iam.IamClient
 import aws.sdk.kotlin.services.iam.model.*
 import aws.sdk.kotlin.services.lambda.LambdaClient
 import aws.sdk.kotlin.services.lambda.model.*
+import aws.sdk.kotlin.services.lambda.model.Cors as LambdaCors
 import aws.sdk.kotlin.services.s3.S3Client
 import aws.sdk.kotlin.services.s3.model.*
 import aws.sdk.kotlin.services.sts.StsClient
@@ -18,13 +19,15 @@ import aws.sdk.kotlin.services.sts.model.GetCallerIdentityRequest
 import aws.smithy.kotlin.runtime.content.ByteStream
 import aws.smithy.kotlin.runtime.content.toByteArray
 import kotlinx.coroutines.delay
+import org.json.JSONArray
 import org.json.JSONObject
 import org.thoughtcrime.securesms.tap.notification.*
 import java.util.UUID
 
 /**
  * AWS API Gateway推送服务部署器
- * 负责自动化部署Lambda函数、API Gateway WebSocket、DynamoDB和事件触发器
+ * 负责自动化部署Lambda函数、API Gateway WebSocket和事件触发器
+ * connectionId存储到用户配置的S3 bucket中
  */
 class AwsApiGatewayDeployer(
     private val context: Context,
@@ -40,9 +43,8 @@ class AwsApiGatewayDeployer(
         private const val CONNECT_FUNCTION_NAME = "tap-ws-connect"
         private const val DISCONNECT_FUNCTION_NAME = "tap-ws-disconnect"
         private const val DEFAULT_FUNCTION_NAME = "tap-ws-default"
-        private const val TABLE_NAME = "tap-ws-connections"
-        private const val CONFIG_BUCKET_PREFIX = "tap-notification-config"
-        private const val CONFIG_KEY = "notification-config.json"
+        private const val CONFIG_DIR = "tap-state"
+        private const val CONFIG_KEY = "tap-state/notification-config.json"
         private const val MAX_DEPLOYMENT_WAIT_SECONDS = 120
         
         private const val WEBHOOK_ASSET_NAME = "aws-webhook.zip"
@@ -64,6 +66,7 @@ class AwsApiGatewayDeployer(
     private var iamClient: IamClient? = null
     private var stsClient: StsClient? = null
     
+    private var userBucketName: String? = null
     private var configBucketName: String? = null
     private var deploymentInfo: NotificationDeployment? = null
     private var cachedAccountId: String? = null
@@ -71,11 +74,34 @@ class AwsApiGatewayDeployer(
     private var apiGatewayId: String? = null
     private var apiGatewayEndpoint: String? = null
 
+    /**
+     * 设置用户bucket名称（从COS provider配置中获取）
+     */
+    fun setUserBucketName(bucketName: String?) {
+        userBucketName = bucketName
+        if (!bucketName.isNullOrEmpty()) {
+            configBucketName = bucketName
+        }
+    }
+
     override suspend fun deployWebhook(): String {
         return try {
             Log.i(TAG, "Deploying webhook Lambda function...")
 
             val lambda = getLambdaClient()
+
+            // 清理已有的旧Webhook函数，避免遗留的URL/连接造成混乱
+            try {
+                val prevFunction = deploymentInfo?.webhookFunctionName
+                if (!prevFunction.isNullOrEmpty()) {
+                    Log.i(TAG, "Found previous webhook function, deleting: $prevFunction")
+                    lambda.deleteFunction(DeleteFunctionRequest { functionName = prevFunction })
+                    Log.d(TAG, "Previous webhook function deleted: $prevFunction")
+                }
+            } catch (cleanupErr: Exception) {
+                Log.w(TAG, "Failed to cleanup previous webhook function (continuing)", cleanupErr)
+            }
+
             val functionName = "$WEBHOOK_FUNCTION_NAME-${UUID.randomUUID().toString().take(8)}"
 
             val zipData = loadAsset(WEBHOOK_ASSET_NAME)
@@ -84,10 +110,12 @@ class AwsApiGatewayDeployer(
                 throw Exception("Must deploy push service before webhook")
             }
             
+            val roleArn = createOrGetLambdaExecutionRole()
+            
             val createRequest = CreateFunctionRequest {
                 this.functionName = functionName
                 this.runtime = Runtime.Nodejs20X
-                this.role = createOrGetLambdaExecutionRole()
+                this.role = roleArn
                 this.handler = "index.handler"
                 this.code = FunctionCode {
                     this.zipFile = zipData
@@ -95,11 +123,13 @@ class AwsApiGatewayDeployer(
                 this.timeout = 30
                 this.memorySize = 256
                 this.environment = Environment {
-                    variables = mapOf(
-                        "LOG_LEVEL" to "INFO",
-                        "CONNECTIONS_TABLE" to TABLE_NAME,
-                        "API_GATEWAY_ENDPOINT" to apiGatewayEndpoint!!
-                    )
+                    variables = buildMap {
+                        put("LOG_LEVEL", "INFO")
+                        // Management API 需要 HTTPS 端点
+                        val mgmtEndpoint = (apiGatewayEndpoint ?: "").replace("wss://", "https://")
+                        put("API_GATEWAY_ENDPOINT", mgmtEndpoint)
+                        // CONNECTIONS_BUCKET 将通过 updateWebhookEnvironment 设置
+                    }
                 }
             }
 
@@ -112,16 +142,61 @@ class AwsApiGatewayDeployer(
                 CreateFunctionUrlConfigRequest {
                     this.functionName = functionName
                     this.authType = FunctionUrlAuthType.None
-                    this.cors = Cors {
-                        allowOrigins = listOf("*")
-                        allowMethods = listOf("POST")
-                        allowHeaders = listOf("*")
+                    this.cors = LambdaCors {
+                        this.allowOrigins = listOf("*")
+                        this.allowMethods = listOf("POST")
+                        this.allowHeaders = listOf("*")
                     }
                 }
             )
 
             val webhookUrl = urlConfig.functionUrl ?: throw Exception("Failed to get function URL")
             Log.i(TAG, "Webhook deployed successfully: $webhookUrl")
+
+            // Add required Function URL permissions per AWS 2025-10 update
+            try {
+                lambda.addPermission(
+                    AddPermissionRequest {
+                        this.functionName = functionName
+                        this.statementId = "AllowFunctionUrlInvoke-${System.currentTimeMillis()}"
+                        this.action = "lambda:InvokeFunctionUrl"
+                        this.principal = "*"
+                        // Restrict to NONE auth type
+                        this.functionUrlAuthType = FunctionUrlAuthType.None
+                    }
+                )
+                Log.d(TAG, "Added permission: lambda:InvokeFunctionUrl for NONE auth")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to add lambda:InvokeFunctionUrl permission (may already exist)", e)
+            }
+
+            // P0修复：添加lambda:InvokeFunction权限（AWS 2025-10要求）
+            // 根据AWS文档，需要添加condition {lambda:InvokedViaFunctionUrl=true}限制只能通过Function URL调用
+            // 由于AWS SDK Kotlin的AddPermissionRequest不直接支持condition字段，
+            // 我们通过添加资源策略语句来实现相同的效果
+            try {
+                // 方法1：尝试通过addPermission添加基础权限
+                lambda.addPermission(
+                    AddPermissionRequest {
+                        this.functionName = functionName
+                        this.statementId = "AllowInvokeFunctionViaUrl-${System.currentTimeMillis()}"
+                        this.action = "lambda:InvokeFunction"
+                        this.principal = "*"
+                        // AWS SDK Kotlin目前不支持condition参数
+                        // 但Function URL的NONE auth type本身已提供了公开访问
+                        // Lambda函数内部会验证webhook签名，提供额外的安全层
+                    }
+                )
+                Log.d(TAG, "Added permission: lambda:InvokeFunction for Function URL access")
+                
+                // 方法2：记录到部署信息中，以便后续通过AWS CLI或Console手动添加condition
+                Log.i(TAG, "IMPORTANT: For enhanced security, manually add condition to the InvokeFunction permission:")
+                Log.i(TAG, "  Condition: { \"Bool\": { \"lambda:InvokedViaFunctionUrl\": \"true\" } }")
+                Log.i(TAG, "  This restricts invocation to Function URL only")
+                
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to add lambda:InvokeFunction permission (may already exist)", e)
+            }
 
             deploymentInfo = (deploymentInfo ?: createEmptyDeployment()).copy(
                 webhookFunctionName = functionName,
@@ -137,12 +212,14 @@ class AwsApiGatewayDeployer(
         }
     }
 
-    override suspend fun deployPushService(): PushServiceInfo {
+    override suspend fun deployPushService(userBucketName: String?): PushServiceInfo {
         return try {
             Log.i(TAG, "Deploying AWS API Gateway WebSocket push service...")
 
-            createDynamoDBTable()
-            
+            if (userBucketName.isNullOrEmpty()) {
+                throw Exception("User bucket name is required for connectionId storage")
+            }
+
             val roleArn = createOrGetLambdaExecutionRole()
             
             val connectFunctionArn = deployLambdaFunction(
@@ -151,7 +228,7 @@ class AwsApiGatewayDeployer(
                 handler = "index.handler",
                 envVars = mapOf(
                     "LOG_LEVEL" to "INFO",
-                    "CONNECTIONS_TABLE" to TABLE_NAME
+                    "CONNECTIONS_BUCKET" to userBucketName!!
                 ),
                 roleArn = roleArn
             )
@@ -162,7 +239,7 @@ class AwsApiGatewayDeployer(
                 handler = "index.handler",
                 envVars = mapOf(
                     "LOG_LEVEL" to "INFO",
-                    "CONNECTIONS_TABLE" to TABLE_NAME
+                    "CONNECTIONS_BUCKET" to userBucketName!!
                 ),
                 roleArn = roleArn
             )
@@ -196,13 +273,19 @@ class AwsApiGatewayDeployer(
                 endpoint = endpoint,
                 region = region,
                 credentials = mapOf(
-                    "apiGatewayId" to apiId,
-                    "tableName" to TABLE_NAME
+                    // Provider创建所需凭证（P0修复：添加accessKeyId和secretAccessKey）
+                    "apiKey" to accessKeyId,
+                    "accessKeyId" to accessKeyId,  // 兼容两种key名称
+                    "secretKey" to secretAccessKey,
+                    "secretAccessKey" to secretAccessKey,  // 兼容两种key名称
+                    // 现有元数据
+                    "apiGatewayId" to apiId
                 ),
                 metadata = mapOf(
                     "provider" to "aws-api-gateway",
                     "connectFunction" to connectFunctionArn,
-                    "disconnectFunction" to disconnectFunctionArn
+                    "disconnectFunction" to disconnectFunctionArn,
+                    "connectionsBucket" to userBucketName!!
                 )
             )
 
@@ -229,10 +312,12 @@ class AwsApiGatewayDeployer(
                 ""
             }
             
+            val roleArn = createOrGetLambdaExecutionRole()
+            
             val createRequest = CreateFunctionRequest {
                 this.functionName = functionName
                 this.runtime = Runtime.Nodejs20X
-                this.role = createOrGetLambdaExecutionRole()
+                this.role = roleArn
                 this.handler = "index.handler"
                 this.code = FunctionCode {
                     this.zipFile = zipData
@@ -405,7 +490,7 @@ class AwsApiGatewayDeployer(
         }
     }
 
-    suspend fun updateWebhookEnvironment(secret: String, userId: String): Boolean {
+    suspend fun updateWebhookEnvironment(secret: String, userId: String, bucketName: String?): Boolean {
         return try {
             val webhookFunctionName = deploymentInfo?.webhookFunctionName
             if (webhookFunctionName == null) {
@@ -413,7 +498,13 @@ class AwsApiGatewayDeployer(
                 return false
             }
             
+            if (bucketName.isNullOrEmpty()) {
+                Log.w(TAG, "Bucket name not provided, cannot update webhook environment")
+                return false
+            }
+            
             Log.i(TAG, "Updating webhook Lambda environment variables...")
+            Log.d(TAG, "[notifySecret调试] B端部署: notifySecret=${secret.take(4)}...${secret.takeLast(4)} (长度=${secret.length})")
             
             val lambda = getLambdaClient()
             
@@ -423,8 +514,9 @@ class AwsApiGatewayDeployer(
                     this.environment = Environment {
                         variables = mapOf(
                             "LOG_LEVEL" to "INFO",
-                            "CONNECTIONS_TABLE" to TABLE_NAME,
-                            "API_GATEWAY_ENDPOINT" to (apiGatewayEndpoint ?: ""),
+                            "CONNECTIONS_BUCKET" to bucketName!!,
+                            // Management API 需要 HTTPS 端点
+                            "API_GATEWAY_ENDPOINT" to ((apiGatewayEndpoint ?: "").replace("wss://", "https://")),
                             "NOTIFY_SECRET" to secret
                         )
                     }
@@ -432,6 +524,7 @@ class AwsApiGatewayDeployer(
             )
             
             Log.i(TAG, "Webhook environment updated successfully")
+            Log.d(TAG, "[notifySecret调试] B端Lambda环境变量已设置: functionName=$webhookFunctionName")
             true
             
         } catch (e: Exception) {
@@ -472,7 +565,7 @@ class AwsApiGatewayDeployer(
             Log.i(TAG, "Configuration saved successfully")
 
             deploymentInfo = deploymentInfo?.copy(
-                deploymentStatus = DeploymentStatus.DEPLOYED
+                deploymentStatus = org.thoughtcrime.securesms.tap.notification.DeploymentStatus.DEPLOYED
             )
 
         } catch (e: Exception) {
@@ -542,73 +635,6 @@ class AwsApiGatewayDeployer(
         }
     }
 
-    private suspend fun createDynamoDBTable() {
-        try {
-            Log.i(TAG, "Creating DynamoDB table: $TABLE_NAME")
-            
-            val dynamoDB = getDynamoDbClient()
-            
-            try {
-                dynamoDB.describeTable(
-                    DescribeTableRequest {
-                        tableName = TABLE_NAME
-                    }
-                )
-                Log.d(TAG, "DynamoDB table already exists: $TABLE_NAME")
-                return
-            } catch (e: Exception) {
-                Log.d(TAG, "Table does not exist, creating...")
-            }
-            
-            dynamoDB.createTable(
-                CreateTableRequest {
-                    tableName = TABLE_NAME
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "userId"
-                            keyType = KeyType.Hash
-                        }
-                    )
-                    attributeDefinitions = listOf(
-                        AttributeDefinition {
-                            attributeName = "userId"
-                            attributeType = ScalarAttributeType.S
-                        }
-                    )
-                    billingMode = BillingMode.PayPerRequest
-                    timeToLiveSpecification = TimeToLiveSpecification {
-                        enabled = true
-                        attributeName = "ttl"
-                    }
-                }
-            )
-            
-            Log.i(TAG, "DynamoDB table created successfully")
-            
-            var attempts = 0
-            while (attempts < 30) {
-                try {
-                    val desc = dynamoDB.describeTable(
-                        DescribeTableRequest {
-                            tableName = TABLE_NAME
-                        }
-                    )
-                    if (desc.table?.tableStatus == TableStatus.Active) {
-                        Log.d(TAG, "Table is active")
-                        return
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "Waiting for table to become active...")
-                }
-                delay(2000)
-                attempts++
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create DynamoDB table", e)
-            throw Exception("DynamoDB table creation failed: ${e.message}", e)
-        }
-    }
 
     private suspend fun deployLambdaFunction(
         name: String,
@@ -830,19 +856,14 @@ class AwsApiGatewayDeployer(
                           "Effect": "Allow",
                           "Action": [
                             "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
                             "s3:ListBucket"
                           ],
-                          "Resource": "*"
-                        },
-                        {
-                          "Effect": "Allow",
-                          "Action": [
-                            "dynamodb:PutItem",
-                            "dynamodb:GetItem",
-                            "dynamodb:DeleteItem",
-                            "dynamodb:Query"
-                          ],
-                          "Resource": "arn:aws:dynamodb:$region:$accountId:table/$TABLE_NAME"
+                          "Resource": [
+                            "arn:aws:s3:::*",
+                            "arn:aws:s3:::*/*"
+                          ]
                         },
                         {
                           "Effect": "Allow",
@@ -947,10 +968,10 @@ class AwsApiGatewayDeployer(
                     os.write(testPayload.toByteArray())
                 }
                 
-                val responseCode = connection.responseCode
-                Log.d(TAG, "Webhook response code: $responseCode")
-                
-                responseCode in 200..299 || responseCode == 403
+            val responseCode = connection.responseCode
+            Log.d(TAG, "Webhook response code: $responseCode")
+            
+            responseCode in 200..299
                 
             } finally {
                 connection.disconnect()
@@ -1025,6 +1046,103 @@ class AwsApiGatewayDeployer(
         }
     }
 
+    /**
+     * 客户端直接调用触发器Lambda函数（方案二：替代S3事件触发）
+     * 
+     * @param remotePath 上传文件的路径（如 v2-channels/{hash}/messages/xxx.dat）
+     * @param bucketName S3 bucket名称
+     * @return 是否成功触发（异步调用，不等待结果）
+     */
+    suspend fun invokeTriggerFunction(
+        remotePath: String,
+        bucketName: String
+    ): Boolean {
+        return try {
+            var functionName = deploymentInfo?.triggerFunctionName
+            if (functionName.isNullOrEmpty()) {
+                // Attempt to discover the trigger function by listing functions
+                try {
+                    val lambda = getLambdaClient()
+                    val list = lambda.listFunctions(ListFunctionsRequest {})
+                    val matched = list.functions?.firstOrNull { it.functionName?.startsWith(TRIGGER_FUNCTION_NAME) == true }
+                    if (matched?.functionName != null) {
+                        functionName = matched.functionName
+                        // cache to deploymentInfo for subsequent calls
+                        deploymentInfo = (deploymentInfo ?: createEmptyDeployment()).copy(
+                            triggerFunctionName = functionName!!,
+                            triggerFunctionArn = matched.functionArn ?: (deploymentInfo?.triggerFunctionArn ?: "")
+                        )
+                        Log.i(TAG, "Discovered trigger function: $functionName")
+                    } else {
+                        Log.w(TAG, "Trigger function name not found via discovery")
+                        return false
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to discover trigger function", e)
+                    return false
+                }
+            }
+
+            Log.d(TAG, "Invoking trigger function: $functionName for path: $remotePath")
+
+            val lambda = getLambdaClient()
+
+            // 构造S3事件格式（模拟S3事件通知）
+            val s3Event = createS3Event(remotePath, bucketName)
+
+            // 调用AWS Lambda Invoke API（异步调用）
+            val invokeRequest = InvokeRequest {
+                this.functionName = functionName
+                this.invocationType = InvocationType.Event  // 异步调用
+                this.payload = s3Event.toString().toByteArray()
+            }
+
+            lambda.invoke(invokeRequest)
+
+            Log.i(TAG, "Trigger function invoked successfully: $functionName")
+            true
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to invoke trigger function", e)
+            false
+        }
+    }
+
+    /**
+     * 构造S3事件格式（模拟S3事件通知）
+     * 格式与aws-f-a.js期望的事件格式一致
+     */
+    private fun createS3Event(key: String, bucketName: String): JSONObject {
+        return JSONObject().apply {
+            put("Records", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("eventVersion", "2.1")
+                    put("eventSource", "aws:s3")
+                    put("awsRegion", region)
+                    put("eventTime", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                        .format(java.util.Date()))
+                    put("eventName", "ObjectCreated:Put")
+                    put("s3", JSONObject().apply {
+                        put("s3SchemaVersion", "1.0")
+                        put("configurationId", "tap-notification-trigger")
+                        put("bucket", JSONObject().apply {
+                            put("name", bucketName)
+                            put("arn", "arn:aws:s3:::$bucketName")
+                        })
+                        put("object", JSONObject().apply {
+                            put("key", key)
+                            put("size", 0)  // 客户端调用时无法确定文件大小
+                            put("eTag", UUID.randomUUID().toString())
+                        })
+                    })
+                })
+            })
+            // 添加requestId用于日志追踪
+            put("requestId", UUID.randomUUID().toString())
+        }
+    }
+
     private fun getLambdaClient(): LambdaClient {
         if (lambdaClient == null) {
             lambdaClient = LambdaClient {
@@ -1085,70 +1203,22 @@ class AwsApiGatewayDeployer(
         return stsClient!!
     }
 
+    /**
+     * 获取配置bucket名称（使用用户现有的bucket，不再创建新bucket）
+     * 配置文件存储在用户bucket的 tap-state/notification-config.json
+     */
     private suspend fun getOrCreateConfigBucket(): String {
         if (configBucketName != null) {
             return configBucketName!!
         }
 
-        val bucketName = "$CONFIG_BUCKET_PREFIX-${UUID.randomUUID().toString().take(8)}"
-        Log.i(TAG, "Creating S3 bucket: $bucketName")
-
-        try {
-            val s3 = getS3Client()
-            
-            val headRequest = HeadBucketRequest {
-                bucket = bucketName
-            }
-            
-            try {
-                s3.headBucket(headRequest)
-                Log.d(TAG, "Bucket already exists: $bucketName")
-            } catch (e: Exception) {
-                val createRequest = CreateBucketRequest {
-                    bucket = bucketName
-                    if (region != "us-east-1") {
-                        createBucketConfiguration = CreateBucketConfiguration {
-                            locationConstraint = BucketLocationConstraint.fromValue(region)
-                        }
-                    }
-                }
-                
-                s3.createBucket(createRequest)
-                Log.i(TAG, "S3 bucket created successfully: $bucketName")
-                
-                val versioningRequest = PutBucketVersioningRequest {
-                    bucket = bucketName
-                    versioningConfiguration = VersioningConfiguration {
-                        status = BucketVersioningStatus.Enabled
-                    }
-                }
-                s3.putBucketVersioning(versioningRequest)
-                Log.d(TAG, "Bucket versioning enabled")
-                
-                val encryptionRequest = PutBucketEncryptionRequest {
-                    bucket = bucketName
-                    serverSideEncryptionConfiguration = ServerSideEncryptionConfiguration {
-                        rules = listOf(
-                            ServerSideEncryptionRule {
-                                applyServerSideEncryptionByDefault = ServerSideEncryptionByDefault {
-                                    sseAlgorithm = ServerSideEncryption.Aes256
-                                }
-                                bucketKeyEnabled = true
-                            }
-                        )
-                    }
-                }
-                s3.putBucketEncryption(encryptionRequest)
-                Log.d(TAG, "Bucket encryption enabled")
-            }
-            
-            configBucketName = bucketName
-            return bucketName
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create S3 bucket", e)
-            throw Exception("S3 bucket creation failed: ${e.message}", e)
+        if (!userBucketName.isNullOrEmpty()) {
+            Log.i(TAG, "Using user bucket for configuration storage: $userBucketName")
+            configBucketName = userBucketName!!
+            return userBucketName!!
         }
+
+        throw Exception("User bucket name is required. Please configure COS provider first.")
     }
 
     private fun loadAsset(assetName: String): ByteArray {
@@ -1169,7 +1239,7 @@ class AwsApiGatewayDeployer(
             triggerFunctionArn = "",
             eventTriggerConfigured = false,
             deployedComponents = emptyList(),
-            deploymentStatus = DeploymentStatus.DEPLOYING
+            deploymentStatus = org.thoughtcrime.securesms.tap.notification.DeploymentStatus.DEPLOYING
         )
     }
 
@@ -1226,13 +1296,13 @@ class AwsApiGatewayDeployer(
                 }
                 val inlinePoliciesResponse = iam.listRolePolicies(listInlinePoliciesRequest)
                 
-                inlinePoliciesResponse.policyNames?.forEach { policyName ->
+                inlinePoliciesResponse.policyNames?.forEach { policyNameValue ->
                     val deleteInlinePolicyRequest = DeleteRolePolicyRequest {
                         roleName = name
-                        policyName = policyName
+                        policyName = policyNameValue
                     }
                     iam.deleteRolePolicy(deleteInlinePolicyRequest)
-                    Log.d(TAG, "Deleted inline policy: $policyName")
+                    Log.d(TAG, "Deleted inline policy: $policyNameValue")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to delete inline policies from role: $name", e)
@@ -1274,42 +1344,10 @@ class AwsApiGatewayDeployer(
     }
     
     override suspend fun deleteDynamoDBTable(identifier: String, name: String): Boolean {
-        return try {
-            Log.i(TAG, "Deleting DynamoDB table: $name")
-            
-            val dynamodb = getDynamoDbClient()
-            
-            val deleteRequest = aws.sdk.kotlin.services.dynamodb.model.DeleteTableRequest {
-                tableName = name
-            }
-            
-            dynamodb.deleteTable(deleteRequest)
-            
-            Log.i(TAG, "DynamoDB table deletion initiated: $name")
-            
-            var attempts = 0
-            val maxAttempts = 30
-            while (attempts < maxAttempts) {
-                try {
-                    val describeRequest = DescribeTableRequest {
-                        tableName = name
-                    }
-                    dynamodb.describeTable(describeRequest)
-                    delay(2000)
-                    attempts++
-                } catch (e: Exception) {
-                    Log.i(TAG, "DynamoDB table deleted successfully: $name")
-                    return@try true
-                }
-            }
-            
-            Log.w(TAG, "DynamoDB table deletion timeout: $name")
-            true
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete DynamoDB table: $name", e)
-            false
-        }
+        // 不再使用DynamoDB表，connectionId存储在S3中
+        // 如果需要清理，可以通过删除S3中的tap-ws-connections/目录来实现
+        Log.d(TAG, "deleteDynamoDBTable called but no longer needed (using S3 storage)")
+        return true
     }
 
     override fun cleanup() {

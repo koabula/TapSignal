@@ -7,7 +7,7 @@ interface NotificationDeployer {
     
     suspend fun deployWebhook(): String
     
-    suspend fun deployPushService(): PushServiceInfo
+    suspend fun deployPushService(userBucketName: String? = null): PushServiceInfo
     
     suspend fun setupEventTrigger(userBucketName: String? = null): TriggerInfo
     

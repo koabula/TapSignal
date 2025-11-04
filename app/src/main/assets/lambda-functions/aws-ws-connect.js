@@ -1,21 +1,22 @@
 /**
  * AWS Lambda WebSocket $connect Handler
  * 
- * 功能：处理WebSocket连接事件，保存connectionId到DynamoDB
+ * 功能：处理WebSocket连接事件，保存connectionId到S3
  * 
  * 触发方式：API Gateway WebSocket $connect 路由
  * 输入：event.requestContext.connectionId, event.queryStringParameters.userId
  * 输出：{ statusCode: 200 } 或错误响应
  */
 
-const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
-const TABLE_NAME = process.env.CONNECTIONS_TABLE || 'tap-ws-connections';
+const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
+const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const TTL_HOURS = 24;
 
-const dynamodbClient = new DynamoDBClient({
-    region: process.env.AWS_REGION
+const s3Client = new S3Client({
+    region: AWS_REGION
 });
 
 function log(level, message, data = {}) {
@@ -54,25 +55,41 @@ exports.handler = async (event) => {
             };
         }
         
+        if (!BUCKET_NAME) {
+            log('ERROR', 'CONNECTIONS_BUCKET not configured', { requestId });
+            return {
+                statusCode: 500,
+                body: 'Server configuration error'
+            };
+        }
+        
         const now = Math.floor(Date.now() / 1000);
         const ttl = now + (TTL_HOURS * 3600);
         
-        const command = new PutItemCommand({
-            TableName: TABLE_NAME,
-            Item: {
-                userId: { S: userId },
-                connectionId: { S: connectionId },
-                connectedAt: { N: now.toString() },
-                ttl: { N: ttl.toString() }
-            }
+        const connectionData = {
+            userId: userId,
+            connectionId: connectionId,
+            connectedAt: now,
+            ttl: ttl
+        };
+        
+        const key = `tap-ws-connections/${userId}.json`;
+        
+        const command = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            Body: JSON.stringify(connectionData),
+            ContentType: 'application/json'
         });
         
-        await dynamodbClient.send(command);
+        await s3Client.send(command);
         
-        log('INFO', 'Connection saved to DynamoDB', {
+        log('INFO', 'Connection saved to S3', {
             requestId,
             userId,
             connectionId,
+            bucket: BUCKET_NAME,
+            key: key,
             ttl
         });
         

@@ -43,6 +43,24 @@ class CloudFunctionDeployer(
                 
                 if (triggerInfo.validate()) {
                     Log.i(TAG, "云函数F_A部署成功: ${triggerInfo.triggerName}")
+                    // Configure S3 event notifications for AWS provider
+                    if (cosConfig.provider == CosConfig.Provider.AWS && deployer is AwsApiGatewayDeployer) {
+                        try {
+                            val awsDeployer = deployer as AwsApiGatewayDeployer
+                            if (!cosConfig.bucketName.isNullOrEmpty() && triggerInfo.triggerArn != null) {
+                                val configured = awsDeployer.configureS3EventNotification(
+                                    userBucketName = cosConfig.bucketName!!,
+                                    triggerFunctionArn = triggerInfo.triggerArn!!,
+                                    filterPrefix = "v2-channels/"
+                                )
+                                Log.i(TAG, "S3 event notification configured: $configured")
+                            } else {
+                                Log.w(TAG, "Bucket name or triggerArn missing; skip S3 event notification configuration")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "配置S3事件通知失败（将继续部署流程）", e)
+                        }
+                    }
                     triggerInfo
                 } else {
                     Log.e(TAG, "云函数F_A部署失败: 验证失败")
@@ -172,7 +190,7 @@ class CloudFunctionDeployer(
                     )
                 )
                 
-                val pushServiceInfo = notificationDeployer.deployPushService()
+                val pushServiceInfo = notificationDeployer.deployPushService(userBucketName = cosConfig.bucketName)
                 Log.d(TAG, "推送服务部署完成: ${pushServiceInfo.endpoint}")
                 
                 tracker.recordCheckpoint(
@@ -232,12 +250,12 @@ class CloudFunctionDeployer(
                 if (cosConfig.provider == CosConfig.Provider.AWS && deployer is AwsApiGatewayDeployer) {
                     val awsDeployer = deployer as AwsApiGatewayDeployer
                     val topicId = pushServiceInfo.credentials["topicId"] ?: ""
-                    awsDeployer.updateWebhookEnvironment(notifySecret, topicId)
+                    awsDeployer.updateWebhookEnvironment(notifySecret, topicId, cosConfig.bucketName)
                     Log.d(TAG, "Webhook环境变量已更新")
                 } else if (cosConfig.provider == CosConfig.Provider.TENCENT && deployer is TencentApiGatewayDeployer) {
                     val tencentDeployer = deployer as TencentApiGatewayDeployer
                     val topicId = pushServiceInfo.credentials["topicId"] ?: ""
-                    tencentDeployer.updateWebhookEnvironment(notifySecret, topicId)
+                    tencentDeployer.updateWebhookEnvironment(notifySecret, topicId, cosConfig.bucketName)
                     Log.d(TAG, "Webhook环境变量已更新")
                 }
                 
@@ -350,7 +368,9 @@ class CloudFunctionDeployer(
                     accessKeyId = cosConfig.secretId,
                     secretAccessKey = cosConfig.secretKey,
                     region = cosConfig.region
-                )
+                ).apply {
+                    setUserBucketName(cosConfig.bucketName)
+                }
             }
             CosConfig.Provider.TENCENT -> {
                 TencentApiGatewayDeployer(
@@ -358,7 +378,9 @@ class CloudFunctionDeployer(
                     secretId = cosConfig.secretId,
                     secretKey = cosConfig.secretKey,
                     region = cosConfig.region
-                )
+                ).apply {
+                    setUserBucketName(cosConfig.bucketName)
+                }
             }
             else -> {
                 Log.w(TAG, "不支持的provider: ${cosConfig.provider}")
@@ -430,7 +452,7 @@ class CloudFunctionDeployer(
             val topicId = config.pushServiceInfo.credentials["topicId"] ?: ""
             
             // 更新Webhook函数环境变量
-            val webhookSuccess = tencentDeployer.updateWebhookEnvironment(notifySecret, topicId)
+            val webhookSuccess = tencentDeployer.updateWebhookEnvironment(notifySecret, topicId, cosConfig.bucketName)
             
             if (webhookSuccess) {
                 Log.i(TAG, "腾讯云云函数环境变量配置成功")

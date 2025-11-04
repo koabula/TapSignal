@@ -39,9 +39,13 @@ object JsonSerializer {
             null -> JSONObject.NULL
             is Map<*, *> -> {
                 val orderedMap = LinkedHashMap<String, Any?>()
-                value.keys.filterIsInstance<String>().forEach { key ->
-                    orderedMap[key] = convertValue(value[key])
-                }
+                // 深度排序：对键名进行字典序排序，确保稳定序列化
+                value.keys
+                    .filterIsInstance<String>()
+                    .sorted()
+                    .forEach { key ->
+                        orderedMap[key] = convertValue(value[key])
+                    }
                 JSONObject(orderedMap)
             }
             is List<*> -> {

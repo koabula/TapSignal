@@ -1,18 +1,879 @@
-2025-10-29 17:10:35.278  9402-9437  IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
-2025-10-29 17:10:35.283  9402-9437  Job                     org.thoughtcrime.securesms           I  [JOB::99145b8f-37ae-4eda-ad1e-63d3797a4c70][IndividualSendJob] onSubmit() (Time Since Submission: 9 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::8)
+--------- beginning of main
+--------- beginning of system
+2025-11-04 09:27:49.751  7009-7143  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting existing WebSocket connection: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:27:49.751  7009-7143  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
+2025-11-04 09:27:49.751  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
+2025-11-04 09:27:49.752  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:27:49.753  7009-7143  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:27:50.254  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
+2025-11-04 09:27:50.255  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:27:50.301 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:52592 --> ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:27:50.533  7009-7166  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:50.534  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #1 in 1000ms
 --------- beginning of kernel
-
-
-2025-10-29 17:10:35.276  9402-9437  TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
-2025-10-29 17:10:35.278  9402-9437  IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
-2025-10-29 17:10:35.283  9402-9437  Job                     org.thoughtcrime.securesms           I  [JOB::99145b8f-37ae-4eda-ad1e-63d3797a4c70][IndividualSendJob] onSubmit() (Time Since Submission: 9 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::8)
-2025-10-29 17:10:35.283  1526-1526  GoogleInpu...hodService com...gle.android.inputmethod.latin  I  GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[mParcelledData.dataSize=240]}, true)
-2025-10-29 17:10:35.293  1526-1526  GoogleInpu...hodService com...gle.android.inputmethod.latin  I  GoogleInputMethodService.onStartInputView():1995 onStartInputView(EditorInfo{inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, android.support.text.emoji.emojiCompat_replaceAll=false}]}, true)
-2025-10-29 17:10:35.327  1526-1526  AndroidIME              com...gle.android.inputmethod.latin  I  AbstractIme.onActivate():86 LatinIme.onActivate() : EditorInfo = inputType=0x2c001(Normal) imeOptions=0x40000004 privateImeOptions=null actionName=SEND actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x3000 hintText=non-empty label=null packageName=org.thoughtcrime.securesms fieldId=2131363219 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, android.support.text.emoji.emojiCompat_replaceAll=false}], IncognitoMode = false, DeviceLocked = false
---------- beginning of kernel
-2025-10-29 17:10:38.445   382-10239 resolv                  netd                                 I  res_nsend: used send_dg 113 terrno: 0
-2025-10-29 17:10:39.843   382-10242 resolv                  netd                                 I  res_nsend: used send_dg 77 terrno: 0
-2025-10-29 17:10:54.544  9402-9437  SignalServ...sageSender org.thoughtcrime.securesms           W  [sendMessage][1761729033535] Pipe failed, falling back... (SocketException: Connection terminated unexpectedly)
-2025-10-29 17:10:54.552  9402-9437  SignalServ...sageSender org.thoughtcrime.securesms           W  [sendMessage][1761729034338] pipe failed, falling back... (SocketException: Connection terminated unexpectedly)
-2025-10-29 17:10:56.841  9402-9437  SealedSenderAccessUtil  org.thoughtcrime.securesms           I  Unidentified: 0, Other: 1
-2025-10-29 17:10:56.841  9402-9437  LibSignalChatConnection org.thoughtcrime.securesms           I  [sendRequest] Enqueuing request send for after connection
+2025-11-04 09:27:51.538  7009-7115  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:27:51.642  7009-7166  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:51.643  7009-7115  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #1 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:51.645  7009-7115  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #2 in 2000ms
+2025-11-04 09:27:53.648  7009-7115  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:27:53.734  7009-7166  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:53.736  7009-7043  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #2 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:53.737  7009-7043  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #3 in 4000ms
+2025-11-04 09:27:57.741  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:27:57.829  7009-7166  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:57.831  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #3 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:27:57.831  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #4 in 8000ms
+2025-11-04 09:27:58.537  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting existing WebSocket connection: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:27:58.537  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
+2025-11-04 09:27:58.537  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
+2025-11-04 09:27:58.538  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:27:58.539  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:27:59.046  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
+2025-11-04 09:27:59.048  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:27:59.116 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:52928 --> ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:27:59.153  7009-7183  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
+                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+                                                                                                    Caused by: java.io.EOFException: connection closed
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530) 
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145) 
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644) 
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012) 
+2025-11-04 09:27:59.155  7009-7115  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #1 in 1000ms
+2025-11-04 09:28:00.158  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:00.211 32070-32101 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:52936 --> ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:00.423  7009-7183  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:00.429  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #1 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:00.431  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #2 in 2000ms
+2025-11-04 09:28:01.985  7009-7052  TapConfigViewModel      org.thoughtcrime.securesms           I  开始部署推送服务: providerType=aws-api-gateway, source=MANUAL
+2025-11-04 09:28:01.988  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Starting deployment for region: ap-southeast-1
+2025-11-04 09:28:01.988  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Cleaning up old WebSocket connections before deployment...
+2025-11-04 09:28:01.988  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
+2025-11-04 09:28:01.989  7009-7052  NotificationProviderFac org.thoughtcrime.securesms           I  AWS API Gateway Provider 创建成功: region=ap-southeast-1
+2025-11-04 09:28:01.989  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:28:02.047  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying AWS API Gateway WebSocket push service...
+2025-11-04 09:28:02.438  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:02.541  7009-7183  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:02.547  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #2 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:02.547  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #3 in 4000ms
+2025-11-04 09:28:02.547 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:52946 --> sts.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:03.167  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  AWS Account ID: 085230022535
+2025-11-04 09:28:03.239 32070-32132 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:36420 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:04.311  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-connect-d6acb149
+2025-11-04 09:28:04.487 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:36430 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:05.304  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
+2025-11-04 09:28:06.553  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:06.637  7009-7183  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:06.639  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #3 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:06.641  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #4 in 8000ms
+2025-11-04 09:28:10.464  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-connect-d6acb149
+2025-11-04 09:28:10.466  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-connect-d6acb149
+2025-11-04 09:28:10.466  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-disconnect-9c144fbf
+2025-11-04 09:28:11.345  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
+2025-11-04 09:28:14.643  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:14.729  7009-7183  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:14.730  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #4 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:14.731  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #5 in 16000ms
+2025-11-04 09:28:15.159  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting existing WebSocket connection: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:28:15.159  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
+2025-11-04 09:28:15.159  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
+2025-11-04 09:28:15.160  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:28:15.160  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:28:15.662  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
+2025-11-04 09:28:15.662  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:15.714 32070-32132 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:53392 --> ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:15.950  7009-7192  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:15.951  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #1 in 1000ms
+2025-11-04 09:28:16.516  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-disconnect-9c144fbf
+2025-11-04 09:28:16.516  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-disconnect-9c144fbf
+2025-11-04 09:28:16.516  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-default-ccdad6cd
+2025-11-04 09:28:16.954  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:17.043  7009-7192  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:17.044  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #1 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:17.044  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #2 in 2000ms
+2025-11-04 09:28:17.090  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
+2025-11-04 09:28:19.046  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:19.149  7009-7192  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:19.150  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #2 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:19.150  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #3 in 4000ms
+2025-11-04 09:28:22.310  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-default-ccdad6cd
+2025-11-04 09:28:22.311  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-default-ccdad6cd
+2025-11-04 09:28:22.311  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Creating API Gateway WebSocket API...
+2025-11-04 09:28:22.411 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:53398 --> apigateway.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:23.152  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:23.239  7009-7192  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:23.240  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #3 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:23.240  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #4 in 8000ms
+2025-11-04 09:28:23.647  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  API created: 76jbb37i94
+2025-11-04 09:28:24.254  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $connect
+2025-11-04 09:28:24.782  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $disconnect
+2025-11-04 09:28:25.307  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $default
+2025-11-04 09:28:25.743  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Stage created: prod
+2025-11-04 09:28:25.743  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  WebSocket API created: wss://76jbb37i94.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:28:25.743  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  API Gateway WebSocket deployed: wss://76jbb37i94.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:28:25.745  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Push service deployed: wss://76jbb37i94.execute-api.ap-southeast-1.amazonaws.com/prod
+2025-11-04 09:28:25.745  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying webhook Lambda function...
+2025-11-04 09:28:26.154  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Lambda function created: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-notification-webhook-b97c9b8c
+2025-11-04 09:28:26.384  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
+2025-11-04 09:28:31.242  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://ut9y3l3gnk.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:31.346  7009-7192  AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:31.347  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #4 failed
+                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
+                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2025-11-04 09:28:31.347  7009-7143  AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #5 in 16000ms
+2025-11-04 09:28:31.539  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-notification-webhook-b97c9b8c
+2025-11-04 09:28:31.780  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Webhook deployed successfully: https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 09:28:31.945  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added permission: lambda:InvokeFunctionUrl for NONE auth
+2025-11-04 09:28:32.123  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added permission: lambda:InvokeFunction for Function URL access
+2025-11-04 09:28:32.123  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  IMPORTANT: For enhanced security, manually add condition to the InvokeFunction permission:
+2025-11-04 09:28:32.123  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I    Condition: { "Bool": { "lambda:InvokedViaFunctionUrl": "true" } }
+2025-11-04 09:28:32.123  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I    This restricts invocation to Function URL only
+2025-11-04 09:28:32.123  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Webhook deployed: https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 09:28:32.124  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Setting up S3 event trigger...
+2025-11-04 09:28:32.125  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Using user bucket for CONFIG_BUCKET: signaltest2
+2025-11-04 09:28:32.622  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Trigger function created: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-notification-trigger-c1bd91eb
+2025-11-04 09:28:32.781  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
+2025-11-04 09:28:37.978  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-notification-trigger-c1bd91eb
+2025-11-04 09:28:38.144  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  S3 invoke permission added to Lambda function
+2025-11-04 09:28:38.145  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Event trigger configured: tap-notification-trigger-c1bd91eb
+2025-11-04 09:28:38.145  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Attempting to configure S3 event notification (optional, client-triggered mode is primary)
+2025-11-04 09:28:38.145  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Configuring S3 event notification on bucket: signaltest2
+2025-11-04 09:28:38.297  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added Lambda permission for S3 to invoke function
+2025-11-04 09:28:38.450 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:48844 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:39.226  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  S3 event notification configured successfully
+2025-11-04 09:28:39.226  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  S3 event notification configured successfully (fallback mode)
+2025-11-04 09:28:39.226  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Updating webhook Lambda environment variables...
+2025-11-04 09:28:39.227  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  [notifySecret调试] B端部署: notifySecret=8c4a...5c3e (长度=32)
+2025-11-04 09:28:39.515  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Webhook environment updated successfully
+2025-11-04 09:28:39.515  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  [notifySecret调试] B端Lambda环境变量已设置: functionName=tap-notification-webhook-b97c9b8c
+2025-11-04 09:28:39.515  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Saving configuration to S3...
+2025-11-04 09:28:39.634  7009-7009  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Configuration saved successfully
+2025-11-04 09:28:39.635  7009-7052  NotificationConfigManag org.thoughtcrime.securesms           I  保存本地推送服务配置: provider=aws-api-gateway
+2025-11-04 09:28:39.635  7009-7052  TransportProviderConfig org.thoughtcrime.securesms           I  保存推送服务配置: provider=aws-api-gateway
+2025-11-04 09:28:39.639  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  配置已保存到本地数据库: provider=aws-api-gateway
+2025-11-04 09:28:39.639  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Deployment completed successfully
+2025-11-04 09:28:39.640  7009-7052  NotificationConfigManag org.thoughtcrime.securesms           I  保存本地推送服务配置: provider=aws-api-gateway
+2025-11-04 09:28:39.641  7009-7052  TransportProviderConfig org.thoughtcrime.securesms           I  保存推送服务配置: provider=aws-api-gateway
+2025-11-04 09:28:39.641  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
+2025-11-04 09:28:39.641  7009-7009  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
+2025-11-04 09:28:39.641  7009-7052  TapConfigViewModel      org.thoughtcrime.securesms           I  推送服务部署成功: providerType=aws-api-gateway, 配置已保存到本地数据库
+2025-11-04 09:28:39.641  7009-7009  AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:28:39.642  7009-7009  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
+2025-11-04 09:28:39.643  7009-7052  NotificationProviderFac org.thoughtcrime.securesms           I  AWS API Gateway Provider 创建成功: region=ap-southeast-1
+2025-11-04 09:28:39.643  7009-7052  NotificationManager     org.thoughtcrime.securesms           I  推送服务管理器初始化成功: aws-api-gateway
+2025-11-04 09:28:47.953  7009-7044  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
+2025-11-04 09:28:47.954  7009-7044  AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://76jbb37i94.execute-api.ap-southeast-1.amazonaws.com/prod?userId=fa33c08f7b594d64
+2025-11-04 09:28:48.008 32070-32132 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50946 --> 76jbb37i94.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:28:49.248  7009-7200  AwsWebSocketClient      org.thoughtcrime.securesms           I  WebSocket connection opened
+2025-11-04 09:28:49.250  7009-7143  AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connected successfully with user ID: fa33c08f7b594d64
+2025-11-04 09:29:09.605  7009-7170  OpenGLRenderer          org.thoughtcrime.securesms           I  Davey! duration=984ms; Flags=1, FrameTimelineVsyncId=23604087, IntendedVsync=61706414304386, Vsync=61707164304356, InputEventId=0, HandleInputStart=61707181394100, AnimationStart=61707181411500, PerformTraversalsStart=61707183600300, DrawStart=61707358228900, FrameDeadline=61706430971052, FrameInterval=61707180580000, FrameStartTime=16666666, SyncQueued=61707365642900, SyncStart=61707366103300, IssueDrawCommandsStart=61707366285800, SwapBuffers=61707384228400, FrameCompleted=61707399340900, DequeueBufferDuration=24200, QueueBufferDuration=326900, GpuCompleted=61707399340900, SwapBuffersCompleted=61707386590500, DisplayPresentTime=288234774265332736, CommandSubmissionCompleted=61707384228400, 
+2025-11-04 09:29:13.972  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
+2025-11-04 09:29:13.972  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
+2025-11-04 09:29:13.973  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
+2025-11-04 09:29:13.973  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
+2025-11-04 09:29:13.974  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
+2025-11-04 09:29:13.974  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
+2025-11-04 09:29:13.979  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:13.979  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219753959/
+2025-11-04 09:29:13.979  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219753959/
+2025-11-04 09:29:13.980  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:13.981  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:13.981  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:13.985  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:13.991  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:13.992  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:13.992  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:14.054 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50364 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:14.298  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:14.299  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:14.299  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:14.299  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:14.299  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:14.300  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219753959/outbox/
+2025-11-04 09:29:14.300  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219753959/outbox/
+2025-11-04 09:29:14.300  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:14.301  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:14.301  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:14.303  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:14.304  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:14.304  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:14.305  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:14.666  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:14.666  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:14.667  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:14.667  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:14.668  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:14.670  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219753959/outbox/messages/
+2025-11-04 09:29:14.670  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219753959/outbox/messages/
+2025-11-04 09:29:14.670  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:14.671  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:14.671  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:14.678  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:14.678  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:14.678  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:14.679  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:14.784  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:14.785  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:14.785  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:14.786  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:14.786  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:14.786  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219753959/outbox/attachments/
+2025-11-04 09:29:14.786  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219753959/outbox/attachments/
+2025-11-04 09:29:14.787  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:14.787  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:14.787  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:14.789  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:14.789  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:14.790  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:14.790  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:14.893  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:14.894  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:14.894  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:14.895  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:14.895  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  开始创建AWS IAM子用户: signal-cos-signal-v2-1762219753959-8820
+2025-11-04 09:29:14.896  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  ===== AWS IAM创建用户操作 =====
+2025-11-04 09:29:14.896  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  用户名: signal-cos-signal-v2-1762219753959-8820
+2025-11-04 09:29:14.897  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  使用凭证 - AccessKeyId: AKIARHWA***, SecretKey长度: 40
+2025-11-04 09:29:14.897  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  发送IAM CreateUser请求...
+2025-11-04 09:29:14.938 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50372 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:14.979  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           E  创建AWS IAM子用户失败: signal-cos-signal-v2-1762219753959-8820
+                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
+                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createIamUser(AwsSubUserManager.kt:230)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:34)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    Caused by: java.io.EOFException: connection closed
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createIamUser(AwsSubUserManager.kt:230) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:34) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100) 
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124) 
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
+2025-11-04 09:29:14.980  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  开始删除AWS IAM子用户: signal-cos-signal-v2-1762219753959-8820
+2025-11-04 09:29:15.022 32070-32132 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50374 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:15.063  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           E  列出用户访问密钥异常: signal-cos-signal-v2-1762219753959-8820
+                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
+                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.listUserAccessKeys(AwsSubUserManager.kt:405)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:70)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    Caused by: java.io.EOFException: connection closed
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.listUserAccessKeys(AwsSubUserManager.kt:405) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:70) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100) 
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124) 
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
+2025-11-04 09:29:15.070  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  开始分离用户所有策略: signal-cos-signal-v2-1762219753959-8820
+2025-11-04 09:29:15.113 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50376 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:15.153  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           E  列出用户策略异常: signal-cos-signal-v2-1762219753959-8820
+                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
+                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.listUserPolicies(AwsSubUserManager.kt:487)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.detachAllUserPolicies(AwsSubUserManager.kt:440)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:76)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    Caused by: java.io.EOFException: connection closed
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.listUserPolicies(AwsSubUserManager.kt:487) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.detachAllUserPolicies(AwsSubUserManager.kt:440) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:76) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100) 
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124) 
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
+2025-11-04 09:29:15.154  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           I  用户策略分离完成: signal-cos-signal-v2-1762219753959-8820, 共删除0个策略
+2025-11-04 09:29:15.203 32070-32132 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:50388 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:15.244  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           E  删除AWS IAM子用户失败: signal-cos-signal-v2-1762219753959-8820
+                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
+                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteIamUser(AwsSubUserManager.kt:365)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:79)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57)
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+                                                                                                    Caused by: java.io.EOFException: connection closed
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
+                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
+                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
+                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
+                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
+                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
+                                                                                                    	at okhttp3.internal.connection.RealCall.execute(RealCall.kt:160) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteIamUser(AwsSubUserManager.kt:365) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.deleteSubUser(AwsSubUserManager.kt:79) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.utils.auth.AwsSubUserManager.createSubUser(AwsSubUserManager.kt:57) 
+                                                                                                    	at org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider$generateToken$2.invokeSuspend(CosTransportProvider.kt:705) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266) 
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101) 
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46) 
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100) 
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124) 
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717) 
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704) 
+2025-11-04 09:29:15.248  7009-7052  CosTransportProvider    org.thoughtcrime.securesms           E  生成COS传输Token失败: recipientId=5a80****************************e461, 错误: 创建AWS IAM子用户失败: connection closed
+2025-11-04 09:29:27.199  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
+2025-11-04 09:29:27.205  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
+2025-11-04 09:29:27.206  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
+2025-11-04 09:29:27.209  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
+2025-11-04 09:29:27.211  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
+2025-11-04 09:29:27.213  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
+2025-11-04 09:29:27.214  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:27.223  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219767182/
+2025-11-04 09:29:27.225  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219767182/
+2025-11-04 09:29:27.226  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:27.228  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:27.229  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:27.231  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:27.239  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:27.241  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:27.245  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:27.341 32070-32101 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58566 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:27.647  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:27.648  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:27.648  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:27.649  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:27.649  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:27.649  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/
+2025-11-04 09:29:27.650  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219767182/outbox/
+2025-11-04 09:29:27.650  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:27.650  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:27.650  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:27.657  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:27.657  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:27.657  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:27.658  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:28.001  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:28.002  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:28.003  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:28.003  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:28.005  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:28.005  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/
+2025-11-04 09:29:28.006  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/
+2025-11-04 09:29:28.006  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:28.007  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:28.007  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:28.009  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:28.010  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:28.010  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:28.011  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:28.114  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/attachments/
+2025-11-04 09:29:28.115  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219767182/outbox/attachments/
+2025-11-04 09:29:28.116  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:28.116  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
+2025-11-04 09:29:28.116  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:28.118  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:28.119  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:28.120  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:28.121  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:28.224  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
+2025-11-04 09:29:28.224  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
+2025-11-04 09:29:28.225  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
+2025-11-04 09:29:28.225  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:28.226  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  开始创建AWS IAM子用户: signal-cos-signal-v2-1762219767182-9500
+2025-11-04 09:29:28.227  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  ===== AWS IAM创建用户操作 =====
+2025-11-04 09:29:28.227  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  用户名: signal-cos-signal-v2-1762219767182-9500
+2025-11-04 09:29:28.227  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  使用凭证 - AccessKeyId: AKIARHWA***, SecretKey长度: 40
+2025-11-04 09:29:28.228  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  发送IAM CreateUser请求...
+2025-11-04 09:29:28.273 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58578 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:29.339  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  ✓ 创建IAM用户成功: signal-cos-signal-v2-1762219767182-9500
+2025-11-04 09:29:29.339  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:29:29.633  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D  构建S3策略 - 目录: /v2-channels/a3adde1ba3b08264_1762219767182/outbox
+2025-11-04 09:29:29.634  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D    Bucket ARN: arn:aws:s...ipv6...signaltest2
+2025-11-04 09:29:29.634  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D    Object ARN: arn:aws:s...ipv6...signaltest2/v2-channels/a3adde1ba3b08264_1762219767182/outbox*
+2025-11-04 09:29:29.635  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D    Bucket操作: [s3:ListBucket]
+2025-11-04 09:29:29.636  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           D    Object操作: [s3:GetObject, s3:HeadObject, s3:GetObjectVersion, s3:ListMultipartUploadParts]
+2025-11-04 09:29:29.922  7009-7052  AwsSubUserManager       org.thoughtcrime.securesms           I  AWS IAM子用户创建成功: signal-cos-signal-v2-1762219767182-9500
+2025-11-04 09:29:29.961  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
+2025-11-04 09:29:29.961  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
+2025-11-04 09:29:29.963  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
+2025-11-04 09:29:29.963  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
+2025-11-04 09:29:29.963  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
+2025-11-04 09:29:29.964  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
+2025-11-04 09:29:29.966  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  列举文件 - 路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/, 前缀: v2-channels/a3adde1ba3b08264_1762219767182/outbox/
+2025-11-04 09:29:29.972  7009-7018  crime.securesms         org.thoughtcrime.securesms           I  Method exceeds compiler instruction limit: 22415 in java.lang.Object aws.sdk.kotlin.services.s3.endpoints.DefaultS3EndpointProvider.resolveEndpoint(aws.sdk.kotlin.services.s3.endpoints.S3EndpointParameters, kotlin.coroutines.Continuation)
+2025-11-04 09:29:29.973  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:29.974  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:29.975  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:29.977  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:30.024 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58584 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:30.271  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  列举文件成功: 1个
+2025-11-04 09:29:36.996  7009-7052  TapMessageProcessor     org.thoughtcrime.securesms           D  [notifySecret调试] A端接收ACCEPT: notifySecret=25bf...9169, webhookUrl=https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/, userId=********-****-****-****-*********df6
+2025-11-04 09:29:36.998  7009-7052  TapMessageProcessor     org.thoughtcrime.securesms           D    - webhookUrl: https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 09:29:37.005  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
+2025-11-04 09:29:37.006  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
+2025-11-04 09:29:37.006  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
+2025-11-04 09:29:37.007  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
+2025-11-04 09:29:37.007  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
+2025-11-04 09:29:37.007  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
+2025-11-04 09:29:37.015  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
+2025-11-04 09:29:37.016  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/contact_config6940775692084798456.json
+2025-11-04 09:29:37.016  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 305 bytes
+2025-11-04 09:29:37.017  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: tap-state/contacts/053abb43f297ee1d.json
+2025-11-04 09:29:37.017  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: tap-state/contacts/053abb43f297ee1d.json
+2025-11-04 09:29:37.018  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:29:37.018  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:29:37.020  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:29:37.021  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:29:37.021  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:29:37.022  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:29:37.073 32070-32131 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:43020 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:29:37.323  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 上传文件成功
+2025-11-04 09:29:37.324  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "55a4a8564918fc0158fd261574c427e6"
+2025-11-04 09:29:37.324  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:30:02.477  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
+2025-11-04 09:30:02.478  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
+2025-11-04 09:30:02.478  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
+2025-11-04 09:30:02.479  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
+2025-11-04 09:30:02.492  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
+2025-11-04 09:30:02.493  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
+2025-11-04 09:30:02.548  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
+2025-11-04 09:30:02.550  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/cos_upload_3837137415650987777.dat
+2025-11-04 09:30:02.551  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 432 bytes
+2025-11-04 09:30:02.553  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/1762219802547_********-****-****-****-*********fa6.dat
+2025-11-04 09:30:02.554  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/1762219802547_********-****-****-****-*********fa6.dat
+2025-11-04 09:30:02.555  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest2
+2025-11-04 09:30:02.557  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
+2025-11-04 09:30:02.562  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
+2025-11-04 09:30:02.562  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
+2025-11-04 09:30:02.563  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
+2025-11-04 09:30:02.564  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
+2025-11-04 09:30:02.633 32070-32103 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:55446 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:30:02.853  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ✓ 上传文件成功
+2025-11-04 09:30:02.853  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "16310c791ce87d705d62a15100f96d01"
+2025-11-04 09:30:02.853  7009-7052  AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
+2025-11-04 09:30:02.862  7009-7052  CosTransportProvider    org.thoughtcrime.securesms           I  准备通知对方Webhook: contactId=********-****-****-****-*********461, url=https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/, userId=********-****-****-****-*********df6, platform=cos, verified=false
+2025-11-04 09:30:02.863  7009-7052  CosTransportProvider    org.thoughtcrime.securesms           D  [notifySecret调试] 发送端调用Webhook: notifySecret=25bf...9169, webhookUrl=https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 09:30:02.949 32070-32103 ClashForAndroid         com.github.kr328.clash               D  [DNS] 5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws --> 52.221.53.97
+2025-11-04 09:30:02.982 32070-32133 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:55450 --> 5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws:443 match Match() using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:30:03.979  7009-7052  CosTransportProvider    org.thoughtcrime.securesms           W  Webhook notify failed: code=403, url=https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/; falling back to trigger function
+2025-11-04 09:30:04.029 32070-32103 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:45854 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:30:04.130 32070-32103 ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:45866 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
+2025-11-04 09:30:04.466  7009-7227  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Discovered trigger function: tap-notification-trigger-c1bd91eb
+2025-11-04 09:30:04.466  7009-7227  AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Invoking trigger function: tap-notification-trigger-c1bd91eb for path: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/1762219802547_cf353c37-f4e1-4cb4-b1d2-d831ab998fa6.dat
+2025-11-04 09:30:04.593  7009-7227  AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Trigger function invoked successfully: tap-notification-trigger-c1bd91eb
+2025-11-04 09:30:04.594  7009-7052  CosTransportProvider    org.thoughtcrime.securesms           I  Fallback trigger invoked (AWS): true

@@ -1582,15 +1582,15 @@ class TransportChannelManager private constructor(private val context: Context) 
             }
         
         // 2. 获取对端Token信息（用于轮询对方消息）
-        // ✅ 首先使用 originalRecipientId 查询Token（保持向后兼容）
-        var peerTokenInfo = tokenPool.getPeerTokenInfo(originalRecipientId, "cos")
+        // ✅ 优先使用ACI格式查询Token（与Token保存格式一致）
+        var peerTokenInfo = tokenPool.getPeerTokenInfo(recipientAci, "cos")
         
-        // ✅ 如果查不到，尝试使用规范化的ACI格式查询（兼容不同ID格式）
+        // ✅ 如果查不到，尝试使用RecipientId格式查询（向后兼容旧版本）
         if (peerTokenInfo == null && originalRecipientId != recipientAci) {
-            Log.d(TAG, "使用originalRecipientId查询peerToken失败,尝试使用ACI格式: originalRecipientId=$originalRecipientId, recipientAci=$recipientAci")
-            peerTokenInfo = tokenPool.getPeerTokenInfo(recipientAci, "cos")
+            Log.d(TAG, "使用ACI格式查询peerToken失败,尝试使用RecipientId格式: recipientAci=$recipientAci, originalRecipientId=$originalRecipientId")
+            peerTokenInfo = tokenPool.getPeerTokenInfo(originalRecipientId, "cos")
             if (peerTokenInfo != null) {
-                Log.i(TAG, "使用ACI格式成功查询到peerToken: recipientAci=$recipientAci")
+                Log.i(TAG, "使用RecipientId格式成功查询到peerToken: originalRecipientId=$originalRecipientId")
             }
         }
         
