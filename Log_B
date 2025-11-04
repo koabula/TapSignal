@@ -1,438 +1,186 @@
 --------- beginning of main
-2025-11-04 09:28:22.900 10351-10413 TapConfigViewModel      org.thoughtcrime.securesms           I  开始部署推送服务: providerType=aws-api-gateway, source=MANUAL
-2025-11-04 09:28:22.902 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Starting deployment for region: ap-southeast-1
-2025-11-04 09:28:22.902 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Cleaning up old WebSocket connections before deployment...
-2025-11-04 09:28:22.903 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
-2025-11-04 09:28:22.903 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
-2025-11-04 09:28:22.903 10351-10413 NotificationProviderFac org.thoughtcrime.securesms           I  AWS API Gateway Provider 创建成功: region=ap-southeast-1
-2025-11-04 09:28:22.903 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying AWS API Gateway WebSocket push service...
+2025-11-04 14:24:35.260  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=339.97168, y[0]=310.98633, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76584369, downTime=76584369, deviceId=4, source=0x5002, displayId=0, eventId=1054707487 }
+2025-11-04 14:24:35.336  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=339.97168, y[0]=310.98633, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76584445, downTime=76584369, deviceId=4, source=0x5002, displayId=0, eventId=949302786 }
 --------- beginning of system
-2025-11-04 09:28:22.967  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:39532 --> sts.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:23.375 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  AWS Account ID: 085230022535
-2025-11-04 09:28:23.444  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:39548 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:24.539 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-connect-b9ee8be7
-2025-11-04 09:28:24.674  5039-5079  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:39556 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:25.489 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
-2025-11-04 09:28:26.642 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:26.736 10351-10538 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:26.737 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #4 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:26.738 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #5 in 16000ms
-2025-11-04 09:28:30.652 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-connect-b9ee8be7
-2025-11-04 09:28:30.652 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-connect-b9ee8be7
-2025-11-04 09:28:30.653 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-disconnect-bb557eac
-2025-11-04 09:28:31.229 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
-2025-11-04 09:28:36.383 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-disconnect-bb557eac
-2025-11-04 09:28:36.383 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-disconnect-bb557eac
-2025-11-04 09:28:36.383 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying Lambda function: tap-ws-default-d2e3e357
-2025-11-04 09:28:36.957 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
-2025-11-04 09:28:42.113 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-ws-default-d2e3e357
-2025-11-04 09:28:42.113 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Lambda function deployed: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-ws-default-d2e3e357
-2025-11-04 09:28:42.114 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Creating API Gateway WebSocket API...
-2025-11-04 09:28:42.195  5039-5079  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58216 --> apigateway.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:42.741 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:42.842 10351-10538 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:42.843 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #5 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:42.843 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #6 in 32000ms
-2025-11-04 09:28:43.170 10351-10406 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting existing WebSocket connection: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod
-2025-11-04 09:28:43.170 10351-10406 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
-2025-11-04 09:28:43.170 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
-2025-11-04 09:28:43.171 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
-2025-11-04 09:28:43.171 10351-10406 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
-2025-11-04 09:28:43.674 10351-10406 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
-2025-11-04 09:28:43.674 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:43.712 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  API created: 5h44bcga0i
-2025-11-04 09:28:43.741  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58218 --> kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:43.776 10351-10552 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    javax.net.ssl.SSLHandshakeException: connection closed
-                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    Caused by: java.io.EOFException: connection closed
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644) 
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012) 
-2025-11-04 09:28:43.777 10351-10473 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #1 in 1000ms
+2025-11-04 14:24:35.383   824-870   WindowManagerShell      com.android.systemui                 V  Transition requested: android.os.BinderProxy@c5445bc TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1265 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=76584491 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@8892945} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{d57c89a org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+2025-11-04 14:24:36.681   581-606   WindowManager           system_server                        V  Sent Transition #353 createdAt=11-04 06:24:35.376 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1265 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.MULTIWINDOW_LAUNCHER] flg=0x10000000 cmp=org.thoughtcrime.securesms/.RoutingActivity } baseActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} topActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.conversation.v2.ConversationActivity} origActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.RoutingActivity} realActivity=ComponentInfo{org.thoughtcrime.securesms/org.thoughtcrime.securesms.MainActivity} numActivities=2 lastActiveTime=76584491 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{f047b88 Task{fe2d604 #1265 type=standard A=10200:org.thoughtcrime.securesms}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{f25d37e org.thoughtcrime.securesms.conversation.v2.ConversationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+2025-11-04 14:24:36.709 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-04 14:24:36.935 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道状态更新被取消
+2025-11-04 14:24:36.935 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-04 14:24:36.946 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
+2025-11-04 14:24:36.946 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
+2025-11-04 14:24:37.842 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-04 14:24:37.852 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=false
+2025-11-04 14:24:37.855 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  隐藏Tap v2指示器: hasActiveChannel=false
+2025-11-04 14:24:42.784  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=1010.9512, y[0]=139.96582, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76591894, downTime=76591894, deviceId=4, source=0x5002, displayId=0, eventId=126574071 }
+2025-11-04 14:24:42.851  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=1010.9512, y[0]=139.96582, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76591961, downTime=76591894, deviceId=4, source=0x5002, displayId=0, eventId=722285255 }
+2025-11-04 14:24:43.998  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=716.95703, y[0]=532.9834, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76593107, downTime=76593107, deviceId=4, source=0x5002, displayId=0, eventId=523593525 }
+2025-11-04 14:24:44.073  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=716.95703, y[0]=532.9834, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76593183, downTime=76593107, deviceId=4, source=0x5002, displayId=0, eventId=586667419 }
+2025-11-04 14:24:44.146 15860-15897 ConversationFragment    org.thoughtcrime.securesms           I  没有发现活跃的Tap通道
+2025-11-04 14:24:44.940  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=966.9512, y[0]=1343.9209, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76594047, downTime=76594047, deviceId=4, source=0x5002, displayId=0, eventId=622748459 }
+2025-11-04 14:24:44.996  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=966.9512, y[0]=1343.9209, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76594106, downTime=76594047, deviceId=4, source=0x5002, displayId=0, eventId=465070701 }
+2025-11-04 14:24:45.022 15860-15897 ConversationFragment    org.thoughtcrime.securesms           I  发送Tap v2模式请求: recipientId=RecipientId::4
+2025-11-04 14:24:45.029 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  TaP模块已初始化，重置标志以确保数据恢复
+2025-11-04 14:24:45.029 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  开始同步初始化TaP模块...
+2025-11-04 14:24:45.030 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  开始初始化核心组件...
+2025-11-04 14:24:45.033 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           V  TAP数据库写连接验证成功
+2025-11-04 14:24:45.033 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           D  TAP数据库健康检查通过，表数量: 3
+2025-11-04 14:24:45.034 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  TAP独立数据库初始化成功
+2025-11-04 14:24:45.035 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  TAP独立数据库表初始化完成
+2025-11-04 14:24:45.035 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  数据库和监控器初始化完成
+2025-11-04 14:24:45.036 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  配置管理器就绪
+2025-11-04 14:24:45.041 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  Token池初始化完成
+2025-11-04 14:24:45.042 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  注册传输Provider...
+2025-11-04 14:24:45.044 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  Provider管理器初始化完成
+2025-11-04 14:24:45.045 15860-15860 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:24:45.059 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  发现已配置Provider: cos
+2025-11-04 14:24:45.059 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  创建Provider实例: cos
+2025-11-04 14:24:45.067 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  Provider创建并注册成功: cos - 云对象存储 (COS)
+2025-11-04 14:24:45.079 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  传输管理器初始化完成，可用Provider数量: 1
+2025-11-04 14:24:45.079 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  已注册Provider: cos - 云对象存储 (COS)
+2025-11-04 14:24:45.080 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  通道管理器初始化完成
+2025-11-04 14:24:45.080 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  数据恢复状态检查:
+2025-11-04 14:24:45.081 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I    - Token总数: 2 (接收=1, 共享=1)
+2025-11-04 14:24:45.081 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I    - 活跃通道数: 0
+2025-11-04 14:24:45.081 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  成功恢复v2 mode数据
+2025-11-04 14:24:45.082 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块同步初始化成功，可用Provider数量: 1
+2025-11-04 14:24:45.082 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  启动轮询服务...
+2025-11-04 14:24:45.083 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  获取活跃接收者列表
+2025-11-04 14:24:45.085 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  接收Token recipientId格式: ********-****-****-****-*********461 (包含'-': true)
+2025-11-04 14:24:45.085 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  共享Token recipientId格式: ********-****-****-****-*********461 (包含'-': true)
+2025-11-04 14:24:45.086 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  找到活跃接收者数量: 1
+2025-11-04 14:24:45.091 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  从TokenPool获取的活跃联系人数量: 1
+2025-11-04 14:24:45.094 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  从通道管理器获取的活跃联系人数量: 0
+2025-11-04 14:24:45.095 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  合并后的活跃联系人总数: 1
+2025-11-04 14:24:45.095 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  启动轮询服务，活跃联系人:
+2025-11-04 14:24:45.096 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I    - ********-****-****-****-*********461
+2025-11-04 14:24:45.096 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  轮询服务启动成功，活跃联系人数量: 1
+2025-11-04 14:24:45.104 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           W  有Token但无活跃通道，跳过轮询添加: recipientId=********-****-****-****-*********461
+2025-11-04 14:24:45.104 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D    可能原因: 1)通道正在建立中 2)等待用户确认 3)历史残留Token
+2025-11-04 14:24:45.104 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D    Token会在用户disable v2 mode或自动降级时被清理
+2025-11-04 14:24:45.104 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  启动推送服务...
+2025-11-04 14:24:45.104 15860-15897 TapNotificationService  org.thoughtcrime.securesms           W  推送服务已初始化
+2025-11-04 14:24:45.104 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  推送服务初始化成功，启动服务
+2025-11-04 14:24:45.105 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  推送服务启动成功
+2025-11-04 14:24:45.105 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  推送服务已启动，COS Provider推送通知状态将在下次部署时更新
+2025-11-04 14:24:45.109 15860-15897 TapNotificationService  org.thoughtcrime.securesms           W  推送服务已启动
+2025-11-04 14:24:45.109 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  TaP模块初始化完成
+2025-11-04 14:24:45.110 15860-15897 ConversationFragment    org.thoughtcrime.securesms           D  TaP模块同步初始化确认完成
 --------- beginning of kernel
-2025-11-04 09:28:44.300 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $connect
-2025-11-04 09:28:44.779 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:44.825 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $disconnect
-2025-11-04 09:28:44.873  5039-5079  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:58224 --> kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:45.088 10351-10552 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:45.089 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #1 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:45.089 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #2 in 2000ms
-2025-11-04 09:28:45.309 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Route created: $default
-2025-11-04 09:28:45.561 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Stage created: prod
-2025-11-04 09:28:45.561 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  WebSocket API created: wss://5h44bcga0i.execute-api.ap-southeast-1.amazonaws.com/prod
-2025-11-04 09:28:45.561 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  API Gateway WebSocket deployed: wss://5h44bcga0i.execute-api.ap-southeast-1.amazonaws.com/prod
-2025-11-04 09:28:45.562 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Push service deployed: wss://5h44bcga0i.execute-api.ap-southeast-1.amazonaws.com/prod
-2025-11-04 09:28:45.563 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Deploying webhook Lambda function...
-2025-11-04 09:28:45.977 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Lambda function created: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-notification-webhook-78b2be90
-2025-11-04 09:28:46.135 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
-2025-11-04 09:28:47.092 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:47.175 10351-10552 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:47.175 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #2 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:47.176 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #3 in 4000ms
-2025-11-04 09:28:51.178 10351-10473 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:51.264 10351-10552 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:51.265 10351-10473 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #3 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:51.266 10351-10473 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #4 in 8000ms
-2025-11-04 09:28:51.284 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-notification-webhook-78b2be90
-2025-11-04 09:28:51.509 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Webhook deployed successfully: https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/
-2025-11-04 09:28:51.678 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added permission: lambda:InvokeFunctionUrl for NONE auth
-2025-11-04 09:28:51.856 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added permission: lambda:InvokeFunction for Function URL access
-2025-11-04 09:28:51.856 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  IMPORTANT: For enhanced security, manually add condition to the InvokeFunction permission:
-2025-11-04 09:28:51.857 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I    Condition: { "Bool": { "lambda:InvokedViaFunctionUrl": "true" } }
-2025-11-04 09:28:51.857 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I    This restricts invocation to Function URL only
-2025-11-04 09:28:51.857 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Webhook deployed: https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/
-2025-11-04 09:28:51.857 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Setting up S3 event trigger...
-2025-11-04 09:28:51.858 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Using user bucket for CONFIG_BUCKET: signaltest3
-2025-11-04 09:28:52.304 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Trigger function created: arn:aws:lambda:ap-southeast-1:085230022535:function:tap-notification-trigger-19d15944
-2025-11-04 09:28:52.458 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function state: Pending, waiting...
-2025-11-04 09:28:57.651 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Function is active: tap-notification-trigger-19d15944
-2025-11-04 09:28:57.809 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  S3 invoke permission added to Lambda function
-2025-11-04 09:28:57.811 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Event trigger configured: tap-notification-trigger-19d15944
-2025-11-04 09:28:57.811 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Attempting to configure S3 event notification (optional, client-triggered mode is primary)
-2025-11-04 09:28:57.811 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Configuring S3 event notification on bucket: signaltest3
-2025-11-04 09:28:57.980 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Added Lambda permission for S3 to invoke function
-2025-11-04 09:28:58.101  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:44452 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:58.227  5039-5107  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:44456 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:58.333  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:44458 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:58.380 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  No existing notification configuration
-2025-11-04 09:28:58.452  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:44474 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:58.547  5039-5107  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:44476 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:28:59.221 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  S3 event notification configured successfully
-2025-11-04 09:28:59.221 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  S3 event notification configured successfully (fallback mode)
-2025-11-04 09:28:59.222 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Updating webhook Lambda environment variables...
-2025-11-04 09:28:59.222 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  [notifySecret调试] B端部署: notifySecret=25bf...9169 (长度=32)
-2025-11-04 09:28:59.268 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://kxrbfrplaj.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:28:59.346 10351-10552 AwsWebSocketClient      org.thoughtcrime.securesms           E  WebSocket failure
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:59.347 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           W  Reconnect attempt #4 failed
-                                                                                                    java.net.ProtocolException: Expected HTTP 101 response but was '500 Internal Server Error'
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket.checkUpgradeSuccess$okhttp_release(RealWebSocket.kt:233)
-                                                                                                    	at okhttp3.internal.ws.RealWebSocket$connect$1.onResponse(RealWebSocket.kt:177)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:532)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-2025-11-04 09:28:59.347 10351-10406 AwsWebSocketClient      org.thoughtcrime.securesms           I  Reconnect attempt #5 in 16000ms
-2025-11-04 09:28:59.543 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Webhook environment updated successfully
-2025-11-04 09:28:59.543 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  [notifySecret调试] B端Lambda环境变量已设置: functionName=tap-notification-webhook-78b2be90
-2025-11-04 09:28:59.544 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Saving configuration to S3...
-2025-11-04 09:28:59.672 10351-10351 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Configuration saved successfully
-2025-11-04 09:28:59.672 10351-10413 NotificationConfigManag org.thoughtcrime.securesms           I  保存本地推送服务配置: provider=aws-api-gateway
-2025-11-04 09:28:59.673 10351-10413 TransportProviderConfig org.thoughtcrime.securesms           I  保存推送服务配置: provider=aws-api-gateway
-2025-11-04 09:28:59.676 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  配置已保存到本地数据库: provider=aws-api-gateway
-2025-11-04 09:28:59.676 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Deployment completed successfully
-2025-11-04 09:28:59.678 10351-10413 NotificationConfigManag org.thoughtcrime.securesms           I  保存本地推送服务配置: provider=aws-api-gateway
-2025-11-04 09:28:59.678 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnecting from AWS API Gateway
-2025-11-04 09:28:59.678 10351-10351 AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnecting from WebSocket
-2025-11-04 09:28:59.679 10351-10413 TransportProviderConfig org.thoughtcrime.securesms           I  保存推送服务配置: provider=aws-api-gateway
-2025-11-04 09:28:59.679 10351-10351 AwsWebSocketClient      org.thoughtcrime.securesms           I  Disconnected successfully
-2025-11-04 09:28:59.679 10351-10413 TapConfigViewModel      org.thoughtcrime.securesms           I  推送服务部署成功: providerType=aws-api-gateway, 配置已保存到本地数据库
-2025-11-04 09:28:59.680 10351-10351 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Disconnected successfully
-2025-11-04 09:28:59.681 10351-10413 NotificationProviderFac org.thoughtcrime.securesms           I  AWS API Gateway Provider 创建成功: region=ap-southeast-1
-2025-11-04 09:28:59.682 10351-10413 NotificationManager     org.thoughtcrime.securesms           I  推送服务管理器初始化成功: aws-api-gateway
-2025-11-04 09:29:08.587 10351-10529 OpenGLRenderer          org.thoughtcrime.securesms           I  Davey! duration=858ms; Flags=1, FrameTimelineVsyncId=27866804, IntendedVsync=76139712991038, Vsync=76140379657678, InputEventId=0, HandleInputStart=76140392987100, AnimationStart=76140393017700, PerformTraversalsStart=76140394354700, DrawStart=76140543832800, FrameDeadline=76139729657704, FrameInterval=76140391748600, FrameStartTime=16666666, SyncQueued=76140559179300, SyncStart=76140560140700, IssueDrawCommandsStart=76140561505500, SwapBuffers=76140569234300, FrameCompleted=76140572315200, DequeueBufferDuration=38100, QueueBufferDuration=951900, GpuCompleted=76140572168400, SwapBuffersCompleted=76140572315200, DisplayPresentTime=0, CommandSubmissionCompleted=76140569234300, 
-2025-11-04 09:29:30.694 10351-10413 TapMessageProcessor     org.thoughtcrime.securesms           D    - webhookUrl: https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/
-2025-11-04 09:29:30.713 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-04 09:29:30.713 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-04 09:29:30.713 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-04 09:29:30.714 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-04 09:29:30.714 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-04 09:29:30.714 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-04 09:29:30.722 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
-2025-11-04 09:29:30.722 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/contact_config58595888488652683.json
-2025-11-04 09:29:30.723 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 305 bytes
-2025-11-04 09:29:30.723 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: tap-state/contacts/a3adde1ba3b08264.json
-2025-11-04 09:29:30.723 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: tap-state/contacts/a3adde1ba3b08264.json
-2025-11-04 09:29:30.724 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:30.724 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:30.726 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:30.726 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:30.727 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:30.727 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:30.776  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34646 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:30.831 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:30.831 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:30.832 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:30.832 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:30.883  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34656 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:30.925 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:30.925 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:30.926 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:30.927 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:30.973  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34672 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:31.016 10351-10413 AwsS3Client             org.thoughtcrime.securesms           E  ✗ 上传文件失败: tap-state/contacts/a3adde1ba3b08264.json
-2025-11-04 09:29:31.016 10351-10413 AwsS3Client             org.thoughtcrime.securesms           E    - 异常: HttpException: javax.net.ssl.SSLHandshakeException: connection closed
-                                                                                                    aws.smithy.kotlin.runtime.http.HttpException: javax.net.ssl.SSLHandshakeException: connection closed; HttpErrorCode(TLS_NEGOTIATION_ERROR)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.OkHttpEngine.roundTrip(OkHttpEngine.kt:194)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.OkHttpEngine$roundTrip$1.invokeSuspend(Unknown Source:15)
+2025-11-04 14:24:48.483 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:24:48.487 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:24:48.499 15860-15897 ConversationFragment    org.thoughtcrime.securesms           I  Tap v2模式通道创建成功: ch_********-****-****-****-*********461_cos_1762237487686, recipientId: RecipientId::4, 对方ACI: ********-****-****-****-*********461, 状态: 发送就绪（等待对方Token）
+2025-11-04 14:24:48.631 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:24:48.636 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:24:48.637 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-04 14:24:48.672 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=5314
+2025-11-04 14:24:48.763 15860-15897 SignalServ...sageSender org.thoughtcrime.securesms           I  [sendMessage][1762237488554] Detected TAP control message, forcing Signal Server transport for reliability
+2025-11-04 14:24:58.787 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237500738 | timestamp=1762237498787
+2025-11-04 14:24:58.794 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:58.795 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:58.850 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237500738 | timestamp=1762237498848
+2025-11-04 14:24:58.877 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237500864 | timestamp=1762237498877
+2025-11-04 14:24:58.880 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:58.881 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:58.948 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237500864 | timestamp=1762237498942
+2025-11-04 14:24:59.410 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237502623 | timestamp=1762237499410
+2025-11-04 14:24:59.414 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:59.415 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:59.470 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237502623 | timestamp=1762237499466
+2025-11-04 14:24:59.899 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237501780 | timestamp=1762237499899
+2025-11-04 14:24:59.903 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:59.904 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:24:59.973 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237501780 | timestamp=1762237499956
+2025-11-04 14:25:03.200 15860-15897 MessageProcessorV2      org.thoughtcrime.securesms           I  [1762237502371] Tap control message detected, processing asynchronously: bodyLength=1165
+2025-11-04 14:25:03.201 15860-15897 MessageProcessorV2      org.thoughtcrime.securesms           I  [1762237502371] Tap control message queued for async processing, not inserting into message database
+2025-11-04 14:25:03.201 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输层控制消息: senderId=RecipientId::4, bodyLength=1165
+2025-11-04 14:25:03.202 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Token交换消息: senderId=RecipientId::4
+2025-11-04 14:25:03.245 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] A端处理ACCEPT: senderId=RecipientId::4, providerType=cos
+2025-11-04 14:25:03.245 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D  [Token交换] A端: senderId=RecipientId::4, peerAci=********-****-****-****-*********461
+2025-11-04 14:25:03.246 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D  [notifySecret调试] A端接收ACCEPT: notifySecret=1b42...3dc8, webhookUrl=https://tqbvjbpeekwraxpk4fda62i3fy0pnwqq.lambda-url.ap-southeast-1.on.aws/, userId=e5deca86f95444f8
+2025-11-04 14:25:03.248 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Webhook配置保存] 开始保存联系人webhook配置
+2025-11-04 14:25:03.249 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - contactId(senderAci): ********-****-****-****-*********461
+2025-11-04 14:25:03.250 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - webhookUrl: https://tqbvjbpeekwraxpk4fda62i3fy0pnwqq.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 14:25:03.251 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - userId: e5deca86f95444f8
+2025-11-04 14:25:03.252 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - notifySecret: 1b42...3dc8
+2025-11-04 14:25:03.252 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - platform: cos
+2025-11-04 14:25:03.255 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Webhook配置保存] 联系人Webhook配置已成功保存到本地数据库: senderAci=********-****-****-****-*********461
+2025-11-04 14:25:03.259 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D  [Webhook配置验证] 查询验证成功:
+2025-11-04 14:25:03.260 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - 查询key: ********-****-****-****-*********461
+2025-11-04 14:25:03.260 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - 配置contactId: ********-****-****-****-*********461
+2025-11-04 14:25:03.260 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - 配置webhookUrl: https://tqbvjbpeekwraxpk4fda62i3fy0pnwqq.lambda-url.ap-southeast-1.on.aws/
+2025-11-04 14:25:03.262 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - 配置notifySecret: 1b42...3dc8
+2025-11-04 14:25:03.262 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D    - 配置userId: e5deca86f95444f8
+2025-11-04 14:25:03.288 15860-15897 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: tap-state/contacts/053abb43f297ee1d.json
+2025-11-04 14:25:03.289 15860-15897 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: tap-state/contacts/053abb43f297ee1d.json
+2025-11-04 14:25:03.955 15860-15897 ContactWebhookManager   org.thoughtcrime.securesms           I  联系人webhook配置保存成功: tap-state/contacts/053abb43f297ee1d.json (尝试 1/3)
+2025-11-04 14:25:03.956 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  已将联系人Webhook配置发布到COS: contactId=********-****-****-****-*********461
+2025-11-04 14:25:03.958 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  已保存Token Accept中的Webhook配置: peerAci=********-****-****-****-*********461
+2025-11-04 14:25:03.960 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D  [Token交换] 解析到Token: senderId=RecipientId::4, tokenId=cos-signal-cos-signal-v2-1762237492684-7225-1762237492684, tokenType=CosTransportToken
+2025-11-04 14:25:03.975 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] 已保存对方receivedToken: peerAci=********-****-****-****-*********461, tokenId=cos-signal-cos-signal-v2-1762237492684-7225-1762237492684
+2025-11-04 14:25:03.975 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] Token验证通过: peerAci=********-****-****-****-*********461
+2025-11-04 14:25:03.976 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] sharedToken存在: peerAci=********-****-****-****-*********461, tokenId=cos-signal-cos-signal-v2-1762237485100-9469-1762237485100
+2025-11-04 14:25:03.992 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:03.992 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:04.006 15860-15888 TapPollingService       org.thoughtcrime.securesms           W  轮询目标不存在: 原始recipient=5a806149-30d0-412a-90d2-9412a40ee461, 规范化=5a806149-30d0-412a-90d2-9412a40ee461, provider=cos
+2025-11-04 14:25:04.006 15860-15888 TapPollingService       org.thoughtcrime.securesms           D  当前轮询任务keys: 
+2025-11-04 14:25:04.007 15860-15888 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=5a806149-30d0-412a-90d2-9412a40ee461
+2025-11-04 14:25:04.010 15860-15888 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:25:04.010 15860-15888 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=RecipientId::4
+2025-11-04 14:25:04.012 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] A端通道成功升级为FULL_ACTIVE: senderId=RecipientId::4, providerType=cos
+2025-11-04 14:25:04.013 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] 通道metadata验证: receivePath=/v2-channels/053abb43f297ee1d_1762237492684/outbox/, hasToken=true
+2025-11-04 14:25:04.014 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  [Token交换] A端轮询启动成功: senderId=RecipientId::4
+2025-11-04 14:25:04.016 15860-15897 DataMessageProcessor    org.thoughtcrime.securesms           I  Tap control message processed successfully: timestamp=1762237502371
+2025-11-04 14:25:04.044 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:04.062 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:04.063 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-04 14:25:04.072 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  Tap确认消息已加入发送队列: recipientId=RecipientId::4, messageId=5315
+2025-11-04 14:25:04.074 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  已发送Tap确认消息: senderId=RecipientId::4
+2025-11-04 14:25:04.101 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           D  已插入v2 mode启用提示消息: messageId=5316
+2025-11-04 14:25:04.108 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  A端已插入v2模式启用提示消息: senderId=RecipientId::4
+2025-11-04 14:25:04.135 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  检测到TAP控制消息，强制使用Signal Server发送: messageId=5315
+2025-11-04 14:25:04.154 15860-15897 SignalServ...sageSender org.thoughtcrime.securesms           I  [sendMessage][1762237504019] Detected TAP control message, forcing Signal Server transport for reliability
+2025-11-04 14:25:11.512 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237514677 | timestamp=1762237511512
+2025-11-04 14:25:11.517 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:25:11.518 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:25:11.576 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237508599 | timestamp=1762237511563
+2025-11-04 14:25:12.195 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********988, type=TEXT_MESSAGE
+2025-11-04 14:25:12.196 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********988
+2025-11-04 14:25:12.196 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********988
+2025-11-04 14:25:12.197 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
+                                                                                                    java.net.ProtocolException: Unexpected end group
+                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:152)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:552)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:372)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:199)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:40)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:84)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.downloadAndProcessFile(NotificationDownloadExecutor.kt:564)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.access$downloadAndProcessFile(NotificationDownloadExecutor.kt:24)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor$downloadAndProcessFile$1.invokeSuspend(Unknown Source:18)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:98)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:829)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-                                                                                                    Caused by: javax.net.ssl.SSLHandshakeException: connection closed
-                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.MetricsInterceptor.intercept(MetricsInterceptor.kt:32)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    Caused by: java.io.EOFException: connection closed
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.MetricsInterceptor.intercept(MetricsInterceptor.kt:32) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644) 
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012) 
-2025-11-04 09:29:31.020 10351-10413 TapMessageProcessor     org.thoughtcrime.securesms           I  Token数据: {"tokenId":"cos-signal-cos-signal-v2-1762219767182-9500-1762219767182","recipientId":"********-****-****-****-*********461","providerType":"cos","permissions":["LIST","READ"],"expirationTime":9223372036854775807,"accessKeyId":"AKIARHWA256DUPNX2UVI","secretAccessKey":"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","region":"ap-southeast-1","bucketName":"signaltest2","cloudProvider":"AWS","channelPath":"/v2-channels/a3adde1ba3b08264_1762219767182/outbox/"}
-2025-11-04 09:29:32.804 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-04 09:29:32.804 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-04 09:29:32.805 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-04 09:29:32.805 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-04 09:29:32.805 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-04 09:29:32.805 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-04 09:29:32.806 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
-2025-11-04 09:29:32.807 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/
-2025-11-04 09:29:32.807 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/
-2025-11-04 09:29:32.807 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:32.807 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
-2025-11-04 09:29:32.808 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:32.810 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:32.811 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:32.811 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:32.811 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:32.863  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34688 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:33.099 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
-2025-11-04 09:29:33.099 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
-2025-11-04 09:29:33.100 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
-2025-11-04 09:29:33.101 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:33.101 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
-2025-11-04 09:29:33.101 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/outbox/
-2025-11-04 09:29:33.102 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/outbox/
-2025-11-04 09:29:33.102 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:33.102 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
-2025-11-04 09:29:33.103 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:33.105 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:33.105 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:33.106 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:33.106 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:33.225 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
-2025-11-04 09:29:33.225 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
-2025-11-04 09:29:33.225 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
-2025-11-04 09:29:33.226 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:33.226 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
-2025-11-04 09:29:33.227 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/
-2025-11-04 09:29:33.228 10351-10361 crime.securesms         org.thoughtcrime.securesms           I  Method exceeds compiler instruction limit: 22415 in java.lang.Object aws.sdk.kotlin.services.s3.endpoints.DefaultS3EndpointProvider.resolveEndpoint(aws.sdk.kotlin.services.s3.endpoints.S3EndpointParameters, kotlin.coroutines.Continuation)
-2025-11-04 09:29:33.228 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/
-2025-11-04 09:29:33.229 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:33.229 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
-2025-11-04 09:29:33.229 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:33.230 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:33.230 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:33.230 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:33.231 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:33.331 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
-2025-11-04 09:29:33.331 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
-2025-11-04 09:29:33.332 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
-2025-11-04 09:29:33.333 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:33.333 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 创建目录操作 =====
-2025-11-04 09:29:33.334 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/outbox/attachments/
-2025-11-04 09:29:33.334 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/outbox/attachments/
-2025-11-04 09:29:33.335 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:33.335 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标区域: ap-southeast-1
-2025-11-04 09:29:33.336 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:33.336 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:33.337 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:33.337 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:33.337 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:33.438 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 创建目录成功
-2025-11-04 09:29:33.439 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "d41d8cd98f00b204e9800998ecf8427e"
-2025-11-04 09:29:33.439 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - VersionId: N/A
-2025-11-04 09:29:33.440 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:33.440 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  开始创建AWS IAM子用户: signal-cos-signal-v2-1762219772796-8452
-2025-11-04 09:29:33.440 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  ===== AWS IAM创建用户操作 =====
-2025-11-04 09:29:33.441 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  用户名: signal-cos-signal-v2-1762219772796-8452
-2025-11-04 09:29:33.441 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  使用凭证 - AccessKeyId: AKIARHWA***, SecretKey长度: 40
-2025-11-04 09:29:33.442 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  发送IAM CreateUser请求...
-2025-11-04 09:29:33.530  5039-5079  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34694 --> iam.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:34.588 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  ✓ 创建IAM用户成功: signal-cos-signal-v2-1762219772796-8452
-2025-11-04 09:29:34.589 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:34.917 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D  构建S3策略 - 目录: /v2-channels/053abb43f297ee1d_1762219772796/outbox
-2025-11-04 09:29:34.917 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D    Bucket ARN: arn:aws:s...ipv6...signaltest3
-2025-11-04 09:29:34.918 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D    Object ARN: arn:aws:s...ipv6...signaltest3/v2-channels/053abb43f297ee1d_1762219772796/outbox*
-2025-11-04 09:29:34.919 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D    Bucket操作: [s3:ListBucket]
-2025-11-04 09:29:34.920 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           D    Object操作: [s3:GetObject, s3:HeadObject, s3:GetObjectVersion, s3:ListMultipartUploadParts]
-2025-11-04 09:29:35.244 10351-10413 AwsSubUserManager       org.thoughtcrime.securesms           I  AWS IAM子用户创建成功: signal-cos-signal-v2-1762219772796-8452
-2025-11-04 09:29:35.278 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-04 09:29:35.278 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-04 09:29:35.279 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest2
-2025-11-04 09:29:35.279 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-04 09:29:35.279 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-04 09:29:35.280 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-04 09:29:35.281 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  列举文件 - 路径: /v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/, 前缀: v2-channels/a3adde1ba3b08264_1762219767182/outbox/messages/
-2025-11-04 09:29:35.288 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:35.288 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:35.288 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:35.288 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:35.341  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34696 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:35.388 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:35.388 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:35.389 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:35.390 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:35.439  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:34710 --> signaltest2.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:35.884 10351-10413 AwsS3Client             org.thoughtcrime.securesms           E  列举文件失败: The AWS Access Key Id you provided does not exist in our records., Request ID: 29CJ331A33FWNB3J, Extended request ID: sDI66+a454gq6KF2d3RmFNi3zaODm01nGpTQeR0xzYsZ+YDsQkpNGJHLPpdJVUWTJKgWg/dzcf75XAttB0KBEtoZW4kJtTsZ
-                                                                                                    aws.sdk.kotlin.services.s3.model.S3Exception: The AWS Access Key Id you provided does not exist in our records., Request ID: 29CJ331A33FWNB3J, Extended request ID: sDI66+a454gq6KF2d3RmFNi3zaODm01nGpTQeR0xzYsZ+YDsQkpNGJHLPpdJVUWTJKgWg/dzcf75XAttB0KBEtoZW4kJtTsZ
-                                                                                                    	at aws.sdk.kotlin.services.s3.serde.ListObjectsV2OperationDeserializerKt.throwListObjectsV2Error(ListObjectsV2OperationDeserializer.kt:74)
-                                                                                                    	at aws.sdk.kotlin.services.s3.serde.ListObjectsV2OperationDeserializerKt.access$throwListObjectsV2Error(ListObjectsV2OperationDeserializer.kt:1)
-                                                                                                    	at aws.sdk.kotlin.services.s3.serde.ListObjectsV2OperationDeserializer.deserialize(ListObjectsV2OperationDeserializer.kt:36)
-                                                                                                    	at aws.sdk.kotlin.services.s3.serde.ListObjectsV2OperationDeserializer.deserialize(ListObjectsV2OperationDeserializer.kt:31)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.operation.DeserializeHandler.call(SdkOperationExecution.kt:347)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.operation.DeserializeHandler$call$1.invokeSuspend(Unknown Source:15)
-                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+                                                                                                    	at kotlinx.coroutines.internal.ScopeCoroutine.afterResume(Scopes.kt:35)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
                                                                                                     	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
                                                                                                     	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
                                                                                                     	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
@@ -440,125 +188,325 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-11-04 09:29:36.226 10351-10599 TapTokenEx...geReceiver org.thoughtcrime.securesms           D  [notifySecret调试] B端发送ACCEPT: notifySecret=25bf...9169, webhookUrl=https://5eu6cctuvzgn3p2w65si7bmp5e0kiiyk.lambda-url.ap-southeast-1.on.aws/, userId=915085cf-af5e-488f-a93e-07ca9fcd0df6
-2025-11-04 09:29:43.512 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-04 09:29:43.513 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-04 09:29:43.513 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-04 09:29:43.516 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-04 09:29:43.517 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-04 09:29:43.517 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-04 09:29:43.579 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
-2025-11-04 09:29:43.581 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/cos_upload_3454195518626640321.dat
-2025-11-04 09:29:43.582 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 387 bytes
-2025-11-04 09:29:43.583 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/1762219783569_********-****-****-****-*********8fe.dat
-2025-11-04 09:29:43.583 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/1762219783569_********-****-****-****-*********8fe.dat
-2025-11-04 09:29:43.584 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:29:43.584 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:29:43.587 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:29:43.590 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:29:43.590 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:29:43.593 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:29:43.694  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57300 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:43.782 10351-10600 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connecting to AWS API Gateway WebSocket...
-2025-11-04 09:29:43.783 10351-10600 AwsWebSocketClient      org.thoughtcrime.securesms           I  Connecting to WebSocket: wss://5h44bcga0i.execute-api.ap-southeast-1.amazonaws.com/prod?userId=34f8f5a0f1284637
-2025-11-04 09:29:43.829  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57306 --> 5h44bcga0i.execute-api.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:43.921 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 上传文件成功
-2025-11-04 09:29:43.921 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "31ef3d49754e7e634f5155b72c4fb47a"
-2025-11-04 09:29:43.923 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:29:43.930 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           I  准备通知对方Webhook: contactId=********-****-****-****-*********973, url=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/, userId=********-****-****-****-*********299, platform=cos, verified=false
-2025-11-04 09:29:43.931 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           D  [notifySecret调试] 发送端调用Webhook: notifySecret=8c4a...5c3e, webhookUrl=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/
-2025-11-04 09:29:44.015  5039-5101  ClashForAndroid         com.github.kr328.clash               D  [DNS] fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws --> 52.221.53.97
-2025-11-04 09:29:44.051  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57314 --> fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws:443 match Match() using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:45.075 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           W  Webhook notify failed: code=403, url=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/; falling back to trigger function
-2025-11-04 09:29:45.080 10351-10648 AwsWebSocketClient      org.thoughtcrime.securesms           I  WebSocket connection opened
-2025-11-04 09:29:45.083 10351-10596 AwsApiGatewayProvider   org.thoughtcrime.securesms           I  Connected successfully with user ID: 34f8f5a0f1284637
-2025-11-04 09:29:45.131  5039-5078  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57318 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:45.231  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57324 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:45.325  5039-5101  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:57334 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:29:45.369 10351-10601 AwsApiGatewayDeployer   org.thoughtcrime.securesms           W  Failed to discover trigger function
-                                                                                                    aws.smithy.kotlin.runtime.http.HttpException: javax.net.ssl.SSLHandshakeException: connection closed; HttpErrorCode(TLS_NEGOTIATION_ERROR)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.OkHttpEngine.roundTrip(OkHttpEngine.kt:194)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.OkHttpEngine$roundTrip$1.invokeSuspend(Unknown Source:15)
+2025-11-04 14:25:12.198 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********988
+2025-11-04 14:25:12.199 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
+2025-11-04 14:25:12.199 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
+2025-11-04 14:25:12.200 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-11-04 14:25:12.201 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********988, type=CIPHERTEXT
+2025-11-04 14:25:12.203 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
+2025-11-04 14:25:12.204 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
+2025-11-04 14:25:12.207 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1762237508286, type=CIPHERTEXT
+2025-11-04 14:25:12.212 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1762237508286
+2025-11-04 14:25:12.212 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1762237508286
+2025-11-04 14:25:12.290 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1762237508286
+2025-11-04 14:25:12.300 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********988
+2025-11-04 14:25:12.302 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1762237508286 | timestamp=1762237512293
+2025-11-04 14:25:12.315 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********988
+2025-11-04 14:25:12.821 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:12.831 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:12.831 15860-15897 SendReadReceiptJob      org.thoughtcrime.securesms           I  Tap模式：跳过已读回执发送
+2025-11-04 14:25:13.816  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=510.9629, y[0]=2216.8945, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76622925, downTime=76622925, deviceId=4, source=0x5002, displayId=0, eventId=639863408 }
+2025-11-04 14:25:13.889  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=507.96387, y[0]=2216.8945, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76622999, downTime=76622925, deviceId=4, source=0x5002, displayId=0, eventId=878827757 }
+2025-11-04 14:25:14.615  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=523.9824, y[0]=1963.916, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76623725, downTime=76623725, deviceId=4, source=0x5002, displayId=0, eventId=419429849 }
+2025-11-04 14:25:14.683  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=523.9824, y[0]=1963.916, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76623793, downTime=76623725, deviceId=4, source=0x5002, displayId=0, eventId=664008265 }
+2025-11-04 14:25:14.695 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:14.700 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:14.700 15860-15897 TypingStatusSender      org.thoughtcrime.securesms           D  Tap模式：跳过typing indicator发送
+2025-11-04 14:25:15.434  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=995.9551, y[0]=1441.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76624543, downTime=76624543, deviceId=4, source=0x5002, displayId=0, eventId=523729720 }
+2025-11-04 14:25:15.510  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=995.9551, y[0]=1441.919, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76624617, downTime=76624543, deviceId=4, source=0x5002, displayId=0, eventId=259724247 }
+2025-11-04 14:25:15.527 15860-15897 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1762237515527 | timestamp=1762237515527
+2025-11-04 14:25:15.574 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:15.601 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:15.609 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-04 14:25:15.706 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:15.724 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:15.724 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=5318
+2025-11-04 14:25:15.725 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=5318, recipient=RecipientId::4
+2025-11-04 14:25:15.725 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=5318
+2025-11-04 14:25:15.725 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=5318, recipient=RecipientId::4
+2025-11-04 14:25:15.731 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=5318
+2025-11-04 14:25:15.741 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=5318
+2025-11-04 14:25:15.750 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=5318, recipient=RecipientId::4
+2025-11-04 14:25:15.752 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientId=RecipientId::4, recipientAci=********-****-****-****-*********461
+2025-11-04 14:25:15.760 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider, recipientId=RecipientId::4
+2025-11-04 14:25:15.761 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
+2025-11-04 14:25:15.761 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
+2025-11-04 14:25:15.843 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=106
+2025-11-04 14:25:15.845 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=5318, ciphertextLength=106
+2025-11-04 14:25:15.846 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1762237515527 | timestamp=1762237515842
+2025-11-04 14:25:15.847 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********fd9
+2025-11-04 14:25:15.847 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-11-04 14:25:15.848 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-11-04 14:25:15.850 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:15.853 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:15.874 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
+2025-11-04 14:25:15.906 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1762237487686, status=FULL_ACTIVE, provider=cos
+2025-11-04 14:25:15.917 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查开始 =====
+2025-11-04 14:25:15.918 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查recipientAci: ********-****-****-****-*********461, 通道数: 1
+2025-11-04 14:25:15.923 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********461_cos_1762237487686, provider=cos
+2025-11-04 14:25:15.924 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762237492684-7225-1762237492684, type=CosTransportToken
+2025-11-04 14:25:15.925 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762237485100-9469-1762237485100, type=CosTransportToken
+2025-11-04 14:25:15.925 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-11-04 14:25:15.925 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查结束 =====
+2025-11-04 14:25:16.439 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:16.440 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:16.453 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败后的系统诊断:
+2025-11-04 14:25:16.471 15860-16129 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:25:16.472 15860-16129 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=5a806149-30d0-412a-90d2-9412a40ee461
+2025-11-04 14:25:16.475 15860-16129 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:25:16.475 15860-16129 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=5a806149-30d0-412a-90d2-9412a40ee461
+2025-11-04 14:25:16.503 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           E  === TAP系统状态诊断 ===
+                                                                                                    1. TransportManager状态:
+                                                                                                       - 初始化状态: true
+                                                                                                    2. Provider状态:
+                                                                                                       - 可用Provider数: 1
+                                                                                                       - 启用Provider数: 1
+                                                                                                       - 可用: cos (云对象存储 (COS))
+                                                                                                       - 启用: cos (云对象存储 (COS))
+                                                                                                    3. 通道状态:
+                                                                                                       - 活跃通道数: 1
+                                                                                                       - 通道: ch_********-****-****-****-*********461_cos_1762237487686
+                                                                                                         * 状态: FULL_ACTIVE
+                                                                                                         * Provider: cos
+                                                                                                         * recipientId: ********-****-****-****-*********461
+                                                                                                         * 是否活跃: true
+                                                                                                    4. Token状态:
+                                                                                                       - 接收Token数: 1
+                                                                                                       - 共享Token数: 1
+                                                                                                       - 接收Token: cos-signal-cos-signal-v2-1762237492684-7225-1762237492684 (cos)
+                                                                                                       - 共享Token: cos-signal-cos-signal-v2-1762237485100-9469-1762237485100 (cos)
+                                                                                                    5. 轮询状态:
+                                                                                                       - 轮询服务启动结果: true
+                                                                                                       - 轮询目标添加测试: true
+                                                                                                    6. 配置状态:
+                                                                                                       - 已配置Provider: cos
+                                                                                                       - 持久化启用Provider: cos
+                                                                                                       - 应执行初始化: false
+                                                                                                    === 诊断完成 ===
+2025-11-04 14:25:16.504 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           W  TAP路由失败，尝试自动修复...
+2025-11-04 14:25:16.514 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始自动修复TAP系统问题
+2025-11-04 14:25:16.527 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复成功: 已添加轮询目标
+2025-11-04 14:25:16.528 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，修复问题数: 1
+2025-11-04 14:25:16.529 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，重新尝试路由...
+2025-11-04 14:25:17.960 15860-15897 CosTransportProvider    org.thoughtcrime.securesms           D  [TapTimeTest] T3_UPLOAD_END | msgId=1762237515527 | timestamp=1762237517958
+2025-11-04 14:25:18.674 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Discovered trigger function: tap-notification-trigger-5936caa9
+2025-11-04 14:25:18.674 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Invoking trigger function: tap-notification-trigger-5936caa9 for path: /v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237516551_b8c2e885-e139-44fd-892d-6da89af3bfd9.dat
+2025-11-04 14:25:18.782 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Trigger function invoked successfully: tap-notification-trigger-5936caa9
+2025-11-04 14:25:18.794 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:18.794 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:18.810 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复后路由成功
+2025-11-04 14:25:18.811 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********fd9
+2025-11-04 14:25:18.811 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=5318
+2025-11-04 14:25:18.817 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=5318, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237516551_********-****-****-****-*********fd9.dat
+2025-11-04 14:25:18.819 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=5318, method=TAP_TRANSPORT, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237516551_********-****-****-****-*********fd9.dat
+2025-11-04 14:25:18.994 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-04 14:25:19.004 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=true
+2025-11-04 14:25:19.055 15860-15897 TapV2ModeIndicator      org.thoughtcrime.securesms           D  显示Tap v2指示器: status=FULL_ACTIVE, provider=cos
+2025-11-04 14:25:26.686  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=529.98047, y[0]=1906.9336, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76635795, downTime=76635795, deviceId=4, source=0x5002, displayId=0, eventId=608307337 }
+2025-11-04 14:25:26.760  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=529.98047, y[0]=1906.9336, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76635870, downTime=76635795, deviceId=4, source=0x5002, displayId=0, eventId=39168660 }
+2025-11-04 14:25:26.767 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:26.782 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:26.784 15860-15897 TypingStatusSender      org.thoughtcrime.securesms           D  Tap模式：跳过typing indicator发送
+2025-11-04 14:25:27.361  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=988.9678, y[0]=1434.8877, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76636470, downTime=76636470, deviceId=4, source=0x5002, displayId=0, eventId=423347684 }
+2025-11-04 14:25:27.435  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=988.9678, y[0]=1434.8877, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76636545, downTime=76636470, deviceId=4, source=0x5002, displayId=0, eventId=238155514 }
+2025-11-04 14:25:27.454 15860-15897 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1762237527450 | timestamp=1762237527450
+2025-11-04 14:25:27.498 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:27.520 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:27.520 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-04 14:25:27.591 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:27.614 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:27.614 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=5319
+2025-11-04 14:25:27.615 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=5319, recipient=RecipientId::4
+2025-11-04 14:25:27.615 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=5319
+2025-11-04 14:25:27.618 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=5319, recipient=RecipientId::4
+2025-11-04 14:25:27.700 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=5319
+2025-11-04 14:25:27.700 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=5319
+2025-11-04 14:25:27.711 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=5319, recipient=RecipientId::4
+2025-11-04 14:25:27.715 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientId=RecipientId::4, recipientAci=********-****-****-****-*********461
+2025-11-04 14:25:27.743 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider, recipientId=RecipientId::4
+2025-11-04 14:25:27.743 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
+2025-11-04 14:25:27.804 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
+2025-11-04 14:25:27.834 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=73
+2025-11-04 14:25:27.840 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=5319, ciphertextLength=73
+2025-11-04 14:25:27.842 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1762237527450 | timestamp=1762237527702
+2025-11-04 14:25:27.856 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********a25
+2025-11-04 14:25:27.866 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-11-04 14:25:27.874 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-11-04 14:25:27.891 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:27.895 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:27.931 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
+2025-11-04 14:25:27.932 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1762237487686, status=FULL_ACTIVE, provider=cos
+2025-11-04 14:25:27.936 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查开始 =====
+2025-11-04 14:25:27.938 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查recipientAci: ********-****-****-****-*********461, 通道数: 1
+2025-11-04 14:25:27.940 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********461_cos_1762237487686, provider=cos
+2025-11-04 14:25:27.942 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762237492684-7225-1762237492684, type=CosTransportToken
+2025-11-04 14:25:27.946 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762237485100-9469-1762237485100, type=CosTransportToken
+2025-11-04 14:25:27.948 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-11-04 14:25:27.948 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查结束 =====
+2025-11-04 14:25:28.646 15860-15897 CosTransportProvider    org.thoughtcrime.securesms           D  [TapTimeTest] T3_UPLOAD_END | msgId=1762237527450 | timestamp=1762237528637
+2025-11-04 14:25:29.863 15860-15963 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Discovered trigger function: tap-notification-trigger-5936caa9
+2025-11-04 14:25:29.863 15860-15963 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Invoking trigger function: tap-notification-trigger-5936caa9 for path: /v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237527928_3e923e87-2a5c-42d1-8731-0254f2baba25.dat
+2025-11-04 14:25:29.980 15860-15888 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Trigger function invoked successfully: tap-notification-trigger-5936caa9
+2025-11-04 14:25:29.992 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:29.993 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:30.010 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********a25
+2025-11-04 14:25:30.011 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=5319
+2025-11-04 14:25:30.011 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=5319, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237527928_********-****-****-****-*********a25.dat
+2025-11-04 14:25:30.012 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=5319, method=TAP_TRANSPORT, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237527928_********-****-****-****-*********a25.dat
+2025-11-04 14:25:37.331 15860-15965 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762237540506 | timestamp=1762237537331
+2025-11-04 14:25:37.340 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:25:37.341 15860-15897 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d_1762237492684
+2025-11-04 14:25:37.446 15860-15897 NotificationDownloadExe org.thoughtcrime.securesms           D  [TapTimeTest] T5_LIST_END | msgId=1762237534171 | timestamp=1762237537430
+2025-11-04 14:25:37.789 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********631, type=TEXT_MESSAGE
+2025-11-04 14:25:37.789 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********631
+2025-11-04 14:25:37.795 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********631
+2025-11-04 14:25:37.797 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
+                                                                                                    java.net.ProtocolException: Unexpected end group
+                                                                                                    	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:152)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:552)
+                                                                                                    	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:372)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:374)
+                                                                                                    	at com.squareup.wire.ProtoAdapter.decode(ProtoAdapter.kt:372)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:199)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.access$adaptTransportMessageToEnvelope(TapEnvelopeAdapter.kt:40)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invokeSuspend(TapEnvelopeAdapter.kt:84)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:8)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter$processEncryptedMessage$2.invoke(Unknown Source:4)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndspatched(Undispatched.kt:66)
+                                                                                                    	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+                                                                                                    	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:165)
+                                                                                                    	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source:1)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapEnvelopeAdapter.processEncryptedMessage(TapEnvelopeAdapter.kt:67)
+                                                                                                    	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.downloadAndProcessFile(NotificationDownloadExecutor.kt:564)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.access$downloadAndProcessFile(NotificationDownloadExecutor.kt:24)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor$downloadAndProcessFile$1.invokeSuspend(Unknown Source:18)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
-                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:98)
+                                                                                                    	at kotlinx.coroutines.internal.ScopeCoroutine.afterResume(Scopes.kt:35)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:266)
+                                                                                                    	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+                                                                                                    	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:46)
+                                                                                                    	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+                                                                                                    	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+                                                                                                    	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:829)
+                                                                                                    	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-                                                                                                    Caused by: javax.net.ssl.SSLHandshakeException: connection closed
-                                                                                                    	at org.conscrypt.SSLUtils.toSSLHandshakeException(SSLUtils.java:361)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232)
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355)
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210)
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78)
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280)
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.MetricsInterceptor.intercept(MetricsInterceptor.kt:32)
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126)
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208)
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    Caused by: java.io.EOFException: connection closed
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.doHandshake(ConscryptEngineSocket.java:232) 
-                                                                                                    	at org.conscrypt.ConscryptEngineSocket.startHandshake(ConscryptEngineSocket.java:209) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTls(ConnectPlan.kt:355) 
-                                                                                                    	at okhttp3.internal.connection.ConnectPlan.connectTlsEtc(ConnectPlan.kt:210) 
-                                                                                                    	at okhttp3.internal.connection.FastFallbackExchangeFinder.find(FastFallbackExchangeFinder.kt:78) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.initExchange$okhttp_release(RealCall.kt:280) 
-                                                                                                    	at okhttp3.internal.connection.ConnectInterceptor.intercept(ConnectInterceptor.kt:32) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.cache.CacheInterceptor.intercept(CacheInterceptor.kt:101) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.BridgeInterceptor.intercept(BridgeInterceptor.kt:85) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(RetryAndFollowUpInterceptor.kt:74) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at aws.smithy.kotlin.runtime.http.engine.okhttp.MetricsInterceptor.intercept(MetricsInterceptor.kt:32) 
-                                                                                                    	at okhttp3.internal.http.RealInterceptorChain.proceed(RealInterceptorChain.kt:126) 
-                                                                                                    	at okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp_release(RealCall.kt:208) 
-                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:530) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145) 
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644) 
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012) 
-2025-11-04 09:29:45.370 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           I  Fallback trigger invoked (AWS): false
-2025-11-04 09:30:07.696 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-04 09:30:07.696 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-04 09:30:07.698 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-04 09:30:07.699 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-04 09:30:07.700 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-04 09:30:07.700 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-04 09:30:07.701 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
-2025-11-04 09:30:07.702 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/cos_upload_2732920526322014169.dat
-2025-11-04 09:30:07.702 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 387 bytes
-2025-11-04 09:30:07.703 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/1762219807682_********-****-****-****-*********cae.dat
-2025-11-04 09:30:07.704 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/1762219807682_********-****-****-****-*********cae.dat
-2025-11-04 09:30:07.705 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-04 09:30:07.705 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-04 09:30:07.706 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-04 09:30:07.707 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-04 09:30:07.707 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-04 09:30:07.708 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-04 09:30:07.749  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:36802 --> signaltest3.s3.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:30:08.216 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 上传文件成功
-2025-11-04 09:30:08.216 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "2ac0f3825c06a1143c64600fc892f468"
-2025-11-04 09:30:08.217 10351-10413 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
-2025-11-04 09:30:08.220 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           I  准备通知对方Webhook: contactId=********-****-****-****-*********973, url=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/, userId=********-****-****-****-*********299, platform=cos, verified=false
-2025-11-04 09:30:08.221 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           D  [notifySecret调试] 发送端调用Webhook: notifySecret=8c4a...5c3e, webhookUrl=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/
-2025-11-04 09:30:08.224  5039-5079  ClashForAndroid         com.github.kr328.clash               D  [DNS] fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws --> 54.179.30.251
-2025-11-04 09:30:08.260  5039-5107  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:36814 --> fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws:443 match Match() using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:30:08.940 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           W  Webhook notify failed: code=403, url=https://fuawqsms672qwejrznsdcjbi2u0ojeox.lambda-url.ap-southeast-1.on.aws/; falling back to trigger function
-2025-11-04 09:30:08.995  5039-5075  ClashForAndroid         com.github.kr328.clash               I  [TCP] 127.0.0.1:37688 --> lambda.ap-southeast-1.amazonaws.com:443 match DomainKeyword(amazon) using BiXin Network[🇭🇰 香港 01]
-2025-11-04 09:30:09.333 10351-10596 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Discovered trigger function: tap-notification-trigger-c1bd91eb
-2025-11-04 09:30:09.333 10351-10596 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Invoking trigger function: tap-notification-trigger-c1bd91eb for path: /v2-channels/053abb43f297ee1d_1762219772796/outbox/messages/1762219807682_275febc1-47ef-4d93-9621-e1a04d66ccae.dat
-2025-11-04 09:30:09.443 10351-10596 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Trigger function invoked successfully: tap-notification-trigger-c1bd91eb
-2025-11-04 09:30:09.444 10351-10413 CosTransportProvider    org.thoughtcrime.securesms           I  Fallback trigger invoked (AWS): true
+2025-11-04 14:25:37.799 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********631
+2025-11-04 14:25:37.803 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
+2025-11-04 14:25:37.804 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
+2025-11-04 14:25:37.804 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-11-04 14:25:37.807 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********631, type=CIPHERTEXT
+2025-11-04 14:25:37.808 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
+2025-11-04 14:25:37.810 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
+2025-11-04 14:25:37.811 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1762237533971, type=CIPHERTEXT
+2025-11-04 14:25:37.816 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1762237533971
+2025-11-04 14:25:37.818 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1762237533971
+2025-11-04 14:25:37.864 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1762237533971
+2025-11-04 14:25:37.880 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********631
+2025-11-04 14:25:37.888 15860-15897 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1762237533971 | timestamp=1762237537872
+2025-11-04 14:25:37.889 15860-15897 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********631
+2025-11-04 14:25:38.430 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:38.474 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:38.475 15860-15897 SendReadReceiptJob      org.thoughtcrime.securesms           I  Tap模式：跳过已读回执发送
+2025-11-04 14:25:40.849  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=456.97656, y[0]=1786.8896, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76649958, downTime=76649958, deviceId=4, source=0x5002, displayId=0, eventId=829436174 }
+2025-11-04 14:25:40.915  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=443.958, y[0]=1786.8896, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76650025, downTime=76649958, deviceId=4, source=0x5002, displayId=0, eventId=202868449 }
+2025-11-04 14:25:40.922 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:40.930 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:40.930 15860-15897 TypingStatusSender      org.thoughtcrime.securesms           D  Tap模式：跳过typing indicator发送
+2025-11-04 14:25:41.926  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=953.96484, y[0]=1453.9307, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76650998, downTime=76650998, deviceId=4, source=0x5002, displayId=0, eventId=29872064 }
+2025-11-04 14:25:41.969  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=953.96484, y[0]=1453.9307, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=76651075, downTime=76650998, deviceId=4, source=0x5002, displayId=0, eventId=194695740 }
+2025-11-04 14:25:42.000 15860-15897 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1762237541998 | timestamp=1762237541998
+2025-11-04 14:25:42.183 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:42.224 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:42.225 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-04 14:25:42.314 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-04 14:25:42.371 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-04 14:25:42.371 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=5321
+2025-11-04 14:25:42.372 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=5321, recipient=RecipientId::4
+2025-11-04 14:25:42.372 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=5321
+2025-11-04 14:25:42.372 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=5321, recipient=RecipientId::4
+2025-11-04 14:25:42.380 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=5321
+2025-11-04 14:25:42.381 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=5321
+2025-11-04 14:25:42.398 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=5321, recipient=RecipientId::4
+2025-11-04 14:25:42.404 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientId=RecipientId::4, recipientAci=********-****-****-****-*********461
+2025-11-04 14:25:42.408 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider, recipientId=RecipientId::4
+2025-11-04 14:25:42.408 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=1, 附件数=0
+2025-11-04 14:25:42.408 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
+2025-11-04 14:25:42.409 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=106
+2025-11-04 14:25:42.409 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=5321, ciphertextLength=106
+2025-11-04 14:25:42.411 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1762237541998 | timestamp=1762237542358
+2025-11-04 14:25:42.414 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********1ad
+2025-11-04 14:25:42.423 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-11-04 14:25:42.423 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-11-04 14:25:42.424 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:42.424 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-11-04 14:25:42.439 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
+2025-11-04 14:25:42.440 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1762237487686, status=FULL_ACTIVE, provider=cos
+2025-11-04 14:25:42.440 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查开始 =====
+2025-11-04 14:25:42.441 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查recipientAci: ********-****-****-****-*********461, 通道数: 1
+2025-11-04 14:25:42.441 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********461_cos_1762237487686, provider=cos
+2025-11-04 14:25:42.441 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762237492684-7225-1762237492684, type=CosTransportToken
+2025-11-04 14:25:42.442 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762237485100-9469-1762237485100, type=CosTransportToken
+2025-11-04 14:25:42.442 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-11-04 14:25:42.442 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查结束 =====
+2025-11-04 14:25:43.023 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:43.024 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:43.072 15860-16129 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:25:43.073 15860-16129 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=5a806149-30d0-412a-90d2-9412a40ee461
+2025-11-04 14:25:43.075 15860-16129 TapPollingService       org.thoughtcrime.securesms           I  轮询服务已禁用（全局开关 ENABLE_POLLING = false），跳过启动
+2025-11-04 14:25:43.083 15860-16129 TapPollingService       org.thoughtcrime.securesms           D  轮询服务已禁用（全局开关），跳过轮询目标添加: recipientId=5a806149-30d0-412a-90d2-9412a40ee461
+2025-11-04 14:25:43.092 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           E  TAP路由失败后的系统诊断:
+2025-11-04 14:25:43.125 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           E  === TAP系统状态诊断 ===
+                                                                                                    1. TransportManager状态:
+                                                                                                       - 初始化状态: true
+                                                                                                    2. Provider状态:
+                                                                                                       - 可用Provider数: 1
+                                                                                                       - 启用Provider数: 1
+                                                                                                       - 可用: cos (云对象存储 (COS))
+                                                                                                       - 启用: cos (云对象存储 (COS))
+                                                                                                    3. 通道状态:
+                                                                                                       - 活跃通道数: 1
+                                                                                                       - 通道: ch_********-****-****-****-*********461_cos_1762237487686
+                                                                                                         * 状态: FULL_ACTIVE
+                                                                                                         * Provider: cos
+                                                                                                         * recipientId: ********-****-****-****-*********461
+                                                                                                         * 是否活跃: true
+                                                                                                    4. Token状态:
+                                                                                                       - 接收Token数: 1
+                                                                                                       - 共享Token数: 1
+                                                                                                       - 接收Token: cos-signal-cos-signal-v2-1762237492684-7225-1762237492684 (cos)
+                                                                                                       - 共享Token: cos-signal-cos-signal-v2-1762237485100-9469-1762237485100 (cos)
+                                                                                                    5. 轮询状态:
+                                                                                                       - 轮询服务启动结果: true
+                                                                                                       - 轮询目标添加测试: true
+                                                                                                    6. 配置状态:
+                                                                                                       - 已配置Provider: cos
+                                                                                                       - 持久化启用Provider: cos
+                                                                                                       - 应执行初始化: false
+                                                                                                    === 诊断完成 ===
+2025-11-04 14:25:43.126 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           W  TAP路由失败，尝试自动修复...
+2025-11-04 14:25:43.127 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始自动修复TAP系统问题
+2025-11-04 14:25:43.155 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复成功: 已添加轮询目标
+2025-11-04 14:25:43.156 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，修复问题数: 1
+2025-11-04 14:25:43.156 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复完成，重新尝试路由...
+2025-11-04 14:25:43.904 15860-15897 CosTransportProvider    org.thoughtcrime.securesms           D  [TapTimeTest] T3_UPLOAD_END | msgId=1762237541998 | timestamp=1762237543897
+2025-11-04 14:25:44.563 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Discovered trigger function: tap-notification-trigger-5936caa9
+2025-11-04 14:25:44.563 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           D  Invoking trigger function: tap-notification-trigger-5936caa9 for path: /v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237543192_60236476-d4ff-4520-85c2-a89f767561ad.dat
+2025-11-04 14:25:44.699 15860-15960 AwsApiGatewayDeployer   org.thoughtcrime.securesms           I  Trigger function invoked successfully: tap-notification-trigger-5936caa9
+2025-11-04 14:25:44.719 15860-15897 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-04 14:25:44.719 15860-15897 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-04 14:25:44.761 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  自动修复后路由成功
+2025-11-04 14:25:44.764 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********1ad
+2025-11-04 14:25:44.765 15860-15897 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=5321
+2025-11-04 14:25:44.768 15860-15897 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=5321, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237543192_********-****-****-****-*********1ad.dat
+2025-11-04 14:25:44.772 15860-15897 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=5321, method=TAP_TRANSPORT, path=/v2-channels/a3adde1ba3b08264_1762237485100/outbox/messages/1762237543192_********-****-****-****-*********1ad.dat

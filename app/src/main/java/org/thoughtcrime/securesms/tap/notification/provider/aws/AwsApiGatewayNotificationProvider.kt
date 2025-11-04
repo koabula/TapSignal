@@ -158,7 +158,7 @@ class AwsApiGatewayNotificationProvider(
             }
 
             Log.i(TAG, "Deployment completed successfully")
-            DeployResult.success(webhookUrl, pushServiceInfo)
+            DeployResult.success(webhookUrl, userId, pushServiceInfoWithUser)
 
         } catch (e: Exception) {
             Log.e(TAG, "Deployment failed", e)
@@ -235,6 +235,10 @@ class AwsApiGatewayNotificationProvider(
             }
             
             // P0修复：总是先断开旧连接，确保只有一个活跃连接
+            // P1修复：在断开前保存回调，断开后恢复
+            val savedCallback = notificationCallback
+            val savedUserId = currentUserId
+            
             if (wsClient != null) {
                 try {
                     val oldEndpoint = currentEndpoint ?: "unknown"
@@ -242,6 +246,13 @@ class AwsApiGatewayNotificationProvider(
                     disconnect()
                     // 短暂延迟，确保旧连接完全清理
                     delay(500)
+                    
+                    // 恢复回调和userId，避免在重连过程中丢失
+                    if (savedCallback != null && savedUserId != null) {
+                        Log.d(TAG, "Restoring callback after disconnect")
+                        notificationCallback = savedCallback
+                        currentUserId = savedUserId
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error disconnecting old endpoint", e)
                 }
@@ -280,8 +291,17 @@ class AwsApiGatewayNotificationProvider(
         try {
             Log.i(TAG, "Disconnecting from AWS API Gateway")
             
-            // 取消消息监听
-            messageListenerJob?.cancel()
+            // 取消消息监听（等待协程完成）
+            messageListenerJob?.let { job ->
+                Log.d(TAG, "Cancelling message listener job")
+                job.cancel()
+                try {
+                    job.join() // 等待协程完全退出
+                    Log.d(TAG, "Message listener job cancelled successfully")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error waiting for message listener job to finish", e)
+                }
+            }
             messageListenerJob = null
             
             // 断开并清理WebSocket客户端
@@ -295,7 +315,8 @@ class AwsApiGatewayNotificationProvider(
             }
             wsClient = null
             
-            // 清理状态
+            // P1修复：延后清理状态，确保消息监听器完全退出后再清空
+            // 此时messageListenerJob已经cancel并join，不会再使用callback
             currentUserId = null
             notificationCallback = null
             currentEndpoint = null
@@ -334,113 +355,32 @@ class AwsApiGatewayNotificationProvider(
     private fun startMessageListener(client: AwsWebSocketClient) {
         messageListenerJob?.cancel()
         messageListenerJob = scope.launch {
+            // 保存回调到局部变量，避免在disconnect时被清空
+            val callback = notificationCallback
+            if (callback == null) {
+                Log.e(TAG, "Notification callback is null, cannot start message listener")
+                return@launch
+            }
+            
             val messageChannel = client.getMessageChannel()
             try {
                 while (isActive) {
                     val message = messageChannel.receive()
                     Log.d(TAG, "Received notification: type=${message.type}, senderId=${message.senderId}")
                     
-                    // P1修复: 收到推送通知后，立即触发消息下载
-                    handleNotificationMessage(message)
-                    
-                    // 保留原有的回调机制
-                    notificationCallback?.invoke(message)
+                    // P0修复：在调用回调前后添加日志
+                    try {
+                        Log.d(TAG, "Invoking notification callback for message: type=${message.type}")
+                        callback.invoke(message)
+                        Log.d(TAG, "Notification callback invoked successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error invoking notification callback", e)
+                    }
                 }
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     Log.e(TAG, "Error in message listener", e)
                 }
-            }
-        }
-    }
-    
-    /**
-     * P1修复: 处理推送通知消息，触发下载流程
-     */
-    private suspend fun handleNotificationMessage(message: NotificationMessage) {
-        try {
-            Log.i(TAG, "[推送下载] 收到推送通知，准备下载消息")
-            Log.d(TAG, "  - 通知类型: ${message.type}")
-            Log.d(TAG, "  - 发送者ID(hash): ${message.senderId}")
-            Log.d(TAG, "  - 时间戳: ${message.timestamp}")
-            
-            // 只处理新消息通知
-            if (message.type != NotificationMessage.TYPE_NEW_MESSAGE) {
-                Log.d(TAG, "[推送下载] 忽略非新消息通知: ${message.type}")
-                return
-            }
-            
-            // 从senderId（hash）解析出完整ACI
-            // senderId是对方的hashId，需要通过本地配置或数据库查询对应的ACI
-            val senderAci = resolveSenderAciFromHashId(message.senderId)
-            if (senderAci == null) {
-                Log.w(TAG, "[推送下载] 无法解析发送者ACI: hashId=${message.senderId}")
-                return
-            }
-            
-            Log.d(TAG, "[推送下载] 解析得到发送者ACI: $senderAci")
-            
-            // P1修复: 触发下载逻辑
-            // 当前实现：确保轮询服务运行，让下一次轮询周期自动下载新消息
-            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-            
-            // 确保轮询服务已启动
-            val pollingStatus = pollingService.getPollingStatus()
-            if (!pollingStatus.isRunning) {
-                Log.i(TAG, "[推送下载] 轮询服务未激活，启动轮询服务")
-                val started = pollingService.startPolling()
-                if (!started) {
-                    Log.w(TAG, "[推送下载] 启动轮询服务失败")
-                    return
-                }
-            }
-            
-            // 调整轮询间隔以快速获取新消息
-            try {
-                pollingService.adjustPollingInterval(
-                    senderAci, 
-                    org.thoughtcrime.securesms.tap.polling.IntervalChangeType.DECREASE
-                )
-                Log.d(TAG, "[推送下载] 已调整轮询间隔，加快消息获取")
-            } catch (e: Exception) {
-                Log.w(TAG, "[推送下载] 调整轮询间隔失败", e)
-            }
-            
-            Log.i(TAG, "[推送下载] 推送通知处理完成，轮询服务将自动下载新消息: senderAci=$senderAci")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "[推送下载] 处理推送通知失败", e)
-        }
-    }
-    
-    /**
-     * P1修复: 从hashId解析发送者ACI
-     * 通过查询数据库中的所有通道来反向查找
-     */
-    private suspend fun resolveSenderAciFromHashId(hashId: String): String? {
-        return withContext(Dispatchers.IO) {
-            try {
-                // 直接从数据库查询所有通道
-                val channelTable = org.thoughtcrime.securesms.database.SignalDatabase.transportChannels
-                val allChannels = channelTable.getAllChannels()
-                
-                for (channelData in allChannels) {
-                    // 解析metadata，查找匹配的peerHashedId
-                    if (channelData.metadata is org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata) {
-                        val cosMetadata = channelData.metadata as org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
-                        if (cosMetadata.peerHashedId == hashId) {
-                            Log.d(TAG, "[推送下载] 找到匹配的通道: hashId=$hashId -> recipientId=${channelData.recipientId}")
-                            return@withContext channelData.recipientId
-                        }
-                    }
-                }
-                
-                Log.w(TAG, "[推送下载] 未找到匹配的ACI: hashId=$hashId")
-                null
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "[推送下载] 解析发送者ACI失败: hashId=$hashId", e)
-                null
             }
         }
     }

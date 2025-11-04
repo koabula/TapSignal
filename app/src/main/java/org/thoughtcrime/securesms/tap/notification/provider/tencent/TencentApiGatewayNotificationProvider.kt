@@ -149,7 +149,7 @@ class TencentApiGatewayNotificationProvider(
             }
 
             Log.i(TAG, "Deployment completed successfully")
-            DeployResult.success(webhookUrl, pushServiceInfo)
+            DeployResult.success(webhookUrl, userId, pushServiceInfoWithUser)
 
         } catch (e: Exception) {
             Log.e(TAG, "Deployment failed", e)
@@ -226,6 +226,10 @@ class TencentApiGatewayNotificationProvider(
             }
             
             // P0修复：总是先断开旧连接，确保只有一个活跃连接
+            // P1修复：在断开前保存回调，断开后恢复
+            val savedCallback = notificationCallback
+            val savedUserId = currentUserId
+            
             if (wsClient != null) {
                 try {
                     val oldEndpoint = currentEndpoint ?: "unknown"
@@ -233,6 +237,13 @@ class TencentApiGatewayNotificationProvider(
                     disconnect()
                     // 短暂延迟，确保旧连接完全清理
                     delay(500)
+                    
+                    // 恢复回调和userId，避免在重连过程中丢失
+                    if (savedCallback != null && savedUserId != null) {
+                        Log.d(TAG, "Restoring callback after disconnect")
+                        notificationCallback = savedCallback
+                        currentUserId = savedUserId
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error disconnecting old endpoint", e)
                 }
@@ -293,8 +304,17 @@ class TencentApiGatewayNotificationProvider(
         try {
             Log.i(TAG, "Disconnecting from Tencent Function URL WebSocket")
             
-            // 取消消息监听
-            messageListenerJob?.cancel()
+            // 取消消息监听（等待协程完成）
+            messageListenerJob?.let { job ->
+                Log.d(TAG, "Cancelling message listener job")
+                job.cancel()
+                try {
+                    job.join() // 等待协程完全退出
+                    Log.d(TAG, "Message listener job cancelled successfully")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error waiting for message listener job to finish", e)
+                }
+            }
             messageListenerJob = null
             
             // 断开并清理WebSocket客户端
@@ -308,7 +328,8 @@ class TencentApiGatewayNotificationProvider(
             }
             wsClient = null
             
-            // 清理状态
+            // P1修复：延后清理状态，确保消息监听器完全退出后再清空
+            // 此时messageListenerJob已经cancel并join，不会再使用callback
             currentUserId = null
             notificationCallback = null
             currentEndpoint = null
@@ -347,12 +368,27 @@ class TencentApiGatewayNotificationProvider(
     private fun startMessageListener(client: TencentWebSocketClient) {
         messageListenerJob?.cancel()
         messageListenerJob = scope.launch {
+            // 保存回调到局部变量，避免在disconnect时被清空
+            val callback = notificationCallback
+            if (callback == null) {
+                Log.e(TAG, "Notification callback is null, cannot start message listener")
+                return@launch
+            }
+            
             val messageChannel = client.getMessageChannel()
             try {
                 while (isActive) {
                     val message = messageChannel.receive()
                     Log.d(TAG, "Received notification: type=${message.type}, senderId=${message.senderId}")
-                    notificationCallback?.invoke(message)
+                    
+                    // P0修复：在调用回调前后添加日志
+                    try {
+                        Log.d(TAG, "Invoking notification callback for message: type=${message.type}")
+                        callback.invoke(message)
+                        Log.d(TAG, "Notification callback invoked successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error invoking notification callback", e)
+                    }
                 }
             } catch (e: Exception) {
                 if (e !is CancellationException) {

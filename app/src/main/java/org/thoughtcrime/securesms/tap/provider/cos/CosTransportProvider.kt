@@ -702,13 +702,18 @@ class CosTransportProvider(
                 
                 // 6. 创建子用户并分配权限
                 val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
+                // 修复: 使用通配符路径，允许访问该hash下所有timestamp版本的目录
+                // 这样即使channelId的timestamp部分变化（重新部署、重新握手），IAM权限仍然有效
+                val wildcardDirectoryPath = "/v2-channels/${myHashedId}_*/outbox"
                 val subUserCredential = subUserManager.createSubUser(
                     userName = subUserName,
-                    directoryPath = "${channelDirectoryPath}outbox", // 允许对方访问我的outbox目录及其子目录
+                    directoryPath = wildcardDirectoryPath,
                     permissions = cosPermission
                 )
                 
-                Log.i(TAG, "子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}")
+                Log.i(TAG, "子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, " +
+                    "accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}, " +
+                    "wildcardPath=$wildcardDirectoryPath")
                 
                 // 7. 计算过期时间
                 val expirationTime = if (request.validityDurationMs > 0L) {
@@ -2252,7 +2257,8 @@ class CosTransportProvider(
     }
 
     /**
-     * 上传成功后触发推送通知（方案二：客户端直接调用云函数）
+     * 上传成功后触发推送通知（通过S3事件触发云函数）
+     * P1修复: 简化逻辑，完全依赖S3触发机制，移除Client端配置验证
      * 
      * @param remotePath 上传文件的远程路径
      * @param metadata 传输元数据
@@ -2264,141 +2270,44 @@ class CosTransportProvider(
         bucketName: String
     ) {
         try {
-            // P0修复: 添加详细日志以诊断recipientId解析问题
-            Log.d(TAG, "[Webhook调试] 开始触发推送: recipientId原始值=${metadata.recipientId}, peerHashedId=${metadata.peerHashedId}")
+            Log.d(TAG, "[推送触发] 通过S3触发器发送推送通知: remotePath=$remotePath, recipientId=${metadata.recipientId}")
             
-            // 新主路径：客户端直连对方Webhook发送提醒
-            // 始终使用对方 ACI 作为本地配置主键，避免将已哈希ID再作为key
-            val aciContactId = resolveAciFromAnyId(metadata.recipientId)
-            if (aciContactId == null) {
-                Log.w(TAG, "无法解析对端标识（peerHashedId/recipientId均不可用），跳过本地直连webhook，依赖 F_A 事件触发")
-                return
-            }
+            // P1修复: 直接调用S3触发器（云函数F_A），由云函数负责：
+            // 1. 从COS读取联系人webhook配置
+            // 2. 验证配置完整性
+            // 3. 调用对方的webhook
+            // 这样避免了Client端的重复逻辑和配置不一致问题
             
-            Log.d(TAG, "[Webhook调试] 解析得到ACI: $aciContactId")
-            
-            // 仅从本地数据库读取对方 webhook 配置；COS 上的同名文件仅供 F_A 使用
-            val cfgMgr = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            val contactConfig = cfgMgr.getContactNotificationConfig(aciContactId)
-            
-            if (contactConfig == null) {
-                Log.w(TAG, "[Webhook调试] 未找到联系人配置: contactId=$aciContactId")
-                // P0修复: 尝试列出部分配置帮助诊断（如果API可用）
-                try {
-                    // 由于getAllContactNotificationConfigs是私有方法，我们只能记录查询失败
-                    Log.d(TAG, "[Webhook调试] 无法查询到联系人配置，可能的原因:")
-                    Log.d(TAG, "  1. 该联系人的webhook配置尚未保存")
-                    Log.d(TAG, "  2. TAP握手时未正确交换webhook配置")
-                    Log.d(TAG, "  3. contactId格式不匹配（查询key: $aciContactId）")
-                } catch (e: Exception) {
-                    Log.w(TAG, "[Webhook调试] 诊断信息获取失败", e)
-                }
-                return
-            }
-            
-            // P0修复: 验证配置的contactId与查询key是否一致
-            if (contactConfig.contactId != aciContactId) {
-                Log.e(TAG, "[Webhook调试] 严重错误：查询到的配置contactId不匹配！查询key=$aciContactId, 配置中的contactId=${contactConfig.contactId}")
-                Log.e(TAG, "这表明配置管理器返回了错误的配置，将不会发送webhook通知")
-                return
-            }
-
-            if (contactConfig.webhookUrl.isNotBlank() && contactConfig.notifySecret.isNotBlank()) {
-                // 发送前详细日志（不打印明文secret）
-                Log.i(TAG, "准备通知对方Webhook: contactId=${aciContactId}, url=${contactConfig.webhookUrl}, userId=${contactConfig.userId}, platform=${contactConfig.platform}, verified=${contactConfig.verified}")
-                Log.d(TAG, "[notifySecret调试] 发送端调用Webhook: notifySecret=${contactConfig.notifySecret.take(4)}...${contactConfig.notifySecret.takeLast(4)}, webhookUrl=${contactConfig.webhookUrl}")
-                if (!contactConfig.verified) {
-                    Log.w(TAG, "联系人Webhook配置未验证(verified=false)，可能导致对方拒绝。将继续尝试发送。")
-                }
-                // 构造通知消息
-                val notification = org.thoughtcrime.securesms.tap.notification.NotificationMessage(
-                    type = org.thoughtcrime.securesms.tap.notification.NotificationMessage.TYPE_NEW_MESSAGE,
-                    senderId = metadata.myHashedId,
-                    timestamp = System.currentTimeMillis(),
-                    metadata = mapOf(
-                        "userId" to contactConfig.userId,
-                        "remotePath" to remotePath,
-                        "bucketName" to bucketName,
-                        "provider" to "cos"
-                    )
-                )
-
-                val builder = org.thoughtcrime.securesms.tap.notification.webhook.WebhookRequestBuilder()
-                val bodyJson = builder.buildRequestJson(notification, contactConfig.notifySecret, "2.0")
-
-                if (bodyJson != null) {
-                    Log.d(TAG, "Webhook请求体长度: ${bodyJson.length} 字节")
-                    val okHttpClient = okhttp3.OkHttpClient()
-                    val request = okhttp3.Request.Builder()
-                        .url(contactConfig.webhookUrl)
-                        .post(bodyJson.toRequestBody("application/json".toMediaType()))
-                        .build()
-
-                    // 简单一次短重试，随后兜底触发器
-                    var success = false
-                    var lastCode = -1
-                    repeat(2) { attempt ->
-                        okHttpClient.newCall(request).execute().use { resp ->
-                            lastCode = resp.code
-                            if (lastCode in 200..299) {
-                                Log.d(TAG, "Webhook notified successfully: ${contactConfig.webhookUrl}")
-                                success = true
-                                return@use
-                            }
-                            // 3) 记录4xx响应体以便诊断
-                            try {
-                                val bodyStr = resp.body?.string()
-                                if (!bodyStr.isNullOrEmpty()) {
-                                    Log.w(TAG, "Webhook non-2xx response: code=${resp.code}, body=${bodyStr}")
-                                }
-                            } catch (_: Throwable) { }
-                        }
-                        if (!success) {
-                            try {
-                                Thread.sleep(if (attempt == 0) 150L else 0L)
-                            } catch (_: InterruptedException) { }
-                        }
+            try {
+                when (cosConfig.provider) {
+                    org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.AWS -> {
+                        val deployer = org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayDeployer(
+                            context,
+                            cosConfig.secretId,
+                            cosConfig.secretKey,
+                            cosConfig.region
+                        )
+                        val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
+                        Log.i(TAG, "S3触发器调用成功 (AWS): $invoked")
                     }
-                    if (!success) {
-                        Log.w(TAG, "Webhook notify failed: code=${lastCode}, url=${contactConfig.webhookUrl}; falling back to trigger function")
-                        // 兜底：直接调用触发器云函数，模拟S3事件通知
-                        try {
-                            when (cosConfig.provider) {
-                                org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.AWS -> {
-                                    val deployer = org.thoughtcrime.securesms.tap.notification.provider.aws.AwsApiGatewayDeployer(
-                                        context,
-                                        cosConfig.secretId,
-                                        cosConfig.secretKey,
-                                        cosConfig.region
-                                    )
-                                    val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
-                                    Log.i(TAG, "Fallback trigger invoked (AWS): $invoked")
-                                }
-                                org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.TENCENT -> {
-                                    val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
-                                        context,
-                                        cosConfig.secretId,
-                                        cosConfig.secretKey,
-                                        cosConfig.region
-                                    )
-                                    val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
-                                    Log.i(TAG, "Fallback trigger invoked (TENCENT): $invoked")
-                                }
-                                else -> {
-                                    Log.w(TAG, "Fallback trigger not supported for provider: ${cosConfig.provider}")
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Fallback trigger invocation failed", e)
-                        }
+                    org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig.Provider.TENCENT -> {
+                        val deployer = org.thoughtcrime.securesms.tap.notification.provider.tencent.TencentApiGatewayDeployer(
+                            context,
+                            cosConfig.secretId,
+                            cosConfig.secretKey,
+                            cosConfig.region
+                        )
+                        val invoked = deployer.invokeTriggerFunction(remotePath, bucketName)
+                        Log.i(TAG, "S3触发器调用成功 (TENCENT): $invoked")
                     }
-                } else {
-                    Log.e(TAG, "Failed to build webhook request JSON for contactId=$aciContactId")
+                    else -> {
+                        Log.w(TAG, "不支持的provider类型，无法触发推送: ${cosConfig.provider}")
+                    }
                 }
-            } else {
-                // 明确不再回退到本地Provider触发，避免触达自身；依赖 F_A 事件触发链路
-                Log.w(TAG, "Local contact webhook config missing/invalid for contactId=$aciContactId; skip direct webhook, rely on F_A. detail: hasConfig=${contactConfig!=null}")
-                return
+            } catch (e: Exception) {
+                Log.e(TAG, "S3触发器调用失败", e)
+                // P1修复: 触发失败时记录错误，但不阻塞主流程
+                // 系统将依赖轮询机制作为降级方案
             }
         } catch (t: Throwable) {
             // 触发失败不影响主流程，仅记录错误

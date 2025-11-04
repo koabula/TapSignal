@@ -1796,8 +1796,9 @@ class ConversationFragment :
               
               val tokenExchangeMessage = if (localNotificationConfig != null && localNotificationConfig.validate()) {
                 Log.d(TAG, "包含Webhook配置到Token交换消息")
+                // P0修复: 如果metadata中没有userId，生成格式与部署时一致（16字符无连字符）
                 val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
-                  ?: java.util.UUID.randomUUID().toString()
+                  ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
                 org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.createWithWebhook(
                   senderAci = myAci,
                   providerType = "cos",

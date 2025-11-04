@@ -2007,6 +2007,33 @@ private fun saveContactWebhookConfig(
         
         if (saved) {
             Log.i(TAG, "[Webhook配置保存] 联系人Webhook配置已成功保存到本地数据库: senderAci=$senderAci")
+            
+            // 立即查询验证保存是否正确
+            try {
+                val verifyConfig = configManager.getContactNotificationConfig(senderAci)
+                if (verifyConfig != null) {
+                    Log.d(TAG, "[Webhook配置验证] 查询验证成功:")
+                    Log.d(TAG, "  - 查询key: $senderAci")
+                    Log.d(TAG, "  - 配置contactId: ${verifyConfig.contactId}")
+                    Log.d(TAG, "  - 配置webhookUrl: ${verifyConfig.webhookUrl}")
+                    Log.d(TAG, "  - 配置notifySecret: ${verifyConfig.notifySecret.take(4)}...${verifyConfig.notifySecret.takeLast(4)}")
+                    Log.d(TAG, "  - 配置userId: ${verifyConfig.userId}")
+                    
+                    if (verifyConfig.contactId != senderAci) {
+                        Log.e(TAG, "[Webhook配置验证] 错误：查询key和配置contactId不匹配！")
+                    }
+                    if (verifyConfig.notifySecret != webhookConfigData.notifySecret) {
+                        Log.e(TAG, "[Webhook配置验证] 错误：notifySecret不匹配！")
+                        Log.e(TAG, "  - 保存的: ${webhookConfigData.notifySecret.take(4)}...${webhookConfigData.notifySecret.takeLast(4)}")
+                        Log.e(TAG, "  - 查询到: ${verifyConfig.notifySecret.take(4)}...${verifyConfig.notifySecret.takeLast(4)}")
+                    }
+                } else {
+                    Log.e(TAG, "[Webhook配置验证] 错误：保存后立即查询失败，未找到配置！key=$senderAci")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[Webhook配置验证] 查询验证异常", e)
+            }
+            
             // 追加：将对方的Webhook配置发布到本用户的COS，供触发器读取
             try {
                 val cosProviderConfig = configManager.getProviderConfig("cos")

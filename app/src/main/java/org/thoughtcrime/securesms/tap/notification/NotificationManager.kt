@@ -138,6 +138,9 @@ class NotificationManager private constructor(private val context: Context) {
     
     private fun handleNotification(notification: NotificationMessage) {
         try {
+            // P0修复：在入口处添加详细日志
+            Log.i(TAG, "handleNotification called: type=${notification.type}, senderId=${notification.senderId}, timestamp=${notification.timestamp}")
+            
             if (!notification.validate()) {
                 Log.w(TAG, "收到无效通知消息")
                 return
@@ -172,13 +175,15 @@ class NotificationManager private constructor(private val context: Context) {
     private fun handleNewMessageNotification(notification: NotificationMessage) {
         try {
             val senderId = notification.senderId
+            val fileKey = notification.metadata["key"] as? String
             
-            Log.i(TAG, "处理新消息通知，触发下载: senderId=$senderId")
+            Log.i(TAG, "处理新消息通知，触发下载: senderId=$senderId, key=$fileKey")
             
             // 异步执行下载任务
             notificationScope.launch {
                 try {
-                    val result = downloadExecutor.executeNotificationDownload(senderId)
+                    // 使用新的直接下载方案
+                    val result = downloadExecutor.executeDirectDownload(notification)
                     
                     if (result.isSuccess) {
                         Log.i(TAG, "推送触发下载成功: senderId=$senderId, " +

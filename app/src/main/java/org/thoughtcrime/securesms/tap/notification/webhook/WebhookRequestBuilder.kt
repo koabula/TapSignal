@@ -57,7 +57,7 @@ class WebhookRequestBuilder {
         version: String = "2.0"
     ): String? {
         return try {
-            // 1) 使用稳定序列化构造用于签名的主体（仅一次），确保与最终请求体完全一致
+            // 1) 使用稳定序列化构造用于签名的主体
             val notificationMap = JsonSerializer.buildNotificationMap(
                 type = notification.type,
                 senderId = notification.senderId,
@@ -74,10 +74,13 @@ class WebhookRequestBuilder {
                 return null
             }
 
-            // 2) 复用 signatureBodyJson，直接追加 signature 字段，避免二次序列化差异
-            val signatureBodyObj = JSONObject(signatureBodyJson)
-            signatureBodyObj.put("signature", signature)
-            signatureBodyObj.toString()
+            // 2) 直接构造完整JSON，保持与signatureBodyJson相同的顺序
+            // 避免通过JSONObject解析再序列化导致的字段顺序变化
+            // 格式：去掉最后的 '}' 然后添加 ',"signature":"xxx"}'
+            val completeJson = signatureBodyJson.trimEnd().removeSuffix("}") + 
+                               ",\"signature\":\"$signature\"}"
+            
+            completeJson
         } catch (e: Exception) {
             Log.e(TAG, "构建Webhook请求JSON失败", e)
             null

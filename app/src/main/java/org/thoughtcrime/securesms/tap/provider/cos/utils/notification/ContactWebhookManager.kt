@@ -28,8 +28,9 @@ class ContactWebhookManager(
     
     /**
      * 保存联系人webhook配置
+     * P0修复: 添加重试机制
      */
-    suspend fun saveContactConfig(config: ContactNotificationConfig): Boolean {
+    suspend fun saveContactConfig(config: ContactNotificationConfig, maxRetries: Int = 3): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "保存联系人webhook配置: contactId=${LogSanitizer.sanitize(config.contactId)}")
@@ -52,27 +53,46 @@ class ContactWebhookManager(
                 val contactHash = hashContactId(config.contactId)
                 val key = "${CONTACTS_PREFIX}${contactHash}.json"
                 
-                val tempFile = File.createTempFile("contact_config", ".json", context.cacheDir)
-                try {
-                    tempFile.writeText(jsonConfig)
-                    
-                    val uploadSuccess = cosClient.uploadFile(tempFile, key)
-                    
-                    if (uploadSuccess) {
-                        Log.i(TAG, "联系人webhook配置保存成功: $key")
-                        true
-                    } else {
-                        Log.e(TAG, "联系人webhook配置保存失败: $key")
-                        false
-                    }
-                } finally {
-                    if (tempFile.exists()) {
-                        tempFile.delete()
+                // P0修复: 重试逻辑
+                var lastException: Exception? = null
+                for (attempt in 1..maxRetries) {
+                    try {
+                        val tempFile = File.createTempFile("contact_config", ".json", context.cacheDir)
+                        try {
+                            tempFile.writeText(jsonConfig)
+                            
+                            val uploadSuccess = cosClient.uploadFile(tempFile, key)
+                            
+                            if (uploadSuccess) {
+                                Log.i(TAG, "联系人webhook配置保存成功: $key (尝试 $attempt/$maxRetries)")
+                                return@withContext true
+                            } else {
+                                Log.w(TAG, "联系人webhook配置上传失败: $key (尝试 $attempt/$maxRetries)")
+                            }
+                        } finally {
+                            if (tempFile.exists()) {
+                                tempFile.delete()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        lastException = e
+                        Log.w(TAG, "保存联系人webhook配置失败 (尝试 $attempt/$maxRetries)", e)
+                        
+                        // 指数退避：1秒，2秒，4秒
+                        if (attempt < maxRetries) {
+                            val delayMs = (1000L * (1 shl (attempt - 1)))
+                            Log.d(TAG, "等待 ${delayMs}ms 后重试...")
+                            kotlinx.coroutines.delay(delayMs)
+                        }
                     }
                 }
                 
+                // 所有重试都失败
+                Log.e(TAG, "联系人webhook配置保存失败，已用尽所有重试: $key", lastException)
+                false
+                
             } catch (e: Exception) {
-                Log.e(TAG, "保存联系人webhook配置失败", e)
+                Log.e(TAG, "保存联系人webhook配置失败（外层异常）", e)
                 false
             }
         }

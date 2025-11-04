@@ -50,7 +50,276 @@ class NotificationDownloadExecutor(
     private val fileProcessingFailures = ConcurrentHashMap<String, FileProcessingFailure>()
     
     /**
-     * 执行推送触发的下载
+     * 执行推送触发的直接下载（新方案）
+     * 从WebSocket通知中提取完整的文件路径，直接下载该文件
+     * 
+     * @param notification 推送通知消息
+     * @return 下载执行结果
+     */
+    suspend fun executeDirectDownload(notification: NotificationMessage): NotificationDownloadResult {
+        val startTime = System.currentTimeMillis()
+        
+        return try {
+            // P0修复：在下载执行器入口添加详细日志
+            Log.i(TAG, "[推送下载] executeDirectDownload called: senderId=${notification.senderId}, type=${notification.type}")
+            
+            // 1. 从notification.metadata中提取文件路径
+            val fileKey = notification.metadata["key"] as? String
+            if (fileKey == null) {
+                Log.e(TAG, "[推送下载失败] 推送通知缺少文件key")
+                Log.e(TAG, "[诊断] notification内容: type=${notification.type}, " +
+                    "senderId=${notification.senderId}, timestamp=${notification.timestamp}, " +
+                    "metadata=${notification.metadata}")
+                return NotificationDownloadResult.failure(
+                    "推送通知缺少文件key",
+                    System.currentTimeMillis() - startTime
+                )
+            }
+            
+            val bucketName = notification.metadata["bucket"] as? String
+            Log.i(TAG, "[推送下载] 开始直接下载推送文件: key=$fileKey, bucket=$bucketName")
+            
+            // 2. 从senderId提取纯hash，查找recipientId和通道
+            val pureHashId = if (notification.senderId.contains("_")) {
+                notification.senderId.split("_").firstOrNull() ?: notification.senderId
+            } else {
+                notification.senderId
+            }
+            
+            Log.i(TAG, "[推送下载] 解析senderId: 原始=${notification.senderId}, 纯hash=$pureHashId")
+            
+            val recipientId = findRecipientIdByHash(pureHashId)
+            if (recipientId == null) {
+                // 增强诊断：列出所有通道的peerHashedId
+                val channelTable = SignalDatabase.transportChannels
+                val allChannels = channelTable.getAllChannels()
+                Log.e(TAG, "[推送下载失败] 未找到匹配的recipientId: pureHashId=$pureHashId")
+                Log.e(TAG, "[诊断] 数据库中的通道总数: ${allChannels.size}")
+                
+                allChannels.forEachIndexed { index, channelData ->
+                    if (channelData.metadata is org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata) {
+                        val cosMetadata = channelData.metadata as org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                        Log.e(TAG, "[诊断] 通道[$index]: " +
+                            "recipientId=${channelData.recipientId}, " +
+                            "peerHashedId=${cosMetadata.peerHashedId}, " +
+                            "peerBucketName=${cosMetadata.peerBucketName}, " +
+                            "providerType=${cosMetadata.providerType}, " +
+                            "peerReceivePath=${cosMetadata.peerReceivePath}")
+                    } else {
+                        Log.e(TAG, "[诊断] 通道[$index]: " +
+                            "recipientId=${channelData.recipientId}, " +
+                            "metadata类型=${channelData.metadata?.javaClass?.name ?: "null"}")
+                    }
+                }
+                
+                return NotificationDownloadResult.failure(
+                    "未找到匹配的recipientId",
+                    System.currentTimeMillis() - startTime
+                )
+            }
+            
+            Log.i(TAG, "[推送下载] 成功找到recipientId: pureHashId=$pureHashId -> recipientId=$recipientId")
+            
+            val channel = channelManager.getActiveChannels(recipientId).firstOrNull()
+            if (channel == null || channel.metadata == null) {
+                Log.e(TAG, "[推送下载失败] 未找到活跃通道: recipientId=$recipientId")
+                Log.e(TAG, "[诊断] 尝试查询该recipientId的所有通道状态")
+                val allChannelsForRecipient = channelManager.getActiveChannels(recipientId)
+                Log.e(TAG, "[诊断] recipientId=$recipientId 的活跃通道数: ${allChannelsForRecipient.size}")
+                return NotificationDownloadResult.failure(
+                    "未找到活跃通道",
+                    System.currentTimeMillis() - startTime
+                )
+            }
+            
+            val metadata = channel.metadata!!
+            Log.d(TAG, "[推送下载] 找到通道: channelId=${channel.channelId}, providerType=${metadata.providerType}")
+            
+            // 3. 获取Provider
+            val provider = transportManager.getProvider(metadata.providerType)
+            if (provider == null) {
+                Log.e(TAG, "[推送下载失败] Provider不可用: ${metadata.providerType}")
+                return NotificationDownloadResult.failure(
+                    "Provider不可用",
+                    System.currentTimeMillis() - startTime
+                )
+            }
+            
+            Log.d(TAG, "[推送下载] Provider准备就绪: ${metadata.providerType}")
+            
+            // 4. 提取文件名并检查是否已处理（重复检查）
+            val fileName = fileKey.substringAfterLast("/")
+            val pollingState = pollingStateTable.getPollingState(recipientId, metadata.providerType)
+            val processedFiles = pollingState?.processedFiles ?: emptySet()
+            
+            if (processedFiles.contains(fileName)) {
+                Log.d(TAG, "文件已处理，跳过: $fileName")
+                return NotificationDownloadResult.success(0, 0, System.currentTimeMillis() - startTime)
+            }
+            
+            // 时间测试点：T5 - 完成准备，即将下载密文
+            val msgId = try {
+                val fileNameWithoutExt = fileName.substringBeforeLast(".")
+                val parts = fileNameWithoutExt.split("_")
+                if (parts.isNotEmpty() && parts[0].toLongOrNull() != null) {
+                    parts[0]
+                } else {
+                    notification.timestamp.toString()
+                }
+            } catch (e: Exception) {
+                notification.timestamp.toString()
+            }
+            Log.d(TAG, "[TapTimeTest] T5_LIST_END | msgId=$msgId | timestamp=${System.currentTimeMillis()}")
+            
+            // 5. 直接下载该文件
+            val fileInfo = FileInfo(
+                name = fileName,
+                path = fileKey,
+                size = 0,
+                lastModified = notification.timestamp
+            )
+            
+            val fileResult = downloadAndProcessFile(provider, metadata, recipientId, fileInfo)
+            
+            val responseTime = System.currentTimeMillis() - startTime
+            
+            // 6. 处理下载结果
+            when (fileResult.status) {
+                FileProcessStatus.SUCCESS -> {
+                    // 下载成功，更新数据库
+                    pollingStateTable.recordSuccessfulPoll(
+                        recipientId,
+                        metadata.providerType,
+                        setOf(fileName),
+                        1
+                    )
+                    clearFileProcessingFailure(fileName, recipientId)
+                    
+                    // Phase 2: 检查并下载附件
+                    val attachmentResult = downloadAttachmentsIfNeeded(
+                        provider, metadata, recipientId, fileKey, notification
+                    )
+                    
+                    Log.i(TAG, "直接下载成功: $fileName, 附件=${attachmentResult.attachmentsProcessed}")
+                    
+                    NotificationDownloadResult.success(
+                        1,
+                        1 + attachmentResult.attachmentsProcessed,
+                        responseTime
+                    )
+                }
+                
+                FileProcessStatus.FAILED_SKIP -> {
+                    // 标记为已处理，避免重复
+                    pollingStateTable.recordSuccessfulPoll(
+                        recipientId,
+                        metadata.providerType,
+                        setOf(fileName),
+                        0
+                    )
+                    NotificationDownloadResult.success(0, 1, responseTime)
+                }
+                
+                else -> {
+                    recordFileProcessingFailure(fileName, recipientId, fileResult.error)
+                    NotificationDownloadResult.failure(fileResult.error, responseTime)
+                }
+            }
+            
+        } catch (e: TimeoutCancellationException) {
+            val responseTime = System.currentTimeMillis() - startTime
+            Log.w(TAG, "直接下载超时")
+            NotificationDownloadResult.failure("TIMEOUT", responseTime)
+            
+        } catch (e: Exception) {
+            val responseTime = System.currentTimeMillis() - startTime
+            Log.e(TAG, "直接下载过程中发生错误", e)
+            NotificationDownloadResult.failure(e.message ?: "UNKNOWN_ERROR", responseTime)
+        }
+    }
+    
+    /**
+     * Phase 2: 检查并下载附件
+     * 从message文件路径推导attachment路径
+     */
+    private suspend fun downloadAttachmentsIfNeeded(
+        provider: TransportProvider,
+        metadata: TransportMetadata,
+        recipientId: String,
+        messageKey: String,
+        notification: NotificationMessage
+    ): AttachmentDownloadResult {
+        return try {
+            // 从message key推导attachments目录
+            // 例如: v2-channels/{channelId}/outbox/messages/xxx.dat
+            //   -> v2-channels/{channelId}/outbox/attachments/
+            val attachmentsPath = messageKey
+                .replace("/messages/", "/attachments/")
+                .substringBeforeLast("/") + "/"
+            
+            Log.d(TAG, "检查附件目录: $attachmentsPath")
+            
+            // 列举attachments目录
+            val listResult = withTimeout(TapPollingConstants.PollingService.POLLING_TIMEOUT_MS) {
+                errorHandler.executeWithRetry({
+                    provider.listFiles(attachmentsPath, metadata)
+                }, ErrorContext(
+                    providerType = metadata.providerType,
+                    operationType = "listFiles",
+                    targetId = recipientId,
+                    channelId = "${metadata.providerType}:${recipientId}",
+                    metadata = mapOf("pollingPath" to attachmentsPath)
+                ))
+            }
+            
+            if (listResult !is TransportResult.Success || listResult.files.isNullOrEmpty()) {
+                Log.d(TAG, "没有附件文件")
+                return AttachmentDownloadResult(0)
+            }
+            
+            val allAttachments = listResult.files
+            
+            // 过滤出与当前消息相关的附件
+            // 附件命名规则: {timestamp}_{messageId}_{index}.bin
+            val messageFileName = messageKey.substringAfterLast("/").substringBeforeLast(".")
+            val relatedAttachments = allAttachments.filter { attachment ->
+                attachment.name.startsWith(messageFileName)
+            }
+            
+            if (relatedAttachments.isEmpty()) {
+                Log.d(TAG, "没有相关附件")
+                return AttachmentDownloadResult(0)
+            }
+            
+            Log.i(TAG, "找到${relatedAttachments.size}个附件，开始下载")
+            
+            // 下载所有相关附件
+            var successCount = 0
+            for (attachment in relatedAttachments) {
+                val attachmentResult = downloadAndProcessFile(provider, metadata, recipientId, attachment)
+                if (attachmentResult.status == FileProcessStatus.SUCCESS) {
+                    successCount++
+                    // 更新数据库
+                    pollingStateTable.recordSuccessfulPoll(
+                        recipientId,
+                        metadata.providerType,
+                        setOf(attachment.name),
+                        0
+                    )
+                }
+            }
+            
+            Log.i(TAG, "附件下载完成: 成功=$successCount, 总数=${relatedAttachments.size}")
+            AttachmentDownloadResult(successCount)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "下载附件失败", e)
+            AttachmentDownloadResult(0)
+        }
+    }
+    
+    /**
+     * 执行推送触发的下载（旧方案，保留用于兼容）
      * 
      * @param senderId 发送者ID (ACI hash)
      * @return 下载执行结果
@@ -191,6 +460,24 @@ class NotificationDownloadExecutor(
             
             Log.i(TAG, "找到新文件数量: ${newFiles.size}, recipientId=$recipientId")
             
+            // 时间测试点：T5 - 完成列举消息（下载密文之前）
+            // 从第一个新文件名中提取timestamp作为msgId (格式: timestamp_messageId.dat)
+            val firstFile = newFiles.firstOrNull()
+            if (firstFile != null) {
+                val msgId = try {
+                    val fileName = firstFile.name.substringBeforeLast(".")
+                    val parts = fileName.split("_")
+                    if (parts.isNotEmpty() && parts[0].toLongOrNull() != null) {
+                        parts[0] // timestamp在前
+                    } else {
+                        firstFile.lastModified.toString() // fallback
+                    }
+                } catch (e: Exception) {
+                    firstFile.lastModified.toString()
+                }
+                Log.d(TAG, "[TapTimeTest] T5_LIST_END | msgId=$msgId | timestamp=${System.currentTimeMillis()}")
+            }
+            
             // 3. Download: 下载并处理文件
             var messagesProcessed = 0
             val newProcessedFiles = mutableSetOf<String>()
@@ -294,31 +581,73 @@ class NotificationDownloadExecutor(
      * 查找活跃通道
      */
     private fun findActiveChannel(senderId: String): TransportChannel? {
-        // 尝试通过多种方式查找通道
-        
-        // 1. 直接使用senderId查找（可能是ACI hash）
-        val directChannels = channelManager.getActiveChannels(senderId)
-        if (directChannels.isNotEmpty()) {
-            Log.d(TAG, "通过senderId找到通道: senderId=$senderId")
-            return directChannels.firstOrNull()
+        // Step 1: 解析senderId，提取纯hash部分
+        // Lambda发送的格式可能是: {hash}_{timestamp}
+        val pureHashId = if (senderId.contains("_")) {
+            senderId.split("_").firstOrNull() ?: senderId
+        } else {
+            senderId
         }
         
-        // 2. 遍历所有通道，通过metadata中的hash匹配
-        // 注意：这可能比较慢，但是推送通知触发的下载频率不高
-        val allChannels = channelManager.getAllActiveChannels()
-        for (channel in allChannels) {
-            val metadata = channel.metadata ?: continue
-            val receiveMetadata = metadata.getReceiveMetadata()
-            
-            // 检查路径中是否包含senderId（hash）
-            if (receiveMetadata.path.contains(senderId)) {
-                Log.d(TAG, "通过path匹配找到通道: senderId=$senderId, channel=${channel.channelId}")
-                return channel
-            }
+        if (pureHashId != senderId) {
+            Log.d(TAG, "解析senderId: 原始=$senderId, 纯hash=$pureHashId")
         }
         
-        Log.w(TAG, "未找到匹配的通道: senderId=$senderId")
+        // Step 2: 通过hash查找recipientId (ACI)
+        val recipientId = findRecipientIdByHash(pureHashId)
+        if (recipientId == null) {
+            Log.w(TAG, "未找到匹配的recipientId: pureHashId=$pureHashId")
+            return null
+        }
+        
+        Log.d(TAG, "找到recipientId: pureHashId=$pureHashId -> recipientId=$recipientId")
+        
+        // Step 3: 通过recipientId查找通道
+        val channels = channelManager.getActiveChannels(recipientId)
+        if (channels.isNotEmpty()) {
+            Log.d(TAG, "找到活跃通道: recipientId=$recipientId")
+            return channels.firstOrNull()
+        }
+        
+        Log.w(TAG, "未找到活跃通道: recipientId=$recipientId")
         return null
+    }
+    
+    /**
+     * 通过peerHashedId查找recipientId
+     * 遍历所有通道，匹配metadata中的peerHashedId
+     */
+    private fun findRecipientIdByHash(hashId: String): String? {
+        try {
+            Log.d(TAG, "[查找通道] 开始通过peerHashedId查找: hashId=$hashId")
+            
+            val channelTable = SignalDatabase.transportChannels
+            val allChannels = channelTable.getAllChannels()
+            
+            Log.d(TAG, "[查找通道] 数据库中总通道数: ${allChannels.size}")
+            
+            var cosChannelCount = 0
+            for (channelData in allChannels) {
+                if (channelData.metadata is org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata) {
+                    cosChannelCount++
+                    val cosMetadata = channelData.metadata as org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+                    
+                    Log.v(TAG, "[查找通道] 检查通道: recipientId=${channelData.recipientId}, " +
+                        "peerHashedId=${cosMetadata.peerHashedId}, 匹配=${cosMetadata.peerHashedId == hashId}")
+                    
+                    if (cosMetadata.peerHashedId == hashId) {
+                        Log.i(TAG, "[查找通道] 找到匹配: hashId=$hashId -> recipientId=${channelData.recipientId}")
+                        return channelData.recipientId
+                    }
+                }
+            }
+            
+            Log.w(TAG, "[查找通道] 未找到匹配: hashId=$hashId, 共检查了${cosChannelCount}个COS通道")
+            return null
+        } catch (e: Exception) {
+            Log.e(TAG, "[查找通道] 异常: hashId=$hashId", e)
+            return null
+        }
     }
     
     /**
@@ -534,5 +863,12 @@ data class FileProcessingFailure(
     val failureCount: Int,
     val lastFailureTime: Long,
     val lastError: String
+)
+
+/**
+ * 附件下载结果
+ */
+private data class AttachmentDownloadResult(
+    val attachmentsProcessed: Int
 )
 

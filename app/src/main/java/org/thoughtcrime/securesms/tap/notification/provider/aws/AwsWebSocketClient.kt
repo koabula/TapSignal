@@ -170,6 +170,9 @@ class AwsWebSocketClient(
         try {
             val notificationMessage = parseNotificationMessage(text)
             if (notificationMessage != null) {
+                // 时间测试点：T4 - 收到WebSocket推送提醒
+                Log.d(TAG, "[TapTimeTest] T4_PUSH_RECEIVED | msgId=${notificationMessage.timestamp} | timestamp=${System.currentTimeMillis()}")
+                
                 scope.launch {
                     messageChannel.send(notificationMessage)
                 }

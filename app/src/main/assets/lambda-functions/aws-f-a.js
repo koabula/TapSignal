@@ -73,7 +73,7 @@ async function sendWebhookNotification(webhookUrl, notification, notifySecret) {
     log('DEBUG', 'Sending webhook notification', { webhookUrl });
     
     const requestBody = {
-        version: '1.0',
+        version: '2.0',
         notification: notification
     };
     
@@ -165,7 +165,16 @@ async function sendWebhookNotification(webhookUrl, notification, notifySecret) {
 
 function extractSenderIdFromKey(key) {
     const match = key.match(/v2-channels\/([^/]+)\//);
-    return match ? match[1] : null;
+    if (!match) return null;
+    
+    // 提取channelId，格式: {hash}_{timestamp}
+    const channelId = match[1];
+    
+    // 修复: 只返回hash部分，去掉timestamp后缀
+    // 这样Android端可以直接通过hash查找通道，不需要额外处理
+    const hashOnly = channelId.split('_')[0];
+    
+    return hashOnly;
 }
 
 function hashString(str) {

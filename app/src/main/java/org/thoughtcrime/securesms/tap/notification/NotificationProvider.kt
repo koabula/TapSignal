@@ -24,14 +24,16 @@ interface NotificationProvider {
 data class DeployResult(
     val success: Boolean,
     val webhookUrl: String? = null,
+    val userId: String? = null,
     val pushServiceInfo: PushServiceInfo? = null,
     val errorMessage: String? = null
 ) {
     companion object {
-        fun success(webhookUrl: String, pushServiceInfo: PushServiceInfo): DeployResult {
+        fun success(webhookUrl: String, userId: String, pushServiceInfo: PushServiceInfo): DeployResult {
             return DeployResult(
                 success = true,
                 webhookUrl = webhookUrl,
+                userId = userId,
                 pushServiceInfo = pushServiceInfo
             )
         }

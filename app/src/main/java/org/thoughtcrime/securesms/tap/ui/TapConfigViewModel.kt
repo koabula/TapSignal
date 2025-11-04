@@ -582,19 +582,45 @@ class TapConfigViewModel : ViewModel() {
                     if (initSuccess) {
                         Log.i(TAG, "NotificationManager重新初始化成功")
                         
-                        // 重新连接WebSocket
-                        val userId = pushServiceInfo.metadata["userId"] as? String ?: ""
-                        if (userId.isNotEmpty()) {
+                        // 重新连接WebSocket（方案1+4：优先使用deployResult中的userId，防御性重试）
+                        var userId = deployResult.userId
+                        
+                        if (userId == null) {
+                            Log.w(TAG, "deployResult中没有userId，尝试从配置中获取")
+                            userId = pushServiceInfo.metadata["userId"] as? String
+                            
+                            if (userId == null) {
+                                Log.w(TAG, "首次从配置获取userId失败，强制重新加载配置")
+                                kotlinx.coroutines.delay(100L)
+                                notificationConfigManager.reloadConfig()
+                                kotlinx.coroutines.delay(100L)
+                                val reloadedConfig = notificationConfigManager.getLocalConfig()
+                                userId = reloadedConfig?.pushServiceInfo?.metadata?.get("userId") as? String
+                                
+                                if (userId == null) {
+                                    Log.e(TAG, "重新加载后仍无法获取userId")
+                                    val config = notificationConfigManager.getLocalConfig()
+                                    Log.e(TAG, "诊断信息:")
+                                    Log.e(TAG, "  - webhookUrl: ${config?.webhookUrl}")
+                                    Log.e(TAG, "  - pushServiceInfo.endpoint: ${config?.pushServiceInfo?.endpoint}")
+                                    Log.e(TAG, "  - pushServiceInfo.metadata: ${config?.pushServiceInfo?.metadata}")
+                                    Log.e(TAG, "  - deployResult.webhookUrl: ${deployResult.webhookUrl}")
+                                    Log.e(TAG, "  - deployResult.userId: ${deployResult.userId}")
+                                    Log.w(TAG, "无法获取userId，跳过WebSocket连接")
+                                }
+                            }
+                        }
+                        
+                        if (userId != null && userId.isNotEmpty()) {
+                            Log.i(TAG, "准备连接WebSocket: userId=$userId (来源: ${if (deployResult.userId != null) "deployResult" else "config"})")
                             val connectResult = notificationManager.connect(userId) { notification ->
                                 Log.d(TAG, "收到推送通知: ${notification.type}")
                             }
                             if (connectResult.success) {
-                                Log.i(TAG, "WebSocket重新连接成功")
+                                Log.i(TAG, "WebSocket连接成功")
                             } else {
-                                Log.w(TAG, "WebSocket重新连接失败: ${connectResult.errorMessage}")
+                                Log.w(TAG, "WebSocket连接失败: ${connectResult.errorMessage}")
                             }
-                        } else {
-                            Log.w(TAG, "无法获取userId，跳过WebSocket连接")
                         }
                     } else {
                         Log.w(TAG, "NotificationManager重新初始化失败")

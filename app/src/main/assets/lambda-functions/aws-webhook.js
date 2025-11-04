@@ -34,9 +34,9 @@ function log(level, message, data = {}) {
     }
 }
 
-function verifySignature(body, signature, secret) {
+function verifySignature(bodyString, signature, secret) {
     const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(JSON.stringify(body));
+    hmac.update(bodyString);
     const expectedSignature = hmac.digest('hex');
     
     return crypto.timingSafeEqual(
@@ -199,20 +199,23 @@ exports.handler = async (event) => {
             };
         }
         
-        const bodyForSignature = {
-            version: request.version,
-            notification: request.notification
-        };
+        // 从原始body中提取签名，然后移除signature字段后验证
+        // 这样避免了重新序列化导致的顺序/格式差异
+        const bodyObj = JSON.parse(event.body);
+        const receivedSignature = bodyObj.signature;
+        delete bodyObj.signature;
+        const bodyForSignature = JSON.stringify(bodyObj);
         
-        if (!verifySignature(bodyForSignature, request.signature, notifySecret)) {
+        if (!verifySignature(bodyForSignature, receivedSignature, notifySecret)) {
             const expectedSig = crypto.createHmac('sha256', notifySecret)
-                .update(JSON.stringify(bodyForSignature))
+                .update(bodyForSignature)
                 .digest('hex');
             log('WARN', 'Invalid signature', { 
                 requestId,
                 expected: expectedSig.substring(0, 16) + '...',
-                received: request.signature.substring(0, 16) + '...',
-                bodyLength: JSON.stringify(bodyForSignature).length
+                received: receivedSignature.substring(0, 16) + '...',
+                bodyLength: bodyForSignature.length,
+                bodyPreview: bodyForSignature.substring(0, 100) + '...'
             });
             return {
                 statusCode: 403,

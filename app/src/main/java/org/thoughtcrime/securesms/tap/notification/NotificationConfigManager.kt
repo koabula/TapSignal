@@ -35,6 +35,9 @@ class NotificationConfigManager private constructor(private val context: Context
     private val mutex = Mutex()
     private val configManager = TransportProviderConfigManager.getInstance(context)
     
+    @Volatile
+    private var cachedConfig: NotificationConfig? = null
+    
     /**
      * 保存本地推送服务配置
      * 
@@ -51,7 +54,12 @@ class NotificationConfigManager private constructor(private val context: Context
                     return@withLock false
                 }
                 
-                configManager.saveNotificationConfig(config)
+                val saved = configManager.saveNotificationConfig(config)
+                if (saved) {
+                    cachedConfig = config
+                    Log.d(TAG, "配置保存成功，缓存已更新")
+                }
+                saved
             } catch (e: Exception) {
                 Log.e(TAG, "保存本地推送服务配置失败", e)
                 false
@@ -67,9 +75,38 @@ class NotificationConfigManager private constructor(private val context: Context
     suspend fun getLocalConfig(): NotificationConfig? {
         return mutex.withLock {
             try {
-                configManager.getNotificationConfig()
+                if (cachedConfig != null) {
+                    Log.d(TAG, "从缓存返回配置")
+                    return@withLock cachedConfig
+                }
+                
+                val config = configManager.getNotificationConfig()
+                if (config != null) {
+                    cachedConfig = config
+                }
+                config
             } catch (e: Exception) {
                 Log.e(TAG, "获取本地推送服务配置失败", e)
+                null
+            }
+        }
+    }
+    
+    /**
+     * 强制重新加载配置（清除缓存）
+     */
+    suspend fun reloadConfig(): NotificationConfig? {
+        return mutex.withLock {
+            try {
+                Log.d(TAG, "强制重新加载配置")
+                cachedConfig = null
+                val config = configManager.getNotificationConfig()
+                if (config != null) {
+                    cachedConfig = config
+                }
+                config
+            } catch (e: Exception) {
+                Log.e(TAG, "重新加载配置失败", e)
                 null
             }
         }

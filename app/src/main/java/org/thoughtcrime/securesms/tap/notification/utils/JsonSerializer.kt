@@ -32,17 +32,17 @@ object JsonSerializer {
     /**
      * 将对象转换为JSON兼容的值
      * 
-     * 递归处理嵌套的Map和List，保持插入顺序
+     * 递归处理嵌套的Map和List，保持插入顺序（与JavaScript JSON.stringify一致）
      */
     private fun convertValue(value: Any?): Any? {
         return when (value) {
             null -> JSONObject.NULL
             is Map<*, *> -> {
                 val orderedMap = LinkedHashMap<String, Any?>()
-                // 深度排序：对键名进行字典序排序，确保稳定序列化
+                // 保持原始插入顺序，与JavaScript的JSON.stringify()行为一致
+                // 不进行排序，因为JavaScript不会对对象属性排序
                 value.keys
                     .filterIsInstance<String>()
-                    .sorted()
                     .forEach { key ->
                         orderedMap[key] = convertValue(value[key])
                     }
