@@ -564,7 +564,13 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 "notifySecret" to config.notifySecret,
                 "userId" to config.userId,
                 "lastUpdated" to config.lastUpdated,
-                "verified" to config.verified
+                "verified" to config.verified,
+                "gatewayEndpoint" to (config.gatewayEndpoint ?: ""),
+                "gatewayRegion" to (config.gatewayRegion ?: ""),
+                "gatewayProvider" to (config.gatewayProvider ?: ""),
+                "offlineBucket" to (config.offlineBucket ?: ""),
+                "presignDelegation" to config.presignDelegation,
+                "gatewayMetadata" to config.gatewayMetadata
             )
             
             allConfigs[contactId] = configMap
@@ -597,6 +603,13 @@ class TransportProviderConfigManager private constructor(private val context: Co
             val userId = configMap["userId"] as? String ?: return null
             val lastUpdated = (configMap["lastUpdated"] as? Number)?.toLong() ?: return null
             val verified = configMap["verified"] as? Boolean ?: false
+            val gatewayEndpoint = (configMap["gatewayEndpoint"] as? String).takeUnless { it.isNullOrEmpty() }
+            val gatewayRegion = (configMap["gatewayRegion"] as? String).takeUnless { it.isNullOrEmpty() }
+            val gatewayProvider = (configMap["gatewayProvider"] as? String).takeUnless { it.isNullOrEmpty() }
+            val offlineBucket = (configMap["offlineBucket"] as? String).takeUnless { it.isNullOrEmpty() }
+            val presignDelegation = configMap["presignDelegation"] as? Boolean ?: false
+            @Suppress("UNCHECKED_CAST")
+            val gatewayMetadata = configMap["gatewayMetadata"] as? Map<String, Any> ?: emptyMap()
             
             ContactNotificationConfig(
                 contactId = contactIdValue,
@@ -605,7 +618,13 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 notifySecret = notifySecret,
                 userId = userId,
                 lastUpdated = lastUpdated,
-                verified = verified
+                verified = verified,
+                gatewayEndpoint = gatewayEndpoint,
+                gatewayRegion = gatewayRegion,
+                gatewayProvider = gatewayProvider,
+                offlineBucket = offlineBucket,
+                presignDelegation = presignDelegation,
+                gatewayMetadata = gatewayMetadata
             )
         } catch (e: Exception) {
             Log.e(TAG, "获取联系人推送配置失败: contactId=$contactId", e)

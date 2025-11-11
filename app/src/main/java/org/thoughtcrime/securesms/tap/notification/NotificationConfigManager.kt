@@ -182,6 +182,16 @@ class NotificationConfigManager private constructor(private val context: Context
                 put("platform", config.platform)
                 put("lastUpdated", config.lastUpdated)
                 put("version", "2.0")
+                config.gatewayEndpoint?.let { put("gatewayEndpoint", it) }
+                config.gatewayRegion?.let { put("gatewayRegion", it) }
+                config.gatewayProvider?.let { put("gatewayProvider", it) }
+                config.offlineBucket?.let { put("offlineBucket", it) }
+                if (config.presignDelegation) {
+                    put("presignDelegation", true)
+                }
+                if (config.gatewayMetadata.isNotEmpty()) {
+                    put("gatewayMetadata", org.json.JSONObject(config.gatewayMetadata))
+                }
             }.toString()
             
             val uploadPath = "tap-state/contacts/${contactHash}.json"

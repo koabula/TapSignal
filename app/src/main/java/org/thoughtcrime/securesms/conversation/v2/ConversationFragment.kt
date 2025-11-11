@@ -1799,6 +1799,7 @@ class ConversationFragment :
                 // P0修复: 如果metadata中没有userId，生成格式与部署时一致（16字符无连字符）
                 val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
                   ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+                val gatewayConfig = org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder.build(localNotificationConfig)
                 org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.createWithWebhook(
                   senderAci = myAci,
                   providerType = "cos",
@@ -1811,7 +1812,8 @@ class ConversationFragment :
                   requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_OFFER,
                   webhookUrl = localNotificationConfig.webhookUrl,
                   notifySecret = localNotificationConfig.notifySecret,
-                  userId = userId
+                  userId = userId,
+                  gatewayConfig = gatewayConfig
                 )
               } else {
                 Log.d(TAG, "未配置推送服务，发送普通Token交换消息")

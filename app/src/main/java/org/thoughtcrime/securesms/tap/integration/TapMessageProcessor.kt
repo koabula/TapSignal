@@ -545,10 +545,16 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 // 如果包含Webhook配置,先保存
                 if (tokenExchangeMessage.hasWebhookConfig()) {
                     val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
+                    val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
                     if (webhookConfigData != null) {
                         val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
                         val senderAci = recipient.requireAci().toString()
-                        saveContactWebhookConfig(senderAci, webhookConfigData, tokenExchangeMessage.providerType)
+                        saveContactWebhookConfig(
+                            senderAci,
+                            webhookConfigData,
+                            tokenExchangeMessage.providerType,
+                            gatewayConfigData
+                        )
                         Log.i(TAG, "已保存Token Offer中的Webhook配置: senderAci=$senderAci")
                     }
                 }
@@ -578,9 +584,15 @@ class TapMessageProcessor private constructor(private val context: Context) {
             // 如果包含Webhook配置,先保存
             if (tokenExchangeMessage.hasWebhookConfig()) {
                 val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
+                val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
                 if (webhookConfigData != null) {
                     Log.d(TAG, "[notifySecret调试] A端接收ACCEPT: notifySecret=${webhookConfigData.notifySecret.take(4)}...${webhookConfigData.notifySecret.takeLast(4)}, webhookUrl=${webhookConfigData.webhookUrl}, userId=${webhookConfigData.userId}")
-                    saveContactWebhookConfig(peerAci, webhookConfigData, tokenExchangeMessage.providerType)
+                    saveContactWebhookConfig(
+                        peerAci,
+                        webhookConfigData,
+                        tokenExchangeMessage.providerType,
+                        gatewayConfigData
+                    )
                     Log.i(TAG, "已保存Token Accept中的Webhook配置: peerAci=$peerAci")
                 }
             }
@@ -1931,13 +1943,12 @@ private suspend fun processWebhookUpdate(
     Log.i(TAG, "处理Webhook配置更新: senderId=$senderId")
     
     return try {
-        // 提取Webhook配置
         val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
         if (webhookConfigData == null) {
             Log.w(TAG, "Webhook更新消息缺少有效配置")
             return TapProcessResult.Failed("缺少有效的Webhook配置")
         }
-        
+
         if (!webhookConfigData.validate()) {
             Log.w(TAG, "Webhook配置验证失败")
             return TapProcessResult.Failed("Webhook配置验证失败")
@@ -1947,26 +1958,19 @@ private suspend fun processWebhookUpdate(
         val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
         val senderAci = recipient.requireAci().toString()
         
-        // 创建ContactNotificationConfig
-        val contactConfig = org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig(
-            contactId = senderAci,
-            platform = tokenExchangeMessage.providerType,
-            webhookUrl = webhookConfigData.webhookUrl,
-            notifySecret = webhookConfigData.notifySecret,
-            userId = webhookConfigData.userId,
-            lastUpdated = System.currentTimeMillis(),
-            verified = false
+        val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
+
+        val saved = saveContactWebhookConfig(
+            senderAci = senderAci,
+            webhookConfigData = webhookConfigData,
+            providerType = tokenExchangeMessage.providerType,
+            gatewayConfigData = gatewayConfigData
         )
-        
-        // 保存到配置管理器
-        val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-        val saved = configManager.saveContactNotificationConfig(senderAci, contactConfig)
-        
-        if (saved) {
+        return if (saved) {
             Log.i(TAG, "Webhook配置更新成功: senderAci=$senderAci")
             TapProcessResult.Success("Webhook配置已更新")
         } else {
-            Log.w(TAG, "Webhook配置保存失败: senderAci=$senderAci")
+            Log.w(TAG, "Webhook配置更新失败: senderAci=$senderAci")
             TapProcessResult.Failed("Webhook配置保存失败")
         }
     } catch (e: Exception) {
@@ -1981,9 +1985,10 @@ private suspend fun processWebhookUpdate(
 private fun saveContactWebhookConfig(
     senderAci: String,
     webhookConfigData: org.thoughtcrime.securesms.tap.WebhookConfigData,
-    providerType: String
-) {
-    try {
+    providerType: String,
+    gatewayConfigData: org.thoughtcrime.securesms.tap.GatewayConfigData? = null
+): Boolean {
+    return try {
         val contactConfig = org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig(
             contactId = senderAci,
             platform = providerType,
@@ -1991,7 +1996,13 @@ private fun saveContactWebhookConfig(
             notifySecret = webhookConfigData.notifySecret,
             userId = webhookConfigData.userId,
             lastUpdated = System.currentTimeMillis(),
-            verified = false
+            verified = false,
+            gatewayEndpoint = gatewayConfigData?.endpoint,
+            gatewayRegion = gatewayConfigData?.region,
+            gatewayProvider = gatewayConfigData?.provider,
+            offlineBucket = gatewayConfigData?.offlineBucket,
+            presignDelegation = gatewayConfigData?.presignDelegation ?: false,
+            gatewayMetadata = gatewayConfigData?.metadata ?: emptyMap()
         )
         
         // P0修复: 添加更详细的保存日志
@@ -2084,11 +2095,14 @@ private fun saveContactWebhookConfig(
             } catch (e: Exception) {
                 Log.w(TAG, "发布联系人Webhook配置到COS时发生异常", e)
             }
+            true
         } else {
             Log.w(TAG, "联系人Webhook配置保存失败: senderAci=$senderAci")
+            false
         }
     } catch (e: Exception) {
         Log.e(TAG, "保存联系人Webhook配置异常: senderAci=$senderAci", e)
+        false
     }
 }
 

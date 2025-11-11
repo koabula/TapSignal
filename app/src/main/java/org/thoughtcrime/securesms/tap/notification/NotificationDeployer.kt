@@ -94,7 +94,13 @@ data class ContactNotificationConfig(
     val notifySecret: String,
     val userId: String,
     val lastUpdated: Long,
-    val verified: Boolean = false
+    val verified: Boolean = false,
+    val gatewayEndpoint: String? = null,
+    val gatewayRegion: String? = null,
+    val gatewayProvider: String? = null,
+    val offlineBucket: String? = null,
+    val presignDelegation: Boolean = false,
+    val gatewayMetadata: Map<String, Any> = emptyMap()
 ) {
     fun validate(): Boolean {
         return contactId.isNotEmpty() && 

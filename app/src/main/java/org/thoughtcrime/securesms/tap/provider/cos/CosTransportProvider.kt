@@ -2,6 +2,8 @@ package org.thoughtcrime.securesms.tap.provider.cos
 
 import android.content.Context
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.tap.provider.cos.notification.TapLambdaDispatcher
+import org.thoughtcrime.securesms.tap.provider.cos.notification.TapLambdaDispatcherFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClient
 import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
@@ -14,13 +16,19 @@ import org.thoughtcrime.securesms.tap.GroupTransportManager.GroupTransportMetada
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
 import org.thoughtcrime.securesms.tap.notification.*
 import org.thoughtcrime.securesms.tap.provider.cos.utils.notification.*
-import java.io.File
+import org.thoughtcrime.securesms.tap.provider.cos.utils.PresignedUrlGenerator
+import org.thoughtcrime.securesms.tap.provider.cos.utils.S3CompatiblePresignedUrlGenerator
+import org.thoughtcrime.securesms.tap.provider.cos.notification.LambdaDispatchResult
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -90,6 +98,13 @@ class CosTransportProvider(
             notificationPrefs.edit().putBoolean(KEY_NOTIFICATION_ENABLED, value).apply()
         }
 
+    private val presignedUrlGenerator: PresignedUrlGenerator by lazy {
+        S3CompatiblePresignedUrlGenerator(cosConfig)
+    }
+
+    @Volatile
+    private var lambdaDispatcher: TapLambdaDispatcher? = null
+
     /**
      * 推送消息到COS
      */
@@ -106,17 +121,6 @@ class CosTransportProvider(
                         "元数据不是COS类型"
                     )
 
-                // 获取发送元数据（使用本端凭证和存储）
-                val sendMetadata = cosMetadata.getSendMetadata()
-                
-                // 创建COS客户端（使用发送元数据）
-                val cosClient = createCosClientForSend(cosMetadata)
-                    ?: return@withContext TransportResult.failure(
-                        TransportError.PROVIDER_UNAVAILABLE,
-                        true,
-                        "无法创建COS客户端"
-                    )
-
                 // 检查消息大小
                 if (isMessageTooLarge(message)) {
                     return@withContext TransportResult.failure(
@@ -126,83 +130,70 @@ class CosTransportProvider(
                     )
                 }
 
-                // 序列化消息为JSON格式（兼容coscomm）
-                val messageData = TransportMessage.serialize(message)
-                
-                // 创建临时文件
-                val tempFile = createTempFile(messageData)
-                
-                try {
-                    // 根据消息类型选择正确的v2-channels子目录
-                    val basePath = sendMetadata.path  // 现在这是 /v2-channels/{hash}/outbox/
-                    val messageTypePath = when (message.messageType) {
-                        org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE -> "attachments"
-                        else -> "messages" // TEXT_MESSAGE, CONTROL_MESSAGE, RATCHET_UPDATE, CALL_MESSAGE
-                    }
-                    val fullPath = "${basePath}${messageTypePath}/"
-                    // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
-                    val remotePath = "${fullPath}${System.currentTimeMillis()}_${message.messageId}.dat"
-                    
-                    Log.d(TAG, "v2-channels路径: messageType=${message.messageType}, path=$fullPath")
-                    
-                    // 上传文件到COS/S3
-                    val uploadSuccess = cosClient.uploadFile(tempFile, remotePath)
-                    
-                    if (uploadSuccess) {
-                        Log.i(TAG, "消息推送成功: messageId=${message.messageId}")
-                        Log.d(TAG, "[TapTimeTest] T3_UPLOAD_END | msgId=${message.timestamp} | timestamp=${System.currentTimeMillis()}")
-                        
-                        // 推送通知触发机制（方案二：客户端直接触发）：
-                        // 1. 文件上传成功后，客户端直接调用云函数触发器
-                        // 2. 云函数从tap-state/contacts/读取接收方的webhook配置并发送HTTP通知
-                        // 3. 接收方的Webhook将通知推送到WebSocket服务
-                        // 4. 接收方客户端通过WebSocket接收推送
-                        // 
-                        // 注意：触发器调用失败不影响主流程，仅记录错误
-                        // 动态检测全局推送配置，必要时开启客户端触发
-                        if (!notificationEnabled) {
-                            try {
-                                val cfgMgr = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-                                if (cfgMgr.isNotificationEnabled()) {
-                                    notificationEnabled = true
-                                    Log.i(TAG, "检测到全局推送配置有效，启用客户端触发通知模式")
-                                }
-                            } catch (_: Exception) { /* ignore */ }
-                        }
+                val dispatcher = getLambdaDispatcher()
+                    ?: return@withContext TransportResult.failure(
+                        TransportError.PROVIDER_UNAVAILABLE,
+                        true,
+                        "推送服务未初始化"
+                    )
 
-                        if (notificationEnabled) {
-                            // 异步触发推送通知（不阻塞主流程）
-                            // 使用COS元数据中的bucketName
-                            val bucketName = cosMetadata.myBucketName
-                            Log.d(TAG, "推送通知已启用，触发推送: remotePath=$remotePath")
-                            triggerNotificationAfterUpload(remotePath, cosMetadata, bucketName)
-                            // 同时检查webhook配置完整性
-                            ensureNotificationChannelReady(metadata.recipientId, cosMetadata)
-                        } else {
-                            Log.w(TAG, "推送通知未启用（notificationEnabled=false），消息已上传但不会触发推送")
-                            Log.w(TAG, "请确保推送服务已成功部署和初始化")
-                        }
+                val payload = buildLambdaPayload(message, cosMetadata)
+                val traceId = payload.optString("traceId", "")
+                
+                // 指数退避重试: 最多3次, 间隔 1s, 2s, 4s
+                var dispatchResult: LambdaDispatchResult? = null
+                var lastError: String? = null
+                val maxRetries = 3
+                
+                for (attempt in 1..maxRetries) {
+                    try {
+                        dispatchResult = dispatcher.dispatch(payload)
                         
-                        TransportResult.Success(
-                            message = null,
-                            metadata = mapOf(
-                                "remotePath" to remotePath,
-                                "uploadTime" to System.currentTimeMillis()
-                            )
-                        )
-                    } else {
-                        Log.e(TAG, "消息推送失败: messageId=${message.messageId}")
-                        TransportResult.failure(
-                            TransportError.NETWORK_ERROR,
-                            true,
-                            "文件上传失败"
-                        )
+                        if (dispatchResult.success) {
+                            if (attempt > 1) {
+                                Log.i(TAG, "Lambda推送重试成功: messageId=${message.messageId}, attempt=$attempt, traceId=$traceId")
+                            } else {
+                                Log.i(TAG, "Lambda推送成功: messageId=${message.messageId}, traceId=$traceId")
+                            }
+                            break
+                        } else {
+                            lastError = dispatchResult.errorMessage ?: "未知错误"
+                            Log.w(TAG, "Lambda推送失败 (attempt $attempt/$maxRetries): $lastError, traceId=$traceId")
+                            
+                            if (attempt < maxRetries) {
+                                val delayMs = (1L shl (attempt - 1)) * 1000L // 1s, 2s, 4s
+                                kotlinx.coroutines.delay(delayMs)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        lastError = e.message ?: "调用异常"
+                        Log.w(TAG, "Lambda推送异常 (attempt $attempt/$maxRetries): $lastError, traceId=$traceId", e)
+                        
+                        if (attempt < maxRetries) {
+                            val delayMs = (1L shl (attempt - 1)) * 1000L
+                            kotlinx.coroutines.delay(delayMs)
+                        } else {
+                            throw e
+                        }
                     }
-                } finally {
-                    // 清理临时文件
-                    if (tempFile.exists()) {
-                        tempFile.delete()
-                    }
+                }
+
+                if (dispatchResult?.success == true) {
+                    TransportResult.Success(
+                        metadata = mapOf(
+                            "providerType" to providerType,
+                            "deliveryChannel" to "lambda-websocket",
+                            "traceId" to traceId,
+                            "lambdaStatus" to (dispatchResult.statusCode ?: 200)
+                        )
+                    )
+                } else {
+                    Log.e(TAG, "Lambda推送最终失败: messageId=${message.messageId}, traceId=$traceId, error=$lastError")
+                    TransportResult.failure(
+                        TransportError.NETWORK_ERROR,
+                        true,
+                        lastError ?: "Lambda推送失败"
+                    )
                 }
 
             } catch (e: Exception) {
@@ -256,7 +247,7 @@ class CosTransportProvider(
                             TransportResult.Success(message)
                         } else {
                             Log.w(TAG, "消息解析失败: ${latestFile.name}")
-                            TransportResult.Failed(TransportError.INVALID_FORMAT, false, "消息解析失败")
+                            TransportResult.failure(TransportError.INVALID_FORMAT, false, "消息解析失败")
                         }
                     } finally {
                         if (tempFile.exists()) {
@@ -474,14 +465,25 @@ class CosTransportProvider(
                     val uploadSuccess = cosClient.uploadFile(tempFile, path)
                     
                     if (uploadSuccess) {
-                        Log.d(TAG, "文件上传成功: $path")
-                        TransportResult.Success(
-                            metadata = mapOf(
-                                "uploadPath" to path,
-                                "uploadTime" to System.currentTimeMillis(),
-                                "fileSize" to data.size
-                            )
+                        val presignedResult = if (shouldGeneratePresignedUrl(path)) {
+                            presignedUrlGenerator.generate(path.removePrefix("/"))
+                        } else {
+                            null
+                        }
+
+                        val metadataMap = mutableMapOf<String, Any>(
+                            "remotePath" to path,
+                            "uploadTime" to System.currentTimeMillis(),
+                            "fileSize" to data.size
                         )
+                        presignedResult?.let {
+                            metadataMap["presignedUrl"] = it.url
+                            metadataMap["presignedExpiresAt"] = it.expiresAtEpochMillis
+                            metadataMap["presignedExpiresIn"] = it.expiresInSeconds
+                        }
+
+                        Log.d(TAG, "文件上传成功: $path")
+                        TransportResult.Success(metadata = metadataMap)
                     } else {
                         Log.e(TAG, "文件上传失败: $path")
                         TransportResult.failure(
@@ -1675,20 +1677,6 @@ class CosTransportProvider(
     }
 
     /**
-     * 创建临时文件保存消息数据
-     */
-    private fun createTempFile(data: ByteArray): File {
-        val tempFile = File.createTempFile("cos_upload_", ".dat", context.cacheDir)
-        
-        // 写入Tap通用格式的消息数据（与远端文件扩展名保持一致）
-        tempFile.outputStream().use { output ->
-            output.write(data)
-        }
-        
-        return tempFile
-    }
-
-    /**
      * 从文件解析消息 - 使用Tap通用格式
      */
     override suspend fun parseTransportMessage(fileData: ByteArray, fileInfo: FileInfo, metadata: TransportMetadata): TransportMessage? {
@@ -2580,4 +2568,70 @@ class CosTransportProvider(
         }
         return cloudFunctionDeployer!!
     }
-} 
+
+    private fun shouldGeneratePresignedUrl(path: String): Boolean {
+        return path.contains("/attachments/")
+    }
+
+    private suspend fun getLambdaDispatcher(): TapLambdaDispatcher? {
+        lambdaDispatcher?.let { return it }
+        return withContext(Dispatchers.IO) {
+            val config = org.thoughtcrime.securesms.tap.TransportProviderConfigManager
+                .getInstance(context)
+                .getNotificationConfig()
+            if (config == null) {
+                Log.w(TAG, "未找到推送服务配置，无法创建Lambda分发器")
+                null
+            } else {
+                TapLambdaDispatcherFactory.create(context, cosConfig, config).also {
+                    lambdaDispatcher = it
+                }
+            }
+        }
+    }
+
+    private fun buildLambdaPayload(
+        message: TransportMessage,
+        metadata: org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
+    ): JSONObject {
+        val messageJson = JSONObject(TransportMessage.objectMapper.writeValueAsString(message))
+        val attachmentsArray = JSONArray().apply {
+            message.contentMetadata.attachmentsPresigned.forEach { presigned ->
+                put(
+                    JSONObject().apply {
+                        put("attachmentId", presigned.attachmentId)
+                        put("url", presigned.url)
+                        put("expiresAt", presigned.expiresAt)
+                    }
+                )
+            }
+        }
+        val traceId = UUID.randomUUID().toString()
+
+        return JSONObject().apply {
+            put("operation", "direct_message")
+            put("version", "3.0")
+            put("traceId", traceId)
+            put("timestamp", System.currentTimeMillis())
+            put("sender", JSONObject().apply {
+                put("aci", message.senderId)
+                put("hash", metadata.myHashedId)
+                put("bucket", metadata.myBucketName)
+                put("region", metadata.myRegion)
+                put("provider", cosConfig.provider.name.lowercase())
+            })
+            put("recipient", JSONObject().apply {
+                put("aci", message.recipientId)
+                put("hash", metadata.peerHashedId)
+            })
+            put("recipientHash", metadata.peerHashedId)
+            put("configBucket", metadata.myBucketName)
+            put("message", messageJson)
+            put("attachmentsPresigned", attachmentsArray)
+            put("deliveryHint", JSONObject().apply {
+                put("channel", "websocket")
+                put("fallback", "s3-offline")
+            })
+        }
+    }
+}

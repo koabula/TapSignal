@@ -8,7 +8,7 @@
  * 输出：{ statusCode, deliveredCount, results }
  */
 
-const { S3Client, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
@@ -18,6 +18,8 @@ const CONFIG_BUCKET = process.env.CONFIG_BUCKET;
 const CONFIG_KEY = process.env.CONFIG_KEY || 'notification-config.json';
 const CONTACTS_PREFIX = 'tap-state/contacts/';
 const CHANNEL_PREFIX = 'v2-channels/';
+const DEDUP_PREFIX = 'tap-dedup/';
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000; // 24小时
 
 const s3Client = new S3Client({
     region: process.env.AWS_REGION
@@ -181,10 +183,191 @@ function hashString(str) {
     return crypto.createHash('sha256').update(str).digest('hex').substring(0, 16);
 }
 
+function generateTraceId() {
+    return typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex');
+}
+
+async function loadContactConfig(bucket, hash) {
+    const key = `${CONTACTS_PREFIX}${hash}.json`;
+    try {
+        return await getS3Object(bucket, key);
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            log('WARN', 'Contact config not found', { bucket, key });
+            return null;
+        }
+        throw error;
+    }
+}
+
+async function checkDuplicate(bucket, traceId) {
+    if (!traceId) return false;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    
+    try {
+        const response = await s3Client.send(new GetObjectCommand({
+            Bucket: bucket,
+            Key: key
+        }));
+        
+        const metadata = response.Metadata || {};
+        const timestamp = parseInt(metadata.timestamp || '0', 10);
+        const age = Date.now() - timestamp;
+        
+        if (age < DEDUP_TTL_MS) {
+            log('INFO', 'Duplicate request detected', { traceId, age });
+            return true;
+        } else {
+            log('DEBUG', 'Dedup marker expired, treating as new', { traceId, age });
+            return false;
+        }
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            return false;
+        }
+        log('WARN', 'Failed to check duplicate', { traceId, error: error.message });
+        return false;
+    }
+}
+
+async function markProcessed(bucket, traceId) {
+    if (!traceId) return;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    const now = Date.now();
+    
+    try {
+        await s3Client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: JSON.stringify({ traceId, processedAt: now }),
+            Metadata: {
+                timestamp: now.toString(),
+                ttl: (now + DEDUP_TTL_MS).toString()
+            }
+        }));
+        log('DEBUG', 'Request marked as processed', { traceId });
+    } catch (error) {
+        log('WARN', 'Failed to mark request as processed', { traceId, error: error.message });
+    }
+}
+
+async function handleDirectMessage(event) {
+    const requestId = event.traceId || event.requestId || generateTraceId();
+    log('INFO', 'Handling direct message dispatch', { requestId });
+
+    const recipientHash = event.recipientHash || event.recipient?.hash;
+    if (!recipientHash) {
+        log('WARN', 'Missing recipient hash for direct dispatch', { requestId });
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'recipientHash missing'
+        };
+    }
+
+    const bucket = event.configBucket || CONFIG_BUCKET;
+    if (!bucket) {
+        log('ERROR', 'CONFIG_BUCKET not configured for direct dispatch', { requestId });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: 'CONFIG_BUCKET missing'
+        };
+    }
+
+    // 去重检查
+    const isDuplicate = await checkDuplicate(bucket, requestId);
+    if (isDuplicate) {
+        log('INFO', 'Duplicate request, returning cached result', { requestId });
+        return {
+            statusCode: 200,
+            deliveredCount: 1,
+            cached: true,
+            results: [
+                {
+                    contactId: recipientHash,
+                    success: true,
+                    cached: true
+                }
+            ]
+        };
+    }
+
+    let contactConfig;
+    try {
+        contactConfig = await loadContactConfig(bucket, recipientHash);
+    } catch (error) {
+        log('ERROR', 'Failed to load contact config for direct dispatch', {
+            bucket,
+            recipientHash,
+            error: error.message
+        });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: error.message
+        };
+    }
+
+    if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
+        log('WARN', 'Contact config incomplete for direct dispatch', { recipientHash });
+        return {
+            statusCode: 404,
+            deliveredCount: 0,
+            error: 'contact config missing'
+        };
+    }
+
+    const notification = {
+        type: 'new_message',
+        senderId: event.sender?.hash || event.sender?.aci || 'unknown',
+        timestamp: Date.now(),
+        metadata: {
+            delivery: 'direct',
+            traceId: requestId,
+            message: event.message,
+            attachmentsPresigned: event.attachmentsPresigned || [],
+            deliveryHint: event.deliveryHint || {}
+        }
+    };
+
+    const result = await sendWebhookNotification(
+        contactConfig.webhookUrl,
+        notification,
+        contactConfig.notifySecret
+    );
+
+    // 标记为已处理
+    if (result.success) {
+        await markProcessed(bucket, requestId);
+    }
+
+    return {
+        statusCode: result.success ? 200 : 500,
+        deliveredCount: result.success ? 1 : 0,
+        results: [
+            {
+                contactId: contactConfig.contactId || recipientHash,
+                success: result.success,
+                statusCode: result.statusCode,
+                error: result.error
+            }
+        ]
+    };
+}
+
 exports.handler = async (event) => {
     const requestId = event.requestId || 'unknown';
     
     try {
+        if (event && event.operation === 'direct_message') {
+            return await handleDirectMessage(event);
+        }
+
         log('INFO', 'S3 event trigger activated', { 
             requestId,
             recordCount: event.Records?.length || 0
@@ -336,4 +519,3 @@ exports.handler = async (event) => {
         };
     }
 };
-

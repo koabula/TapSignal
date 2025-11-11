@@ -19,11 +19,95 @@ const CONFIG_KEY = process.env.CONFIG_KEY || 'notification-config.json';
 const REGION = process.env.REGION || 'ap-guangzhou';
 const CONTACTS_PREFIX = 'tap-state/contacts/';
 const CHANNEL_PREFIX = 'v2-channels/';
+const DEDUP_PREFIX = 'tap-dedup/';
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000; // 24小时
 
 const cos = new COS({
     SecretId: process.env.TAP_SECRET_ID,
     SecretKey: process.env.TAP_SECRET_KEY
 });
+
+function generateTraceId() {
+    return typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex');
+}
+
+async function loadContactConfig(bucket, region, hash) {
+    const key = `${CONTACTS_PREFIX}${hash}.json`;
+    try {
+        return await getCosObject(bucket, region, key);
+    } catch (error) {
+        if (error && error.errorCode === 'NoSuchKey') {
+            log('WARN', 'Contact config not found', { bucket, key });
+            return null;
+        }
+        throw error;
+    }
+}
+
+async function checkDuplicate(bucket, region, traceId) {
+    if (!traceId) return false;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    
+    return new Promise((resolve) => {
+        cos.headObject({
+            Bucket: bucket,
+            Region: region,
+            Key: key
+        }, (err, data) => {
+            if (err) {
+                if (err.statusCode === 404) {
+                    resolve(false);
+                } else {
+                    log('WARN', 'Failed to check duplicate', { traceId, error: err.message });
+                    resolve(false);
+                }
+                return;
+            }
+            
+            const metadata = data.headers || {};
+            const timestamp = parseInt(metadata['x-cos-meta-timestamp'] || '0', 10);
+            const age = Date.now() - timestamp;
+            
+            if (age < DEDUP_TTL_MS) {
+                log('INFO', 'Duplicate request detected', { traceId, age });
+                resolve(true);
+            } else {
+                log('DEBUG', 'Dedup marker expired, treating as new', { traceId, age });
+                resolve(false);
+            }
+        });
+    });
+}
+
+async function markProcessed(bucket, region, traceId) {
+    if (!traceId) return;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    const now = Date.now();
+    
+    return new Promise((resolve) => {
+        cos.putObject({
+            Bucket: bucket,
+            Region: region,
+            Key: key,
+            Body: JSON.stringify({ traceId, processedAt: now }),
+            Headers: {
+                'x-cos-meta-timestamp': now.toString(),
+                'x-cos-meta-ttl': (now + DEDUP_TTL_MS).toString()
+            }
+        }, (err) => {
+            if (err) {
+                log('WARN', 'Failed to mark request as processed', { traceId, error: err.message });
+            } else {
+                log('DEBUG', 'Request marked as processed', { traceId });
+            }
+            resolve();
+        });
+    });
+}
 
 function log(level, message, data = {}) {
     const levels = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
@@ -76,6 +160,108 @@ async function listContactConfigs(bucket, region) {
             }
         });
     });
+}
+
+async function handleDirectMessage(event) {
+    const requestId = event.traceId || event.requestId || generateTraceId();
+    log('INFO', 'Handling direct message dispatch', { requestId });
+
+    const recipientHash = event.recipientHash || event.recipient?.hash;
+    if (!recipientHash) {
+        log('WARN', 'Missing recipient hash for direct dispatch', { requestId });
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'recipientHash missing'
+        };
+    }
+
+    const bucket = event.configBucket || CONFIG_BUCKET;
+    const region = event.configRegion || REGION;
+    if (!bucket) {
+        log('ERROR', 'CONFIG_BUCKET not configured', { requestId });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: 'CONFIG_BUCKET missing'
+        };
+    }
+
+    // 去重检查
+    const isDuplicate = await checkDuplicate(bucket, region, requestId);
+    if (isDuplicate) {
+        log('INFO', 'Duplicate request, returning cached result', { requestId });
+        return {
+            statusCode: 200,
+            deliveredCount: 1,
+            cached: true,
+            results: [
+                {
+                    contactId: recipientHash,
+                    success: true,
+                    cached: true
+                }
+            ]
+        };
+    }
+
+    let contactConfig;
+    try {
+        contactConfig = await loadContactConfig(bucket, region, recipientHash);
+    } catch (error) {
+        log('ERROR', 'Failed to load contact config', { bucket, recipientHash, error: error.message });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: error.message
+        };
+    }
+
+    if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
+        log('WARN', 'Contact config incomplete for direct dispatch', { recipientHash });
+        return {
+            statusCode: 404,
+            deliveredCount: 0,
+            error: 'contact config missing'
+        };
+    }
+
+    const notification = {
+        type: 'new_message',
+        senderId: event.sender?.hash || event.sender?.aci || 'unknown',
+        timestamp: Date.now(),
+        metadata: {
+            delivery: 'direct',
+            traceId: requestId,
+            message: event.message,
+            attachmentsPresigned: event.attachmentsPresigned || [],
+            deliveryHint: event.deliveryHint || {}
+        }
+    };
+
+    const result = await sendWebhookNotification(
+        contactConfig.webhookUrl,
+        notification,
+        contactConfig.notifySecret
+    );
+
+    // 标记为已处理
+    if (result.success) {
+        await markProcessed(bucket, region, requestId);
+    }
+
+    return {
+        statusCode: result.success ? 200 : 500,
+        deliveredCount: result.success ? 1 : 0,
+        results: [
+            {
+                contactId: contactConfig.contactId || recipientHash,
+                success: result.success,
+                statusCode: result.statusCode,
+                error: result.error
+            }
+        ]
+    };
 }
 
 async function sendWebhookNotification(webhookUrl, notification, notifySecret) {
@@ -194,6 +380,10 @@ exports.main_handler = async (event) => {
     const requestId = event.requestId || 'unknown';
     
     try {
+        if (event && event.operation === 'direct_message') {
+            return await handleDirectMessage(event);
+        }
+
         log('INFO', 'COS event trigger activated', { 
             requestId,
             recordCount: event.Records?.length || 0

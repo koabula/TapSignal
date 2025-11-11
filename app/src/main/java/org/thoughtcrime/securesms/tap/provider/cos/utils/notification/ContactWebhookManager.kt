@@ -48,6 +48,16 @@ class ContactWebhookManager(
                     put("userId", config.userId)
                     put("lastUpdated", config.lastUpdated)
                     put("verified", config.verified)
+                    config.gatewayEndpoint?.let { put("gatewayEndpoint", it) }
+                    config.gatewayRegion?.let { put("gatewayRegion", it) }
+                    config.gatewayProvider?.let { put("gatewayProvider", it) }
+                    config.offlineBucket?.let { put("offlineBucket", it) }
+                    if (config.presignDelegation) {
+                        put("presignDelegation", true)
+                    }
+                    if (config.gatewayMetadata.isNotEmpty()) {
+                        put("gatewayMetadata", JSONObject(config.gatewayMetadata))
+                    }
                 }.toString()
                 
                 val contactHash = hashContactId(config.contactId)
@@ -127,7 +137,15 @@ class ContactWebhookManager(
                         notifySecret = jsonConfig.getString("notifySecret"),
                         userId = jsonConfig.getString("userId"),
                         lastUpdated = jsonConfig.getLong("lastUpdated"),
-                        verified = jsonConfig.optBoolean("verified", false)
+                        verified = jsonConfig.optBoolean("verified", false),
+                        gatewayEndpoint = jsonConfig.optString("gatewayEndpoint", null),
+                        gatewayRegion = jsonConfig.optString("gatewayRegion", null),
+                        gatewayProvider = jsonConfig.optString("gatewayProvider", null),
+                        offlineBucket = jsonConfig.optString("offlineBucket", null),
+                        presignDelegation = jsonConfig.optBoolean("presignDelegation", false),
+                        gatewayMetadata = jsonConfig.optJSONObject("gatewayMetadata")?.let { obj ->
+                            obj.keys().asSequence().associateWith { key -> obj.get(key) }
+                        } ?: emptyMap()
                     )
                     
                     Log.d(TAG, "联系人webhook配置加载成功")
@@ -178,7 +196,15 @@ class ContactWebhookManager(
                                     notifySecret = jsonConfig.getString("notifySecret"),
                                     userId = jsonConfig.getString("userId"),
                                     lastUpdated = jsonConfig.getLong("lastUpdated"),
-                                    verified = jsonConfig.optBoolean("verified", false)
+                                    verified = jsonConfig.optBoolean("verified", false),
+                                    gatewayEndpoint = jsonConfig.optString("gatewayEndpoint", null),
+                                    gatewayRegion = jsonConfig.optString("gatewayRegion", null),
+                                    gatewayProvider = jsonConfig.optString("gatewayProvider", null),
+                                    offlineBucket = jsonConfig.optString("offlineBucket", null),
+                                    presignDelegation = jsonConfig.optBoolean("presignDelegation", false),
+                                    gatewayMetadata = jsonConfig.optJSONObject("gatewayMetadata")?.let { obj ->
+                                        obj.keys().asSequence().associateWith { key -> obj.get(key) }
+                                    } ?: emptyMap()
                                 )
                                 
                                 if (config.validate()) {

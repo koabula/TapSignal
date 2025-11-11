@@ -329,6 +329,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
                     ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
                 Log.d(TAG, "[notifySecret调试] B端发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$userId")
+                val gatewayConfig = org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder.build(localNotificationConfig)
                 TapTokenExchangeMessage.createWithWebhook(
                     senderAci = myAci,
                     providerType = originalMessage.providerType,
@@ -341,7 +342,8 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
                     webhookUrl = localNotificationConfig.webhookUrl,
                     notifySecret = localNotificationConfig.notifySecret,
-                    userId = userId
+                    userId = userId,
+                    gatewayConfig = gatewayConfig
                 )
             } else {
                 Log.d(TAG, "未配置推送服务，发送普通Token交换响应消息")

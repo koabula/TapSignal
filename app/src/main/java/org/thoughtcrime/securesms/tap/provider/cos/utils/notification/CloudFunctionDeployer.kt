@@ -233,12 +233,21 @@ class CloudFunctionDeployer(
                 )
                 
                 val notifySecret = generateNotifySecret()
-                
+
+                val enhancedPushInfo = pushServiceInfo.copy(
+                    metadata = pushServiceInfo.metadata + mapOf(
+                        "triggerFunctionName" to triggerInfo.triggerName,
+                        "triggerFunctionArn" to (triggerInfo.triggerArn ?: ""),
+                        "triggerConfigured" to triggerInfo.configured,
+                        "triggerFilterPrefix" to (triggerInfo.filterPrefix ?: "")
+                    )
+                )
+
                 val config = NotificationConfig(
                     provider = getProviderType(),
                     webhookUrl = webhookUrl,
                     notifySecret = notifySecret,
-                    pushServiceInfo = pushServiceInfo,
+                    pushServiceInfo = enhancedPushInfo,
                     deployedAt = System.currentTimeMillis()
                 )
                 

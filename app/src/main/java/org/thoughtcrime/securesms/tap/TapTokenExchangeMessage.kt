@@ -28,7 +28,11 @@ data class TapTokenExchangeMessage(
     
     // 推送服务配置 (Phase 5新增)
     @JsonProperty("webhookConfig")
-    val webhookConfig: Map<String, Any>? = null
+    val webhookConfig: Map<String, Any>? = null,
+
+    // Gateway配置 (Phase 2新增)
+    @JsonProperty("gatewayConfig")
+    val gatewayConfig: Map<String, Any>? = null
 ) {
     
     companion object {
@@ -99,7 +103,8 @@ data class TapTokenExchangeMessage(
             requestType: String,
             webhookUrl: String?,
             notifySecret: String?,
-            userId: String?
+            userId: String?,
+            gatewayConfig: Map<String, Any>? = null
         ): TapTokenExchangeMessage {
             val webhookConfig = if (webhookUrl != null && notifySecret != null && userId != null) {
                 mapOf(
@@ -119,7 +124,8 @@ data class TapTokenExchangeMessage(
                 metadata = metadata,
                 requestType = requestType,
                 version = 1,
-                webhookConfig = webhookConfig
+                webhookConfig = webhookConfig,
+                gatewayConfig = gatewayConfig
             )
         }
         
@@ -138,7 +144,8 @@ data class TapTokenExchangeMessage(
             providerType: String,
             webhookUrl: String,
             notifySecret: String,
-            userId: String
+            userId: String,
+            gatewayConfig: Map<String, Any>? = null
         ): TapTokenExchangeMessage {
             return TapTokenExchangeMessage(
                 senderAci = senderAci,
@@ -155,7 +162,8 @@ data class TapTokenExchangeMessage(
                     "notifySecret" to notifySecret,
                     "userId" to userId,
                     "version" to "2.0"
-                )
+                ),
+                gatewayConfig = gatewayConfig
             )
         }
     }
@@ -192,6 +200,42 @@ data class TapTokenExchangeMessage(
     fun hasWebhookConfig(): Boolean {
         return webhookConfig != null && extractWebhookConfig() != null
     }
+
+    /**
+     * 提取Gateway配置
+     */
+    fun extractGatewayConfig(): GatewayConfigData? {
+        val config = gatewayConfig ?: return null
+        return try {
+            val endpoint = config["endpoint"] as? String ?: return null
+            val region = config["region"] as? String ?: return null
+            val provider = config["provider"] as? String ?: "unknown"
+            val offlineBucket = config["offlineBucket"] as? String
+            val presignDelegation = when (val raw = config["presignDelegation"]) {
+                is Boolean -> raw
+                is Number -> raw.toInt() != 0
+                else -> false
+            }
+            val metadata = (config["metadata"] as? Map<*, *>)?.mapNotNull { (k, v) ->
+                if (k is String && (v is String || v is Number || v is Boolean)) {
+                    k to v
+                } else null
+            }?.toMap() ?: emptyMap()
+
+            GatewayConfigData(
+                endpoint = endpoint,
+                region = region,
+                provider = provider,
+                offlineBucket = offlineBucket,
+                presignDelegation = presignDelegation,
+                metadata = metadata
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun hasGatewayConfig(): Boolean = extractGatewayConfig() != null
 }
 
 /**
@@ -209,4 +253,19 @@ data class WebhookConfigData(
                notifySecret.isNotEmpty() &&
                userId.isNotEmpty()
     }
-} 
+}
+
+data class GatewayConfigData(
+    val endpoint: String,
+    val region: String,
+    val provider: String,
+    val offlineBucket: String? = null,
+    val presignDelegation: Boolean = false,
+    val metadata: Map<String, Any> = emptyMap()
+) {
+    fun validate(): Boolean {
+        return endpoint.isNotEmpty() &&
+               region.isNotEmpty() &&
+               provider.isNotEmpty()
+    }
+}

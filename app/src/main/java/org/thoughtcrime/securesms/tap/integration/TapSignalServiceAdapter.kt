@@ -68,7 +68,15 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
     private var globalMessageId: String? = null
     @Volatile
     private var globalTimestamp: Long? = null
-    private val attachmentPaths = mutableMapOf<String, String>() // attachmentId -> transportPath
+    private val attachmentPaths = mutableMapOf<String, AttachmentTransferDescriptor>() // attachmentId -> descriptor
+
+    private data class AttachmentTransferDescriptor(
+        val remotePath: String,
+        val presignedUrl: String? = null,
+        val presignedExpiresAt: Long? = null
+    ) {
+        fun effectivePath(): String = presignedUrl ?: remotePath
+    }
     
     /**
      * 获取当前发送上下文中的recipient
@@ -471,11 +479,6 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             val attachmentFileName = "${timestamp}_${messageId}.dat"
             val fullTapPath = "${basePath}attachments/$attachmentFileName"
             
-            // 存储路径映射，供buildTransportMessage使用
-            attachmentPaths[attachmentId] = fullTapPath
-            
-            Log.d(TAG, "使用通道路径构建附件路径: basePath=$basePath, fullPath=$fullTapPath")
-            
             // 读取附件数据
             val attachmentData = readAttachmentData(attachment)
             if (attachmentData == null || attachmentData.isEmpty()) {
@@ -484,11 +487,16 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             // 上传附件到TAP传输层 - 使用与消息路由一致的TAP通道路径
-            val uploadResult = uploadAttachmentToTap(attachmentData, fullTapPath, attachment)
-            if (!uploadResult) {
+            val descriptor = uploadAttachmentToTap(attachmentData, fullTapPath, attachment)
+            if (descriptor == null) {
                 Log.e(TAG, "上传附件到TAP失败: ${attachment.fileName}")
                 return null
             }
+
+            // 存储路径映射，供后续metadata使用
+            attachmentPaths[attachmentId] = descriptor
+            
+            Log.d(TAG, "使用通道路径构建附件路径: basePath=$basePath, descriptor=${descriptor.effectivePath()}")
             
             // 计算文件哈希
             val fileHash = try {
@@ -500,10 +508,10 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             // 将完整TAP通道路径编码为key
-            val keyContent = "TAP:$fullTapPath"
+            val keyContent = "TAP:${descriptor.effectivePath()}"
             val encodedKey = keyContent.toByteArray(Charsets.UTF_8)
             
-            Log.i(TAG, "TAP附件上传成功，创建AttachmentPointer: path=$fullTapPath, size=${attachmentData.size}")
+            Log.i(TAG, "TAP附件上传成功，创建AttachmentPointer: path=${descriptor.effectivePath()}, size=${attachmentData.size}")
             
             // 创建TAP专用的AttachmentPointer
             SignalServiceAttachmentPointer(
@@ -570,13 +578,13 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         attachmentData: ByteArray,
         transportPath: String,
         attachment: Attachment
-    ): Boolean {
+    ): AttachmentTransferDescriptor? {
         return try {
             // 获取可用的TransportProvider
             val enabledProviders = transportManager.getEnabledProviders()
             if (enabledProviders.isEmpty()) {
                 Log.e(TAG, "没有可用的TransportProvider")
-                return false
+                return null
             }
             
             val provider = enabledProviders.first() // 使用第一个可用的provider
@@ -588,7 +596,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             val activeChannels = channelManager.getAllActiveChannels()
             if (activeChannels.isEmpty()) {
                 Log.e(TAG, "没有活跃的传输通道")
-                return false
+                return null
             }
             
             // 使用第一个活跃通道的metadata
@@ -600,21 +608,27 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             when (uploadResult) {
                 is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
                     Log.i(TAG, "TAP附件上传成功: path=$transportPath, size=${attachmentData.size}")
-                    true
+                    val presignedUrl = uploadResult.metadata?.get("presignedUrl") as? String
+                    val expiresAt = (uploadResult.metadata?.get("presignedExpiresAt") as? Number)?.toLong()
+                    AttachmentTransferDescriptor(
+                        remotePath = transportPath,
+                        presignedUrl = presignedUrl,
+                        presignedExpiresAt = expiresAt
+                    )
                 }
                 is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
                     Log.e(TAG, "TAP附件上传失败: path=$transportPath, error=${uploadResult.error}")
-                    false
+                    null
                 }
                 else -> {
                     Log.w(TAG, "TAP附件上传未知结果: path=$transportPath, result=${uploadResult::class.simpleName}")
-                    false
+                    null
                 }
             }
             
         } catch (e: Exception) {
             Log.e(TAG, "上传附件到TAP异常: path=$transportPath", e)
-            false
+            null
         }
     }
     
@@ -628,13 +642,25 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         encryptedData: EncryptedMessageData
     ): org.thoughtcrime.securesms.tap.TransportMessage {
         
+        val attachmentsPresigned = attachmentPaths.mapNotNull { (attachmentId, descriptor) ->
+            descriptor.presignedUrl?.let { url ->
+                org.thoughtcrime.securesms.tap.TransportAttachmentPresigned(
+                    attachmentId = attachmentId,
+                    url = url,
+                    expiresAt = descriptor.presignedExpiresAt ?: (System.currentTimeMillis() + 15 * 60 * 1000)
+                )
+            }
+        }
+        
         // 构建内容元数据
         val contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
             originalSize = encryptedData.ciphertext.size.toLong(),
             compressionType = org.thoughtcrime.securesms.tap.TransportCompressionType.NONE,
             encryptionAlgorithm = "signal-protocol",
             sourceDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId,
-            isSessionCipherEncrypted = true  // 私聊使用 SessionCipher 加密
+            isSessionCipherEncrypted = true,  // 私聊使用 SessionCipher 加密
+            deliveryChannel = "tap-websocket",
+            attachmentsPresigned = attachmentsPresigned
         )
         
         // 构建附件列表
@@ -645,10 +671,10 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             // 使用实际上传时的路径，确保与createTapAttachmentPointer完全一致
-            val actualUploadPath = attachmentPaths[attachmentId]
-            val fullTapPath = if (actualUploadPath != null) {
-                // 使用实际上传的路径
-                actualUploadPath
+            val descriptor = attachmentPaths[attachmentId]
+            val fullTapPath = if (descriptor != null) {
+                // 使用实际上传的路径或预签名URL
+                descriptor.effectivePath()
             } else {
                 // 降级处理：重新构建路径（这种情况不应该发生）
                 Log.w(TAG, "未找到附件的实际上传路径，重新构建: attachmentId=$attachmentId")

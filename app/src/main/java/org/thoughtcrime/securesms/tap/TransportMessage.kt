@@ -635,7 +635,19 @@ data class TransportContentMetadata(
     
     /** 是否使用 SessionCipher 加密（true=SessionCipher用于2人群组和私聊, false=SenderKey用于3+人群组） */
     @JsonProperty("isSessionCipherEncrypted")
-    val isSessionCipherEncrypted: Boolean = false
+    val isSessionCipherEncrypted: Boolean = false,
+
+    /** 传输通道描述，如 websocket/lambda */
+    @JsonProperty("deliveryChannel")
+    val deliveryChannel: String? = null,
+
+    /** 附件预签名信息列表 */
+    @JsonProperty("attachmentsPresigned")
+    val attachmentsPresigned: List<TransportAttachmentPresigned> = emptyList(),
+
+    /** 提供给Gateway的额外调度或离线写入提示 */
+    @JsonProperty("gatewayFailoverHints")
+    val gatewayFailoverHints: Map<String, Any>? = null
 )
 
 /**
@@ -648,6 +660,20 @@ enum class TransportCompressionType {
     @JsonProperty("gzip")
     GZIP
 }
+
+/**
+ * 附件预签名URL信息
+ */
+data class TransportAttachmentPresigned(
+    @JsonProperty("attachmentId")
+    val attachmentId: String,
+
+    @JsonProperty("url")
+    val url: String,
+
+    @JsonProperty("expiresAt")
+    val expiresAt: Long
+)
 
 /**
  * 传输附件数据结构

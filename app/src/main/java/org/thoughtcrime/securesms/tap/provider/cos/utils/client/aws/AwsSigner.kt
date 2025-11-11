@@ -56,5 +56,20 @@ object AwsSigner {
 
         return "$algorithm Credential=$accessKeyId/$credentialScope, SignedHeaders=$signedHeaders, Signature=$signature"
     }
+
+    /**
+     * 计算SigV4签名
+     */
+    fun signString(
+        secretKey: String,
+        dateStamp: String,
+        regionName: String,
+        serviceName: String,
+        stringToSign: String
+    ): String {
+        val signingKey = getSignatureKey(secretKey, dateStamp, regionName, serviceName)
+        val signatureBytes = hmacSHA256(signingKey, stringToSign)
+        return ByteString.of(*signatureBytes).hex()
+    }
 }
 
