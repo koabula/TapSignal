@@ -129,6 +129,6 @@ class S3CompatiblePresignedUrlGenerator(
     }
 
     companion object {
-        private const val MAX_EXPIRATION_SECONDS = 7 * 24 * 60 * 60 // 7天
+        private const val MAX_EXPIRATION_SECONDS = 14 * 24 * 60 * 60 // 14天
     }
 }

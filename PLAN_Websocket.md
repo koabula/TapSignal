@@ -48,7 +48,7 @@ Client_A ──(密文POST+元数据)──► Lambda_A
 ### 5.3 Gateway_B
 - **WebSocket 会话管理**：维护 userId→sessionId 映射，支持多设备，提供 backpressure（如 session 队列满则触发离线写入）。
 - **离线队列**：S3_B 结构 `/tap-offline/{recipientHash}/{messageId}.bin`，Gateway 记录 offset 映射；Client_B 上线时发送 `SYNC_REQUEST`，Gateway 从 S3_B 批量取回并按序推送（仅缓存文本密文，附件始终由客户端依靠预签名 URL 直接获取）。
-- **附件重签名服务**：提供 `/attachments/resign` 接口，根据 messageId 返回新的预签名 URL。
+
 
 ### 5.4 Client_B
 - **WebSocket Handler**：区分 `realtime` 与 `offline` 消息；实时消息直接入库，离线消息收到后向 Gateway 发送 ACK。
