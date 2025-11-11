@@ -429,7 +429,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
             }
             
             // 将NotificationConfig转换为Map存储
-            val configMap = mapOf(
+            val configMap = mutableMapOf(
                 "provider" to config.provider,
                 "webhookUrl" to config.webhookUrl,
                 "notifySecret" to config.notifySecret,
@@ -442,6 +442,11 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 "deployedAt" to config.deployedAt,
                 "version" to config.version
             )
+            
+            // 添加websocketManagementEndpoint（如果存在）
+            config.websocketManagementEndpoint?.let {
+                configMap["websocketManagementEndpoint"] = it
+            }
             
             tapValues.setNotificationConfig(configMap)
             
@@ -483,13 +488,17 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 metadata = metadata
             )
             
+            // 读取websocketManagementEndpoint（向后兼容）
+            val websocketEndpoint = configMap["websocketManagementEndpoint"] as? String
+            
             NotificationConfig(
                 provider = provider,
                 webhookUrl = webhookUrl,
                 notifySecret = notifySecret,
                 pushServiceInfo = pushServiceInfo,
                 deployedAt = deployedAt,
-                version = version
+                version = version,
+                websocketManagementEndpoint = websocketEndpoint
             )
         } catch (e: Exception) {
             Log.e(TAG, "获取推送服务配置失败", e)
@@ -565,7 +574,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 "userId" to config.userId,
                 "lastUpdated" to config.lastUpdated,
                 "verified" to config.verified,
-                "gatewayEndpoint" to (config.gatewayEndpoint ?: ""),
+                "websocketManagementEndpoint" to (config.websocketManagementEndpoint ?: ""),
                 "gatewayRegion" to (config.gatewayRegion ?: ""),
                 "gatewayProvider" to (config.gatewayProvider ?: ""),
                 "offlineBucket" to (config.offlineBucket ?: ""),
@@ -603,7 +612,9 @@ class TransportProviderConfigManager private constructor(private val context: Co
             val userId = configMap["userId"] as? String ?: return null
             val lastUpdated = (configMap["lastUpdated"] as? Number)?.toLong() ?: return null
             val verified = configMap["verified"] as? Boolean ?: false
-            val gatewayEndpoint = (configMap["gatewayEndpoint"] as? String).takeUnless { it.isNullOrEmpty() }
+            // 优先读取新字段名，向后兼容旧字段名
+            val websocketEndpoint = (configMap["websocketManagementEndpoint"] as? String).takeUnless { it.isNullOrEmpty() }
+                ?: (configMap["gatewayEndpoint"] as? String).takeUnless { it.isNullOrEmpty() }
             val gatewayRegion = (configMap["gatewayRegion"] as? String).takeUnless { it.isNullOrEmpty() }
             val gatewayProvider = (configMap["gatewayProvider"] as? String).takeUnless { it.isNullOrEmpty() }
             val offlineBucket = (configMap["offlineBucket"] as? String).takeUnless { it.isNullOrEmpty() }
@@ -619,7 +630,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 userId = userId,
                 lastUpdated = lastUpdated,
                 verified = verified,
-                gatewayEndpoint = gatewayEndpoint,
+                websocketManagementEndpoint = websocketEndpoint,
                 gatewayRegion = gatewayRegion,
                 gatewayProvider = gatewayProvider,
                 offlineBucket = offlineBucket,

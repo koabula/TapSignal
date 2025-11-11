@@ -647,7 +647,8 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 org.thoughtcrime.securesms.tap.TransportAttachmentPresigned(
                     attachmentId = attachmentId,
                     url = url,
-                    expiresAt = descriptor.presignedExpiresAt ?: (System.currentTimeMillis() + 15 * 60 * 1000)
+                    // 统一使用14天过期时间，与预签名URL生成器保持一致
+                    expiresAt = descriptor.presignedExpiresAt ?: (System.currentTimeMillis() + 14 * 24 * 60 * 60 * 1000L)
                 )
             }
         }

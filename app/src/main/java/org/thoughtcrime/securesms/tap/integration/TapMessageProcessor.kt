@@ -1997,7 +1997,7 @@ private fun saveContactWebhookConfig(
             userId = webhookConfigData.userId,
             lastUpdated = System.currentTimeMillis(),
             verified = false,
-            gatewayEndpoint = gatewayConfigData?.endpoint,
+            websocketManagementEndpoint = gatewayConfigData?.endpoint,
             gatewayRegion = gatewayConfigData?.region,
             gatewayProvider = gatewayConfigData?.provider,
             offlineBucket = gatewayConfigData?.offlineBucket,

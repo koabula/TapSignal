@@ -182,7 +182,7 @@ class NotificationConfigManager private constructor(private val context: Context
                 put("platform", config.platform)
                 put("lastUpdated", config.lastUpdated)
                 put("version", "2.0")
-                config.gatewayEndpoint?.let { put("gatewayEndpoint", it) }
+                config.websocketManagementEndpoint?.let { put("websocketManagementEndpoint", it) }
                 config.gatewayRegion?.let { put("gatewayRegion", it) }
                 config.gatewayProvider?.let { put("gatewayProvider", it) }
                 config.offlineBucket?.let { put("offlineBucket", it) }

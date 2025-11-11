@@ -48,7 +48,7 @@ class ContactWebhookManager(
                     put("userId", config.userId)
                     put("lastUpdated", config.lastUpdated)
                     put("verified", config.verified)
-                    config.gatewayEndpoint?.let { put("gatewayEndpoint", it) }
+                    config.websocketManagementEndpoint?.let { put("websocketManagementEndpoint", it) }
                     config.gatewayRegion?.let { put("gatewayRegion", it) }
                     config.gatewayProvider?.let { put("gatewayProvider", it) }
                     config.offlineBucket?.let { put("offlineBucket", it) }
@@ -138,7 +138,8 @@ class ContactWebhookManager(
                         userId = jsonConfig.getString("userId"),
                         lastUpdated = jsonConfig.getLong("lastUpdated"),
                         verified = jsonConfig.optBoolean("verified", false),
-                        gatewayEndpoint = jsonConfig.optString("gatewayEndpoint", null),
+                        websocketManagementEndpoint = jsonConfig.optString("websocketManagementEndpoint", null)
+                            .takeUnless { it.isNullOrEmpty() } ?: jsonConfig.optString("gatewayEndpoint", null),
                         gatewayRegion = jsonConfig.optString("gatewayRegion", null),
                         gatewayProvider = jsonConfig.optString("gatewayProvider", null),
                         offlineBucket = jsonConfig.optString("offlineBucket", null),
@@ -197,7 +198,8 @@ class ContactWebhookManager(
                                     userId = jsonConfig.getString("userId"),
                                     lastUpdated = jsonConfig.getLong("lastUpdated"),
                                     verified = jsonConfig.optBoolean("verified", false),
-                                    gatewayEndpoint = jsonConfig.optString("gatewayEndpoint", null),
+                                    websocketManagementEndpoint = jsonConfig.optString("websocketManagementEndpoint", null)
+                                        .takeUnless { it.isNullOrEmpty() } ?: jsonConfig.optString("gatewayEndpoint", null),
                                     gatewayRegion = jsonConfig.optString("gatewayRegion", null),
                                     gatewayProvider = jsonConfig.optString("gatewayProvider", null),
                                     offlineBucket = jsonConfig.optString("offlineBucket", null),
