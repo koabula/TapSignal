@@ -3084,13 +3084,18 @@ public class SignalServiceMessageSender {
                                                               urgent,
                                                               story);
 
-      byte[] ciphertext = extractPrimaryCiphertext(messages);
-      if (ciphertext == null) {
-        Log.w(TAG, "[" + timestamp + "] TAP delivery失败(" + telemetryTag + "): 无法提取密文");
-        return null;
+      byte[] envelopeBytes = constructEnvelopeFromOutgoingMessage(messages, recipient, timestamp, Optional.empty());
+      if (envelopeBytes == null) {
+        byte[] fallbackCiphertext = extractPrimaryCiphertext(messages);
+        if (fallbackCiphertext == null) {
+          Log.w(TAG, "[" + timestamp + "] TAP delivery失败(" + telemetryTag + "): 无法提取密文");
+          return null;
+        }
+        Log.w(TAG, "[" + timestamp + "] TAP delivery使用fallback密文路径(" + telemetryTag + ")");
+        envelopeBytes = fallbackCiphertext;
       }
 
-      SendMessageResult result = tapTransport.sendMessageViaTap(recipient, ciphertext, timestamp, urgent, online);
+      SendMessageResult result = tapTransport.sendMessageViaTap(recipient, envelopeBytes, timestamp, urgent, online);
       Log.d(TAG, "[" + timestamp + "] TAP delivery成功(" + telemetryTag + "): recipient=" + recipient.getIdentifier());
       return result;
     } catch (IOException | UntrustedIdentityException | InvalidKeyException e) {

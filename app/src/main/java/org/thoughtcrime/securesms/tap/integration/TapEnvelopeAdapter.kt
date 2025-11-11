@@ -312,6 +312,10 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 Log.d(TAG, "libsignal类型: PLAINTEXT_TYPE (8) → Envelope.PLAINTEXT_CONTENT (8)")
                 Envelope.Type.PLAINTEXT_CONTENT
             }
+            6 -> {
+                Log.d(TAG, "libsignal类型: UNIDENTIFIED_SENDER (6) → Envelope.UNIDENTIFIED_SENDER (6)")
+                Envelope.Type.UNIDENTIFIED_SENDER
+            }
             else -> {
                 Log.w(TAG, "未知的libsignal类型: $signalCiphertextType, 默认使用 CIPHERTEXT")
                 Envelope.Type.CIPHERTEXT

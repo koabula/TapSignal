@@ -9,6 +9,7 @@ import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.tap.TransportContentMetadata
 import org.thoughtcrime.securesms.tap.TransportMessage
+import org.thoughtcrime.securesms.tap.TransportCompressionType
 import org.thoughtcrime.securesms.tap.TransportMessageType
 import org.thoughtcrime.securesms.tap.TransportResult
 import org.thoughtcrime.securesms.tap.group.GroupSendResult
@@ -17,6 +18,7 @@ import org.thoughtcrime.securesms.tap.group.GroupV2Status
 import org.whispersystems.signalservice.api.TapMessageTransport
 import org.whispersystems.signalservice.api.messages.SendMessageResult
 import org.whispersystems.signalservice.api.push.SignalServiceAddress
+import org.whispersystems.signalservice.internal.push.Envelope
 import java.io.IOException
 import java.util.Optional
 
@@ -29,6 +31,19 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
     companion object {
         private const val TAG = "TapMessageTransportImpl"
     }
+
+    private fun mapEnvelopeTypeToSignalCiphertextType(type: Envelope.Type?): Int {
+        return when (type) {
+            Envelope.Type.CIPHERTEXT -> 2
+            Envelope.Type.PREKEY_BUNDLE -> 3
+            Envelope.Type.SENDERKEY_MESSAGE -> 7
+            Envelope.Type.UNIDENTIFIED_SENDER -> 6
+            Envelope.Type.PLAINTEXT_CONTENT -> 8
+            else -> 2
+        }
+    }
+
+    private val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
     
     override fun shouldUseTapForGroup(groupId: Optional<ByteArray>): Boolean {
         if (!groupId.isPresent) {
@@ -156,32 +171,80 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
         urgent: Boolean,
         online: Boolean
     ): SendMessageResult {
-        // 此方法已废弃：私聊应该使用 TapSignalServiceAdapter 路径
-        // 如果调用到这里，说明某处代码仍在使用旧的发送路径
-        // 抛出异常以快速定位问题调用点
-        val errorMessage = """
-            ========================================
-            TapMessageTransportImpl.sendMessageViaTap() 已废弃
-            ========================================
-            私聊消息应该通过以下路径发送：
-            IndividualSendJob 
-              → TapMessageSendIntegrator
-                → TapSignalServiceAdapter.sendWithSignalEncryption()
-            
-            如果调用到此方法，说明：
-            1. 某处代码仍在使用旧的发送路径
-            2. 可能导致密文版本不正确（version 1 错误）
-            
-            请检查调用栈，找到调用此方法的位置并修复
-            ========================================
-            recipient: ${recipient.identifier}
-            ciphertextSize: ${ciphertext.size}
-            timestamp: $timestamp
-            ========================================
-        """.trimIndent()
+        Log.i(TAG, "sendMessageViaTap(control): recipient=${recipient.identifier}, ciphertextSize=${ciphertext.size}, timestamp=$timestamp")
         
-        Log.e(TAG, errorMessage)
-        throw IOException(errorMessage)
+        return try {
+            val senderAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            val recipientAci = recipient.identifier
+
+            val envelope = try {
+                Envelope.ADAPTER.decode(ciphertext)
+            } catch (e: Exception) {
+                Log.w(TAG, "无法解析Envelope，使用原始密文包装: recipient=${recipient.identifier}", e)
+                null
+            }
+
+            val signalCiphertextType = envelope?.let { mapEnvelopeTypeToSignalCiphertextType(it.type) } ?: 2
+
+            val metadata = TransportContentMetadata(
+                originalSize = ciphertext.size.toLong(),
+                compressionType = TransportCompressionType.NONE,
+                encryptionAlgorithm = "signal-protocol",
+                sourceDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId,
+                isSessionCipherEncrypted = true,
+                deliveryChannel = "tap-control"
+            )
+            val transportMessage = TransportMessage(
+                messageId = TransportMessage.generateMessageId(),
+                timestamp = timestamp,
+                senderId = senderAci,
+                recipientId = recipientAci,
+                messageType = TransportMessageType.CONTROL_MESSAGE,
+                signalCiphertext = Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+                signalCiphertextType = signalCiphertextType,
+                contentMetadata = metadata,
+                attachments = emptyList()
+            )
+            
+            val routeResult = runBlocking {
+                transportManager.routeMessage(transportMessage, recipientAci)
+            }
+            when (routeResult) {
+                is TransportResult.Success -> {
+                    Log.i(TAG, "TAP控制消息发送成功: recipient=${recipient.identifier}")
+                    SendMessageResult.success(
+                        recipient,
+                        emptyList(),
+                        true,
+                        false,
+                        timestamp,
+                        Optional.empty()
+                    )
+                }
+                is TransportResult.PartialSuccess -> {
+                    Log.w(TAG, "TAP控制消息部分成功: recipient=${recipient.identifier}")
+                    SendMessageResult.success(
+                        recipient,
+                        emptyList(),
+                        true,
+                        false,
+                        timestamp,
+                        Optional.empty()
+                    )
+                }
+                is TransportResult.RetryScheduled -> {
+                    Log.w(TAG, "TAP控制消息已计划重试: recipient=${recipient.identifier}")
+                    throw IOException("TAP control message scheduled for retry")
+                }
+                is TransportResult.Failed -> {
+                    Log.e(TAG, "TAP控制消息发送失败: ${routeResult.errorMessage}")
+                    throw IOException("TAP control message failed: ${routeResult.errorMessage}")
+                }
+            }
+        } catch (e: Exception) {
+            if (e is IOException) throw e
+            Log.e(TAG, "TAP控制消息发送异常", e)
+            throw IOException("TAP control message exception: ${e.message}", e)
+        }
     }
 }
-
