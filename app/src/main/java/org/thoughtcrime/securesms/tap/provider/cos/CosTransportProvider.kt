@@ -47,6 +47,7 @@ class CosTransportProvider(
         private val TAG = Log.tag(CosTransportProvider::class.java)
         private const val PREF_NAME = "cos_transport_provider"
         private const val KEY_NOTIFICATION_ENABLED = "notification_enabled"
+        private const val OFFLINE_PREFIX = "tap-offline/"
         
         // 已移除硬编码配置，改为使用可配置的 CosProviderConfig
     }
@@ -2567,6 +2568,65 @@ class CosTransportProvider(
             initializeNotificationComponents()
         }
         return cloudFunctionDeployer!!
+    }
+
+    data class OfflineMessageDescriptor(
+        val key: String,
+        val size: Long,
+        val lastModified: Long
+    )
+
+    suspend fun listOfflineMessages(recipientHash: String): List<OfflineMessageDescriptor> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val cosClient = CosClientFactory.createClient(cosConfig, context)
+                val prefix = buildOfflinePrefix(recipientHash)
+                val files = cosClient.listFiles(prefix)
+                files.map { cosFile ->
+                    OfflineMessageDescriptor(
+                        key = cosFile.name,
+                        size = cosFile.size,
+                        lastModified = cosFile.lastModified
+                    )
+                }.sortedBy { it.lastModified }
+            } catch (e: Exception) {
+                Log.w(TAG, "列举离线消息失败: recipientHash=${LogSanitizer.sanitize(recipientHash)}", e)
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun downloadOfflineMessage(objectKey: String): ByteArray? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val cosClient = CosClientFactory.createClient(cosConfig, context)
+                cosClient.downloadFileToMemory(objectKey)
+            } catch (e: Exception) {
+                Log.w(TAG, "下载离线消息失败: key=${LogSanitizer.sanitize(objectKey)}", e)
+                null
+            }
+        }
+    }
+
+    suspend fun deleteOfflineMessage(objectKey: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val cosClient = CosClientFactory.createClient(cosConfig, context)
+                cosClient.deleteFile(objectKey)
+            } catch (e: Exception) {
+                Log.w(TAG, "删除离线消息失败: key=${LogSanitizer.sanitize(objectKey)}", e)
+                false
+            }
+        }
+    }
+
+    private fun buildOfflinePrefix(recipientHash: String): String {
+        val normalized = recipientHash.trim().lowercase()
+        return if (normalized.isEmpty()) {
+            OFFLINE_PREFIX
+        } else {
+            "$OFFLINE_PREFIX$normalized/"
+        }
     }
 
     private fun shouldGeneratePresignedUrl(path: String): Boolean {

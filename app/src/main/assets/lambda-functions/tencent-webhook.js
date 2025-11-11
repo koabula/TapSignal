@@ -17,6 +17,7 @@ const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
 const REGION = process.env.REGION || 'ap-guangzhou';
 const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
 const WS_FUNCTION_URL = process.env.WS_FUNCTION_URL; // WebSocket函数的URL（用于推送）
+const OFFLINE_PREFIX = 'tap-offline/';
 
 const cos = new COS({
     SecretId: process.env.TAP_SECRET_ID,
@@ -173,8 +174,7 @@ async function pushToWebSocket(connectionId, notification, wsFunctionUrl, userId
                             statusCode: res.statusCode,
                             response: response
                         });
-                        // 即使推送失败也不抛出异常，允许后续保存到队列
-                        resolve();  // 改为resolve，允许降级到队列机制
+                        reject(new Error('Push request failed'));
                     }
                 } catch (e) {
                     log('WARN', 'Failed to parse push response', {
@@ -183,8 +183,7 @@ async function pushToWebSocket(connectionId, notification, wsFunctionUrl, userId
                         response: data,
                         error: e.message
                     });
-                    // 解析失败也允许继续，降级到队列机制
-                    resolve();
+                    reject(new Error('Push response parse error'));
                 }
             });
         });
@@ -194,15 +193,13 @@ async function pushToWebSocket(connectionId, notification, wsFunctionUrl, userId
                 connectionId,
                 error: error.message 
             });
-            // P1修复：推送失败不抛出异常，允许降级到队列机制
-            resolve();  // 改为resolve，允许降级处理
+            reject(error);
         });
         
         req.on('timeout', () => {
             req.destroy();
             log('WARN', 'Push request timeout', { connectionId });
-            // 超时也允许继续，降级到队列机制
-            resolve();
+            reject(new Error('Push request timeout'));
         });
         
         req.write(payload);
@@ -213,39 +210,32 @@ async function pushToWebSocket(connectionId, notification, wsFunctionUrl, userId
 /**
  * 保存通知到队列（COS）以供客户端轮询获取
  */
-async function saveNotificationToQueue(userId, notification) {
-    if (!BUCKET_NAME) {
-        log('ERROR', 'CONNECTIONS_BUCKET not configured, cannot queue notification');
+async function saveOfflineMessage(recipientHash, notification) {
+    if (!BUCKET_NAME || !recipientHash) {
+        log('WARN', '无法保存离线消息，缺少bucket或recipientHash', { recipientHash });
         return;
     }
-    
-    try {
-        const queueKey = `tap-notifications/${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.json`;
-        
-        await new Promise((resolve, reject) => {
-            cos.putObject({
-                Bucket: BUCKET_NAME,
-                Region: REGION,
-                Key: queueKey,
-                Body: JSON.stringify(notification),
-                ContentType: 'application/json'
-            }, (err, data) => {
-                if (err) {
-                    log('ERROR', 'Failed to queue notification', { userId, error: err.message });
-                    reject(err);
-                } else {
-                    log('INFO', 'Notification queued', { userId, queueKey });
-                    resolve();
-                }
-            });
+    const safeHash = recipientHash.trim().toLowerCase();
+    const messageId = notification.metadata?.message?.messageId || notification.metadata?.traceId || notification.timestamp;
+    const key = `${OFFLINE_PREFIX}${safeHash}/${Date.now()}-${messageId || 'message'}.json`;
+
+    await new Promise((resolve, reject) => {
+        cos.putObject({
+            Bucket: BUCKET_NAME,
+            Region: REGION,
+            Key: key,
+            Body: JSON.stringify(notification),
+            ContentType: 'application/json'
+        }, (err) => {
+            if (err) {
+                log('ERROR', '保存离线消息失败', { key, error: err.message });
+                reject(err);
+            } else {
+                log('INFO', '离线消息已保存', { key });
+                resolve();
+            }
         });
-    } catch (error) {
-        log('ERROR', 'Failed to save notification to queue', {
-            userId,
-            error: error.message
-        });
-        // 不抛出异常，允许请求继续处理
-    }
+    });
 }
 
 exports.main_handler = async (event) => {
@@ -357,69 +347,44 @@ exports.main_handler = async (event) => {
             };
         }
         
+        const recipientHash = request.recipient?.hash || request.recipientHash || request.notification.metadata?.recipientHash || userId;
         const connectionId = await getConnectionId(userId);
         if (!connectionId) {
             log('WARN', 'User not connected', { requestId, userId });
-            
-            // 保存通知到COS以供后续轮询
-            await saveNotificationToQueue(userId, request.notification);
-            
+            await saveOfflineMessage(recipientHash, request.notification);
             return {
                 statusCode: 200,
                 body: JSON.stringify({
                     statusCode: 200,
                     delivered: 0,
-                    message: 'User not connected (notification queued)'
+                    message: 'User not connected (offline stored)'
                 })
             };
         }
         
-        // P1修复：尝试通过WebSocket推送消息
         let delivered = 0;
         if (WS_FUNCTION_URL) {
             try {
-                // P1修复：传递userId参数到推送函数
                 await pushToWebSocket(connectionId, request.notification, WS_FUNCTION_URL, userId);
-                
-                // 注意：由于腾讯云函数URL WebSocket推送的特殊性，
-                // 推送可能不是真正的实时推送，而是将消息保存到队列
-                // 客户端需要通过轮询或其他机制获取消息
-                // 这里我们假设推送成功（实际可能是队列成功）
                 delivered = 1;
-                
-                log('INFO', 'Notification queued for push via WebSocket', { 
+                log('INFO', 'Notification delivered via WebSocket', { 
                     requestId,
                     userId,
                     connectionId,
                     senderId: request.notification.senderId
                 });
             } catch (error) {
-                log('WARN', 'Failed to push via WebSocket, queuing notification', {
+                log('WARN', 'Failed to push via WebSocket, storing offline', {
                     requestId,
                     userId,
                     connectionId,
                     error: error.message
                 });
-                // 推送失败，保存到队列
-                await saveNotificationToQueue(userId, request.notification);
+                await saveOfflineMessage(recipientHash, request.notification);
             }
         } else {
-            log('WARN', 'WS_FUNCTION_URL not configured, queuing notification', { requestId });
-            await saveNotificationToQueue(userId, request.notification);
-        }
-        
-        // P1修复：即使推送成功，也保存一份到队列作为备份
-        // 确保消息不会丢失（客户端可以轮询获取）
-        try {
-            await saveNotificationToQueue(userId, request.notification);
-            log('DEBUG', 'Notification also saved to queue as backup', { requestId, userId });
-        } catch (error) {
-            log('WARN', 'Failed to save notification to queue', {
-                requestId,
-                userId,
-                error: error.message
-            });
-            // 队列保存失败不影响响应
+            log('WARN', 'WS_FUNCTION_URL not configured, storing offline', { requestId });
+            await saveOfflineMessage(recipientHash, request.notification);
         }
         
         return {
@@ -427,7 +392,7 @@ exports.main_handler = async (event) => {
             body: JSON.stringify({
                 statusCode: 200,
                 delivered: delivered,
-                message: delivered > 0 ? 'ok' : 'notification queued'
+                message: delivered > 0 ? 'ok' : 'queued'
             })
         };
         

@@ -9,7 +9,7 @@
  */
 
 const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require('@aws-sdk/client-apigatewaymanagementapi');
-const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
@@ -17,6 +17,7 @@ const BUCKET_NAME = process.env.CONNECTIONS_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
 const API_GATEWAY_ENDPOINT = process.env.API_GATEWAY_ENDPOINT;
+const OFFLINE_PREFIX = 'tap-offline/';
 
 const s3Client = new S3Client({
     region: AWS_REGION
@@ -133,6 +134,29 @@ async function pushToWebSocket(connectionId, notification) {
     }
 }
 
+async function saveOfflineMessage(recipientHash, notification) {
+    if (!BUCKET_NAME || !recipientHash) {
+        log('WARN', '无法保存离线消息，缺少bucket或recipientHash', { recipientHash });
+        return;
+    }
+
+    const safeHash = recipientHash.trim().toLowerCase();
+    const messageId = notification.metadata?.message?.messageId || notification.metadata?.traceId || notification.timestamp;
+    const key = `${OFFLINE_PREFIX}${safeHash}/${Date.now()}-${messageId || 'message'}.json`;
+
+    try {
+        await s3Client.send(new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            Body: JSON.stringify(notification),
+            ContentType: 'application/json'
+        }));
+        log('INFO', '离线消息已保存', { key });
+    } catch (error) {
+        log('ERROR', '保存离线消息失败', { key, error: error.message });
+    }
+}
+
 exports.handler = async (event) => {
     const requestId = event.requestContext?.requestId || 'unknown';
     
@@ -240,34 +264,46 @@ exports.handler = async (event) => {
             };
         }
         
+        const recipientHash = request.recipient?.hash || request.recipientHash || request.notification.metadata?.recipientHash || userId;
         const connectionId = await getConnectionId(userId);
         if (!connectionId) {
             log('WARN', 'User not connected', { requestId, userId });
+            await saveOfflineMessage(recipientHash, request.notification);
             return {
                 statusCode: 200,
                 body: JSON.stringify({
                     statusCode: 200,
                     delivered: 0,
-                    message: 'User not connected (offline)'
+                    message: 'User not connected (offline stored)'
                 })
             };
         }
         
-        await pushToWebSocket(connectionId, request.notification);
-        
-        log('INFO', 'Notification delivered successfully', { 
-            requestId,
-            userId,
-            connectionId,
-            senderId: request.notification.senderId
-        });
+        let delivered = 0;
+        try {
+            await pushToWebSocket(connectionId, request.notification);
+            delivered = 1;
+            log('INFO', 'Notification delivered successfully', { 
+                requestId,
+                userId,
+                connectionId,
+                senderId: request.notification.senderId
+            });
+        } catch (error) {
+            log('WARN', 'Push failed, storing offline', {
+                requestId,
+                userId,
+                error: error.message
+            });
+            await saveOfflineMessage(recipientHash, request.notification);
+        }
         
         return {
             statusCode: 200,
             body: JSON.stringify({
                 statusCode: 200,
-                delivered: 1,
-                message: 'ok'
+                delivered,
+                message: delivered > 0 ? 'ok' : 'queued'
             })
         };
         

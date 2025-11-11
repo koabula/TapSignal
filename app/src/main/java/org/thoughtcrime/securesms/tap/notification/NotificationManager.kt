@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.keyvalue.SignalStore
+import org.thoughtcrime.securesms.tap.utils.TransportIdHasher
 
 /**
  * 推送服务管理器
@@ -81,6 +83,7 @@ class NotificationManager private constructor(private val context: Context) {
                 if (result.success) {
                     connectionState = ConnectionState.CONNECTED
                     Log.i(TAG, "推送服务连接成功")
+                    triggerOfflineSync()
                 } else {
                     connectionState = ConnectionState.DISCONNECTED
                     Log.e(TAG, "推送服务连接失败: ${result.errorMessage}")
@@ -134,6 +137,25 @@ class NotificationManager private constructor(private val context: Context) {
     
     fun getCurrentConfig(): NotificationConfig? {
         return currentConfig
+    }
+    
+    private fun triggerOfflineSync() {
+        val myAci = try {
+            SignalStore.account.requireAci()
+        } catch (e: Exception) {
+            Log.w(TAG, "无法获取本端ACI，跳过离线同步", e)
+            return
+        }
+        val myHash = try {
+            TransportIdHasher.hashAci(myAci)
+        } catch (e: Exception) {
+            Log.w(TAG, "计算本端哈希失败，跳过离线同步", e)
+            return
+        }
+        notificationScope.launch {
+            val result = downloadExecutor.syncOfflineMessages(myHash)
+            Log.i(TAG, "离线消息同步完成: processed=${result.processed}, failed=${result.failed}, scanned=${result.scanned}, skipped=${result.skippedReason}")
+        }
     }
     
     private fun handleNotification(notification: NotificationMessage) {
@@ -219,4 +241,3 @@ enum class ConnectionState {
     CONNECTED,
     RECONNECTING
 }
-

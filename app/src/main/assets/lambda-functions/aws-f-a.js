@@ -329,6 +329,8 @@ async function handleDirectMessage(event) {
         metadata: {
             delivery: 'direct',
             traceId: requestId,
+            recipientHash,
+            userId: contactConfig.userId,
             message: event.message,
             attachmentsPresigned: event.attachmentsPresigned || [],
             deliveryHint: event.deliveryHint || {}
@@ -346,15 +348,19 @@ async function handleDirectMessage(event) {
         await markProcessed(bucket, requestId);
     }
 
+    if (!result.success) {
+        throw new Error(`Webhook delivery failed: ${result.error || result.statusCode || 'unknown error'}`);
+    }
+
     return {
-        statusCode: result.success ? 200 : 500,
-        deliveredCount: result.success ? 1 : 0,
+        statusCode: 200,
+        deliveredCount: 1,
         results: [
             {
                 contactId: contactConfig.contactId || recipientHash,
-                success: result.success,
+                success: true,
                 statusCode: result.statusCode,
-                error: result.error
+                error: null
             }
         ]
     };
@@ -368,141 +374,15 @@ exports.handler = async (event) => {
             return await handleDirectMessage(event);
         }
 
-        log('INFO', 'S3 event trigger activated', { 
+        log('WARN', 'Unsupported operation for F_A', {
             requestId,
-            recordCount: event.Records?.length || 0
+            operation: event?.operation
         });
-        
-        if (!event.Records || event.Records.length === 0) {
-            log('WARN', 'No S3 records in event', { requestId });
-            return {
-                statusCode: 200,
-                deliveredCount: 0,
-                results: []
-            };
-        }
-        
-        const results = [];
-        
-        for (const record of event.Records) {
-            try {
-                const bucket = record.s3.bucket.name;
-                const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
-                
-                log('DEBUG', 'Processing S3 record', { bucket, key });
-                
-                if (!key.startsWith(CHANNEL_PREFIX)) {
-                    log('DEBUG', 'Skipping non-channel object', { key });
-                    continue;
-                }
-                
-                const senderId = extractSenderIdFromKey(key);
-                if (!senderId) {
-                    log('WARN', 'Cannot extract sender ID from key', { key });
-                    continue;
-                }
-                
-                const configBucket = CONFIG_BUCKET || bucket;
-                
-                let contactConfigs = [];
-                try {
-                    const objects = await listContactConfigs(configBucket);
-                    
-                    for (const obj of objects) {
-                        try {
-                            const config = await getS3Object(configBucket, obj.Key);
-                            contactConfigs.push(config);
-                        } catch (err) {
-                            log('WARN', 'Failed to load contact config', { 
-                                key: obj.Key,
-                                error: err.message
-                            });
-                        }
-                    }
-                } catch (err) {
-                    log('ERROR', 'Failed to list contact configs', { 
-                        bucket: configBucket,
-                        error: err.message
-                    });
-                }
-                
-                log('INFO', 'Sending notifications to contacts', {
-                    senderId,
-                    contactCount: contactConfigs.length
-                });
-                
-                for (const contactConfig of contactConfigs) {
-                    try {
-                        if (!contactConfig.webhookUrl || !contactConfig.notifySecret || !contactConfig.userId) {
-                            log('WARN', 'Invalid contact config', {
-                                contactId: contactConfig.contactId,
-                                missingFields: {
-                                    webhookUrl: !contactConfig.webhookUrl,
-                                    notifySecret: !contactConfig.notifySecret,
-                                    userId: !contactConfig.userId
-                                }
-                            });
-                            continue;
-                        }
-                        
-                        const notification = {
-                            type: 'new_message',
-                            senderId: senderId,
-                            timestamp: Date.now(),
-                            metadata: {
-                                bucket: bucket,
-                                key: key,
-                                eventTime: record.eventTime,
-                                userId: contactConfig.userId
-                            }
-                        };
-                        
-                        const result = await sendWebhookNotification(
-                            contactConfig.webhookUrl,
-                            notification,
-                            contactConfig.notifySecret
-                        );
-                        
-                        results.push({
-                            contactId: contactConfig.contactId,
-                            success: result.success,
-                            statusCode: result.statusCode,
-                            error: result.error
-                        });
-                        
-                    } catch (err) {
-                        log('ERROR', 'Failed to send notification to contact', {
-                            contactId: contactConfig.contactId,
-                            error: err.message
-                        });
-                        results.push({
-                            contactId: contactConfig.contactId,
-                            success: false,
-                            error: err.message
-                        });
-                    }
-                }
-                
-            } catch (err) {
-                log('ERROR', 'Error processing S3 record', {
-                    error: err.message,
-                    stack: err.stack
-                });
-            }
-        }
-        
-        const deliveredCount = results.filter(r => r.success).length;
-        
-        log('INFO', 'Event processing completed', {
-            requestId,
-            totalResults: results.length,
-            deliveredCount: deliveredCount
-        });
-        
+
         return {
-            statusCode: 200,
-            deliveredCount: deliveredCount,
-            results: results
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'unsupported operation'
         };
         
     } catch (error) {

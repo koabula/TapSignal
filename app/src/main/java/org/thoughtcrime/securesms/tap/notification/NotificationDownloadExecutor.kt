@@ -2,13 +2,17 @@ package org.thoughtcrime.securesms.tap.notification
 
 import android.content.Context
 import kotlinx.coroutines.*
+import org.json.JSONArray
+import org.json.JSONObject
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
 import org.thoughtcrime.securesms.tap.integration.TapProcessResult
 import org.thoughtcrime.securesms.tap.polling.TapPollingConstants
+import org.thoughtcrime.securesms.tap.provider.cos.CosTransportProvider
 import org.thoughtcrime.securesms.database.SignalDatabase
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.text.Charsets
 
 /**
  * 推送通知下载执行器
@@ -62,6 +66,9 @@ class NotificationDownloadExecutor(
         return try {
             // P0修复：在下载执行器入口添加详细日志
             Log.i(TAG, "[推送下载] executeDirectDownload called: senderId=${notification.senderId}, type=${notification.type}")
+            processInlineNotification(notification, startTime, source = "realtime")?.let {
+                return it
+            }
             
             // 1. 从notification.metadata中提取文件路径
             val fileKey = notification.metadata["key"] as? String
@@ -237,6 +244,43 @@ class NotificationDownloadExecutor(
             NotificationDownloadResult.failure(e.message ?: "UNKNOWN_ERROR", responseTime)
         }
     }
+
+    private suspend fun processInlineNotification(
+        notification: NotificationMessage,
+        startTime: Long,
+        source: String
+    ): NotificationDownloadResult? {
+        val payload = notification.metadata["message"] ?: return null
+        val responseTimeOnError = System.currentTimeMillis() - startTime
+        return try {
+            val messageJson = when (payload) {
+                is JSONObject -> payload.toString()
+                is Map<*, *> -> JSONObject(payload).toString()
+                is String -> payload
+                else -> {
+                    Log.w(TAG, "[推送下载] 未知的message载荷类型: ${payload::class.java.simpleName}")
+                    return NotificationDownloadResult.failure("无效的message载荷", responseTimeOnError)
+                }
+            }
+
+            val transportMessage = TransportMessage.objectMapper.readValue(messageJson, TransportMessage::class.java)
+            Log.d(TAG, "[推送下载] 已解析inline消息: messageId=${transportMessage.messageId}, source=$source")
+
+            val tapResult = messageProcessor.processTapTransportMessage(transportMessage)
+            val responseTime = System.currentTimeMillis() - startTime
+            when (tapResult) {
+                is TapProcessResult.Success -> {
+                    NotificationDownloadResult.success(1, transportMessage.attachments.size + 1, responseTime)
+                }
+                is TapProcessResult.Failed -> {
+                    NotificationDownloadResult.failure(tapResult.error, responseTime)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[推送下载] 解析inline消息失败", e)
+            NotificationDownloadResult.failure(e.message ?: "INLINE_MESSAGE_ERROR", responseTimeOnError)
+        }
+    }
     
     /**
      * Phase 2: 检查并下载附件
@@ -397,6 +441,50 @@ class NotificationDownloadExecutor(
             val responseTime = System.currentTimeMillis() - startTime
             Log.e(TAG, "下载过程中发生错误: senderId=$senderId", e)
             NotificationDownloadResult.failure(e.message ?: "UNKNOWN_ERROR", responseTime)
+        }
+    }
+
+    suspend fun syncOfflineMessages(recipientHash: String): OfflineSyncResult {
+        val startTime = System.currentTimeMillis()
+        return try {
+            val provider = transportManager.getProvider("cos") as? CosTransportProvider
+                ?: return OfflineSyncResult.skipped("cos provider not available")
+            val descriptors = provider.listOfflineMessages(recipientHash)
+            if (descriptors.isEmpty()) {
+                return OfflineSyncResult(processed = 0, failed = 0, scanned = 0, duration = System.currentTimeMillis() - startTime)
+            }
+
+            var processed = 0
+            var failed = 0
+            descriptors.forEach { descriptor ->
+                val raw = provider.downloadOfflineMessage(descriptor.key)
+                if (raw == null) {
+                    failed++
+                    return@forEach
+                }
+                val notification = parseOfflineNotification(raw)
+                if (notification == null) {
+                    failed++
+                    return@forEach
+                }
+                val result = processInlineNotification(notification, System.currentTimeMillis(), source = "offline")
+                if (result != null && result.isSuccess) {
+                    processed += result.messagesProcessed
+                    provider.deleteOfflineMessage(descriptor.key)
+                } else {
+                    failed++
+                }
+            }
+
+            OfflineSyncResult(
+                processed = processed,
+                failed = failed,
+                scanned = descriptors.size,
+                duration = System.currentTimeMillis() - startTime
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "离线消息同步失败", e)
+            OfflineSyncResult.failed(System.currentTimeMillis() - startTime, e.message ?: "offline_sync_error")
         }
     }
     
@@ -777,7 +865,48 @@ class NotificationDownloadExecutor(
             Log.w(TAG, "清理文件处理失败记录时出错", e)
         }
     }
-}
+
+    private fun parseOfflineNotification(raw: ByteArray): NotificationMessage? {
+        return try {
+            val json = JSONObject(String(raw, Charsets.UTF_8))
+            val metadataMap = json.optJSONObject("metadata")?.toMapDeep() ?: emptyMap()
+            NotificationMessage(
+                type = json.optString("type", NotificationMessage.TYPE_NEW_MESSAGE),
+                senderId = json.optString("senderId", ""),
+                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
+                metadata = metadataMap
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "解析离线通知失败", e)
+            null
+        }
+    }
+
+    private fun JSONObject.toMapDeep(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        keys().forEach { key ->
+            val value = when (val raw = this.get(key)) {
+                is JSONObject -> raw.toMapDeep()
+                is JSONArray -> raw.toListDeep()
+                else -> raw
+            }
+            result[key] = value
+        }
+        return result
+    }
+
+    private fun JSONArray.toListDeep(): List<Any> {
+        val list = mutableListOf<Any>()
+        for (i in 0 until length()) {
+            val value = when (val raw = get(i)) {
+                is JSONObject -> raw.toMapDeep()
+                is JSONArray -> raw.toListDeep()
+                else -> raw
+            }
+            list.add(value)
+        }
+        return list
+    }
 
 /**
  * 推送下载结果
@@ -806,6 +935,19 @@ data class NotificationDownloadResult(
                 responseTime = responseTime,
                 error = error
             )
+    }
+}
+
+data class OfflineSyncResult(
+    val processed: Int,
+    val failed: Int,
+    val scanned: Int,
+    val duration: Long,
+    val skippedReason: String? = null
+) {
+    companion object {
+        fun skipped(reason: String) = OfflineSyncResult(0, 0, 0, 0, reason)
+        fun failed(duration: Long, reason: String) = OfflineSyncResult(0, 1, 0, duration, reason)
     }
 }
 
@@ -872,3 +1014,4 @@ private data class AttachmentDownloadResult(
     val attachmentsProcessed: Int
 )
 
+}

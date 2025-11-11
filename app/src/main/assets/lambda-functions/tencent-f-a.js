@@ -233,6 +233,8 @@ async function handleDirectMessage(event) {
         metadata: {
             delivery: 'direct',
             traceId: requestId,
+            recipientHash,
+            userId: contactConfig.userId,
             message: event.message,
             attachmentsPresigned: event.attachmentsPresigned || [],
             deliveryHint: event.deliveryHint || {}
@@ -250,15 +252,19 @@ async function handleDirectMessage(event) {
         await markProcessed(bucket, region, requestId);
     }
 
+    if (!result.success) {
+        throw new Error(`Webhook delivery failed: ${result.error || result.statusCode || 'unknown error'}`);
+    }
+
     return {
-        statusCode: result.success ? 200 : 500,
-        deliveredCount: result.success ? 1 : 0,
+        statusCode: 200,
+        deliveredCount: 1,
         results: [
             {
                 contactId: contactConfig.contactId || recipientHash,
-                success: result.success,
+                success: true,
                 statusCode: result.statusCode,
-                error: result.error
+                error: null
             }
         ]
     };

@@ -30,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.ByteString
 import java.util.UUID
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /**
  * Tap Envelope适配器
@@ -55,6 +57,13 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
     private val transportManager = TransportManager.getInstance(context)
     private val channelManager = TransportChannelManager.getInstance(context)
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
     
     /**
      * 处理加密的传输消息
@@ -893,6 +902,22 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 Log.w(TAG, "TransportAttachment中没有有效的传输路径: ${tapAttachment.fileName}")
                 return
             }
+
+            if (isHttpUrl(fullTapPath)) {
+                val httpData = downloadAttachmentFromUrl(fullTapPath)
+                if (httpData != null && httpData.isNotEmpty()) {
+                    saveTapAttachmentData(
+                        attachmentData = httpData,
+                        tapAttachment = tapAttachment,
+                        messageTimestamp = messageTimestamp,
+                        envelope = envelope
+                    )
+                    Log.i(TAG, "通过预签名URL下载附件成功: path=$fullTapPath")
+                } else {
+                    Log.w(TAG, "预签名URL下载附件失败或数据为空: path=$fullTapPath")
+                }
+                return
+            }
             
             // 构建FileInfo - 使用完整的TAP通道路径
             val fileInfo = FileInfo(
@@ -943,6 +968,27 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             
         } catch (e: Exception) {
             Log.e(TAG, "下载单个TAP附件异常: ${tapAttachment.fileName}", e)
+        }
+    }
+
+    private fun isHttpUrl(path: String): Boolean {
+        return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
+    }
+
+    private suspend fun downloadAttachmentFromUrl(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val request = Request.Builder().url(url).get().build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "预签名URL请求失败: code=${response.code}")
+                    null
+                } else {
+                    response.body?.bytes()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "通过预签名URL下载附件异常", e)
+            null
         }
     }
     
