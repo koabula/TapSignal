@@ -247,6 +247,18 @@ public class SignalServiceMessageSender {
 
     EnvelopeContent envelopeContent = EnvelopeContent.encrypted(content, ContentHint.IMPLICIT, Optional.empty());
 
+    SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
+                                                            sealedSenderAccess,
+                                                            message.getWhen(),
+                                                            envelopeContent,
+                                                            false,
+                                                            false,
+                                                            false,
+                                                            "receipt");
+    if (tapResult != null) {
+      return tapResult;
+    }
+
     return sendMessage(recipient, sealedSenderAccess, message.getWhen(), envelopeContent, false, null, null, false, false);
   }
 
@@ -267,6 +279,20 @@ public class SignalServiceMessageSender {
     PlaintextContent content         = new PlaintextContent(errorMessage);
     EnvelopeContent  envelopeContent = EnvelopeContent.plaintext(content, groupId);
 
+    if (!groupId.isPresent()) {
+      SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
+                                                              sealedSenderAccess,
+                                                              timestamp,
+                                                              envelopeContent,
+                                                              false,
+                                                              false,
+                                                              false,
+                                                              "retry_receipt");
+      if (tapResult != null) {
+        return;
+      }
+    }
+
     sendMessage(recipient, sealedSenderAccess, timestamp, envelopeContent, false, null, null, false, false);
   }
 
@@ -283,8 +309,45 @@ public class SignalServiceMessageSender {
 
     Content         content         = createTypingContent(message);
     EnvelopeContent envelopeContent = EnvelopeContent.encrypted(content, ContentHint.IMPLICIT, Optional.empty());
+    List<SignalServiceAddress> remainingRecipients       = new ArrayList<>();
+    List<SealedSenderAccess>  remainingSealedSenderAccess = new ArrayList<>();
 
-    sendMessage(recipients, sealedSenderAccesses, message.getTimestamp(), envelopeContent, true, null, cancelationSignal, null, false, false);
+    for (int i = 0; i < recipients.size(); i++) {
+      SignalServiceAddress recipient          = recipients.get(i);
+      SealedSenderAccess   sealedSenderAccess = sealedSenderAccesses.get(i);
+
+      SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
+                                                               sealedSenderAccess,
+                                                               message.getTimestamp(),
+                                                               envelopeContent,
+                                                               true,
+                                                               false,
+                                                               false,
+                                                               "typing");
+
+      if (tapResult == null) {
+        remainingRecipients.add(recipient);
+        remainingSealedSenderAccess.add(sealedSenderAccess);
+      } else {
+        Log.d(TAG, "[" + message.getTimestamp() + "] Typing indicator通过TAP发送: recipient=" + recipient.getIdentifier());
+      }
+    }
+
+    if (remainingRecipients.isEmpty()) {
+      Log.d(TAG, "[" + message.getTimestamp() + "] 所有typing indicator均已通过TAP发送");
+      return;
+    }
+
+    sendMessage(remainingRecipients,
+                remainingSealedSenderAccess,
+                message.getTimestamp(),
+                envelopeContent,
+                true,
+                null,
+                cancelationSignal,
+                null,
+                false,
+                false);
   }
 
   /**
@@ -2992,6 +3055,46 @@ public class SignalServiceMessageSender {
       
     } catch (Exception e) {
       Log.e(TAG, "constructEnvelope: Failed to construct Envelope", e);
+      return null;
+    }
+  }
+
+  private SendMessageResult tryTapDeliveryForRecipient(SignalServiceAddress recipient,
+                                                       @Nullable SealedSenderAccess sealedSenderAccess,
+                                                       long timestamp,
+                                                       EnvelopeContent content,
+                                                       boolean online,
+                                                       boolean urgent,
+                                                       boolean story,
+                                                       String telemetryTag) {
+    if (tapTransport == null) {
+      return null;
+    }
+
+    if (!tapTransport.shouldUseTapForRecipient(recipient)) {
+      return null;
+    }
+
+    try {
+      OutgoingPushMessageList messages = getEncryptedMessages(recipient,
+                                                              sealedSenderAccess,
+                                                              timestamp,
+                                                              content,
+                                                              online,
+                                                              urgent,
+                                                              story);
+
+      byte[] ciphertext = extractPrimaryCiphertext(messages);
+      if (ciphertext == null) {
+        Log.w(TAG, "[" + timestamp + "] TAP delivery失败(" + telemetryTag + "): 无法提取密文");
+        return null;
+      }
+
+      SendMessageResult result = tapTransport.sendMessageViaTap(recipient, ciphertext, timestamp, urgent, online);
+      Log.d(TAG, "[" + timestamp + "] TAP delivery成功(" + telemetryTag + "): recipient=" + recipient.getIdentifier());
+      return result;
+    } catch (IOException | UntrustedIdentityException | InvalidKeyException e) {
+      Log.w(TAG, "[" + timestamp + "] TAP delivery失败(" + telemetryTag + "): " + e.getClass().getSimpleName() + ": " + e.getMessage());
       return null;
     }
   }

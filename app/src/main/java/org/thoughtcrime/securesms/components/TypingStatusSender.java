@@ -76,25 +76,6 @@ public class TypingStatusSender {
   }
 
   private void sendTyping(long threadId, boolean typingStarted) {
-    // 检查是否为Tap模式，如果是则跳过typing indicator发送
-    try {
-      org.thoughtcrime.securesms.recipients.Recipient recipient = 
-          org.thoughtcrime.securesms.database.SignalDatabase.threads().getRecipientForThreadId(threadId);
-      
-      if (recipient != null) {
-        boolean isTapMode = org.thoughtcrime.securesms.tap.integration.TapMessageSendIntegrator.Companion
-            .getInstance(org.thoughtcrime.securesms.dependencies.AppDependencies.getApplication())
-            .canUseTapForSending(recipient.getId());
-        
-        if (isTapMode) {
-          Log.d(TAG, "Tap模式：跳过typing indicator发送");
-          return;
-        }
-      }
-    } catch (Exception e) {
-      Log.w(TAG, "检查Tap模式失败，继续发送typing indicator", e);
-    }
-    
     AppDependencies.getJobManager().add(new TypingSendJob(threadId, typingStarted));
   }
 

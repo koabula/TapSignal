@@ -100,20 +100,6 @@ public class SendViewedReceiptJob extends BaseJob {
    * maximum size.
    */
   public static void enqueue(long threadId, @NonNull RecipientId recipientId, List<MarkedMessageInfo> markedMessageInfos) {
-    // 检查是否为Tap模式，如果是则跳过回执发送（避免依赖Signal Server）
-    try {
-      boolean isTapMode = org.thoughtcrime.securesms.tap.integration.TapMessageSendIntegrator.Companion
-          .getInstance(AppDependencies.getApplication())
-          .canUseTapForSending(recipientId);
-      
-      if (isTapMode) {
-        Log.i(TAG, "Tap模式：跳过已查看回执发送");
-        return;
-      }
-    } catch (Exception e) {
-      Log.w(TAG, "检查Tap模式失败，继续发送回执", e);
-    }
-    
     JobManager                    jobManager      = AppDependencies.getJobManager();
     List<List<MarkedMessageInfo>> messageIdChunks = ListUtil.chunk(markedMessageInfos, MAX_TIMESTAMPS);
 

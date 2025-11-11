@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.tap.utils.TransportIdHasher
@@ -40,6 +41,10 @@ class NotificationManager private constructor(private val context: Context) {
     
     // 协程作用域
     private val notificationScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val offlineSyncRunning = AtomicBoolean(false)
+    @Volatile
+    private var lastOfflineSyncTime: Long = 0L
     
     suspend fun initialize(provider: NotificationProvider, config: NotificationConfig): Boolean {
         return mutex.withLock {
@@ -83,7 +88,7 @@ class NotificationManager private constructor(private val context: Context) {
                 if (result.success) {
                     connectionState = ConnectionState.CONNECTED
                     Log.i(TAG, "推送服务连接成功")
-                    triggerOfflineSync()
+                    triggerOfflineSync("initial_connect")
                 } else {
                     connectionState = ConnectionState.DISCONNECTED
                     Log.e(TAG, "推送服务连接失败: ${result.errorMessage}")
@@ -139,7 +144,7 @@ class NotificationManager private constructor(private val context: Context) {
         return currentConfig
     }
     
-    private fun triggerOfflineSync() {
+    fun triggerOfflineSync(reason: String = "manual") {
         val myAci = try {
             SignalStore.account.requireAci()
         } catch (e: Exception) {
@@ -152,11 +157,25 @@ class NotificationManager private constructor(private val context: Context) {
             Log.w(TAG, "计算本端哈希失败，跳过离线同步", e)
             return
         }
+        if (!offlineSyncRunning.compareAndSet(false, true)) {
+            Log.d(TAG, "离线同步已在执行中，跳过: reason=$reason")
+            return
+        }
         notificationScope.launch {
-            val result = downloadExecutor.syncOfflineMessages(myHash)
-            Log.i(TAG, "离线消息同步完成: processed=${result.processed}, failed=${result.failed}, scanned=${result.scanned}, skipped=${result.skippedReason}")
+            try {
+                Log.i(TAG, "开始离线消息同步: reason=$reason")
+                val result = downloadExecutor.syncOfflineMessages(myHash)
+                Log.i(TAG, "离线消息同步完成: processed=${result.processed}, failed=${result.failed}, scanned=${result.scanned}, skipped=${result.skippedReason}")
+            } finally {
+                lastOfflineSyncTime = System.currentTimeMillis()
+                offlineSyncRunning.set(false)
+            }
         }
     }
+
+    fun isOfflineSyncRunning(): Boolean = offlineSyncRunning.get()
+
+    fun getLastOfflineSyncTime(): Long = lastOfflineSyncTime
     
     private fun handleNotification(notification: NotificationMessage) {
         try {

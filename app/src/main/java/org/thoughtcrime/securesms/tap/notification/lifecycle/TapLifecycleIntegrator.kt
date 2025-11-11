@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.notification.NotificationConnectionManager
+import org.thoughtcrime.securesms.tap.notification.NotificationManager
 import org.thoughtcrime.securesms.tap.notification.NotificationMessage
 import org.thoughtcrime.securesms.util.AppForegroundObserver
 
@@ -36,7 +37,7 @@ class TapLifecycleIntegrator private constructor(
     
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val connectionManager = NotificationConnectionManager.getInstance(context)
-    private val offlineHandler = NotificationOfflineHandler.getInstance(context)
+    private val notificationManager = NotificationManager.getInstance(context)
     private val networkMonitor = NotificationNetworkMonitor.getInstance(context)
     
     private var userId: String? = null
@@ -122,7 +123,7 @@ class TapLifecycleIntegrator private constructor(
                     connectionManager.onEnterForeground(currentUserId, callback)
                     
                     // 处理离线期间的消息
-                    offlineHandler.processOfflineMessages()
+                    notificationManager.triggerOfflineSync("app_foreground")
                 } catch (e: Exception) {
                     Log.e(TAG, "进入前台处理失败", e)
                 }

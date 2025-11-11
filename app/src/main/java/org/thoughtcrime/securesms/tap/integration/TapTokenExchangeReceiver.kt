@@ -10,6 +10,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
 import org.thoughtcrime.securesms.tap.TransportTokenPool
+import org.thoughtcrime.securesms.tap.TransportProvider
+import org.thoughtcrime.securesms.tap.notification.NotificationConfig
 import org.thoughtcrime.securesms.util.JsonUtils
 
 /**
@@ -54,6 +56,9 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
+                val channelVersion = resolveChannelVersion(tokenExchangeMessage)
+                val gatewayOnly = tokenExchangeMessage.isGatewayOnlyChannel()
+
                 // 2. 获取Token池实例并确保已初始化
                 val tokenPool = TransportTokenPool.getInstance(context)
                 
@@ -64,32 +69,34 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // 3. 解析并保存接收到的Token（A发给B的Token）
-                val receivedTokenData = tokenExchangeMessage.tokenData
-                val receivedToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(receivedTokenData)
-                if (receivedToken == null) {
-                    Log.e(TAG, "无法解析接收到的Token数据")
-                    return@launch
-                }
-                
-                // 使用senderAci（ACI格式）作为键，与metadata构建保持一致
-                val senderAci = tokenExchangeMessage.senderAci
+                var senderAci = tokenExchangeMessage.senderAci
                 if (senderAci.isBlank()) {
                     Log.e(TAG, "Token交换消息中缺少senderAci")
                     return@launch
                 }
-                
-                // 保存到接收Token池（使用ACI格式 - 关键修复）
-                val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
-                if (!saved) {
-                    Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
-                    return@launch
+
+                if (!gatewayOnly) {
+                    // 3. 解析并保存接收到的Token（A发给B的Token）
+                    val receivedTokenData = tokenExchangeMessage.tokenData
+                    val receivedToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(receivedTokenData)
+                    if (receivedToken == null) {
+                        Log.e(TAG, "无法解析接收到的Token数据")
+                        return@launch
+                    }
+                    
+                    val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
+                    if (!saved) {
+                        Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
+                        return@launch
+                    }
+                    
+                    Log.i(TAG, "[Token交换] B端接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
+                } else {
+                    Log.d(TAG, "Gateway-only握手，跳过接收Token保存: senderAci=$senderAci")
                 }
                 
-                Log.i(TAG, "[Token交换] B端接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
-                
                 // 4. 执行对称操作 - 生成B的Token并发送给A
-                generateAndSendResponseToken(context, senderId, tokenExchangeMessage)
+                generateAndSendResponseToken(context, senderId, tokenExchangeMessage, channelVersion)
                 
                 // 5. 关闭通知
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
@@ -117,7 +124,59 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
     /**
      * 生成B的Token并发送响应给A
      */
-    private suspend fun generateAndSendResponseToken(context: Context, senderId: String, originalMessage: TapTokenExchangeMessage) {
+    private suspend fun handleGatewayOnlyAcceptance(
+        context: Context,
+        senderId: String,
+        originalMessage: TapTokenExchangeMessage,
+        channelVersion: Int,
+        provider: TransportProvider,
+        providerConfig: Map<String, Any>
+    ) {
+        try {
+            val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+            val channel = channelManager.getOrCreateChannel(
+                recipientId = senderId,
+                providerType = originalMessage.providerType,
+                provider = provider,
+                options = org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelOptions(
+                    channelVersion = channelVersion,
+                    gatewayOnly = true
+                )
+            )
+
+            if (channel == null) {
+                Log.e(TAG, "Gateway-only通道创建失败: recipientId=$senderId")
+                return
+            }
+
+            channelManager.upgradeChannelToFullActive(
+                recipientId = senderId,
+                providerType = originalMessage.providerType,
+                options = org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
+                    channelVersion = channelVersion,
+                    gatewayOnly = true
+                )
+            )
+
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+            val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+            val localNotificationConfig = notificationConfigManager.getLocalConfig()
+            val responseMessage = buildAcceptResponse(
+                myAci = myAci,
+                originalMessage = originalMessage,
+                tokenPayload = emptyMap(),
+                providerConfig = providerConfig,
+                localNotificationConfig = localNotificationConfig,
+                channelVersion = channelVersion
+            )
+
+            sendTokenExchangeResponse(context, senderId, responseMessage)
+        } catch (e: Exception) {
+            Log.e(TAG, "Gateway-only握手处理失败", e)
+        }
+    }
+
+    private suspend fun generateAndSendResponseToken(context: Context, senderId: String, originalMessage: TapTokenExchangeMessage, channelVersion: Int) {
         try {
             Log.i(TAG, "开始生成响应Token: senderId=$senderId")
             
@@ -196,6 +255,8 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 Log.e(TAG, "无法获取Provider配置: ${originalMessage.providerType}")
                 return
             }
+            val providerConfigMap = providerConfig
+
             
             // 6. 清理旧的v2 mode状态（确保使用全新的Token和目录）
             val senderAci = originalMessage.senderAci
@@ -226,6 +287,13 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 Log.w(TAG, "B端清理旧Channel失败", e)
             }
             
+            if (originalMessage.isGatewayOnlyChannel()) {
+                handleGatewayOnlyAcceptance(context, senderId, originalMessage, channelVersion, provider, providerConfigMap)
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                notificationManager.cancel(senderId.hashCode())
+                return
+            }
+
             // 7. 为A生成专用Token
             val tokenRequest = org.thoughtcrime.securesms.tap.TransportTokenRequest(
                 recipientId = originalMessage.senderAci,
@@ -235,7 +303,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     org.thoughtcrime.securesms.tap.TransportPermission.LIST
                 ),
                 validityDurationMs = 0L, // 长期有效
-                providerConfig = providerConfig ?: emptyMap(),
+                providerConfig = providerConfigMap,
                 purpose = "v2_mode_response_token"
             )
             
@@ -319,46 +387,16 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             
             // 9. 创建响应消息
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-            
             val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
             val localNotificationConfig = notificationConfigManager.getLocalConfig()
-            
-            val responseMessage = if (localNotificationConfig != null && localNotificationConfig.validate()) {
-                Log.d(TAG, "包含Webhook配置到Token交换响应消息")
-                // P0修复: 如果metadata中没有userId，生成格式与部署时一致（16字符无连字符）
-                val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
-                    ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
-                Log.d(TAG, "[notifySecret调试] B端发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$userId")
-                val gatewayConfig = org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder.build(localNotificationConfig)
-                TapTokenExchangeMessage.createWithWebhook(
-                    senderAci = myAci,
-                    providerType = originalMessage.providerType,
-                    tokenData = generatedToken.toMap(),
-                    metadata = mapOf(
-                        "providerConfig" to providerConfig,
-                        "recipientAci" to originalMessage.senderAci,
-                        "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
-                    ),
-                    requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
-                    webhookUrl = localNotificationConfig.webhookUrl,
-                    notifySecret = localNotificationConfig.notifySecret,
-                    userId = userId,
-                    gatewayConfig = gatewayConfig
-                )
-            } else {
-                Log.d(TAG, "未配置推送服务，发送普通Token交换响应消息")
-                TapTokenExchangeMessage(
-                    senderAci = myAci,
-                    providerType = originalMessage.providerType,
-                    tokenData = generatedToken.toMap(),
-                    metadata = mapOf(
-                        "providerConfig" to providerConfig,
-                        "recipientAci" to originalMessage.senderAci,
-                        "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
-                    ),
-                    requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT
-                )
-            }
+            val responseMessage = buildAcceptResponse(
+                myAci = myAci,
+                originalMessage = originalMessage,
+                tokenPayload = generatedToken.toMap(),
+                providerConfig = providerConfigMap,
+                localNotificationConfig = localNotificationConfig,
+                channelVersion = channelVersion
+            )
             
             // 10. 发送响应消息
             sendTokenExchangeResponse(context, senderId, responseMessage)
@@ -445,4 +483,51 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             Log.e(TAG, "发送Token交换响应失败", e)
         }
     }
-} 
+
+    private fun buildAcceptResponse(
+        myAci: String,
+        originalMessage: TapTokenExchangeMessage,
+        tokenPayload: Map<String, Any>,
+        providerConfig: Map<String, Any>,
+        localNotificationConfig: NotificationConfig?,
+        channelVersion: Int
+    ): TapTokenExchangeMessage {
+        val metadata = mapOf(
+            "providerConfig" to providerConfig,
+            "recipientAci" to originalMessage.senderAci,
+            "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
+        )
+
+        return if (localNotificationConfig != null && localNotificationConfig.validate()) {
+            val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
+                ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+            Log.d(TAG, "[notifySecret调试] 发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$userId")
+            val gatewayConfig = org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder.build(localNotificationConfig)
+            TapTokenExchangeMessage.createWithWebhook(
+                senderAci = myAci,
+                providerType = originalMessage.providerType,
+                tokenData = tokenPayload,
+                metadata = metadata,
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
+                webhookUrl = localNotificationConfig.webhookUrl,
+                notifySecret = localNotificationConfig.notifySecret,
+                userId = userId,
+                gatewayConfig = gatewayConfig,
+                channelVersion = channelVersion
+            )
+        } else {
+            TapTokenExchangeMessage(
+                senderAci = myAci,
+                providerType = originalMessage.providerType,
+                tokenData = tokenPayload,
+                metadata = metadata,
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
+                channelVersion = channelVersion
+            )
+        }
+    }
+
+    private fun resolveChannelVersion(message: TapTokenExchangeMessage): Int {
+        return if (message.channelVersion <= 0) 2 else message.channelVersion
+    }
+}

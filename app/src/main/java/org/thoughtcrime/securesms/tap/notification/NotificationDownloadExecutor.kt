@@ -457,22 +457,37 @@ class NotificationDownloadExecutor(
             var processed = 0
             var failed = 0
             descriptors.forEach { descriptor ->
-                val raw = provider.downloadOfflineMessage(descriptor.key)
-                if (raw == null) {
+                var processedThisEntry = false
+                try {
+                    val raw = provider.downloadOfflineMessage(descriptor.key)
+                    if (raw == null) {
+                        failed++
+                        return@forEach
+                    }
+
+                    val notification = parseOfflineNotification(raw)
+                    if (notification == null) {
+                        failed++
+                        return@forEach
+                    }
+
+                    val result = processInlineNotification(notification, System.currentTimeMillis(), source = "offline")
+                    if (result != null && result.isSuccess) {
+                        processed += result.messagesProcessed
+                        processedThisEntry = true
+                    } else {
+                        failed++
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "处理离线消息失败: key=${descriptor.key}", e)
                     failed++
-                    return@forEach
-                }
-                val notification = parseOfflineNotification(raw)
-                if (notification == null) {
-                    failed++
-                    return@forEach
-                }
-                val result = processInlineNotification(notification, System.currentTimeMillis(), source = "offline")
-                if (result != null && result.isSuccess) {
-                    processed += result.messagesProcessed
-                    provider.deleteOfflineMessage(descriptor.key)
-                } else {
-                    failed++
+                } finally {
+                    val deleted = provider.deleteOfflineMessage(descriptor.key)
+                    if (!deleted) {
+                        Log.w(TAG, "离线消息删除失败(后续将重新清理): key=${descriptor.key}")
+                    } else if (!processedThisEntry) {
+                        Log.d(TAG, "离线消息在失败后已清理: key=${descriptor.key}")
+                    }
                 }
             }
 

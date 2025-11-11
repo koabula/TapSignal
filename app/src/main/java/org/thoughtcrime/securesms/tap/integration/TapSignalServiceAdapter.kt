@@ -69,13 +69,34 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
     @Volatile
     private var globalTimestamp: Long? = null
     private val attachmentPaths = mutableMapOf<String, AttachmentTransferDescriptor>() // attachmentId -> descriptor
+    private val attachmentIdRegistry = mutableMapOf<String, String>()
 
     private data class AttachmentTransferDescriptor(
         val remotePath: String,
         val presignedUrl: String? = null,
         val presignedExpiresAt: Long? = null
-    ) {
-        fun effectivePath(): String = presignedUrl ?: remotePath
+    )
+
+    private fun attachmentRegistryKey(attachment: Attachment): String {
+        return when (attachment) {
+            is DatabaseAttachment -> "db:${attachment.attachmentId.id}"
+            is UriAttachment -> "uri:${attachment.uri}"
+            else -> "mem:${System.identityHashCode(attachment)}"
+        }
+    }
+
+    private fun ensureAttachmentId(attachment: Attachment, indexHint: Int? = null): String {
+        val key = attachmentRegistryKey(attachment)
+        return attachmentIdRegistry.getOrPut(key) {
+            when (attachment) {
+                is DatabaseAttachment -> attachment.attachmentId.id.toString()
+                else -> {
+                    val baseId = globalMessageId ?: org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId()
+                    val suffix = indexHint?.let { "_$it" } ?: "_${System.currentTimeMillis()}"
+                    "uri_${baseId}${suffix}"
+                }
+            }
+        }
     }
     
     /**
@@ -95,6 +116,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             globalMessageId = org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId()
             globalTimestamp = System.currentTimeMillis()
             attachmentPaths.clear()
+            attachmentIdRegistry.clear()
         } else {
             // 清理发送上下文
             clearSendingContext()
@@ -109,6 +131,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         globalMessageId = null
         globalTimestamp = null
         attachmentPaths.clear()
+        attachmentIdRegistry.clear()
     }
     
     
@@ -452,10 +475,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             // 生成附件ID和文件名
-            val attachmentId = when (attachment) {
-                is DatabaseAttachment -> attachment.attachmentId.id.toString()
-                else -> "uri_${timestamp}"
-            }
+            val attachmentId = ensureAttachmentId(attachment)
             
             val fileName = attachment.fileName ?: "attachment_${attachmentId}"
             
@@ -496,7 +516,7 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             // 存储路径映射，供后续metadata使用
             attachmentPaths[attachmentId] = descriptor
             
-            Log.d(TAG, "使用通道路径构建附件路径: basePath=$basePath, descriptor=${descriptor.effectivePath()}")
+            Log.d(TAG, "使用通道路径构建附件路径: basePath=$basePath, descriptor=${descriptor.remotePath}")
             
             // 计算文件哈希
             val fileHash = try {
@@ -508,10 +528,10 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
             }
             
             // 将完整TAP通道路径编码为key
-            val keyContent = "TAP:${descriptor.effectivePath()}"
+            val keyContent = "TAP:${descriptor.remotePath}"
             val encodedKey = keyContent.toByteArray(Charsets.UTF_8)
             
-            Log.i(TAG, "TAP附件上传成功，创建AttachmentPointer: path=${descriptor.effectivePath()}, size=${attachmentData.size}")
+            Log.i(TAG, "TAP附件上传成功，创建AttachmentPointer: path=${descriptor.remotePath}, size=${attachmentData.size}")
             
             // 创建TAP专用的AttachmentPointer
             SignalServiceAttachmentPointer(
@@ -666,27 +686,12 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
         
         // 构建附件列表
         val transportAttachments = outgoingMessage.attachments.mapIndexed { index, attachment ->
-            val attachmentId = when (attachment) {
-                is DatabaseAttachment -> attachment.attachmentId.id.toString()
-                else -> "msg_${messageId}_att_${index}"
-            }
+            val attachmentId = ensureAttachmentId(attachment, index)
             
             // 使用实际上传时的路径，确保与createTapAttachmentPointer完全一致
             val descriptor = attachmentPaths[attachmentId]
-            val fullTapPath = if (descriptor != null) {
-                // 使用实际上传的路径或预签名URL
-                descriptor.effectivePath()
-            } else {
-                // 降级处理：重新构建路径（这种情况不应该发生）
-                Log.w(TAG, "未找到附件的实际上传路径，重新构建: attachmentId=$attachmentId")
-                val provider = transportManager.getEnabledProviders().firstOrNull()
-                val basePath = provider?.getSendPath(recipient.requireAci().toString(), org.thoughtcrime.securesms.tap.TransportMessageType.MEDIA_MESSAGE)
-                    ?: "/v2-channels/${recipient.requireAci()}/outbox/"
-                val fallbackTimestamp = globalTimestamp ?: System.currentTimeMillis()
-                val fallbackMessageId = globalMessageId ?: org.thoughtcrime.securesms.tap.TransportMessage.generateMessageId()
-                // 文件名格式: timestamp_messageId.dat (时间戳在前，确保COS marker字典序正确)
-                "${basePath}attachments/${fallbackTimestamp}_${fallbackMessageId}.dat"
-            }
+                ?: throw IllegalStateException("未找到附件$attachmentId 的上传描述符，无法构建TransportAttachment")
+            val fullTapPath = descriptor.remotePath
             
             org.thoughtcrime.securesms.tap.TransportAttachment(
                 attachmentId = attachmentId,

@@ -19,13 +19,16 @@ data class TapTokenExchangeMessage(
     
     @JsonProperty("metadata")
     val metadata: Map<String, Any>,
-    
+
     @JsonProperty("requestType")
     val requestType: String, // "OFFER" 或 "ACCEPT"
-    
+
     @JsonProperty("version")
     val version: Int = 1,
-    
+
+    @JsonProperty("channelVersion")
+    val channelVersion: Int = CURRENT_CHANNEL_VERSION,
+
     // 推送服务配置 (Phase 5新增)
     @JsonProperty("webhookConfig")
     val webhookConfig: Map<String, Any>? = null,
@@ -49,8 +52,10 @@ data class TapTokenExchangeMessage(
         
         // 推送服务相关消息类型 (Phase 5新增)
         const val REQUEST_TYPE_WEBHOOK_UPDATE = "WEBHOOK_UPDATE"  // Webhook配置更新
-        
+
         const val TAP_TOKEN_EXCHANGE_PREFIX = "TAP_TOKEN_EXCHANGE:"
+        const val CURRENT_CHANNEL_VERSION = 3
+        const val CHANNEL_VERSION_GATEWAY_ONLY = 3
         
         /**
          * 将Token交换消息编码为JSON字符串
@@ -104,7 +109,8 @@ data class TapTokenExchangeMessage(
             webhookUrl: String?,
             notifySecret: String?,
             userId: String?,
-            gatewayConfig: Map<String, Any>? = null
+            gatewayConfig: Map<String, Any>? = null,
+            channelVersion: Int = CURRENT_CHANNEL_VERSION
         ): TapTokenExchangeMessage {
             val webhookConfig = if (webhookUrl != null && notifySecret != null && userId != null) {
                 mapOf(
@@ -124,6 +130,7 @@ data class TapTokenExchangeMessage(
                 metadata = metadata,
                 requestType = requestType,
                 version = 1,
+                channelVersion = channelVersion,
                 webhookConfig = webhookConfig,
                 gatewayConfig = gatewayConfig
             )
@@ -145,7 +152,8 @@ data class TapTokenExchangeMessage(
             webhookUrl: String,
             notifySecret: String,
             userId: String,
-            gatewayConfig: Map<String, Any>? = null
+            gatewayConfig: Map<String, Any>? = null,
+            channelVersion: Int = CURRENT_CHANNEL_VERSION
         ): TapTokenExchangeMessage {
             return TapTokenExchangeMessage(
                 senderAci = senderAci,
@@ -157,6 +165,7 @@ data class TapTokenExchangeMessage(
                 ),
                 requestType = REQUEST_TYPE_WEBHOOK_UPDATE,
                 version = 1,
+                channelVersion = channelVersion,
                 webhookConfig = mapOf(
                     "webhookUrl" to webhookUrl,
                     "notifySecret" to notifySecret,
@@ -236,6 +245,8 @@ data class TapTokenExchangeMessage(
     }
 
     fun hasGatewayConfig(): Boolean = extractGatewayConfig() != null
+
+    fun isGatewayOnlyChannel(): Boolean = channelVersion >= CHANNEL_VERSION_GATEWAY_ONLY
 }
 
 /**

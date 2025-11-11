@@ -690,7 +690,11 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             // 先立即下载TAP附件数据
             if (transportMessage.attachments.isNotEmpty()) {
                 Log.d(TAG, "立即下载TAP附件数据: messageId=${transportMessage.messageId}, 附件数=${transportMessage.attachments.size}")
-                downloadTapAttachmentsImmediately(transportMessage, envelope.timestamp ?: System.currentTimeMillis(), envelope)
+                downloadTapAttachmentsImmediately(
+                    transportMessage = transportMessage,
+                    messageTimestamp = envelope.timestamp ?: System.currentTimeMillis(),
+                    envelope = envelope
+                )
             }
             
             // 获取原始附件列表并修复
@@ -869,10 +873,21 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             
             Log.d(TAG, "开始立即下载${transportMessage.attachments.size}个附件")
             
+            val presignedIndex = transportMessage.contentMetadata.attachmentsPresigned.associateBy { it.attachmentId }
+
             // 逐个下载附件
             for ((index, tapAttachment) in transportMessage.attachments.withIndex()) {
                 try {
-                    downloadSingleTapAttachment(provider, channel, tapAttachment, transportMessage.messageId, messageTimestamp, index, envelope)
+                    downloadSingleTapAttachment(
+                        provider = provider,
+                        channel = channel,
+                        tapAttachment = tapAttachment,
+                        messageId = transportMessage.messageId,
+                        messageTimestamp = messageTimestamp,
+                        attachmentIndex = index,
+                        envelope = envelope,
+                        presignedIndex = presignedIndex
+                    )
                 } catch (e: Exception) {
                     Log.w(TAG, "下载附件失败，继续处理其他附件: attachmentId=${tapAttachment.attachmentId}", e)
                 }
@@ -893,7 +908,8 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
         messageId: String,
         messageTimestamp: Long,
         attachmentIndex: Int,
-        envelope: Envelope
+        envelope: Envelope,
+        presignedIndex: Map<String, org.thoughtcrime.securesms.tap.TransportAttachmentPresigned>
     ) {
         try {
             // 直接使用TransportAttachment中记录的完整TAP通道路径
@@ -903,8 +919,15 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 return
             }
 
-            if (isHttpUrl(fullTapPath)) {
-                val httpData = downloadAttachmentFromUrl(fullTapPath)
+            val presigned = presignedIndex[tapAttachment.attachmentId]
+            val preferredUrl = when {
+                isHttpUrl(fullTapPath) -> fullTapPath
+                presigned != null -> presigned.url
+                else -> null
+            }
+
+            if (!preferredUrl.isNullOrBlank() && isHttpUrl(preferredUrl)) {
+                val httpData = downloadAttachmentFromUrl(preferredUrl)
                 if (httpData != null && httpData.isNotEmpty()) {
                     saveTapAttachmentData(
                         attachmentData = httpData,
@@ -912,11 +935,11 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                         messageTimestamp = messageTimestamp,
                         envelope = envelope
                     )
-                    Log.i(TAG, "通过预签名URL下载附件成功: path=$fullTapPath")
+                    Log.i(TAG, "通过预签名URL下载附件成功: path=$preferredUrl")
+                    return
                 } else {
-                    Log.w(TAG, "预签名URL下载附件失败或数据为空: path=$fullTapPath")
+                    Log.w(TAG, "预签名URL下载附件失败或数据为空: path=$preferredUrl，尝试回退到Provider")
                 }
-                return
             }
             
             // 构建FileInfo - 使用完整的TAP通道路径

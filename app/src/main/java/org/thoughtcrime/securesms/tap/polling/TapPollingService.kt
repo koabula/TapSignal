@@ -53,6 +53,8 @@ class TapPollingService(private val context: Context) {
                 INSTANCE ?: TapPollingService(context.applicationContext).also { INSTANCE = it }
             }
         }
+
+        fun isPollingEnabled(): Boolean = ENABLE_POLLING
     }
     
     // 核心依赖组件

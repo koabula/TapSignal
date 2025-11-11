@@ -67,7 +67,20 @@ class TransportChannelManager private constructor(private val context: Context) 
         private const val DEFAULT_CLEANUP_INTERVAL_MS = 60000L // 1分钟
         private const val DEFAULT_CHANNEL_TIMEOUT_MS = 300000L // 5分钟
         private const val DEFAULT_MAX_CHANNELS = 100
+
+        private const val CONFIG_KEY_CHANNEL_VERSION = "channelVersion"
+        private const val CONFIG_KEY_GATEWAY_ONLY = "gatewayOnly"
     }
+
+    data class ChannelOptions(
+        val channelVersion: Int? = null,
+        val gatewayOnly: Boolean = false
+    )
+
+    data class ChannelUpgradeOptions(
+        val channelVersion: Int? = null,
+        val gatewayOnly: Boolean = false
+    )
     
     // 通道存储和索引（内存缓存）
     private val channels = ConcurrentHashMap<String, TransportChannel>()
@@ -135,7 +148,8 @@ class TransportChannelManager private constructor(private val context: Context) 
     suspend fun establishChannel(
         recipientId: String,
         providerType: String,
-        metadata: TransportMetadata
+        metadata: TransportMetadata,
+        initialConfig: Map<String, Any?> = emptyMap()
     ): TransportChannel? {
         var channelToSave: TransportChannel? = null
         var channelIdToActivate: String? = null
@@ -170,7 +184,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                         status = TransportChannelStatus.ESTABLISHING,
                         createdAt = currentTime,
                         lastActiveAt = currentTime,
-                        priority = calculateChannelPriority(recipientId, providerType)
+                        priority = calculateChannelPriority(recipientId, providerType),
+                        config = emptyMap<String, Any>().withEntries(initialConfig)
                     )
                     
                     // 存储通道到内存
@@ -225,7 +240,8 @@ class TransportChannelManager private constructor(private val context: Context) 
     suspend fun getOrCreateChannel(
         recipientId: String,
         providerType: String,
-        provider: TransportProvider
+        provider: TransportProvider,
+        options: ChannelOptions = ChannelOptions()
     ): TransportChannel? {
         return withContext(Dispatchers.IO) {
             // ✅ 步骤1：规范化RecipientId为ACI格式，确保与内部逻辑一致
@@ -236,19 +252,26 @@ class TransportChannelManager private constructor(private val context: Context) 
             val existingChannel = getActiveChannel(normalizedRecipientId, providerType)
             if (existingChannel != null) {
                 Log.d(TAG, "使用现有通道: ${existingChannel.channelId}, 原始ID=$recipientId")
-                return@withContext existingChannel
+                val updatedChannel = existingChannel.applyChannelOptions(options)
+                if (updatedChannel !== existingChannel) {
+                    channelLock.write {
+                        channels[updatedChannel.channelId] = updatedChannel
+                    }
+                    saveChannelToDatabaseAsync(updatedChannel)
+                }
+                return@withContext updatedChannel
             }
             
             // 步骤3：创建新的元数据
             // ✅ 传入规范化ID和原始ID，确保Token操作使用正确的格式
-            val metadata = createChannelMetadata(normalizedRecipientId, recipientId, providerType, provider)
+            val metadata = createChannelMetadata(normalizedRecipientId, recipientId, providerType, provider, options.gatewayOnly)
             if (metadata == null) {
                 Log.w(TAG, "无法创建通道元数据: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, providerType=$providerType")
                 return@withContext null
             }
             
             // 步骤4：建立新通道（使用规范化ID）
-            establishChannel(normalizedRecipientId, providerType, metadata)
+            establishChannel(normalizedRecipientId, providerType, metadata, options.toConfigEntries())
         }
     }
     
@@ -689,11 +712,15 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 将通道升级为FULL_ACTIVE状态
      * 当双向Token交换完成时调用
      */
-    suspend fun upgradeChannelToFullActive(recipientId: String, providerType: String): Boolean {
+    suspend fun upgradeChannelToFullActive(
+        recipientId: String,
+        providerType: String,
+        options: ChannelUpgradeOptions = ChannelUpgradeOptions()
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             // ✅ 步骤1：规范化RecipientId为ACI格式，确保与内部逻辑一致
             val normalizedRecipientId = normalizeRecipientId(recipientId)
-            Log.d(TAG, "升级通道到FULL_ACTIVE: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, provider=$providerType")
+            Log.d(TAG, "升级通道到FULL_ACTIVE: 原始ID=$recipientId, 规范化ID=$normalizedRecipientId, provider=$providerType, options=$options")
             
             // 预先准备可能需要的metadata更新（在锁外执行）
             // ✅ 传入规范化ID和原始ID，确保Token操作使用正确的格式
@@ -703,7 +730,7 @@ class TransportChannelManager private constructor(private val context: Context) 
                     val provider = getTransportManager().getProvider(providerType)
                     val configManager = TransportProviderConfigManager.getInstance(context)
                     if (provider != null && configManager != null) {
-                        createCosChannelMetadata(normalizedRecipientId, recipientId, provider, configManager, tokenPool)
+                        createCosChannelMetadata(normalizedRecipientId, recipientId, provider, configManager, tokenPool, options.gatewayOnly)
                     } else {
                         Log.w(TAG, "无法获取provider或configManager for metadata更新")
                         null
@@ -746,10 +773,10 @@ class TransportChannelManager private constructor(private val context: Context) 
                                     status = TransportChannelStatus.FULL_ACTIVE,
                                     metadata = updatedMetadata,
                                     lastActiveAt = System.currentTimeMillis()
-                                )
+                                ).applyUpgradeOptions(options)
                             } else {
                                 // 使用原有方式升级（没有metadata更新或更新失败）
-                                channel.updateStatus(TransportChannelStatus.FULL_ACTIVE)
+                                channel.updateStatus(TransportChannelStatus.FULL_ACTIVE).applyUpgradeOptions(options)
                             }
                             
                             channels[channelId] = upgradedChannel
@@ -787,33 +814,32 @@ class TransportChannelManager private constructor(private val context: Context) 
                     saveChannelToDatabaseAsync(upgradedChannel)
                     Log.d(TAG, "通道数据库保存完成: channelId=${upgradedChannel.channelId}")
                     
-                    // 如果metadata被更新，需要重新启动轮询任务以使用新metadata
-                    if (updatedMetadata != null && upgradedChannel.metadata != null) {
-                        try {
-                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                            
-                            // 移除旧的轮询任务（使用旧metadata）
-                            pollingService.removePollingTarget(normalizedRecipientId, providerType)
-                            Log.d(TAG, "通道升级：移除旧轮询任务以更新metadata: recipientId=$normalizedRecipientId")
-                            
-                            // 用新metadata重新添加轮询任务
-                            val added = pollingService.addPollingTarget(normalizedRecipientId, upgradedChannel.metadata!!, upgradedChannel)
-                            if (added) {
-                                Log.i(TAG, "通道升级：轮询任务已更新为新metadata: recipientId=$normalizedRecipientId, newReceivePath=${upgradedChannel.metadata!!.getReceiveMetadata().path}")
-                            } else {
-                                Log.w(TAG, "通道升级：重新添加轮询任务失败: recipientId=$normalizedRecipientId")
+                    val pollingEnabled = org.thoughtcrime.securesms.tap.polling.TapPollingService.isPollingEnabled()
+                    if (pollingEnabled && !options.gatewayOnly) {
+                        if (updatedMetadata != null && upgradedChannel.metadata != null) {
+                            try {
+                                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                                pollingService.removePollingTarget(normalizedRecipientId, providerType)
+                                Log.d(TAG, "通道升级：移除旧轮询任务以更新metadata: recipientId=$normalizedRecipientId")
+                                val added = pollingService.addPollingTarget(normalizedRecipientId, upgradedChannel.metadata!!, upgradedChannel)
+                                if (added) {
+                                    Log.i(TAG, "通道升级：轮询任务已更新为新metadata: recipientId=$normalizedRecipientId, newReceivePath=${upgradedChannel.metadata!!.getReceiveMetadata().path}")
+                                } else {
+                                    Log.w(TAG, "通道升级：重新添加轮询任务失败: recipientId=$normalizedRecipientId")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "通道升级：更新轮询任务失败: channelId=${upgradedChannel.channelId}", e)
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "通道升级：更新轮询任务失败: channelId=${upgradedChannel.channelId}", e)
+                        } else {
+                            try {
+                                ensurePollingServiceRunning(normalizedRecipientId, upgradedChannel)
+                                Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}, recipientId=$normalizedRecipientId")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
+                            }
                         }
                     } else {
-                        // metadata未更新，使用原有的轮询确保逻辑
-                        try {
-                            ensurePollingServiceRunning(normalizedRecipientId, upgradedChannel)
-                            Log.d(TAG, "通道升级后轮询确保成功: channelId=${upgradedChannel.channelId}, recipientId=$normalizedRecipientId")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "确保轮询运行失败，但通道升级已完成: channelId=${upgradedChannel.channelId}", e)
-                        }
+                        Log.d(TAG, "轮询已禁用或通道为Gateway-only，跳过轮询任务更新: recipientId=$normalizedRecipientId")
                     }
                     
                     return@withContext true
@@ -1469,7 +1495,8 @@ class TransportChannelManager private constructor(private val context: Context) 
         normalizedRecipientId: String,
         originalRecipientId: String,
         providerType: String,
-        provider: TransportProvider
+        provider: TransportProvider,
+        gatewayOnly: Boolean
     ): TransportMetadata? {
         return try {
             Log.d(TAG, "创建通道元数据: normalizedId=$normalizedRecipientId, originalId=$originalRecipientId, providerType=$providerType")
@@ -1479,7 +1506,7 @@ class TransportChannelManager private constructor(private val context: Context) 
             val tokenPool = TransportTokenPool.getInstance(context)
             
             val metadata = when (providerType) {
-                "cos" -> createCosChannelMetadata(normalizedRecipientId, originalRecipientId, provider, configManager, tokenPool)
+                "cos" -> createCosChannelMetadata(normalizedRecipientId, originalRecipientId, provider, configManager, tokenPool, gatewayOnly)
                 else -> createGenericChannelMetadata(normalizedRecipientId, providerType, provider, configManager, tokenPool)
             }
             
@@ -1506,6 +1533,49 @@ class TransportChannelManager private constructor(private val context: Context) 
                 null
             }
         }
+    }
+
+    private fun Map<String, Any>.withEntries(entries: Map<String, Any?>): Map<String, Any> {
+        if (entries.isEmpty()) return this
+        val merged = this.toMutableMap()
+        entries.forEach { (key, value) ->
+            if (value == null) {
+                merged.remove(key)
+            } else {
+                merged[key] = value
+            }
+        }
+        return merged
+    }
+
+    private fun ChannelOptions.toConfigEntries(): Map<String, Any?> {
+        val map = mutableMapOf<String, Any?>()
+        channelVersion?.let { map[CONFIG_KEY_CHANNEL_VERSION] = it }
+        if (gatewayOnly) {
+            map[CONFIG_KEY_GATEWAY_ONLY] = true
+        }
+        return map
+    }
+
+    private fun ChannelUpgradeOptions.toConfigEntries(): Map<String, Any?> {
+        val map = mutableMapOf<String, Any?>()
+        channelVersion?.let { map[CONFIG_KEY_CHANNEL_VERSION] = it }
+        if (gatewayOnly) {
+            map[CONFIG_KEY_GATEWAY_ONLY] = true
+        }
+        return map
+    }
+
+    private fun TransportChannel.applyChannelOptions(options: ChannelOptions): TransportChannel {
+        val entries = options.toConfigEntries()
+        if (entries.isEmpty()) return this
+        return copy(config = config.withEntries(entries))
+    }
+
+    private fun TransportChannel.applyUpgradeOptions(options: ChannelUpgradeOptions): TransportChannel {
+        val entries = options.toConfigEntries()
+        if (entries.isEmpty()) return this
+        return copy(config = config.withEntries(entries))
     }
     
     /**
@@ -1572,7 +1642,8 @@ class TransportChannelManager private constructor(private val context: Context) 
         originalRecipientId: String,
         provider: TransportProvider,
         configManager: TransportProviderConfigManager,
-        tokenPool: TransportTokenPool
+        tokenPool: TransportTokenPool,
+        gatewayOnly: Boolean
     ): org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata? {
         // 1. 获取本端COS配置
         val myProviderConfig = configManager.getProviderConfig("cos")
@@ -1619,7 +1690,9 @@ class TransportChannelManager private constructor(private val context: Context) 
         
         // 5. 获取或复用已有的本端Token供对方使用
         // 优先复用已有Token，避免在通道升级时重新生成导致路径不一致
-        val sharedTokenForPeer = run {
+        val sharedTokenForPeer = if (gatewayOnly) {
+            null
+        } else run {
             // 先检查是否已有有效的sharedToken
             val existingToken = tokenPool.getValidSharedToken(recipientAci, "cos")
             

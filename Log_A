@@ -1,71 +1,93 @@
---------- beginning of main
---------- beginning of system
-2025-11-11 14:58:06.044 24950-24990 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1762844286040 | timestamp=1762844286040
-2025-11-11 14:58:06.150 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::8
-2025-11-11 14:58:06.156 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
-2025-11-11 14:58:06.156 24950-24990 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
-2025-11-11 14:58:06.190 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::8
-2025-11-11 14:58:06.206 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::8, providers=1
-2025-11-11 14:58:06.206 24950-24990 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=5825
-2025-11-11 14:58:06.207 24950-24990 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=5825, recipient=RecipientId::8
-2025-11-11 14:58:06.209 24950-24990 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=5825
-2025-11-11 14:58:06.211 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=5825, recipient=RecipientId::8
-2025-11-11 14:58:06.216 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=5825
-2025-11-11 14:58:06.219 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=5825
-2025-11-11 14:58:06.220 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=5825, recipient=RecipientId::8
-2025-11-11 14:58:06.221 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientId=RecipientId::8, recipientAci=********-****-****-****-*********973
-2025-11-11 14:58:06.229 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：1个FULL_ACTIVE通道，1个匹配Provider, recipientId=RecipientId::8
-2025-11-11 14:58:06.229 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=0, 附件数=1
-2025-11-11 14:58:06.936 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP附件上传成功: path=/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_********-****-****-****-*********c76.dat, size=6341
-2025-11-11 14:58:06.937 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用通道路径构建附件路径: basePath=/v2-channels/053abb43f297ee1d_1762844224594/outbox/, descriptor=https://signaltest3.s3.ap-southeast-1.***.com/***
-2025-11-11 14:58:06.938 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP附件上传成功，创建AttachmentPointer: path=https://signaltest3.s3.ap-southeast-1.***.com/*** size=6341
-2025-11-11 14:58:06.939 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********973
-2025-11-11 14:58:06.946 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=186
-2025-11-11 14:58:06.947 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=5825, ciphertextLength=186
-2025-11-11 14:58:06.948 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1762844286040 | timestamp=1762844286946
-2025-11-11 14:58:06.949 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********040
-2025-11-11 14:58:06.950 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
-2025-11-11 14:58:06.951 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
-2025-11-11 14:58:06.951 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
-2025-11-11 14:58:06.951 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
-2025-11-11 14:58:06.963 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=1
-2025-11-11 14:58:06.963 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********973_cos_1762844230553, status=FULL_ACTIVE, provider=cos
-2025-11-11 14:58:06.964 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查开始 =====
-2025-11-11 14:58:06.964 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查recipientAci: ********-****-****-****-*********973, 通道数: 1
-2025-11-11 14:58:06.965 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********973_cos_1762844230553, provider=cos
-2025-11-11 14:58:06.965 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762844235517-3819-1762844235517, type=CosTransportToken
-2025-11-11 14:58:06.965 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762844224594-4100-1762844224594, type=CosTransportToken
-2025-11-11 14:58:06.970 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
-2025-11-11 14:58:06.970 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查结束 =====
-2025-11-11 14:58:07.655 24950-24990 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********973_cos_1762844230553
-2025-11-11 14:58:07.656 24950-24990 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
-2025-11-11 14:58:07.667 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********040
-2025-11-11 14:58:07.668 24950-24990 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=5825
-2025-11-11 14:58:07.668 24950-24990 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=5825, path=null
-2025-11-11 14:58:07.668 24950-24990 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=5825, method=TAP_TRANSPORT, path=unknown
---------- beginning of kernel
-
-
---------- beginning of main
---------- beginning of system
-2025-11-11 14:58:06.236 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-11 14:58:06.237 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-11 14:58:06.237 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-11 14:58:06.238 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-11 14:58:06.238 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-11 14:58:06.240 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-11 14:58:06.240 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  ===== 上传文件操作 =====
-2025-11-11 14:58:06.241 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  本地文件: /data/user/0/org.thoughtcrime.securesms/cache/cos_upload_405803644201502386.dat
-2025-11-11 14:58:06.241 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  文件大小: 6341 bytes
-2025-11-11 14:58:06.243 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  原始路径: /v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_********-****-****-****-*********c76.dat
-2025-11-11 14:58:06.244 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  标准化路径: v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_********-****-****-****-*********c76.dat
-2025-11-11 14:58:06.245 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  目标存储桶: signaltest3
-2025-11-11 14:58:06.245 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  发送PutObject请求...
-2025-11-11 14:58:06.246 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-11 14:58:06.246 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-11 14:58:06.247 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-11 14:58:06.248 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-11 14:58:06.931 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  ✓ 上传文件成功
-2025-11-11 14:58:06.931 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D    - ETag: "087656c49c5b9e8654bf21133b36b8b1"
-2025-11-11 14:58:06.932 24950-24990 AwsS3Client             org.thoughtcrime.securesms           D  ===== 操作完成 =====
---------- beginning of kernel
+2025-11-11 18:02:37.561  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=706.9707, y[0]=1830.9082, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=93370430, downTime=93370430, deviceId=4, source=0x5002, displayId=0, eventId=80349250 }
+2025-11-11 18:02:37.637  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=706.9707, y[0]=1830.9082, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=93370507, downTime=93370430, deviceId=4, source=0x5002, displayId=0, eventId=925436924 }
+2025-11-11 18:02:37.764 26579-26614 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForRecipient: recipient=********-****-****-****-*********461, hasPrivateChannel=true
+2025-11-11 18:02:37.767 26579-26614 TapMessageTransportImpl org.thoughtcrime.securesms           E  ========================================
+                                                                                                    TapMessageTransportImpl.sendMessageViaTap() 已废弃
+                                                                                                    ========================================
+                                                                                                    私聊消息应该通过以下路径发送：
+                                                                                                    IndividualSendJob 
+                                                                                                      → TapMessageSendIntegrator
+                                                                                                        → TapSignalServiceAdapter.sendWithSignalEncryption()
+                                                                                                    
+                                                                                                    如果调用到此方法，说明：
+                                                                                                    1. 某处代码仍在使用旧的发送路径
+                                                                                                    2. 可能导致密文版本不正确（version 1 错误）
+                                                                                                    
+                                                                                                    请检查调用栈，找到调用此方法的位置并修复
+                                                                                                    ========================================
+                                                                                                    recipient: ********-****-****-****-*********461
+                                                                                                    ciphertextSize: 615
+                                                                                                    timestamp: 1762855357675
+                                                                                                    ========================================
+2025-11-11 18:02:37.770 26579-26614 SignalServ...sageSender org.thoughtcrime.securesms           W  [1762855357675] TAP delivery失败(typing): IOException: ========================================
+                                                                                                    TapMessageTransportImpl.sendMessageViaTap() 已废弃
+                                                                                                    ========================================
+                                                                                                    私聊消息应该通过以下路径发送：
+                                                                                                    IndividualSendJob 
+                                                                                                      → TapMessageSendIntegrator
+                                                                                                        → TapSignalServiceAdapter.sendWithSignalEncryption()
+                                                                                                    
+                                                                                                    如果调用到此方法，说明：
+                                                                                                    1. 某处代码仍在使用旧的发送路径
+                                                                                                    2. 可能导致密文版本不正确（version 1 错误）
+                                                                                                    
+                                                                                                    请检查调用栈，找到调用此方法的位置并修复
+                                                                                                    ========================================
+                                                                                                    recipient: ********-****-****-****-*********461
+                                                                                                    ciphertextSize: 615
+                                                                                                    timestamp: 1762855357675
+                                                                                                    ========================================
+2025-11-11 18:02:39.700  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=998.9541, y[0]=1434.8877, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=93372568, downTime=93372568, deviceId=4, source=0x5002, displayId=0, eventId=966555486 }
+2025-11-11 18:02:39.765  1088-1088  TaplEvents              com...le.android.apps.nexuslauncher  D  TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=998.9541, y[0]=1434.8877, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=93372634, downTime=93372568, deviceId=4, source=0x5002, displayId=0, eventId=869034435 }
+2025-11-11 18:02:39.871 26579-26614 ConversationRepository  org.thoughtcrime.securesms           D  [TapTimeTest] T1_SEND_START | msgId=1762855359861 | timestamp=1762855359861
+2025-11-11 18:02:40.043 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-11 18:02:40.111 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-11 18:02:40.112 26579-26614 IndividualSendJob       org.thoughtcrime.securesms           I  Tap模式：跳过附件CDN上传，附件将通过Tap层传输
+2025-11-11 18:02:40.412 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
+2025-11-11 18:02:40.482 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
+2025-11-11 18:02:40.482 26579-26614 IndividualSendJob       org.thoughtcrime.securesms           I  检测到Tap v2通道，通过Tap传输层发送: messageId=5426
+2025-11-11 18:02:40.483 26579-26614 IndividualSendJob       org.thoughtcrime.securesms           I  开始Tap传输层集成发送: messageId=5426, recipient=RecipientId::4
+2025-11-11 18:02:40.483 26579-26614 IndividualSendJob       org.thoughtcrime.securesms           I  使用Tap传输层发送消息: messageId=5426
+2025-11-11 18:02:40.483 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  发送消息: messageId=5426, recipient=RecipientId::4
+2025-11-11 18:02:40.523 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  使用Tap传输层发送: messageId=5426
+2025-11-11 18:02:40.524 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  执行Tap传输层发送: messageId=5426
+2025-11-11 18:02:40.531 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           I  开始Signal加密+Tap传输: messageId=5426, recipient=RecipientId::4
+2025-11-11 18:02:40.532 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  发送前状态验证和同步: recipientId=RecipientId::4, recipientAci=********-****-****-****-*********461
+2025-11-11 18:02:40.577 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           I  发送前状态验证通过：2个FULL_ACTIVE通道，1个匹配Provider, recipientId=RecipientId::4
+2025-11-11 18:02:40.583 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  构建Signal数据消息: body长度=3, 附件数=0
+2025-11-11 18:02:40.588 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  使用Signal加密消息: address=********-****-****-****-*********461
+2025-11-11 18:02:40.603 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密完成: type=2, size=106
+2025-11-11 18:02:40.603 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Signal加密成功: messageId=5426, ciphertextLength=106
+2025-11-11 18:02:40.610 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  [TapTimeTest] T2_ENCRYPT_END | msgId=1762855359861 | timestamp=1762855360604
+2025-11-11 18:02:40.626 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  通过TAP传输层发送: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:40.627 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  开始路由消息，进行详细诊断
+2025-11-11 18:02:40.629 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 可用providers=1, 启用providers=1
+2025-11-11 18:02:40.632 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  可用provider: cos - 云对象存储 (COS)
+2025-11-11 18:02:40.634 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  启用provider: cos - 云对象存储 (COS)
+2025-11-11 18:02:40.676 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  路由诊断: 活跃通道数=2
+2025-11-11 18:02:40.676 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1762237487686, status=FULL_ACTIVE, provider=cos
+2025-11-11 18:02:40.679 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  活跃通道: ch_********-****-****-****-*********461_cos_1762841715771, status=FULL_ACTIVE, provider=cos
+2025-11-11 18:02:40.711 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查开始 =====
+2025-11-11 18:02:40.731 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查recipientAci: ********-****-****-****-*********461, 通道数: 2
+2025-11-11 18:02:40.794 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********461_cos_1762237487686, provider=cos
+2025-11-11 18:02:40.794 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762849186421-6086-1762849186421, type=CosTransportToken
+2025-11-11 18:02:40.843 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762849409840-7827-1762849409840, type=CosTransportToken
+2025-11-11 18:02:40.844 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-11-11 18:02:40.846 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  检查通道: ch_********-****-****-****-*********461_cos_1762841715771, provider=cos
+2025-11-11 18:02:40.847 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ receivedToken存在: tokenId=cos-signal-cos-signal-v2-1762849186421-6086-1762849186421, type=CosTransportToken
+2025-11-11 18:02:40.847 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D    ✓ sharedToken存在: tokenId=cos-signal-cos-signal-v2-1762849409840-7827-1762849409840, type=CosTransportToken
+2025-11-11 18:02:40.851 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  Token状态检查: provider=cos, hasReceived=true, hasShared=true
+2025-11-11 18:02:40.855 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           D  ===== Token状态详细检查结束 =====
+2025-11-11 18:02:42.446 26579-26614 AwsTapLambdaDispatcher  org.thoughtcrime.securesms           I  发现触发函数: tap-notification-trigger-c503ec6d
+2025-11-11 18:02:44.525 26579-26614 TapTransportChannelTabl org.thoughtcrime.securesms           D  通道保存成功 (独立数据库): ch_********-****-****-****-*********461_cos_1762237487686
+2025-11-11 18:02:44.526 26579-26614 TapDatabaseManager      org.thoughtcrime.securesms           V  TAP数据库事务执行成功
+2025-11-11 18:02:44.552 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP路由成功: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:44.553 26579-26614 TapSignalServiceAdapter org.thoughtcrime.securesms           I  TAP传输成功: messageId=5426
+2025-11-11 18:02:44.554 26579-26614 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层发送成功: messageId=5426, path=null
+2025-11-11 18:02:44.557 26579-26614 IndividualSendJob       org.thoughtcrime.securesms           I  Tap传输层集成发送成功: messageId=5426, method=TAP_TRANSPORT, path=unknown
+2025-11-11 18:02:44.943 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-11 18:02:44.987 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=true
+2025-11-11 18:02:45.174 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  更新Tap v2指示器状态: recipientAci=5a806149-3...
+2025-11-11 18:02:45.202 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道查询结果: hasActiveChannel=true
+2025-11-11 18:02:45.247 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  显示Tap v2指示器: status=FULL_ACTIVE, provider=cos
+2025-11-11 18:02:45.261 26579-26614 TapV2ModeIndicator      org.thoughtcrime.securesms           D  通道状态更新被取消

@@ -1,13 +1,14 @@
 --------- beginning of main
+--------- beginning of kernel
 --------- beginning of system
-2025-11-11 14:58:07.508 20772-22958 AwsWebSocketClient      org.thoughtcrime.securesms           D  Received WebSocket message: {"type":"new_message","senderId":"053abb43f297ee1d","timestamp":1762844289518,"metadata":{"delivery":"direct","traceId":"d1e9c1a1-18d6-4848-8fd7-42f4e5fc3b1d","recipientHash":"a3adde1ba3b08264","userId":"4edef74e3ea34e0b","message":{"version":"1.0","messageId":"076cc487-cfae-4fff-9954-50122902c040","timestamp":1762844286040,"senderId":"5a806149-30d0-412a-90d2-9412a40ee461","recipientId":"c716a84d-2fbd-4598-8bc3-b12cbba41973","messageType":"text","signalCiphertext":"RAohBWgb++Z76k4NYJ4OhjttvQXhF0Kb3ljPnxZy5Mvlg6gFEAMYAyJgea2lszrMidGgVgQS3j4fPzyDQKvYnkFDX9+75N3bTmyd/7Ztr5cIFvoTQwcicWOX3+50YHqD1Tcnb4ZLQcVe2QWrBwa5FK6C+jPGl3emQ3PVodXNZNpcZ6f8pssSMbs9KiYBoQMMBQWW4zfydxxqSiEo2jnoYEXpL+U2cINx30lkwA3L232LxbwMEAUgLoIU","signalCiphertextType":2,"contentMetadata":{"originalSize":186,"compressionType":"none","encryptionAlgorithm":"signal-protocol","sourceDeviceId":1,"isSessionCipherEncrypted":true,"deliveryChannel":"tap-websocket","attachmentsPresigned":[{"attachmentId":"64","url":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","expiresAt":1764053886933}],"gatewayFailoverHints":null},"attachments":[{"attachmentId":"64","fileName":"attachment_64","mimeType":"audio/aac","size":6341,"fileHash":null,"transportPath":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","encryptedData":""}],"encryptedContent":"RAohBWgb++Z76k4NYJ4OhjttvQXhF0Kb3ljPnxZy5Mvlg6gFEAMYAyJgea2lszrMidGgVgQS3j4fPzyDQKvYnkFDX9+75N3bTmyd/7Ztr5cIFvoTQwcicWOX3+50YHqD1Tcnb4ZLQcVe2QWrBwa5FK6C+jPGl3emQ3PVodXNZNpcZ6f8pssSMbs9KiYBoQMMBQWW4zfydxxqSiEo2jnoYEXpL+U2cINx30lkwA3L232LxbwMEAUgLoIU"},"attachmentsPresigned":[{"attachmentId":"64","url":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","expiresAt":1764053886933}],"deliveryHint":{"channel":"websocket","fallback":"s3-offline"}}}
-2025-11-11 14:58:07.511 20772-22958 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762844289518 | timestamp=1762844287511
-2025-11-11 14:58:07.523 20772-20808 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=053abb43f297ee1d
-2025-11-11 14:58:07.526 20772-20808 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=053abb43f297ee1d
-2025-11-11 14:58:07.535 20772-20808 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********040, type=TEXT_MESSAGE
-2025-11-11 14:58:07.538 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********040
-2025-11-11 14:58:07.543 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********040
-2025-11-11 14:58:07.545 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
+2025-11-11 18:02:44.492 30552-30653 AwsWebSocketClient      org.thoughtcrime.securesms           D  Received WebSocket message: {"type":"new_message","senderId":"a3adde1ba3b08264","timestamp":1762855365564,"metadata":{"delivery":"direct","traceId":"21efc377-83a3-4f11-8758-c9d158257e1e","recipientHash":"053abb43f297ee1d","userId":"68cb8b1173f64b8e","message":{"version":"1.0","messageId":"7588364b-ce0b-4db0-a620-5583bf53f6f0","timestamp":1762855359861,"senderId":"c716a84d-2fbd-4598-8bc3-b12cbba41973","recipientId":"5a806149-30d0-412a-90d2-9412a40ee461","messageType":"text","signalCiphertext":"RAohBV7VvBwBnDxLURF8yEa1UeTOdmDhK4+9h5dpaul76mQUEA0YBSIQBl6r4/kB+zjiCvOlVrpfdComAbwEEwUN3dd/MuPpVwVfnNtNXICDNRkeKyMDxfo1lu7a8I/DvffdK+H7BD7wkA==","signalCiphertextType":2,"contentMetadata":{"originalSize":106,"compressionType":"none","encryptionAlgorithm":"signal-protocol","sourceDeviceId":1,"isSessionCipherEncrypted":true,"deliveryChannel":"tap-websocket","attachmentsPresigned":[],"gatewayFailoverHints":null},"attachments":[],"encryptedContent":"RAohBV7VvBwBnDxLURF8yEa1UeTOdmDhK4+9h5dpaul76mQUEA0YBSIQBl6r4/kB+zjiCvOlVrpfdComAbwEEwUN3dd/MuPpVwVfnNtNXICDNRkeKyMDxfo1lu7a8I/DvffdK+H7BD7wkA=="},"attachmentsPresigned":[],"deliveryHint":{"channel":"websocket","fallback":"s3-offline"}}}
+2025-11-11 18:02:44.494 30552-30653 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762855365564 | timestamp=1762855364494
+2025-11-11 18:02:44.504 30552-30586 TapModuleInitializer    org.thoughtcrime.securesms           D  收到推送通知: type=new_message, senderId=a3adde1ba3b08264
+2025-11-11 18:02:44.505 30552-30586 TapModuleInitializer    org.thoughtcrime.securesms           I  收到新消息推送通知: senderId=a3adde1ba3b08264
+2025-11-11 18:02:44.602 30552-30586 TapMessageProcessor     org.thoughtcrime.securesms           I  处理Tap传输消息: messageId=********-****-****-****-*********6f0, type=TEXT_MESSAGE
+2025-11-11 18:02:44.604 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  开始处理加密传输消息: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:44.609 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  转换TransportMessage为Envelope: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:44.614 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  无法反序列化为Envelope，可能是旧格式，尝试手动构造
                                                                                                     java.net.ProtocolException: Unexpected end group
                                                                                                     	at com.squareup.wire.ProtoReader.nextTag(ProtoReader.kt:152)
                                                                                                     	at org.whispersystems.signalservice.internal.push.Envelope$Companion$ADAPTER$1.decode(Envelope.kt:552)
@@ -27,7 +28,7 @@
                                                                                                     	at org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.processTapTransportMessage(TapMessageProcessor.kt:165)
                                                                                                     	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.processInlineNotification(NotificationDownloadExecutor.kt:269)
                                                                                                     	at org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor.executeDirectDownload(NotificationDownloadExecutor.kt:69)
-                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationManager$handleNewMessageNotification$1.invokeSuspend(NotificationManager.kt:208)
+                                                                                                    	at org.thoughtcrime.securesms.tap.notification.NotificationManager$handleNewMessageNotification$1.invokeSuspend(NotificationManager.kt:227)
                                                                                                     	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
                                                                                                     	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
                                                                                                     	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
@@ -36,147 +37,54 @@
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
                                                                                                     	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-2025-11-11 14:58:07.546 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********040
-2025-11-11 14:58:07.546 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
-2025-11-11 14:58:07.547 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
-2025-11-11 14:58:07.547 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
-2025-11-11 14:58:07.548 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********040, type=CIPHERTEXT
-2025-11-11 14:58:07.548 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
-2025-11-11 14:58:07.548 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
-2025-11-11 14:58:07.557 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1762844286040, type=CIPHERTEXT
-2025-11-11 14:58:07.562 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1762844286040
-2025-11-11 14:58:07.563 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到TAP附件，修复AttachmentPointer: messageId=********-****-****-****-*********040, 附件数=1
-2025-11-11 14:58:07.563 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  开始修复AttachmentPointer: messageId=********-****-****-****-*********040
-2025-11-11 14:58:07.564 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  立即下载TAP附件数据: messageId=********-****-****-****-*********040, 附件数=1
-2025-11-11 14:58:07.570 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  开始立即下载1个附件
-2025-11-11 14:58:08.189 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  预签名URL请求失败: code=400
-2025-11-11 14:58:08.191 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           W  预签名URL下载附件失败或数据为空: path=https://signaltest3.s3.ap-southeast-1.***.com/***
-2025-11-11 14:58:08.194 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  修复TAP附件指针: fileName=attachment_64, contentType=audio/aac, size=6341, cdnKey=tap_64_attachment_64
-2025-11-11 14:58:08.196 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  修复附件指针 #0: cdnNumber=999, key长度=447
-2025-11-11 14:58:08.197 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  TAP附件修复完成: messageId=********-****-****-****-*********040, 修复附件数=1
-2025-11-11 14:58:08.197 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1762844286040
-2025-11-11 14:58:08.382 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           D  检查附件类型: attachmentId=AttachmentId::69, cdnNumber=999, fileName=attachment_64, isTapAttachment=true (CDN 999)
-2025-11-11 14:58:08.383 20772-20808 AttachmentDownloadJob   org.thoughtcrime.securesms           I  检测到Tap附件，使用Tap下载机制: attachmentId=AttachmentId::69
-2025-11-11 14:58:08.383 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           I  开始下载Tap附件: messageId=5370, attachmentId=AttachmentId::69
-2025-11-11 14:58:08.417 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           D  未找到预下载附件文件: /data/user/0/org.thoughtcrime.securesms/cache/tap_attachments/1955689583_1762844286197_********-****-****-****-*********c76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=*************************************************************256
-2025-11-11 14:58:08.423 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           W  未找到预下载数据，使用降级下载: attachmentId=AttachmentId::69
-2025-11-11 14:58:08.439 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1762844286040
-2025-11-11 14:58:08.440 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           D  从CDN 999附件key解析路径: attachmentId=AttachmentId::69, path=https://signaltest3.s3.ap-southeast-1.***.com/***
-2025-11-11 14:58:08.530 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********040
-2025-11-11 14:58:08.530 20772-20808 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1762844286040 | timestamp=1762844288527
-2025-11-11 14:58:08.531 20772-20808 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********040
-2025-11-11 14:58:08.868 20772-20808 TapMessageSendIntegrato org.thoughtcrime.securesms           D  检查Tap传输层可用性: recipientId=RecipientId::4
-2025-11-11 14:58:08.887 20772-20808 TapMessageSendIntegrato org.thoughtcrime.securesms           I  Tap传输层可用: recipientId=RecipientId::4, providers=1
-2025-11-11 14:58:08.888 20772-20808 SendReadReceiptJob      org.thoughtcrime.securesms           I  Tap模式：跳过已读回执发送
-2025-11-11 14:58:09.923 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           W  未找到匹配的附件消息: senderId=********-****-****-****-*********461, path=https://signaltest3.s3.ap-southeast-1.***.com/***
-2025-11-11 14:58:09.923 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           W  Tap附件下载失败: attachmentId=AttachmentId::69
-2025-11-11 14:58:09.923 20772-20808 AttachmentDownloadJob   org.thoughtcrime.securesms           E  Tap附件下载失败，标记为失败: attachmentId=AttachmentId::69
---------- beginning of kernel
-
-
---------- beginning of main
---------- beginning of system
-2025-11-11 14:58:07.508 20772-22958 AwsWebSocketClient      org.thoughtcrime.securesms           D  Received WebSocket message: {"type":"new_message","senderId":"053abb43f297ee1d","timestamp":1762844289518,"metadata":{"delivery":"direct","traceId":"d1e9c1a1-18d6-4848-8fd7-42f4e5fc3b1d","recipientHash":"a3adde1ba3b08264","userId":"4edef74e3ea34e0b","message":{"version":"1.0","messageId":"076cc487-cfae-4fff-9954-50122902c040","timestamp":1762844286040,"senderId":"5a806149-30d0-412a-90d2-9412a40ee461","recipientId":"c716a84d-2fbd-4598-8bc3-b12cbba41973","messageType":"text","signalCiphertext":"RAohBWgb++Z76k4NYJ4OhjttvQXhF0Kb3ljPnxZy5Mvlg6gFEAMYAyJgea2lszrMidGgVgQS3j4fPzyDQKvYnkFDX9+75N3bTmyd/7Ztr5cIFvoTQwcicWOX3+50YHqD1Tcnb4ZLQcVe2QWrBwa5FK6C+jPGl3emQ3PVodXNZNpcZ6f8pssSMbs9KiYBoQMMBQWW4zfydxxqSiEo2jnoYEXpL+U2cINx30lkwA3L232LxbwMEAUgLoIU","signalCiphertextType":2,"contentMetadata":{"originalSize":186,"compressionType":"none","encryptionAlgorithm":"signal-protocol","sourceDeviceId":1,"isSessionCipherEncrypted":true,"deliveryChannel":"tap-websocket","attachmentsPresigned":[{"attachmentId":"64","url":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","expiresAt":1764053886933}],"gatewayFailoverHints":null},"attachments":[{"attachmentId":"64","fileName":"attachment_64","mimeType":"audio/aac","size":6341,"fileHash":null,"transportPath":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","encryptedData":""}],"encryptedContent":"RAohBWgb++Z76k4NYJ4OhjttvQXhF0Kb3ljPnxZy5Mvlg6gFEAMYAyJgea2lszrMidGgVgQS3j4fPzyDQKvYnkFDX9+75N3bTmyd/7Ztr5cIFvoTQwcicWOX3+50YHqD1Tcnb4ZLQcVe2QWrBwa5FK6C+jPGl3emQ3PVodXNZNpcZ6f8pssSMbs9KiYBoQMMBQWW4zfydxxqSiEo2jnoYEXpL+U2cINx30lkwA3L232LxbwMEAUgLoIU"},"attachmentsPresigned":[{"attachmentId":"64","url":"https://signaltest3.s3.ap-southeast-1.amazonaws.com/v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/1762844286197_8428a749-2c40-4f9c-a1ea-fdb99775fc76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=2c7fb26387552bdbfe439dde402e16937a2253d56c5478aa5e2b1388a3eee256","expiresAt":1764053886933}],"deliveryHint":{"channel":"websocket","fallback":"s3-offline"}}}
-2025-11-11 14:58:07.511 20772-22958 AwsWebSocketClient      org.thoughtcrime.securesms           D  [TapTimeTest] T4_PUSH_RECEIVED | msgId=1762844289518 | timestamp=1762844287511
-2025-11-11 14:58:07.513 20772-20850 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Received notification: type=new_message, senderId=053abb43f297ee1d
-2025-11-11 14:58:07.514 20772-20850 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Invoking notification callback for message: type=new_message
-2025-11-11 14:58:07.516 20772-20850 AwsApiGatewayProvider   org.thoughtcrime.securesms           D  Notification callback invoked successfully
-2025-11-11 14:58:08.417 20772-20808 TapAttachmentDownloadIn org.thoughtcrime.securesms           D  未找到预下载附件文件: /data/user/0/org.thoughtcrime.securesms/cache/tap_attachments/1955689583_1762844286197_********-****-****-****-*********c76.dat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARHWA256DYVIYYJGZ%2F20251111%2Fap-southeast-1%2Fs3%2Faws4_request&X-Amz-Date=20251111T065806Z&X-Amz-Expires=1209600&X-Amz-SignedHeaders=host&X-Amz-Signature=*************************************************************256
-2025-11-11 14:58:08.478 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-11 14:58:08.479 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-11 14:58:08.482 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-11 14:58:08.484 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-11 14:58:08.485 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-11 14:58:08.486 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-11 14:58:08.488 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  列举文件 - 路径: /v2-channels/053abb43f297ee1d_1762844224594/outbox/messages/, 前缀: v2-channels/053abb43f297ee1d_1762844224594/outbox/messages/
-2025-11-11 14:58:08.494 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-11 14:58:08.495 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-11 14:58:08.497 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-11 14:58:08.498 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-11 14:58:09.198 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  列举文件成功: 1个
-2025-11-11 14:58:09.200 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  ===== AWS S3客户端初始化 =====
-2025-11-11 14:58:09.201 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  区域: ap-southeast-1
-2025-11-11 14:58:09.201 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  存储桶: signaltest3
-2025-11-11 14:58:09.201 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  AccessKeyId前缀: AKIARHWA***
-2025-11-11 14:58:09.201 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  使用凭证类型: 永久凭证
-2025-11-11 14:58:09.202 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  ===== 初始化完成 =====
-2025-11-11 14:58:09.202 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  列举文件 - 路径: /v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/, 前缀: v2-channels/053abb43f297ee1d_1762844224594/outbox/attachments/
-2025-11-11 14:58:09.205 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  AWS凭证提供者 - 解析凭证
-2025-11-11 14:58:09.205 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - AccessKeyId: AKIARHWA***
-2025-11-11 14:58:09.205 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - SecretKey长度: 40
-2025-11-11 14:58:09.206 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D    - SessionToken: 无
-2025-11-11 14:58:09.906 20772-20808 AwsS3Client             org.thoughtcrime.securesms           D  列举文件成功: 2个
---------- beginning of kernel
-2025-11-11 14:58:30.270 22588-23199 BugleAction             com.google.android.apps.messaging    W  cksi: Jibe SDK Service not available. Is the Jibe SDK service running? Did you call connect() and wait for the notification before calling an API function?
-                                                                                                    	at cksa.b(PG:2)
-                                                                                                    	at com.google.android.rcs.client.profile.RcsProfileService.g(PG:1)
-                                                                                                    	at com.google.android.rcs.client.profile.RcsProfileService.getMsisdn(PG:3)
-                                                                                                    	at awsw.aj(PG:17)
-                                                                                                    	at awsw.z(PG:2)
-                                                                                                    	at abfl.b(PG:303)
-                                                                                                    	at ajik.call(PG:22)
-                                                                                                    	at cnpr.call(PG:3)
-                                                                                                    	at ctda.a(PG:1)
-                                                                                                    	at ctet.run(PG:4)
-                                                                                                    	at bxfd.run(PG:1)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at bxef.run(PG:2)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    	at bxfj.run(PG:5)
-2025-11-11 14:58:30.272 22588-23199 SubscriptionMetadataUti com.google.android.apps.messaging    W  Bugle: SubscriptionMetadataUtils get: unexpected subId = -2, replacing with -1
-                                                                                                    cpwb: FULL
-                                                                                                    	at bdsy.h(PG:6)
-                                                                                                    	at bdvp.a(PG:1)
-                                                                                                    	at bgit.<init>(PG:1)
-                                                                                                    	at bgiu.a(PG:1)
-                                                                                                    	at awsw.ai(PG:3)
-                                                                                                    	at awsw.aj(PG:25)
-                                                                                                    	at awsw.z(PG:2)
-                                                                                                    	at abfl.b(PG:303)
-                                                                                                    	at ajik.call(PG:22)
-                                                                                                    	at cnpr.call(PG:3)
-                                                                                                    	at ctda.a(PG:1)
-                                                                                                    	at ctet.run(PG:4)
-                                                                                                    	at bxfd.run(PG:1)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at bxef.run(PG:2)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    	at bxfj.run(PG:5)
-2025-11-11 14:58:30.272 22588-23199 SubscriptionMetadataUti com.google.android.apps.messaging    W  Bugle: SubscriptionMetadataUtils get: unexpected subId = -2, replacing with -1
-                                                                                                    cpwb: FULL
-                                                                                                    	at bdsy.h(PG:6)
-                                                                                                    	at bgit.<init>(PG:2)
-                                                                                                    	at bgiu.a(PG:1)
-                                                                                                    	at awsw.ai(PG:3)
-                                                                                                    	at awsw.aj(PG:25)
-                                                                                                    	at awsw.z(PG:2)
-                                                                                                    	at abfl.b(PG:303)
-                                                                                                    	at ajik.call(PG:22)
-                                                                                                    	at cnpr.call(PG:3)
-                                                                                                    	at ctda.a(PG:1)
-                                                                                                    	at ctet.run(PG:4)
-                                                                                                    	at bxfd.run(PG:1)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at bxef.run(PG:2)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    	at bxfj.run(PG:5)
-2025-11-11 14:58:30.276 22588-23199 SubscriptionMetadataUti com.google.android.apps.messaging    W  Bugle: SubscriptionMetadataUtils get: unexpected subId = -2, replacing with -1
-                                                                                                    cpwb: FULL
-                                                                                                    	at bdsy.h(PG:6)
-                                                                                                    	at awsw.ai(PG:18)
-                                                                                                    	at awsw.aj(PG:25)
-                                                                                                    	at awsw.z(PG:2)
-                                                                                                    	at abfl.b(PG:303)
-                                                                                                    	at ajik.call(PG:22)
-                                                                                                    	at cnpr.call(PG:3)
-                                                                                                    	at ctda.a(PG:1)
-                                                                                                    	at ctet.run(PG:4)
-                                                                                                    	at bxfd.run(PG:1)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
-                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
-                                                                                                    	at bxef.run(PG:2)
-                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
-                                                                                                    	at bxfj.run(PG:5)
+2025-11-11 18:02:44.615 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用旧格式兼容模式: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:44.616 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  libsignal类型: WHISPER_TYPE (2) → Envelope.CIPHERTEXT (1)
+2025-11-11 18:02:44.617 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  消息类型: signalCiphertextType=2, envelopeType=CIPHERTEXT
+2025-11-11 18:02:44.617 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  从消息元数据获取设备ID: 1
+2025-11-11 18:02:44.618 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Envelope转换成功(旧格式): messageId=********-****-****-****-*********6f0, type=CIPHERTEXT
+2025-11-11 18:02:44.618 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  检测到加密类型标识: isSessionCipherEncrypted=true
+2025-11-11 18:02:44.624 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用 SessionCipher 解密（2人群组/私聊）
+2025-11-11 18:02:44.625 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用Signal解密Envelope: timestamp=1762855359861, type=CIPHERTEXT
+2025-11-11 18:02:44.631 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  Signal解密成功: timestamp=1762855359861
+2025-11-11 18:02:44.634 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  使用MessageContentProcessor处理消息: timestamp=1762855359861
+2025-11-11 18:02:44.827 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  MessageContentProcessor处理完成: timestamp=1762855359861
+2025-11-11 18:02:44.848 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:44.849 30552-30586 TapEnvelopeAdapter      org.thoughtcrime.securesms           D  [TapTimeTest] T6_DISPLAY | msgId=1762855359861 | timestamp=1762855364832
+2025-11-11 18:02:44.854 30552-30586 TapMessageProcessor     org.thoughtcrime.securesms           I  传输消息处理成功: messageId=********-****-****-****-*********6f0
+2025-11-11 18:02:45.417 30552-30586 TapMessageTransportImpl org.thoughtcrime.securesms           D  shouldUseTapForRecipient: recipient=********-****-****-****-*********973, hasPrivateChannel=true
+2025-11-11 18:02:45.443 30552-30586 TapMessageTransportImpl org.thoughtcrime.securesms           E  ========================================
+                                                                                                    TapMessageTransportImpl.sendMessageViaTap() 已废弃
+                                                                                                    ========================================
+                                                                                                    私聊消息应该通过以下路径发送：
+                                                                                                    IndividualSendJob 
+                                                                                                      → TapMessageSendIntegrator
+                                                                                                        → TapSignalServiceAdapter.sendWithSignalEncryption()
+                                                                                                    
+                                                                                                    如果调用到此方法，说明：
+                                                                                                    1. 某处代码仍在使用旧的发送路径
+                                                                                                    2. 可能导致密文版本不正确（version 1 错误）
+                                                                                                    
+                                                                                                    请检查调用栈，找到调用此方法的位置并修复
+                                                                                                    ========================================
+                                                                                                    recipient: ********-****-****-****-*********973
+                                                                                                    ciphertextSize: 251
+                                                                                                    timestamp: 1762855365371
+                                                                                                    ========================================
+2025-11-11 18:02:45.444 30552-30586 SignalServ...sageSender org.thoughtcrime.securesms           W  [1762855365371] TAP delivery失败(receipt): IOException: ========================================
+                                                                                                    TapMessageTransportImpl.sendMessageViaTap() 已废弃
+                                                                                                    ========================================
+                                                                                                    私聊消息应该通过以下路径发送：
+                                                                                                    IndividualSendJob 
+                                                                                                      → TapMessageSendIntegrator
+                                                                                                        → TapSignalServiceAdapter.sendWithSignalEncryption()
+                                                                                                    
+                                                                                                    如果调用到此方法，说明：
+                                                                                                    1. 某处代码仍在使用旧的发送路径
+                                                                                                    2. 可能导致密文版本不正确（version 1 错误）
+                                                                                                    
+                                                                                                    请检查调用栈，找到调用此方法的位置并修复
+                                                                                                    ========================================
+                                                                                                    recipient: ********-****-****-****-*********973
+                                                                                                    ciphertextSize: 251
+                                                                                                    timestamp: 1762855365371
+                                                                                                    ========================================

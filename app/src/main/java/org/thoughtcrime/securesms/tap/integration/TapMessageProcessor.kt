@@ -580,6 +580,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
             val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
             val peerAci = recipient.requireAci().toString()
             Log.d(TAG, "[Token交换] A端: senderId=$senderId, peerAci=$peerAci")
+            val channelVersion = resolveChannelVersion(tokenExchangeMessage)
             
             // 如果包含Webhook配置,先保存
             if (tokenExchangeMessage.hasWebhookConfig()) {
@@ -594,6 +595,24 @@ class TapMessageProcessor private constructor(private val context: Context) {
                         gatewayConfigData
                     )
                     Log.i(TAG, "已保存Token Accept中的Webhook配置: peerAci=$peerAci")
+                }
+            }
+
+            if (tokenExchangeMessage.isGatewayOnlyChannel()) {
+                val upgraded = channelManager.upgradeChannelToFullActive(
+                    senderId.toString(),
+                    tokenExchangeMessage.providerType,
+                    org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
+                        channelVersion = channelVersion,
+                        gatewayOnly = true
+                    )
+                )
+                return if (upgraded) {
+                    Log.i(TAG, "[Token交换] Gateway-only通道激活成功: senderId=$senderId")
+                    TapProcessResult.Success("Gateway-only通道已激活")
+                } else {
+                    Log.w(TAG, "[Token交换] Gateway-only通道升级失败: senderId=$senderId")
+                    TapProcessResult.Failed("通道升级失败")
                 }
             }
             
@@ -632,7 +651,13 @@ class TapMessageProcessor private constructor(private val context: Context) {
             }
             
             // 更新通道状态为FULL_ACTIVE，使用RecipientId格式
-            val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
+            val upgraded = channelManager.upgradeChannelToFullActive(
+                senderId.toString(),
+                tokenExchangeMessage.providerType,
+                org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
+                    channelVersion = channelVersion
+                )
+            )
             if (upgraded) {
                 Log.i(TAG, "[Token交换] A端通道成功升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                 
@@ -642,22 +667,25 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     val receiveMetadata = channel.metadata!!.getReceiveMetadata()
                     Log.i(TAG, "[Token交换] 通道metadata验证: receivePath=${receiveMetadata.path}, hasToken=${receiveMetadata.token != null}")
                     
-                    // 启动轮询（在Token验证通过后）
-                    try {
-                        val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                        val pollingStarted = pollingService.startPolling()
-                        if (pollingStarted) {
-                            val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
-                            if (targetAdded) {
-                                Log.i(TAG, "[Token交换] A端轮询启动成功: senderId=$senderId")
+                    if (org.thoughtcrime.securesms.tap.polling.TapPollingService.isPollingEnabled()) {
+                        try {
+                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                            val pollingStarted = pollingService.startPolling()
+                            if (pollingStarted) {
+                                val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
+                                if (targetAdded) {
+                                    Log.i(TAG, "[Token交换] A端轮询启动成功: senderId=$senderId")
+                                } else {
+                                    Log.w(TAG, "[Token交换] A端轮询目标添加失败: senderId=$senderId")
+                                }
                             } else {
-                                Log.w(TAG, "[Token交换] A端轮询目标添加失败: senderId=$senderId")
+                                Log.w(TAG, "[Token交换] A端轮询服务启动失败: senderId=$senderId")
                             }
-                        } else {
-                            Log.w(TAG, "[Token交换] A端轮询服务启动失败: senderId=$senderId")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[Token交换] A端启动轮询异常: senderId=$senderId", e)
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "[Token交换] A端启动轮询异常: senderId=$senderId", e)
+                    } else {
+                        Log.d(TAG, "[Token交换] 轮询已禁用，跳过A端轮询启动: senderId=$senderId")
                     }
                 } else {
                     Log.w(TAG, "[Token交换] 通道metadata为null，无法启动轮询: senderId=$senderId")
@@ -1164,6 +1192,7 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
         val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
         val peerAci = recipient.requireAci().toString()
         Log.d(TAG, "[Token交换] B端: senderId=$senderId, peerAci=$peerAci")
+        val channelVersion = resolveChannelVersion(tokenExchangeMessage)
         
         // B端收到A的确认消息前，先验证Token状态（使用ACI格式）
         val receivedToken = tokenPool.getValidReceivedToken(peerAci, tokenExchangeMessage.providerType)
@@ -1182,8 +1211,32 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
             Log.d(TAG, "[Token交换] B端Token完整: receivedTokenId=${receivedToken.tokenId}, sharedTokenId=${sharedToken.tokenId}")
         }
         
+        if (tokenExchangeMessage.isGatewayOnlyChannel()) {
+            val upgraded = channelManager.upgradeChannelToFullActive(
+                senderId.toString(),
+                tokenExchangeMessage.providerType,
+                org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
+                    channelVersion = channelVersion,
+                    gatewayOnly = true
+                )
+            )
+            return if (upgraded) {
+                Log.i(TAG, "[Token交换] B端Gateway-only通道升级成功: senderId=$senderId")
+                TapProcessResult.Success("Gateway-only通道已激活")
+            } else {
+                Log.w(TAG, "[Token交换] Gateway-only通道升级失败: senderId=$senderId")
+                TapProcessResult.Failed("通道升级失败")
+            }
+        }
+
         // B端收到A的确认消息，将自己的通道升级为FULL_ACTIVE
-        val upgraded = channelManager.upgradeChannelToFullActive(senderId.toString(), tokenExchangeMessage.providerType)
+        val upgraded = channelManager.upgradeChannelToFullActive(
+            senderId.toString(),
+            tokenExchangeMessage.providerType,
+            org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
+                channelVersion = channelVersion
+            )
+        )
         if (upgraded) {
             Log.i(TAG, "[Token交换] B端收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
             
@@ -1194,26 +1247,28 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
                 Log.i(TAG, "[Token交换] B端通道metadata验证: receivePath=${receiveMetadata.path}, hasToken=${receiveMetadata.token != null}")
                 
                 // 通道升级成功后启动轮询（在Token验证通过后）
-                try {
-                    val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                    Log.d(TAG, "[Token交换] B端准备启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
-                    
-                    val pollingStarted = pollingService.startPolling()
-                    if (pollingStarted) {
-                        val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
-                        if (targetAdded) {
-                            Log.i(TAG, "[Token交换] B端轮询启动成功: senderId=$senderId")
-                        } else {
-                            Log.w(TAG, "[Token交换] B端轮询目标添加失败: senderId=$senderId")
-                            // 增强诊断：详细分析轮询目标添加失败的原因
-                            diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
+                    if (org.thoughtcrime.securesms.tap.polling.TapPollingService.isPollingEnabled()) {
+                        try {
+                            val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
+                            Log.d(TAG, "[Token交换] B端准备启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
+                            val pollingStarted = pollingService.startPolling()
+                            if (pollingStarted) {
+                                val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
+                                if (targetAdded) {
+                                    Log.i(TAG, "[Token交换] B端轮询启动成功: senderId=$senderId")
+                                } else {
+                                    Log.w(TAG, "[Token交换] B端轮询目标添加失败: senderId=$senderId")
+                                    diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
+                                }
+                            } else {
+                                Log.w(TAG, "[Token交换] B端轮询服务启动失败: senderId=$senderId")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[Token交换] B端启动轮询异常: senderId=$senderId", e)
                         }
                     } else {
-                        Log.w(TAG, "[Token交换] B端轮询服务启动失败: senderId=$senderId")
+                        Log.d(TAG, "[Token交换] 轮询已禁用，B端跳过轮询启动: senderId=$senderId")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "[Token交换] B端启动轮询异常: senderId=$senderId", e)
-                }
             } else {
                 Log.w(TAG, "[Token交换] B端通道metadata为null，跳过轮询启动: senderId=$senderId")
                 // 诊断metadata为null的原因
@@ -1695,6 +1750,10 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
      * 启动群组轮询（修复版：使用群组receivedTokens构建metadata）
      */
     private suspend fun startGroupPolling(groupId: String, memberAcis: List<String>) {
+        if (!org.thoughtcrime.securesms.tap.polling.TapPollingService.isPollingEnabled()) {
+            Log.d(TAG, "群组轮询已禁用，跳过: groupId=$groupId")
+            return
+        }
         try {
             val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
             val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
@@ -2104,6 +2163,10 @@ private fun saveContactWebhookConfig(
         Log.e(TAG, "保存联系人Webhook配置异常: senderAci=$senderAci", e)
         false
     }
+}
+
+private fun resolveChannelVersion(message: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): Int {
+    return if (message.channelVersion <= 0) 2 else message.channelVersion
 }
 
 /**

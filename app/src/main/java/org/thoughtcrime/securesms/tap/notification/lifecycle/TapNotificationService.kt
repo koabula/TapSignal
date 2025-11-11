@@ -44,7 +44,6 @@ class TapNotificationService private constructor(
     private val notificationManager = NotificationManager.getInstance(context)
     private val configManager = NotificationConfigManager.getInstance(context)
     private val lifecycleIntegrator = TapLifecycleIntegrator.getInstance(context)
-    private val offlineHandler = NotificationOfflineHandler.getInstance(context)
     private val dozeHandler = TapDozeHandler.getInstance(context)
     
     private var isInitialized = false
@@ -293,9 +292,7 @@ class TapNotificationService private constructor(
         } else {
             // 退出Doze模式，尝试恢复正常连接
             Log.d(TAG, "退出Doze模式，尝试恢复连接")
-            scope.launch {
-                offlineHandler.processOfflineMessages()
-            }
+            notificationManager.triggerOfflineSync("doze_exit")
         }
     }
     
@@ -305,27 +302,14 @@ class TapNotificationService private constructor(
     private fun handleDozeCheck() {
         Log.d(TAG, "执行Doze模式定期检查")
         
-        scope.launch {
-            try {
-                // 在Doze模式下定期检查离线消息
-                offlineHandler.processOfflineMessages()
-            } catch (e: Exception) {
-                Log.e(TAG, "Doze检查异常", e)
-            }
-        }
+        notificationManager.triggerOfflineSync("doze_check")
     }
     
     /**
      * 手动触发离线消息处理
      */
     fun processOfflineMessages() {
-        scope.launch {
-            try {
-                offlineHandler.processOfflineMessages()
-            } catch (e: Exception) {
-                Log.e(TAG, "处理离线消息失败", e)
-            }
-        }
+        notificationManager.triggerOfflineSync("manual_request")
     }
     
     /**
@@ -365,8 +349,8 @@ class TapNotificationService private constructor(
             started = isStarted,
             connected = isConnected(),
             inDozeMode = dozeHandler.isInDozeMode(),
-            processingOffline = offlineHandler.isProcessing(),
-            lastOfflineProcessTime = offlineHandler.getLastProcessTime()
+            processingOffline = notificationManager.isOfflineSyncRunning(),
+            lastOfflineProcessTime = notificationManager.getLastOfflineSyncTime()
         )
     }
     
