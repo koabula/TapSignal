@@ -136,38 +136,9 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
         providerConfig: Map<String, Any>
     ) {
         try {
-            // 确保 senderId 是 ACI 格式
-            val senderAci = if (senderId.contains("-") && senderId.length >= 32) {
-                senderId
-            } else {
-                // 尝试转换为 ACI
-                try {
-                    val recipientId = when {
-                        senderId.startsWith("RecipientId::") -> {
-                            val id = senderId.removePrefix("RecipientId::").toLong()
-                            org.thoughtcrime.securesms.recipients.RecipientId.from(id)
-                        }
-                        senderId.all { it.isDigit() } -> {
-                            org.thoughtcrime.securesms.recipients.RecipientId.from(senderId.toLong())
-                        }
-                        else -> {
-                            Log.e(TAG, "无法解析senderId格式: $senderId")
-                            return
-                        }
-                    }
-                    val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
-                    recipient.requireAci().toString()
-                } catch (e: Exception) {
-                    Log.e(TAG, "无法转换senderId为ACI: $senderId", e)
-                    return
-                }
-            }
-            
-            Log.d(TAG, "Gateway-only握手: 原始senderId=$senderId, ACI=$senderAci")
-            
             val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
             val channel = channelManager.getOrCreateChannel(
-                recipientId = senderAci,
+                recipientId = senderId,
                 providerType = originalMessage.providerType,
                 provider = provider,
                 options = org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelOptions(
@@ -177,12 +148,12 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             )
 
             if (channel == null) {
-                Log.e(TAG, "Gateway-only通道创建失败: recipientId=$senderAci")
+                Log.e(TAG, "Gateway-only通道创建失败: recipientId=$senderId")
                 return
             }
 
             channelManager.upgradeChannelToFullActive(
-                recipientId = senderAci,
+                recipientId = senderId,
                 providerType = originalMessage.providerType,
                 options = org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
                     channelVersion = channelVersion,
@@ -366,7 +337,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             
             Log.i(TAG, "[Token交换] B端新sharedToken保存成功: senderAci=$senderAci, tokenId=${generatedToken.tokenId}")
             
-            // 9. 建立传输通道 (B端为接收方建立通道，使用ACI格式)
+            // 9. 建立传输通道 (B端为接收方建立通道，使用RecipientId格式)
             try {
                 val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
                 
@@ -375,11 +346,9 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 if (!initialized) {
                     Log.w(TAG, "通道管理器初始化失败，跳过通道建立")
                 } else {
-                    // 使用senderAci（已经是ACI格式）创建通道
-                    Log.d(TAG, "B端建立通道: 使用senderAci=$senderAci")
-                    
+                    // 使用getOrCreateChannel方法，它会自动处理metadata创建（使用RecipientId格式）
                     val channel = channelManager.getOrCreateChannel(
-                        recipientId = senderAci,
+                        recipientId = senderId,
                         providerType = originalMessage.providerType,
                         provider = provider
                     )

@@ -103,7 +103,7 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
         
         val groupIdBytes = groupId.get()
         val groupIdString = Base64.encodeToString(groupIdBytes, Base64.NO_WRAP)
-        val messageId = "group_${groupIdString}_${System.currentTimeMillis()}"
+        val messageId = System.currentTimeMillis().toString()
         
         Log.d(TAG, "sendGroupMessageViaTap: groupId bytes size=${groupIdBytes.size}, base64=${groupIdString.substring(0, Math.min(20, groupIdString.length))}..., messageId=$messageId")
         Log.d(TAG, "sendGroupMessageViaTap: recipients list: ${recipients.joinToString { it.identifier }}")

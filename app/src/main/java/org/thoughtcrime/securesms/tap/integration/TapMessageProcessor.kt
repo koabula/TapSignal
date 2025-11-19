@@ -17,8 +17,6 @@ import org.thoughtcrime.securesms.tap.TransportToken
 import org.thoughtcrime.securesms.tap.CosTransportToken
 import org.thoughtcrime.securesms.tap.TransportTokenPool
 import org.thoughtcrime.securesms.tap.TapDatabaseContext
-import org.thoughtcrime.securesms.tap.WebhookConfigData
-import org.thoughtcrime.securesms.tap.GatewayConfigData
 import org.thoughtcrime.securesms.recipients.Recipient
 import kotlinx.coroutines.runBlocking
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -122,29 +120,9 @@ class TapMessageProcessor private constructor(private val context: Context) {
      * @param transportMessage 传输消息
      * @return 处理结果
      */
-    data class PushContext(
-        val groupId: String? = null,
-        val recipientGateway: RecipientGatewaySnapshot? = null
-    )
-
-    data class RecipientGatewaySnapshot(
-        val webhookUrl: String,
-        val notifySecret: String,
-        val userId: String,
-        val provider: String? = null,
-        val region: String? = null,
-        val endpoint: String? = null,
-        val offlineBucket: String? = null,
-        val presignDelegation: Boolean = false,
-        val metadata: Map<String, String> = emptyMap()
-    )
-
-    suspend fun processTapTransportMessage(
-        transportMessage: TransportMessage,
-        pushContext: PushContext? = null
-    ): TapProcessResult {
+    suspend fun processTapTransportMessage(transportMessage: TransportMessage): TapProcessResult {
         Log.i(TAG, "处理Tap传输消息: messageId=${transportMessage.messageId}, type=${transportMessage.messageType}")
-
+        
         return try {
             // 验证消息完整性
             if (!validateTransportMessage(transportMessage)) {
@@ -152,28 +130,34 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 return TapProcessResult.Failed("消息验证失败")
             }
             
-            val resolvedGroupId = resolveGroupId(transportMessage, pushContext)
-            val isGroupMessage = resolvedGroupId != null
+            // 检查是否为群组消息（通过 messageId 前缀识别：group_{groupId}_{originalMessageId}）
+            val isGroupMessage = transportMessage.messageId.startsWith("group_")
             
             if (isGroupMessage) {
-                val senderAci = transportMessage.senderId
-                val timestamp = transportMessage.timestamp
-                val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
-                val duplicate = deduplicator.isDuplicate(
-                    messageId = transportMessage.messageId,
-                    senderAci = senderAci,
-                    rawGroupId = resolvedGroupId,
-                    timestamp = timestamp
-                )
-
-                if (duplicate) {
-                    Log.d(TAG, "群组消息重复，跳过处理: messageId=${transportMessage.messageId}, groupId=$resolvedGroupId")
-                    return TapProcessResult.Success("群组消息重复，已忽略")
+                // 从 messageId 中提取 groupId
+                val parts = transportMessage.messageId.split("_")
+                if (parts.size >= 3) {
+                    val groupId = parts[1]
+                    val senderAci = transportMessage.senderId
+                    val timestamp = transportMessage.timestamp
+                    
+                    // 使用群组消息去重器检查重复
+                    val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
+                    val isDuplicate = deduplicator.isDuplicate(
+                        messageId = transportMessage.messageId,
+                        senderAci = senderAci,
+                        rawGroupId = groupId,
+                        timestamp = timestamp
+                    )
+                    
+                    if (isDuplicate) {
+                        Log.d(TAG, "群组消息重复，跳过处理: messageId=${transportMessage.messageId}, groupId=$groupId")
+                        return TapProcessResult.Success("群组消息重复，已忽略")
+                    }
+                    
+                    // 标记为已处理（在解密成功后再标记）
+                    // deduplicator.markAsProcessed() 将在消息成功处理后调用
                 }
-            }
-
-            if (resolvedGroupId != null) {
-                updateRecipientGatewayIfNeeded(resolvedGroupId, pushContext)
             }
             
             // 将加密消息交给TapEnvelopeAdapter处理Signal相关逻辑
@@ -185,16 +169,22 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     Log.i(TAG, "传输消息处理成功: messageId=${transportMessage.messageId}")
                     
                     // 如果是群组消息，标记为已处理
-                    if (isGroupMessage && resolvedGroupId != null) {
-                        val senderAci = transportMessage.senderId
-                        val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
-                        deduplicator.markAsProcessed(
-                            messageId = transportMessage.messageId,
-                            senderAci = senderAci,
-                            rawGroupId = resolvedGroupId,
-                            timestamp = transportMessage.timestamp,
-                            pollingMemberAci = transportMessage.recipientId
-                        )
+                    if (isGroupMessage) {
+                        // 从 messageId 中提取 groupId
+                        val parts = transportMessage.messageId.split("_")
+                        if (parts.size >= 3) {
+                            val groupId = parts[1]
+                            val senderAci = transportMessage.senderId
+                            
+                            val deduplicator = org.thoughtcrime.securesms.tap.group.GroupMessageDeduplicator.getInstance(context)
+                            deduplicator.markAsProcessed(
+                                messageId = transportMessage.messageId,
+                                senderAci = senderAci,
+                                rawGroupId = groupId,
+                                timestamp = transportMessage.timestamp,
+                                pollingMemberAci = transportMessage.recipientId  // 接收者 ID 即为轮询成员
+                            )
+                        }
                     }
                     
                     TapProcessResult.Success("消息处理成功")
@@ -213,53 +203,6 @@ class TapMessageProcessor private constructor(private val context: Context) {
             Log.e(TAG, "处理传输消息异常: messageId=${transportMessage.messageId}", e)
             TapProcessResult.Failed("处理异常: ${e.message}")
         }
-    }
-
-    private suspend fun updateRecipientGatewayIfNeeded(groupId: String?, pushContext: PushContext?) {
-        if (groupId.isNullOrBlank()) return
-        val gateway = pushContext?.recipientGateway ?: return
-        val webhookConfig = WebhookConfigData(
-            webhookUrl = gateway.webhookUrl,
-            notifySecret = gateway.notifySecret,
-            userId = gateway.userId,
-            version = "2.0"
-        )
-        val gatewayConfig = GatewayConfigData(
-            endpoint = gateway.endpoint,
-            region = gateway.region,
-            provider = gateway.provider,
-            offlineBucket = gateway.offlineBucket,
-            presignDelegation = gateway.presignDelegation,
-            metadata = gateway.metadata
-        )
-
-        try {
-            val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
-            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
-            groupManager.updateMemberGatewayInfo(groupId, myAci, webhookConfig, gatewayConfig)
-        } catch (e: Exception) {
-            Log.w(TAG, "更新群成员Gateway信息失败: groupId=$groupId", e)
-        }
-    }
-
-    private fun resolveGroupId(message: TransportMessage, pushContext: PushContext?): String? {
-        pushContext?.groupId?.let { return it }
-        val hints = message.contentMetadata.gatewayFailoverHints
-        val hintGroupIdValue = hints?.get("groupId")
-        if (hintGroupIdValue != null) {
-            val hintGroupId = hintGroupIdValue.toString()
-            if (hintGroupId.isNotBlank()) {
-                return hintGroupId
-            }
-        }
-
-        if (message.messageId.startsWith("group_")) {
-            val parts = message.messageId.split("_")
-            if (parts.size >= 3) {
-                return parts[1]
-            }
-        }
-        return null
     }
     
     /**
@@ -656,14 +599,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
             }
 
             if (tokenExchangeMessage.isGatewayOnlyChannel() && tokenExchangeMessage.tokenData.isEmpty()) {
-                val senderAci = recipientIdToAci(senderId)
-                if (senderAci == null) {
-                    Log.w(TAG, "无法获取发送者ACI,跳过通道升级: senderId=$senderId")
-                    return TapProcessResult.Failed("无法获取发送者ACI")
-                }
-                
                 val upgraded = channelManager.upgradeChannelToFullActive(
-                    senderAci,
+                    senderId.toString(),
                     tokenExchangeMessage.providerType,
                     org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
                         channelVersion = channelVersion,
@@ -1286,14 +1223,8 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
         }
         
         if (tokenExchangeMessage.isGatewayOnlyChannel()) {
-            val senderAci = recipientIdToAci(senderId)
-            if (senderAci == null) {
-                Log.w(TAG, "无法获取发送者ACI,跳过通道升级: senderId=$senderId")
-                return TapProcessResult.Failed("无法获取发送者ACI")
-            }
-            
             val upgraded = channelManager.upgradeChannelToFullActive(
-                senderAci,
+                senderId.toString(),
                 tokenExchangeMessage.providerType,
                 org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
                     channelVersion = channelVersion,
@@ -1301,7 +1232,7 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
                 )
             )
             return if (upgraded) {
-                Log.i(TAG, "[Token交换] B端Gateway-only通道升级成功: senderId=$senderId, senderAci=$senderAci")
+                Log.i(TAG, "[Token交换] B端Gateway-only通道升级成功: senderId=$senderId")
                 
                 // B端插入v2 mode启用提示消息
                 try {
@@ -1327,24 +1258,18 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
         }
 
         // B端收到A的确认消息，将自己的通道升级为FULL_ACTIVE
-        val senderAci = recipientIdToAci(senderId)
-        if (senderAci == null) {
-            Log.w(TAG, "无法获取发送者ACI,跳过通道升级: senderId=$senderId")
-            return TapProcessResult.Failed("无法获取发送者ACI")
-        }
-        
         val upgraded = channelManager.upgradeChannelToFullActive(
-            senderAci,
+            senderId.toString(),
             tokenExchangeMessage.providerType,
             org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
                 channelVersion = channelVersion
             )
         )
         if (upgraded) {
-            Log.i(TAG, "[Token交换] B端收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, senderAci=$senderAci, providerType=${tokenExchangeMessage.providerType}")
+            Log.i(TAG, "[Token交换] B端收到确认消息，通道升级为FULL_ACTIVE: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
             
             // 验证通道的metadata
-            val channel = channelManager.getActiveChannel(senderAci, tokenExchangeMessage.providerType)
+            val channel = channelManager.getActiveChannel(senderId.toString(), tokenExchangeMessage.providerType)
             if (channel?.metadata != null) {
                 val receiveMetadata = channel.metadata!!.getReceiveMetadata()
                 Log.i(TAG, "[Token交换] B端通道metadata验证: receivePath=${receiveMetadata.path}, hasToken=${receiveMetadata.token != null}")
@@ -1356,12 +1281,12 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
                             Log.d(TAG, "[Token交换] B端准备启动轮询: senderId=$senderId, providerType=${tokenExchangeMessage.providerType}")
                             val pollingStarted = pollingService.startPolling()
                             if (pollingStarted) {
-                                val targetAdded = pollingService.addPollingTarget(senderAci, channel.metadata!!, channel)
+                                val targetAdded = pollingService.addPollingTarget(senderId.toString(), channel.metadata!!, channel)
                                 if (targetAdded) {
-                                    Log.i(TAG, "[Token交换] B端轮询启动成功: senderId=$senderId, senderAci=$senderAci")
+                                    Log.i(TAG, "[Token交换] B端轮询启动成功: senderId=$senderId")
                                 } else {
-                                    Log.w(TAG, "[Token交换] B端轮询目标添加失败: senderId=$senderId, senderAci=$senderAci")
-                                    diagnosisPollingTargetFailure(pollingService, senderAci, channel.metadata!!)
+                                    Log.w(TAG, "[Token交换] B端轮询目标添加失败: senderId=$senderId")
+                                    diagnosisPollingTargetFailure(pollingService, senderId.toString(), channel.metadata!!)
                                 }
                             } else {
                                 Log.w(TAG, "[Token交换] B端轮询服务启动失败: senderId=$senderId")
@@ -1475,9 +1400,6 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             }
             
             Log.d(TAG, "群组提议消息: groupId=$groupId, proposer=$proposerAci, senderPersonalId=$senderId, totalMembers=${totalMembers.size}")
-
-            val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
-            val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
             
             // 同步创建群组状态和保存token（必须完成才能继续）
             // 数据库操作在 IO 线程执行，添加超时保护避免死锁
@@ -1508,19 +1430,6 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                         }
                         
                         Log.i(TAG, "群组状态创建成功: groupId=$groupId, status=PROPOSING")
-
-                        if (webhookConfigData != null) {
-                            saveContactWebhookConfig(
-                                senderAci = proposerAci,
-                                webhookConfigData = webhookConfigData,
-                                providerType = tokenExchangeMessage.providerType,
-                                gatewayConfigData = gatewayConfigData
-                            )
-                        }
-
-                        if (webhookConfigData != null || gatewayConfigData != null) {
-                            groupManager.updateMemberGatewayInfo(groupId, proposerAci, webhookConfigData, gatewayConfigData)
-                        }
                         
                         // 2. 同步保存提议者的 token（必须成功）
                         // 修复：从metadata["myToken"]提取单个token，不是tokens map
@@ -1618,9 +1527,6 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
             
             val accepterAci = tokenExchangeMessage.senderAci
             Log.d(TAG, "群组接受消息: groupId=$groupId, accepter=$accepterAci, senderPersonalId=$senderId")
-
-            val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
-            val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
             
             // 修复：从metadata["myToken"]提取单个token，不是tokens map
             val accepterTokenData = tokenExchangeMessage.metadata["myToken"] as? Map<*, *>
@@ -1655,18 +1561,6 @@ private suspend fun processV2ModeDisable(senderId: org.thoughtcrime.securesms.re
                     Log.d(TAG, "[状态转换] 开始同步处理群组接受: groupId=$groupId, accepter=$accepterAci")
                     
                     val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
-
-                    if (webhookConfigData != null) {
-                        saveContactWebhookConfig(
-                            senderAci = accepterAci,
-                            webhookConfigData = webhookConfigData,
-                            providerType = tokenExchangeMessage.providerType,
-                            gatewayConfigData = gatewayConfigData
-                        )
-                    }
-                    if (webhookConfigData != null || gatewayConfigData != null) {
-                        groupManager.updateMemberGatewayInfo(groupId, accepterAci, webhookConfigData, gatewayConfigData)
-                    }
                     
                     // 获取当前状态（用于日志）
                     val stateBefore = groupManager.getGroupStateSync(groupId)

@@ -6,7 +6,6 @@ import org.thoughtcrime.securesms.tap.SendMetadata
 import org.thoughtcrime.securesms.tap.ReceiveMetadata
 import org.thoughtcrime.securesms.tap.TransportToken
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
-import org.thoughtcrime.securesms.tap.group.GroupMemberGatewayInfo
 
 /**
  * COS传输元数据实现
@@ -34,9 +33,7 @@ data class CosTransportMetadata(
     
     // 哈希化的用户ID
     val myHashedId: String,        // 本端哈希ID
-    val peerHashedId: String,       // 对端哈希ID
-
-    val groupDispatchOverrides: GroupDispatchOverrides? = null
+    val peerHashedId: String       // 对端哈希ID
 ) : TransportMetadata {
     
     override fun getSendMetadata(): SendMetadata {
@@ -76,15 +73,6 @@ data class CosTransportMetadata(
         myToken?.let { map["myToken"] = it.toMap() }
         peerToken?.let { map["peerToken"] = it.toMap() }
         
-        groupDispatchOverrides?.let { overrides ->
-            map["groupDispatchOverrides"] = mapOf(
-                "groupId" to overrides.groupId,
-                "recipientAci" to overrides.recipientAci,
-                "recipientHash" to overrides.recipientHash,
-                "gatewayInfo" to overrides.gatewayInfo.toMap(),
-                "groupMembers" to overrides.groupMembers
-            )
-        }
         return map
     }
     
@@ -198,8 +186,7 @@ data class CosTransportMetadata(
                     peerBucketName = peerBucketName,
                     peerReceivePath = peerReceivePath,
                     myHashedId = myHashedId,
-                    peerHashedId = peerHashedId,
-                    groupDispatchOverrides = parseGroupOverrides(data)
+                    peerHashedId = peerHashedId
                 )
             } catch (e: ClassCastException) {
                 Log.e(TAG, "类型转换错误", e)
@@ -209,65 +196,5 @@ data class CosTransportMetadata(
                 null
             }
         }
-
-        private fun parseGroupOverrides(data: Map<String, Any>): GroupDispatchOverrides? {
-            val overridesMap = data["groupDispatchOverrides"] as? Map<*, *> ?: return null
-            val groupId = overridesMap["groupId"] as? String ?: return null
-            val recipientAci = overridesMap["recipientAci"] as? String ?: return null
-            val recipientHash = overridesMap["recipientHash"] as? String ?: return null
-            val gatewayMap = overridesMap["gatewayInfo"] as? Map<*, *> ?: return null
-            val gatewayInfo = try {
-                GroupMemberGatewayInfo(
-                    memberAci = recipientAci,
-                    provider = gatewayMap["provider"] as? String,
-                    endpoint = gatewayMap["endpoint"] as? String,
-                    region = gatewayMap["region"] as? String,
-                    offlineBucket = gatewayMap["offlineBucket"] as? String,
-                    presignDelegation = (gatewayMap["presignDelegation"] as? Boolean) ?: false,
-                    metadata = (gatewayMap["metadata"] as? Map<String, String>) ?: emptyMap(),
-                    webhookUrl = gatewayMap["webhookUrl"] as? String,
-                    notifySecret = gatewayMap["notifySecret"] as? String,
-                    userId = gatewayMap["userId"] as? String,
-                    updatedAt = (gatewayMap["updatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "解析groupDispatchOverrides失败", e)
-                return null
-            }
-            val members = (overridesMap["groupMembers"] as? List<*>)
-                ?.mapNotNull { it as? String }
-                ?: emptyList()
-            return GroupDispatchOverrides(
-                groupId = groupId,
-                recipientAci = recipientAci,
-                recipientHash = recipientHash,
-                gatewayInfo = gatewayInfo,
-                groupMembers = members
-            )
-        }
     }
-}
-
-data class GroupDispatchOverrides(
-    val groupId: String,
-    val recipientAci: String,
-    val recipientHash: String,
-    val gatewayInfo: GroupMemberGatewayInfo,
-    val groupMembers: List<String> = emptyList()
-)
-
-private fun GroupMemberGatewayInfo.toMap(): Map<String, Any?> {
-    return mapOf(
-        "memberAci" to memberAci,
-        "provider" to provider,
-        "endpoint" to endpoint,
-        "region" to region,
-        "offlineBucket" to offlineBucket,
-        "presignDelegation" to presignDelegation,
-        "metadata" to metadata,
-        "webhookUrl" to webhookUrl,
-        "notifySecret" to notifySecret,
-        "userId" to userId,
-        "updatedAt" to updatedAt
-    )
-}
+} 

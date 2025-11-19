@@ -1,8 +1,5 @@
 package org.thoughtcrime.securesms.tap.group
 
-import org.thoughtcrime.securesms.tap.GatewayConfigData
-import org.thoughtcrime.securesms.tap.WebhookConfigData
-
 /**
  * 群组 V2 Mode 状态数据类
  * 
@@ -23,9 +20,6 @@ data class GroupV2State(
     
     /** 全部成员 ACI 集合 */
     val totalMembers: Set<String>,
-
-    /** 群成员的 Gateway 信息（key = member ACI） */
-    val memberGatewayInfo: Map<String, GroupMemberGatewayInfo> = emptyMap(),
     
     /** 使用的 provider 类型 */
     val providerType: String,
@@ -86,10 +80,8 @@ data class GroupV2State(
      * 更新成员列表（当有新成员加入或离开时）
      */
     fun withTotalMembers(newTotalMembers: Set<String>): GroupV2State {
-        val filteredGateways = memberGatewayInfo.filterKeys { it in newTotalMembers }
         return copy(
             totalMembers = newTotalMembers,
-            memberGatewayInfo = filteredGateways,
             updatedAt = System.currentTimeMillis()
         )
     }
@@ -102,7 +94,6 @@ data class GroupV2State(
             status = GroupV2Status.NATIVE,
             proposerAci = null,
             agreedMembers = emptySet(),
-            memberGatewayInfo = emptyMap(),
             updatedAt = System.currentTimeMillis()
         )
     }
@@ -115,75 +106,11 @@ data class GroupV2State(
                providerType.isNotBlank() &&
                totalMembers.isNotEmpty() &&
                agreedMembers.all { it in totalMembers } &&
-               memberGatewayInfo.keys.all { it in totalMembers } &&
                when (status) {
-                    GroupV2Status.NATIVE -> agreedMembers.isEmpty() && proposerAci == null
-                    GroupV2Status.PROPOSING -> agreedMembers.isNotEmpty() && proposerAci != null
-                    GroupV2Status.FULL_V2_ACTIVE -> isFullyAgreed() && proposerAci != null
+                   GroupV2Status.NATIVE -> agreedMembers.isEmpty() && proposerAci == null
+                   GroupV2Status.PROPOSING -> agreedMembers.isNotEmpty() && proposerAci != null
+                   GroupV2Status.FULL_V2_ACTIVE -> isFullyAgreed() && proposerAci != null
                }
-    }
-
-    fun withMemberGateway(memberAci: String, gatewayInfo: GroupMemberGatewayInfo): GroupV2State {
-        if (memberAci.isBlank()) return this
-        return copy(
-            memberGatewayInfo = memberGatewayInfo.toMutableMap().apply {
-                put(memberAci, gatewayInfo)
-            },
-            updatedAt = System.currentTimeMillis()
-        )
-    }
-
-    fun withoutMemberGateway(memberAci: String): GroupV2State {
-        if (!memberGatewayInfo.containsKey(memberAci)) {
-            return this
-        }
-        return copy(
-            memberGatewayInfo = memberGatewayInfo - memberAci,
-            updatedAt = System.currentTimeMillis()
-        )
-    }
-}
-
-data class GroupMemberGatewayInfo(
-    val memberAci: String,
-    val provider: String? = null,
-    val endpoint: String? = null,
-    val region: String? = null,
-    val offlineBucket: String? = null,
-    val presignDelegation: Boolean = false,
-    val metadata: Map<String, String> = emptyMap(),
-    val webhookUrl: String? = null,
-    val notifySecret: String? = null,
-    val userId: String? = null,
-    val updatedAt: Long = System.currentTimeMillis()
-) {
-    val isDeliverable: Boolean
-        get() = !webhookUrl.isNullOrBlank() && !notifySecret.isNullOrBlank() && !userId.isNullOrBlank()
-
-    companion object {
-        fun fromConfigs(
-            memberAci: String,
-            webhookConfig: WebhookConfigData?,
-            gatewayConfig: GatewayConfigData?
-        ): GroupMemberGatewayInfo? {
-            if (memberAci.isBlank() || webhookConfig == null || !webhookConfig.validate()) {
-                return null
-            }
-
-            return GroupMemberGatewayInfo(
-                memberAci = memberAci,
-                provider = gatewayConfig?.provider,
-                endpoint = gatewayConfig?.endpoint,
-                region = gatewayConfig?.region,
-                offlineBucket = gatewayConfig?.offlineBucket,
-                presignDelegation = gatewayConfig?.presignDelegation ?: false,
-                metadata = gatewayConfig?.metadata ?: emptyMap(),
-                webhookUrl = webhookConfig.webhookUrl,
-                notifySecret = webhookConfig.notifySecret,
-                userId = webhookConfig.userId,
-                updatedAt = System.currentTimeMillis()
-            )
-        }
     }
 }
 

@@ -1,22 +1,17 @@
 package org.thoughtcrime.securesms.tap.integration
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.attachments.AttachmentId
 import org.thoughtcrime.securesms.attachments.DatabaseAttachment
 import org.thoughtcrime.securesms.database.AttachmentTable
 import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.mms.MmsException
-import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tap.TransportChannelManager
 import org.thoughtcrime.securesms.tap.TransportManager
 import org.thoughtcrime.securesms.tap.TransportResult
-import org.thoughtcrime.securesms.tap.FileInfo
+import org.thoughtcrime.securesms.attachments.AttachmentId
+import org.thoughtcrime.securesms.recipients.Recipient
+import org.thoughtcrime.securesms.mms.MmsException
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileInputStream
 
@@ -41,13 +36,6 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
     
     private val channelManager = TransportChannelManager.getInstance(context)
     private val transportManager = TransportManager.getInstance(context)
-    private val httpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-    }
     
     /**
      * 检查附件是否为Tap传输的附件
@@ -175,60 +163,83 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
      */
     private suspend fun downloadAttachmentViaTap(senderId: String, attachment: DatabaseAttachment): Boolean {
         return try {
+            // 构建附件路径
             val attachmentPath = buildAttachmentPath(attachment)
-            if (attachmentPath.isNullOrBlank()) {
+            if (attachmentPath == null) {
                 Log.w(TAG, "无法构建附件路径: attachmentId=${attachment.attachmentId}")
                 return false
             }
-
-            // 优先使用预签名URL或HTTP直链
-            if (isHttpUrl(attachmentPath)) {
-                val httpData = downloadAttachmentFromUrl(attachmentPath)
-                if (httpData != null && httpData.isNotEmpty()) {
-                    saveAttachmentDataToSignal(attachment.mmsId, attachment.attachmentId, httpData)
-                    Log.i(TAG, "通过HTTP下载Tap附件成功: url=$attachmentPath, size=${httpData.size}")
-                    return true
-                } else {
-                    Log.w(TAG, "HTTP下载Tap附件失败或数据为空，尝试回退: url=$attachmentPath")
+            
+            // 通过TransportManager轮询消息来获取附件
+            val messages = transportManager.pollMessages(senderId)
+            
+            // 查找匹配的附件消息
+            val attachmentMessage = messages.find { message ->
+                message.attachments.any { att -> att.fileName == attachmentPath || att.transportPath == attachmentPath }
+            }
+            
+            if (attachmentMessage != null) {
+                val transportAttachment = attachmentMessage.attachments.find { att -> 
+                    att.fileName == attachmentPath || att.transportPath == attachmentPath 
                 }
-            }
-
-            val activeChannels = channelManager.getActiveChannels(senderId)
-            if (activeChannels.isEmpty()) {
-                Log.w(TAG, "没有活跃的传输通道: senderId=$senderId")
-                return false
-            }
-            val channel = activeChannels.first()
-            val provider = transportManager.getProvider(channel.providerType)
-            if (provider == null) {
-                Log.w(TAG, "获取TransportProvider失败: providerType=${channel.providerType}")
-                return false
-            }
-
-            val fileInfo = buildFileInfoForPath(attachment, attachmentPath)
-            val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
-            when (downloadResult) {
-                is TransportResult.Success -> {
-                    val data = downloadResult.data
-                    if (data != null && data.isNotEmpty()) {
-                        saveAttachmentDataToSignal(attachment.mmsId, attachment.attachmentId, data)
-                        Log.i(TAG, "通过Provider下载Tap附件成功: path=${fileInfo.path}, size=${data.size}")
-                        true
-                    } else {
-                        Log.w(TAG, "Provider返回的附件数据为空: path=${fileInfo.path}")
-                        false
+                if (transportAttachment != null) {
+                    // 从TransportAttachment构建FileInfo
+                    val fileInfo = buildFileInfoFromTransportAttachment(transportAttachment, attachmentPath)
+                    if (fileInfo == null) {
+                        Log.w(TAG, "无法构建FileInfo: senderId=$senderId, path=$attachmentPath")
+                        return false
                     }
+                    
+                    // 获取传输通道
+                    val activeChannels = channelManager.getActiveChannels(senderId)
+                    if (activeChannels.isEmpty()) {
+                        Log.w(TAG, "没有活跃的传输通道: senderId=$senderId")
+                        return false
+                    }
+                    val channel = activeChannels.first() // 选择优先级最高的通道
+                    
+                    // 获取对应的TransportProvider
+                    val provider = transportManager.getProvider(channel.providerType)
+                    if (provider == null) {
+                        Log.w(TAG, "获取TransportProvider失败: providerType=${channel.providerType}")
+                        return false
+                    }
+                    
+                    // 通过TransportProvider下载文件数据
+                    val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
+                    
+                    when (downloadResult) {
+                        is TransportResult.Success -> {
+                            val fileData = downloadResult.data
+                            if (fileData != null && fileData.isNotEmpty()) {
+                                Log.i(TAG, "Tap附件数据下载成功: fileName=${transportAttachment.fileName}, dataSize=${fileData.size}")
+                                
+                                // 保存附件数据到Signal存储
+                                saveAttachmentDataToSignal(attachment.mmsId, attachment.attachmentId, fileData)
+                                return true
+                            } else {
+                                Log.w(TAG, "下载的附件数据为空: fileName=${transportAttachment.fileName}")
+                                return false
+                            }
+                        }
+                        is TransportResult.Failed -> {
+                            Log.e(TAG, "Tap附件数据下载失败: fileName=${transportAttachment.fileName}, error=${downloadResult.error}, message=${downloadResult.errorMessage}")
+                            return false
+                        }
+                        else -> {
+                            Log.w(TAG, "未知的下载结果类型: ${downloadResult::class.java.simpleName}")
+                            return false
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "附件信息为空: senderId=$senderId, path=$attachmentPath")
+                    return false
                 }
-                is TransportResult.Failed -> {
-                    Log.e(TAG, "Provider下载Tap附件失败: path=${fileInfo.path}, error=${downloadResult.error}, message=${downloadResult.errorMessage}")
-                    false
-                }
-                else -> {
-                    Log.w(TAG, "未知下载结果类型: ${downloadResult::class.java.simpleName}")
-                    false
-                }
+            } else {
+                Log.w(TAG, "未找到匹配的附件消息: senderId=$senderId, path=$attachmentPath")
+                return false
             }
-
+            
         } catch (e: Exception) {
             Log.e(TAG, "通过Tap下载附件异常: senderId=$senderId", e)
             false
@@ -301,52 +312,31 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
             null
         }
     }
-
-    private fun isHttpUrl(path: String): Boolean {
-        return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
-    }
-
-    private suspend fun downloadAttachmentFromUrl(url: String): ByteArray? = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val request = Request.Builder().url(url).get().build()
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Log.w(TAG, "HTTP下载Tap附件失败: url=$url, code=${response.code}")
-                    null
-                } else {
-                    response.body?.bytes()
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "通过HTTP下载Tap附件异常: url=$url", e)
-            null
-        }
-    }
     
     /**
-     * 基于Attachment记录构建FileInfo
+     * 从TransportAttachment构建FileInfo
      */
-    private fun buildFileInfoForPath(
-        attachment: DatabaseAttachment,
+    private fun buildFileInfoFromTransportAttachment(
+        transportAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
         attachmentPath: String
-    ): FileInfo {
-        val safeName = when {
-            !attachment.fileName.isNullOrBlank() -> attachment.fileName!!
-            attachmentPath.contains('/') -> attachmentPath.substringAfterLast('/').ifBlank { "attachment_${attachment.attachmentId.id}" }
-            else -> "attachment_${attachment.attachmentId.id}"
-        }
-        val safeMime = attachment.contentType ?: "application/octet-stream"
-        return FileInfo(
-            name = safeName,
-            path = attachmentPath,
-            size = attachment.size,
-            lastModified = System.currentTimeMillis(),
-            etag = attachment.remoteDigest?.toString(),
-            mimeType = safeMime,
-            metadata = mapOf(
-                "attachmentId" to attachment.attachmentId.id.toString()
+    ): org.thoughtcrime.securesms.tap.FileInfo? {
+        return try {
+            org.thoughtcrime.securesms.tap.FileInfo(
+                name = transportAttachment.fileName,
+                path = transportAttachment.transportPath ?: attachmentPath,
+                size = transportAttachment.size,
+                lastModified = System.currentTimeMillis(), // 使用当前时间，因为TransportAttachment中没有时间信息
+                etag = transportAttachment.fileHash,
+                mimeType = transportAttachment.mimeType,
+                metadata = mapOf(
+                    "attachmentId" to transportAttachment.attachmentId,
+                    "originalPath" to attachmentPath
+                )
             )
-        )
+        } catch (e: Exception) {
+            Log.e(TAG, "构建FileInfo异常: fileName=${transportAttachment.fileName}", e)
+            null
+        }
     }
     
     /**

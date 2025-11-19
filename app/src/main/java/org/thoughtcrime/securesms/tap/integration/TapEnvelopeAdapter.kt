@@ -20,10 +20,18 @@ import org.thoughtcrime.securesms.messages.MessageContentProcessor
 import org.thoughtcrime.securesms.util.RemoteConfig
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tap.utils.LogSanitizer
+import org.thoughtcrime.securesms.tap.TransportChannelManager
+import org.thoughtcrime.securesms.tap.TransportManager
+import org.thoughtcrime.securesms.tap.TransportResult
+import org.thoughtcrime.securesms.tap.FileInfo
+import org.thoughtcrime.securesms.attachments.AttachmentId
+import org.thoughtcrime.securesms.database.AttachmentTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.ByteString
 import java.util.UUID
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /**
  * Tap Envelope适配器
@@ -47,6 +55,15 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
     }
     
     private val messageDeduplicator = TransportMessageDeduplicator.getInstance(context)
+    private val transportManager = TransportManager.getInstance(context)
+    private val channelManager = TransportChannelManager.getInstance(context)
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
     
     /**
      * 处理加密的传输消息
@@ -674,6 +691,16 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             
             Log.d(TAG, "开始修复AttachmentPointer: messageId=${transportMessage.messageId}")
             
+            // 先立即下载TAP附件数据
+            if (transportMessage.attachments.isNotEmpty()) {
+                Log.d(TAG, "立即下载TAP附件数据: messageId=${transportMessage.messageId}, 附件数=${transportMessage.attachments.size}")
+                downloadTapAttachmentsImmediately(
+                    transportMessage = transportMessage,
+                    messageTimestamp = envelope.timestamp ?: System.currentTimeMillis(),
+                    envelope = envelope
+                )
+            }
+            
             // 获取原始附件列表并修复
             val originalAttachments = dataMessage.attachments
             val fixedAttachments = mutableListOf<org.whispersystems.signalservice.internal.push.AttachmentPointer>()
@@ -821,6 +848,262 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
         }
         
         return builder.build()
+    }
+    
+    /**
+     * 立即下载TAP附件数据
+     * 在消息处理阶段直接下载附件，避免后续查看时的延迟
+     */
+    private suspend fun downloadTapAttachmentsImmediately(
+        transportMessage: TransportMessage,
+        messageTimestamp: Long,
+        envelope: Envelope
+    ) {
+        try {
+            // 获取发送者的活跃通道
+            val senderId = transportMessage.senderId
+            val activeChannels = channelManager.getActiveChannels(senderId)
+            if (activeChannels.isEmpty()) {
+                Log.w(TAG, "无活跃传输通道，跳过立即下载: senderId=${LogSanitizer.sanitize(senderId)}")
+                return
+            }
+            
+            val channel = activeChannels.first()
+            val provider = transportManager.getProvider(channel.providerType)
+            if (provider == null) {
+                Log.w(TAG, "无法获取传输提供者: providerType=${channel.providerType}")
+                return
+            }
+            
+            Log.d(TAG, "开始立即下载${transportMessage.attachments.size}个附件")
+            
+            val presignedIndex = transportMessage.contentMetadata.attachmentsPresigned.associateBy { it.attachmentId }
+
+            // 逐个下载附件
+            for ((index, tapAttachment) in transportMessage.attachments.withIndex()) {
+                try {
+                    downloadSingleTapAttachment(
+                        provider = provider,
+                        channel = channel,
+                        tapAttachment = tapAttachment,
+                        messageId = transportMessage.messageId,
+                        messageTimestamp = messageTimestamp,
+                        attachmentIndex = index,
+                        envelope = envelope,
+                        presignedIndex = presignedIndex
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "下载附件失败，继续处理其他附件: attachmentId=${tapAttachment.attachmentId}", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "立即下载TAP附件过程中发生异常: messageId=${transportMessage.messageId}", e)
+        }
+    }
+    
+    /**
+     * 下载单个TAP附件
+     */
+    private suspend fun downloadSingleTapAttachment(
+        provider: org.thoughtcrime.securesms.tap.TransportProvider,
+        channel: org.thoughtcrime.securesms.tap.TransportChannel,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        messageId: String,
+        messageTimestamp: Long,
+        attachmentIndex: Int,
+        envelope: Envelope,
+        presignedIndex: Map<String, org.thoughtcrime.securesms.tap.TransportAttachmentPresigned>
+    ) {
+        try {
+            // 直接使用TransportAttachment中记录的完整TAP通道路径
+            val fullTapPath = tapAttachment.transportPath
+            if (fullTapPath.isNullOrBlank()) {
+                Log.w(TAG, "TransportAttachment中没有有效的传输路径: ${tapAttachment.fileName}")
+                return
+            }
+
+            val presigned = presignedIndex[tapAttachment.attachmentId]
+            val preferredUrl = when {
+                isHttpUrl(fullTapPath) -> fullTapPath
+                presigned != null -> presigned.url
+                else -> null
+            }
+
+            if (!preferredUrl.isNullOrBlank() && isHttpUrl(preferredUrl)) {
+                val httpData = downloadAttachmentFromUrl(preferredUrl)
+                if (httpData != null && httpData.isNotEmpty()) {
+                    saveTapAttachmentData(
+                        attachmentData = httpData,
+                        tapAttachment = tapAttachment,
+                        messageTimestamp = messageTimestamp,
+                        envelope = envelope
+                    )
+                    Log.i(TAG, "通过预签名URL下载附件成功: path=$preferredUrl")
+                    return
+                } else {
+                    Log.w(TAG, "预签名URL下载附件失败或数据为空: path=$preferredUrl，尝试回退到Provider")
+                }
+            }
+            
+            // 构建FileInfo - 使用完整的TAP通道路径
+            val fileInfo = FileInfo(
+                name = tapAttachment.fileName,
+                path = fullTapPath,
+                size = tapAttachment.size,
+                lastModified = messageTimestamp,
+                etag = tapAttachment.fileHash,
+                mimeType = tapAttachment.mimeType,
+                metadata = mapOf(
+                    "attachmentId" to tapAttachment.attachmentId,
+                    "messageId" to messageId,
+                    "attachmentIndex" to attachmentIndex.toString()
+                )
+            )
+            
+            Log.d(TAG, "下载附件: ${tapAttachment.fileName}, path=$fullTapPath")
+            
+            // 通过Provider下载文件数据
+            val downloadResult = provider.downloadFile(fileInfo, channel.metadata)
+            
+            when (downloadResult) {
+                is TransportResult.Success -> {
+                    val fileData = downloadResult.data
+                    if (fileData != null && fileData.isNotEmpty()) {
+                        Log.d(TAG, "附件下载成功: ${tapAttachment.fileName}, dataSize=${fileData.size}")
+                        
+                        // 尝试直接保存到Signal存储或保存到临时文件
+                        saveTapAttachmentData(
+                            attachmentData = fileData,
+                            tapAttachment = tapAttachment,
+                            messageTimestamp = messageTimestamp,
+                            envelope = envelope
+                        )
+                        
+                        Log.i(TAG, "TAP附件立即下载并保存成功: ${tapAttachment.fileName}")
+                    } else {
+                        Log.w(TAG, "下载的附件数据为空: ${tapAttachment.fileName}")
+                    }
+                }
+                is TransportResult.Failed -> {
+                    Log.e(TAG, "附件下载失败: ${tapAttachment.fileName}, error=${downloadResult.error}")
+                }
+                else -> {
+                    Log.w(TAG, "未知的下载结果类型: ${downloadResult::class.java.simpleName}")
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "下载单个TAP附件异常: ${tapAttachment.fileName}", e)
+        }
+    }
+
+    private fun isHttpUrl(path: String): Boolean {
+        return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
+    }
+
+    private suspend fun downloadAttachmentFromUrl(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val request = Request.Builder().url(url).get().build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "预签名URL请求失败: code=${response.code}")
+                    null
+                } else {
+                    response.body?.bytes()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "通过预签名URL下载附件异常", e)
+            null
+        }
+    }
+    
+    /**
+     * 保存TAP附件数据
+     * 优先尝试直接保存到Signal存储，失败则保存到临时文件
+     */
+    private suspend fun saveTapAttachmentData(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        messageTimestamp: Long,
+        envelope: Envelope
+    ) {
+        try {
+            Log.d(TAG, "保存TAP附件: ${tapAttachment.fileName}, size=${attachmentData.size}")
+            
+            // 验证数据完整性
+            if (attachmentData.isEmpty()) {
+                throw IllegalArgumentException("附件数据为空")
+            }
+            
+            if (attachmentData.size > 100 * 1024 * 1024) {
+                throw IllegalArgumentException("附件数据过大: ${attachmentData.size} bytes")
+            }
+            
+            // 尝试直接保存到Signal存储
+            val directSaveSuccess = tryDirectSaveToSignal(attachmentData, tapAttachment, envelope)
+            
+            if (directSaveSuccess) {
+                Log.i(TAG, "TAP附件直接保存到Signal存储成功: ${tapAttachment.fileName}")
+            } else {
+                // Fallback: 保存到临时文件，由TapAttachmentDownloadInterceptor后续处理
+                Log.d(TAG, "无法直接保存，使用临时文件机制: ${tapAttachment.fileName}")
+                saveToTemporaryFile(attachmentData, tapAttachment)
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "保存TAP附件数据异常: ${tapAttachment.fileName}", e)
+            throw e
+        }
+    }
+    
+    /**
+     * 尝试直接保存到Signal存储
+     * 通过临时文件机制与AttachmentDownloadJob集成
+     */
+    private suspend fun tryDirectSaveToSignal(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        envelope: Envelope
+    ): Boolean {
+        try {
+            // 使用临时文件机制，确保与TapAttachmentDownloadInterceptor完全兼容
+            saveToTemporaryFile(attachmentData, tapAttachment)
+            Log.d(TAG, "TAP附件已保存到临时文件，等待Signal系统处理: ${tapAttachment.fileName}")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "保存附件到临时文件失败: ${tapAttachment.fileName}", e)
+            return false
+        }
+    }
+    
+    /**
+     * 保存到临时文件
+     * 确保与TapAttachmentDownloadInterceptor的查找逻辑完全匹配
+     */
+    private fun saveToTemporaryFile(
+        attachmentData: ByteArray,
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment
+    ) {
+        val tempDir = java.io.File(context.cacheDir, "tap_attachments")
+        if (!tempDir.exists()) {
+            tempDir.mkdirs()
+        }
+        
+        val fullTapPath = tapAttachment.transportPath ?: ""
+        val pathHash = fullTapPath.hashCode().toString()
+        // 确保文件名与TapAttachmentDownloadInterceptor的解析逻辑一致
+        val fileName = if (fullTapPath.isNotBlank()) {
+            fullTapPath.substringAfterLast("/")
+        } else {
+            tapAttachment.fileName
+        }
+        val tempFileKey = "${pathHash}_${fileName}"
+        val tempFile = java.io.File(tempDir, tempFileKey)
+        
+        tempFile.writeBytes(attachmentData)
+        Log.i(TAG, "TAP附件数据已保存到临时文件: ${tempFile.absolutePath}")
     }
     
     /**

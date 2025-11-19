@@ -17,19 +17,13 @@ import kotlin.text.Charsets
 /**
  * 推送通知下载执行器
  * 
- * V2 架构 - WebSocket 推送 + 内联消息优先:
- * 1. 主流程: processInlineNotification() - 直接处理 notification.metadata.message
- * 2. 回退流程: performCompleteDownload() - 列举文件 (仅用于不含内联消息的旧通知)
- * 3. 离线流程: syncOfflineMessages() - 轮询 tap-offline/ 目录
+ * 参考FilePollingExecutor的实现，提供完整的下载流程：
+ * 1. list objects (获取文件列表)
+ * 2. filter (过滤出新文件)
+ * 3. download (下载文件)
+ * 4. parse and process (解析和处理消息)
  * 
- * 性能优化:
- * - 内联消息: 无需 listFiles,直接解析,延迟最低 (0-100ms)
- * - 文件列举: 需要 listFiles,较慢 (200-500ms)
- * - 离线轮询: 定期执行,处理推送失败的消息
- * 
- * 不再需要:
- * - 周期性文件轮询 (TapPollingService.ENABLE_POLLING = false)
- * - 主动 pull 操作 (TransportProvider.pull 已废弃)
+ * 专门用于推送通知触发的下载，复用polling模块的核心逻辑
  */
 class NotificationDownloadExecutor(
     private val context: Context
@@ -272,13 +266,11 @@ class NotificationDownloadExecutor(
             val transportMessage = TransportMessage.objectMapper.readValue(messageJson, TransportMessage::class.java)
             Log.d(TAG, "[推送下载] 已解析inline消息: messageId=${transportMessage.messageId}, source=$source")
 
-            val processedMessage = patchAttachmentsWithPresigned(transportMessage)
-            val pushContext = buildPushContext(notification)
-            val tapResult = messageProcessor.processTapTransportMessage(processedMessage, pushContext)
+            val tapResult = messageProcessor.processTapTransportMessage(transportMessage)
             val responseTime = System.currentTimeMillis() - startTime
             when (tapResult) {
                 is TapProcessResult.Success -> {
-                    NotificationDownloadResult.success(1, processedMessage.attachments.size + 1, responseTime)
+                    NotificationDownloadResult.success(1, transportMessage.attachments.size + 1, responseTime)
                 }
                 is TapProcessResult.Failed -> {
                     NotificationDownloadResult.failure(tapResult.error, responseTime)
@@ -464,17 +456,9 @@ class NotificationDownloadExecutor(
 
             var processed = 0
             var failed = 0
-            val dedupeTracker = mutableSetOf<String>()
             descriptors.forEach { descriptor ->
                 var processedThisEntry = false
                 try {
-                    val dedupeKey = buildOfflineDedupKey(descriptor)
-                    if (dedupeKey != null && !dedupeTracker.add(dedupeKey)) {
-                        Log.d(TAG, "跳过重复离线消息: key=${descriptor.key}")
-                        provider.deleteOfflineMessage(descriptor.key)
-                        return@forEach
-                    }
-                    
                     val raw = provider.downloadOfflineMessage(descriptor.key)
                     if (raw == null) {
                         failed++
@@ -520,20 +504,9 @@ class NotificationDownloadExecutor(
     }
     
     /**
-     * 执行完整的下载流程 (旧式回退逻辑)
-     * 
-     * 此方法仅用于处理不包含内联消息的旧式通知。
-     * V2 模式下优先使用 processInlineNotification()。
-     * 
-     * 流程: listFiles -> filter -> downloadFile -> process
-     * 性能影响: 需要列举文件,比内联消息慢
-     * 
-     * @deprecated V2模式主要使用内联消息,此方法仅作为回退逻辑
+     * 执行完整的下载流程
+     * 参考FilePollingExecutor的performFileBasedPolling实现
      */
-    @Deprecated(
-        message = "V2模式使用内联消息,不需要 listFiles",
-        level = DeprecationLevel.WARNING
-    )
     private suspend fun performCompleteDownload(
         provider: TransportProvider,
         metadata: TransportMetadata,
@@ -948,88 +921,6 @@ class NotificationDownloadExecutor(
             list.add(value)
         }
         return list
-    }
-
-    private fun buildOfflineDedupKey(descriptor: CosTransportProvider.OfflineMessageDescriptor): String? {
-        val groupSegment = descriptor.groupId ?: "private"
-        val fileName = descriptor.key.substringAfterLast('/')
-        val messageId = fileName.substringAfter('-', missingDelimiterValue = fileName).substringBefore('.')
-        if (messageId.isBlank()) return null
-        return "$groupSegment:$messageId"
-    }
-
-    private fun buildPushContext(notification: NotificationMessage): TapMessageProcessor.PushContext? {
-        val groupId = notification.metadata["groupId"] as? String
-        val gatewayRaw = notification.metadata["recipientGateway"]
-        val gateway = parseRecipientGatewaySnapshot(gatewayRaw)
-        return if (groupId == null && gateway == null) {
-            null
-        } else {
-            TapMessageProcessor.PushContext(groupId = groupId, recipientGateway = gateway)
-        }
-    }
-
-    private fun parseRecipientGatewaySnapshot(raw: Any?): TapMessageProcessor.RecipientGatewaySnapshot? {
-        val map = when (raw) {
-            is JSONObject -> raw.toMapDeep()
-            is Map<*, *> -> raw.mapNotNull { (k, v) ->
-                val key = k as? String ?: return@mapNotNull null
-                key to v
-            }.toMap()
-            else -> null
-        } ?: return null
-
-        val webhookUrl = map["webhookUrl"] as? String ?: return null
-        val notifySecret = map["notifySecret"] as? String ?: return null
-        val userId = map["userId"] as? String ?: return null
-
-        val metadataMap = (map["metadata"] as? Map<*, *>)?.mapNotNull { entry ->
-            val key = entry.key as? String ?: return@mapNotNull null
-            val value = entry.value as? String ?: entry.value?.toString() ?: return@mapNotNull null
-            key to value
-        }?.toMap() ?: emptyMap()
-
-        return TapMessageProcessor.RecipientGatewaySnapshot(
-            webhookUrl = webhookUrl,
-            notifySecret = notifySecret,
-            userId = userId,
-            provider = map["provider"] as? String,
-            region = map["region"] as? String,
-            endpoint = map["endpoint"] as? String,
-            offlineBucket = map["offlineBucket"] as? String,
-            presignDelegation = (map["presignDelegation"] as? Boolean) ?: false,
-            metadata = metadataMap
-        )
-    }
-
-    private fun patchAttachmentsWithPresigned(message: TransportMessage): TransportMessage {
-        val presigned = message.contentMetadata.attachmentsPresigned
-        if (presigned.isEmpty() || message.attachments.isEmpty()) {
-            return message
-        }
-
-        val index = presigned.associateBy { it.attachmentId }
-        var changed = false
-        val updated = message.attachments.map { attachment ->
-            val presignedEntry = index[attachment.attachmentId]
-            if (presignedEntry != null && (attachment.transportPath.isNullOrBlank() || !isHttpUrl(attachment.transportPath))) {
-                changed = true
-                attachment.copy(transportPath = presignedEntry.url)
-            } else {
-                attachment
-            }
-        }
-
-        return if (changed) {
-            message.copy(attachments = updated)
-        } else {
-            message
-        }
-    }
-
-    private fun isHttpUrl(path: String?): Boolean {
-        if (path.isNullOrBlank()) return false
-        return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
     }
 
 /**

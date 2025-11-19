@@ -255,27 +255,6 @@ async function markProcessed(bucket, traceId) {
     }
 }
 
-function extractRecipientGateway(event) {
-    const gateway = event.recipientGateway;
-    if (!gateway) {
-        return null;
-    }
-    if (!gateway.webhookUrl || !gateway.notifySecret || !gateway.userId) {
-        return null;
-    }
-    return {
-        webhookUrl: gateway.webhookUrl,
-        notifySecret: gateway.notifySecret,
-        userId: gateway.userId,
-        provider: gateway.provider,
-        region: gateway.region,
-        endpoint: gateway.endpoint,
-        offlineBucket: gateway.offlineBucket,
-        presignDelegation: gateway.presignDelegation,
-        metadata: gateway.metadata || {}
-    };
-}
-
 async function handleDirectMessage(event) {
     const requestId = event.traceId || event.requestId || generateTraceId();
     log('INFO', 'Handling direct message dispatch', { requestId });
@@ -318,22 +297,20 @@ async function handleDirectMessage(event) {
         };
     }
 
-    let contactConfig = extractRecipientGateway(event);
-    if (!contactConfig) {
-        try {
-            contactConfig = await loadContactConfig(bucket, recipientHash);
-        } catch (error) {
-            log('ERROR', 'Failed to load contact config for direct dispatch', {
-                bucket,
-                recipientHash,
-                error: error.message
-            });
-            return {
-                statusCode: 500,
-                deliveredCount: 0,
-                error: error.message
-            };
-        }
+    let contactConfig;
+    try {
+        contactConfig = await loadContactConfig(bucket, recipientHash);
+    } catch (error) {
+        log('ERROR', 'Failed to load contact config for direct dispatch', {
+            bucket,
+            recipientHash,
+            error: error.message
+        });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: error.message
+        };
     }
 
     if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
@@ -359,14 +336,6 @@ async function handleDirectMessage(event) {
             deliveryHint: event.deliveryHint || {}
         }
     };
-
-    if (event.groupId) {
-        notification.metadata.groupId = event.groupId;
-    }
-
-    if (event.recipientGateway) {
-        notification.metadata.recipientGateway = event.recipientGateway;
-    }
 
     const result = await sendWebhookNotification(
         contactConfig.webhookUrl,
@@ -397,205 +366,12 @@ async function handleDirectMessage(event) {
     };
 }
 
-async function storeOfflineMessage(bucket, recipientHash, groupId, notification) {
-    const timestamp = Date.now();
-    const messageId = notification.metadata.message?.messageId || 'unknown';
-    const offlineKey = `tap-offline/${recipientHash}/group/${groupId}/${timestamp}-${messageId}.json`;
-    
-    try {
-        await s3Client.send(new PutObjectCommand({
-            Bucket: bucket,
-            Key: offlineKey,
-            Body: JSON.stringify(notification),
-            ContentType: 'application/json',
-            Metadata: {
-                type: 'offline_group_message',
-                groupId: groupId,
-                recipientHash: recipientHash,
-                timestamp: timestamp.toString()
-            }
-        }));
-        log('INFO', 'Stored offline group message', { offlineKey, groupId, recipientHash });
-        return true;
-    } catch (error) {
-        log('ERROR', 'Failed to store offline group message', {
-            offlineKey,
-            groupId,
-            recipientHash,
-            error: error.message
-        });
-        return false;
-    }
-}
-
-async function handleGroupFanout(event) {
-    const requestId = event.traceId || event.requestId || generateTraceId();
-    log('INFO', 'Handling group fanout dispatch', { 
-        requestId,
-        groupId: event.groupId,
-        recipientAci: event.recipient?.aci
-    });
-
-    const groupId = event.groupId;
-    if (!groupId) {
-        log('WARN', 'Missing groupId for group fanout', { requestId });
-        return {
-            statusCode: 400,
-            deliveredCount: 0,
-            error: 'groupId missing'
-        };
-    }
-
-    const recipientHash = event.recipientHash || event.recipient?.hash;
-    if (!recipientHash) {
-        log('WARN', 'Missing recipient hash for group fanout', { requestId, groupId });
-        return {
-            statusCode: 400,
-            deliveredCount: 0,
-            error: 'recipientHash missing'
-        };
-    }
-
-    const bucket = event.configBucket || CONFIG_BUCKET;
-    if (!bucket) {
-        log('ERROR', 'CONFIG_BUCKET not configured', { requestId });
-        return {
-            statusCode: 500,
-            deliveredCount: 0,
-            error: 'CONFIG_BUCKET missing'
-        };
-    }
-
-    // 去重检查 (使用 groupId + recipientHash 组合)
-    const dedupKey = `${groupId}:${recipientHash}:${requestId}`;
-    const isDuplicate = await checkDuplicate(bucket, dedupKey);
-    if (isDuplicate) {
-        log('INFO', 'Duplicate group fanout request', { requestId, groupId, recipientHash });
-        return {
-            statusCode: 200,
-            deliveredCount: 1,
-            cached: true,
-            results: [{
-                contactId: recipientHash,
-                success: true,
-                cached: true
-            }]
-        };
-    }
-
-    // 优先使用 event.recipientGateway
-    let contactConfig = extractRecipientGateway(event);
-    if (!contactConfig) {
-        try {
-            contactConfig = await loadContactConfig(bucket, recipientHash);
-        } catch (error) {
-            log('ERROR', 'Failed to load contact config for group fanout', {
-                bucket,
-                recipientHash,
-                groupId,
-                error: error.message
-            });
-            return {
-                statusCode: 500,
-                deliveredCount: 0,
-                error: error.message
-            };
-        }
-    }
-
-    if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
-        log('WARN', 'Contact config incomplete for group fanout', { recipientHash, groupId });
-        return {
-            statusCode: 404,
-            deliveredCount: 0,
-            error: 'contact config missing'
-        };
-    }
-
-    // 构建群聊通知
-    const notification = {
-        type: 'new_message',
-        senderId: event.sender?.hash || event.sender?.aci || 'unknown',
-        timestamp: Date.now(),
-        metadata: {
-            delivery: 'group_fanout',
-            traceId: requestId,
-            groupId: groupId,
-            recipientHash: recipientHash,
-            userId: contactConfig.userId,
-            message: event.message,
-            attachmentsPresigned: event.attachmentsPresigned || [],
-            deliveryHint: event.deliveryHint || {}
-        }
-    };
-
-    // 包含 recipientGateway 信息
-    if (event.recipientGateway) {
-        notification.metadata.recipientGateway = event.recipientGateway;
-    }
-
-    const result = await sendWebhookNotification(
-        contactConfig.webhookUrl,
-        notification,
-        contactConfig.notifySecret
-    );
-
-    // 标记为已处理
-    if (result.success) {
-        await markProcessed(bucket, dedupKey);
-    }
-
-    // 离线回退机制
-    if (!result.success) {
-        log('WARN', 'Group fanout webhook failed, falling back to offline storage', {
-            groupId,
-            recipientHash,
-            error: result.error || result.statusCode
-        });
-        
-        const offlineBucket = contactConfig.offlineBucket || bucket;
-        const offlineStored = await storeOfflineMessage(offlineBucket, recipientHash, groupId, notification);
-        
-        if (offlineStored) {
-            await markProcessed(bucket, dedupKey);
-            return {
-                statusCode: 202,
-                deliveredCount: 1,
-                offline: true,
-                results: [{
-                    contactId: contactConfig.contactId || recipientHash,
-                    success: true,
-                    offline: true,
-                    statusCode: 202
-                }]
-            };
-        } else {
-            throw new Error(`Group fanout failed and offline storage failed: ${result.error || result.statusCode || 'unknown error'}`);
-        }
-    }
-
-    return {
-        statusCode: 200,
-        deliveredCount: 1,
-        results: [{
-            contactId: contactConfig.contactId || recipientHash,
-            success: true,
-            statusCode: result.statusCode,
-            error: null
-        }]
-    };
-}
-
 exports.handler = async (event) => {
     const requestId = event.requestId || 'unknown';
     
     try {
         if (event && event.operation === 'direct_message') {
             return await handleDirectMessage(event);
-        }
-
-        if (event && event.operation === 'group_fanout') {
-            return await handleGroupFanout(event);
         }
 
         log('WARN', 'Unsupported operation for F_A', {

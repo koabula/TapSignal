@@ -9,7 +9,6 @@ import androidx.annotation.WorkerThread
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.DatabaseTable
 import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.tap.group.GroupMemberGatewayInfo
 import org.thoughtcrime.securesms.tap.group.GroupV2State
 import org.thoughtcrime.securesms.tap.group.GroupV2Status
 import org.thoughtcrime.securesms.util.JsonUtils
@@ -34,7 +33,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
         private const val PROPOSER_ACI = "proposer_aci"
         private const val AGREED_MEMBERS = "agreed_members"
         private const val TOTAL_MEMBERS = "total_members"
-        private const val MEMBER_GATEWAYS = "member_gateways"
         private const val PROVIDER_TYPE = "provider_type"
         private const val CREATED_AT = "created_at"
         private const val UPDATED_AT = "updated_at"
@@ -48,7 +46,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
                 "$PROPOSER_ACI TEXT, " +
                 "$AGREED_MEMBERS TEXT NOT NULL, " +
                 "$TOTAL_MEMBERS TEXT NOT NULL, " +
-                "$MEMBER_GATEWAYS TEXT NOT NULL DEFAULT '{}', " +
                 "$PROVIDER_TYPE TEXT NOT NULL, " +
                 "$CREATED_AT INTEGER NOT NULL, " +
                 "$UPDATED_AT INTEGER NOT NULL, " +
@@ -394,7 +391,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             put(PROPOSER_ACI, state.proposerAci)
             put(AGREED_MEMBERS, serializeStringSet(state.agreedMembers))
             put(TOTAL_MEMBERS, serializeStringSet(state.totalMembers))
-            put(MEMBER_GATEWAYS, serializeGatewayMap(state.memberGatewayInfo))
             put(PROVIDER_TYPE, state.providerType)
             put(CREATED_AT, state.createdAt)
             put(UPDATED_AT, state.updatedAt)
@@ -413,7 +409,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             val proposerAci = cursor.getString(cursor.getColumnIndexOrThrow(PROPOSER_ACI))
             val agreedMembersJson = cursor.getString(cursor.getColumnIndexOrThrow(AGREED_MEMBERS))
             val totalMembersJson = cursor.getString(cursor.getColumnIndexOrThrow(TOTAL_MEMBERS))
-            val memberGatewaysJson = cursor.getString(cursor.getColumnIndexOrThrow(MEMBER_GATEWAYS))
             val providerType = cursor.getString(cursor.getColumnIndexOrThrow(PROVIDER_TYPE))
             val createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(CREATED_AT))
             val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(UPDATED_AT))
@@ -432,7 +427,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
                 proposerAci = proposerAci,
                 agreedMembers = deserializeStringSet(agreedMembersJson),
                 totalMembers = deserializeStringSet(totalMembersJson),
-                memberGatewayInfo = deserializeGatewayMap(memberGatewaysJson),
                 providerType = providerType,
                 createdAt = createdAt,
                 updatedAt = updatedAt,
@@ -457,15 +451,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
             throw IOException("序列化字符串集合失败: ${e.message}", e)
         }
     }
-
-    private fun serializeGatewayMap(map: Map<String, GroupMemberGatewayInfo>): String {
-        return try {
-            JsonUtils.toJson(map)
-        } catch (e: IOException) {
-            Log.e(TAG, "序列化群成员Gateway信息失败", e)
-            "{}"
-        }
-    }
     
     /**
      * 从 JSON 反序列化字符串集合
@@ -484,22 +469,6 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
         } catch (e: Exception) {
             Log.w(TAG, "反序列化字符串集合失败，返回空集合: json=$json", e)
             emptySet()
-        }
-    }
-
-    private fun deserializeGatewayMap(json: String?): Map<String, GroupMemberGatewayInfo> {
-        if (json.isNullOrBlank()) return emptyMap()
-        return try {
-            val mapper = JsonUtils.getMapper()
-            val type = mapper.typeFactory.constructMapType(
-                MutableMap::class.java,
-                String::class.java,
-                GroupMemberGatewayInfo::class.java
-            )
-            mapper.readValue(json, type)
-        } catch (e: Exception) {
-            Log.w(TAG, "反序列化群成员Gateway信息失败，返回空映射", e)
-            emptyMap()
         }
     }
 }

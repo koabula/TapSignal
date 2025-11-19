@@ -210,15 +210,14 @@ async function pushToWebSocket(connectionId, notification, wsFunctionUrl, userId
 /**
  * 保存通知到队列（COS）以供客户端轮询获取
  */
-async function saveOfflineMessage(recipientHash, notification, groupId = null) {
+async function saveOfflineMessage(recipientHash, notification) {
     if (!BUCKET_NAME || !recipientHash) {
         log('WARN', '无法保存离线消息，缺少bucket或recipientHash', { recipientHash });
         return;
     }
     const safeHash = recipientHash.trim().toLowerCase();
     const messageId = notification.metadata?.message?.messageId || notification.metadata?.traceId || notification.timestamp;
-    const groupSegment = groupId ? `group/${encodeURIComponent(groupId)}/` : '';
-    const key = `${OFFLINE_PREFIX}${safeHash}/${groupSegment}${Date.now()}-${messageId || 'message'}.json`;
+    const key = `${OFFLINE_PREFIX}${safeHash}/${Date.now()}-${messageId || 'message'}.json`;
 
     await new Promise((resolve, reject) => {
         cos.putObject({
@@ -349,11 +348,10 @@ exports.main_handler = async (event) => {
         }
         
         const recipientHash = request.recipient?.hash || request.recipientHash || request.notification.metadata?.recipientHash || userId;
-        const groupId = request.notification.metadata?.groupId || null;
         const connectionId = await getConnectionId(userId);
         if (!connectionId) {
             log('WARN', 'User not connected', { requestId, userId });
-            await saveOfflineMessage(recipientHash, request.notification, groupId);
+            await saveOfflineMessage(recipientHash, request.notification);
             return {
                 statusCode: 200,
                 body: JSON.stringify({
@@ -380,14 +378,13 @@ exports.main_handler = async (event) => {
                     requestId,
                     userId,
                     connectionId,
-                    error: error.message,
-                    groupId
+                    error: error.message
                 });
-                await saveOfflineMessage(recipientHash, request.notification, groupId);
+                await saveOfflineMessage(recipientHash, request.notification);
             }
         } else {
             log('WARN', 'WS_FUNCTION_URL not configured, storing offline', { requestId });
-            await saveOfflineMessage(recipientHash, request.notification, groupId);
+            await saveOfflineMessage(recipientHash, request.notification);
         }
         
         return {
