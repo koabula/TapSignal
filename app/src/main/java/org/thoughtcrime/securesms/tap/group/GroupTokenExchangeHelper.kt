@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
+import java.util.UUID
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.jobs.IndividualSendJob
@@ -12,6 +13,9 @@ import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
 import org.thoughtcrime.securesms.tap.TransportToken
+import org.thoughtcrime.securesms.tap.notification.NotificationConfig
+import org.thoughtcrime.securesms.tap.notification.NotificationConfigManager
+import org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder
 
 /**
  * 群组 Token 交换帮助类
@@ -34,6 +38,10 @@ class GroupTokenExchangeHelper(private val context: Context) {
                 }
             }
         }
+    }
+
+    private val notificationConfigManager: NotificationConfigManager by lazy {
+        NotificationConfigManager.getInstance(context)
     }
     
     /**
@@ -69,13 +77,11 @@ class GroupTokenExchangeHelper(private val context: Context) {
             Log.d(TAG, "群组成员 ACIs: totalMembers=${totalMembers.size}")
             
             // 构建群组提议消息
-            val offerMessage = TapTokenExchangeMessage(
+            val offerMessage = buildGroupTapMessage(
                 senderAci = proposerAci,
                 providerType = providerType,
-                tokenData = emptyMap(), // 群组消息中不包含单个 token，而是在 metadata 中
                 metadata = buildGroupOfferMetadata(groupId, proposerAci, myToken, totalMembers),
-                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_OFFER,
-                version = 1
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_OFFER
             )
             
             val messageBody = TapTokenExchangeMessage.encode(offerMessage)
@@ -125,13 +131,11 @@ class GroupTokenExchangeHelper(private val context: Context) {
         try {
             Log.i(TAG, "发送群组 V2 接受消息: groupId=$groupId, accepter=$accepterAci")
             
-            val acceptMessage = TapTokenExchangeMessage(
+            val acceptMessage = buildGroupTapMessage(
                 senderAci = accepterAci,
                 providerType = providerType,
-                tokenData = emptyMap(),
                 metadata = buildGroupAcceptMetadata(groupId, accepterAci, proposerAci, myToken),
-                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACCEPT,
-                version = 1
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACCEPT
             )
             
             val messageBody = TapTokenExchangeMessage.encode(acceptMessage)
@@ -177,16 +181,14 @@ class GroupTokenExchangeHelper(private val context: Context) {
         try {
             Log.i(TAG, "发送群组 V2 激活消息: groupId=$groupId")
             
-            val activateMessage = TapTokenExchangeMessage(
+            val activateMessage = buildGroupTapMessage(
                 senderAci = senderAci,
                 providerType = providerType,
-                tokenData = emptyMap(),
                 metadata = mapOf(
                     "groupId" to groupId,
                     "timestamp" to System.currentTimeMillis()
                 ),
-                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACTIVATE,
-                version = 1
+                requestType = TapTokenExchangeMessage.REQUEST_TYPE_GROUP_ACTIVATE
             )
             
             val messageBody = TapTokenExchangeMessage.encode(activateMessage)
@@ -635,6 +637,46 @@ class GroupTokenExchangeHelper(private val context: Context) {
             Log.e(TAG, "提取成员 token 失败: memberAci=$memberAci", e)
             null
         }
+    }
+
+    private suspend fun buildGroupTapMessage(
+        senderAci: String,
+        providerType: String,
+        metadata: Map<String, Any>,
+        requestType: String,
+        tokenData: Map<String, Any> = emptyMap()
+    ): TapTokenExchangeMessage {
+        val localConfig = notificationConfigManager.getLocalConfig()
+        if (localConfig != null && localConfig.validate()) {
+            val userId = extractUserId(localConfig)
+            val gatewayConfig = TapGatewayConfigBuilder.build(localConfig)
+            return TapTokenExchangeMessage.createWithWebhook(
+                senderAci = senderAci,
+                providerType = providerType,
+                tokenData = tokenData,
+                metadata = metadata,
+                requestType = requestType,
+                webhookUrl = localConfig.webhookUrl,
+                notifySecret = localConfig.notifySecret,
+                userId = userId,
+                gatewayConfig = gatewayConfig,
+                channelVersion = TapTokenExchangeMessage.CURRENT_CHANNEL_VERSION
+            )
+        }
+        return TapTokenExchangeMessage(
+            senderAci = senderAci,
+            providerType = providerType,
+            tokenData = tokenData,
+            metadata = metadata,
+            requestType = requestType,
+            channelVersion = TapTokenExchangeMessage.CURRENT_CHANNEL_VERSION,
+            version = 1
+        )
+    }
+
+    private fun extractUserId(config: NotificationConfig): String {
+        val metadataUserId = config.pushServiceInfo.metadata["userId"] as? String
+        return metadataUserId ?: UUID.randomUUID().toString().replace("-", "").take(16)
     }
 }
 

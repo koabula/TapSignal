@@ -6,13 +6,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.tap.TransportChannelManager
-import org.thoughtcrime.securesms.tap.TransportManager
-import org.thoughtcrime.securesms.tap.TransportProvider
-import org.thoughtcrime.securesms.tap.TransportResult
-import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
-import org.thoughtcrime.securesms.tap.integration.TapProcessResult
+import org.thoughtcrime.securesms.tap.notification.NotificationDownloadExecutor
+import org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata
 
 /**
  * 推送服务离线消息处理器
@@ -36,19 +32,11 @@ class NotificationOfflineHandler private constructor(
                 }
             }
         }
-        
-        // 离线消息处理最大超时时间
-        private const val OFFLINE_PROCESS_TIMEOUT_MS = 30_000L
-        
-        // 单次批量处理最大消息数
-        private const val MAX_BATCH_SIZE = 50
     }
     
     private val mutex = Mutex()
-    private val transportManager = TransportManager.getInstance(context)
     private val channelManager = TransportChannelManager.getInstance(context)
-    private val messageProcessor = TapMessageProcessor.getInstance(context)
-    private val pollingStateTable = SignalDatabase.transportPollingStates
+    private val downloadExecutor = NotificationDownloadExecutor.getInstance(context)
     
     private var isProcessing = false
     private var lastProcessTime = 0L
@@ -78,37 +66,36 @@ class NotificationOfflineHandler private constructor(
         
         try {
             Log.i(TAG, "开始处理离线消息")
-            
-            val activeChannels = withContext(Dispatchers.IO) {
-                channelManager.getAllActiveChannels()
-            }
-            
-            if (activeChannels.isEmpty()) {
-                Log.d(TAG, "没有活跃的传输通道")
+
+            val recipientHashes = collectRecipientHashes()
+
+            if (recipientHashes.isEmpty()) {
+                Log.d(TAG, "离线同步：无可用 recipient hash，跳过")
                 return
             }
-            
-            Log.i(TAG, "找到 ${activeChannels.size} 个活跃通道，开始检查离线消息")
-            
+
+            Log.i(TAG, "离线同步：准备处理 ${recipientHashes.size} 个 hash")
+
             var totalMessagesProcessed = 0
-            
-            for (channel in activeChannels) {
+            var totalFailed = 0
+
+            for (hash in recipientHashes) {
                 try {
-                    val messagesProcessed = processChannelOfflineMessages(channel)
-                    totalMessagesProcessed += messagesProcessed
-                    
-                    if (messagesProcessed > 0) {
-                        Log.i(TAG, "通道 ${channel.recipientId} 处理了 $messagesProcessed 条离线消息")
-                    }
+                    val result = downloadExecutor.syncOfflineMessages(hash)
+                    totalMessagesProcessed += result.processed
+                    totalFailed += result.failed
+
+                    Log.i(TAG, "离线同步完成: hash=$hash processed=${result.processed} failed=${result.failed} scanned=${result.scanned}")
                 } catch (e: Exception) {
-                    Log.e(TAG, "处理通道 ${channel.recipientId} 离线消息失败", e)
+                    Log.e(TAG, "离线同步失败: hash=$hash", e)
+                    totalFailed++
                 }
             }
-            
+
             if (totalMessagesProcessed > 0) {
-                Log.i(TAG, "离线消息处理完成，共处理 $totalMessagesProcessed 条消息")
+                Log.i(TAG, "离线消息处理完成，共处理 $totalMessagesProcessed 条消息，失败 $totalFailed")
             } else {
-                Log.d(TAG, "没有发现离线消息")
+                Log.d(TAG, "离线同步完成，无新增消息，失败 $totalFailed")
             }
             
         } catch (e: Exception) {
@@ -120,136 +107,18 @@ class NotificationOfflineHandler private constructor(
         }
     }
     
-    /**
-     * 处理单个通道的离线消息
-     */
-    private suspend fun processChannelOfflineMessages(
-        channel: org.thoughtcrime.securesms.tap.TransportChannel
-    ): Int {
+    private suspend fun collectRecipientHashes(): Set<String> {
         return withContext(Dispatchers.IO) {
-            try {
-                val provider = transportManager.getProvider(channel.providerType)
-                if (provider == null) {
-                    Log.w(TAG, "Provider不可用: ${channel.providerType}")
-                    return@withContext 0
-                }
-                
-                val metadata = channel.metadata
-                
-                // 获取轮询状态
-                val pollingState = pollingStateTable.getPollingState(
-                    channel.recipientId,
-                    channel.providerType
-                )
-                
-                // 列出文件
-                val basePath = metadata.getReceiveMetadata().path
-                val pollingPaths = listOf("${basePath}messages/", "${basePath}attachments/")
-                
-                val allFiles = mutableListOf<org.thoughtcrime.securesms.tap.FileInfo>()
-                for (path in pollingPaths) {
-                    val listResult = provider.listFiles(path, metadata)
-                    
-                    if (listResult is TransportResult.Success && !listResult.files.isNullOrEmpty()) {
-                        allFiles.addAll(listResult.files)
-                    }
-                }
-                
-                if (allFiles.isEmpty()) {
-                    return@withContext 0
-                }
-                
-                // 过滤出新文件
-                val processedFiles = pollingState?.processedFiles ?: emptySet()
-                val lastProcessedTime = pollingState?.lastProcessedTime ?: 0L
-                
-                val newFiles = allFiles.filter { file ->
-                    !processedFiles.contains(file.name) && 
-                    file.lastModified > lastProcessedTime
-                }.sortedBy { it.lastModified }
-                
-                if (newFiles.isEmpty()) {
-                    return@withContext 0
-                }
-                
-                Log.d(TAG, "通道 ${channel.recipientId} 发现 ${newFiles.size} 个新文件")
-                
-                // 处理新文件（限制批量大小）
-                val filesToProcess = newFiles.take(MAX_BATCH_SIZE)
-                var messagesProcessed = 0
-                val newProcessedFiles = mutableSetOf<String>()
-                
-                for (file in filesToProcess) {
-                    try {
-                        val processed = processOfflineFile(provider, file, metadata)
-                        if (processed) {
-                            messagesProcessed++
-                            newProcessedFiles.add(file.name)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "处理离线文件失败: ${file.name}", e)
-                    }
-                }
-                
-                // 更新轮询状态
-                if (messagesProcessed > 0) {
-                    pollingStateTable.recordSuccessfulPoll(
-                        channel.recipientId,
-                        channel.providerType,
-                        newProcessedFiles,
-                        messagesProcessed
-                    )
-                }
-                
-                messagesProcessed
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "处理通道离线消息异常", e)
-                0
+            val activeChannels = channelManager.getAllActiveChannels()
+            if (activeChannels.isEmpty()) {
+                emptySet()
+            } else {
+                activeChannels.mapNotNull { channel ->
+                    val metadata = channel.metadata
+                    val cosMetadata = metadata as? CosTransportMetadata
+                    cosMetadata?.peerHashedId
+                }.toSet()
             }
-        }
-    }
-    
-    /**
-     * 处理单个离线文件
-     */
-    private suspend fun processOfflineFile(
-        provider: TransportProvider,
-        file: org.thoughtcrime.securesms.tap.FileInfo,
-        metadata: org.thoughtcrime.securesms.tap.TransportMetadata
-    ): Boolean {
-        return try {
-            // 下载文件
-            val downloadResult = provider.downloadFile(file, metadata)
-            
-            if (downloadResult !is TransportResult.Success || downloadResult.data == null) {
-                Log.w(TAG, "下载离线文件失败: ${file.name}")
-                return false
-            }
-            
-            // 解析消息
-            val message = provider.parseTransportMessage(downloadResult.data, file, metadata)
-            if (message == null) {
-                Log.d(TAG, "文件不是消息文件，跳过: ${file.name}")
-                return false
-            }
-            
-            // 处理消息
-            val processResult = messageProcessor.processTapTransportMessage(message)
-            when (processResult) {
-                is TapProcessResult.Success -> {
-                    Log.d(TAG, "离线消息处理成功: ${file.name}")
-                    true
-                }
-                is TapProcessResult.Failed -> {
-                    Log.w(TAG, "离线消息处理失败: ${file.name}, error=${processResult.error}")
-                    false
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "处理离线文件异常: ${file.name}", e)
-            false
         }
     }
     

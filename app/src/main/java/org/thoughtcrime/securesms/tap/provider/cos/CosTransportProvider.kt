@@ -19,6 +19,7 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.notification.*
 import org.thoughtcrime.securesms.tap.provider.cos.utils.PresignedUrlGenerator
 import org.thoughtcrime.securesms.tap.provider.cos.utils.S3CompatiblePresignedUrlGenerator
 import org.thoughtcrime.securesms.tap.provider.cos.notification.LambdaDispatchResult
+import org.thoughtcrime.securesms.tap.group.GroupMemberGatewayInfo
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -205,9 +206,18 @@ class CosTransportProvider(
     }
 
     /**
-     * 从COS拉取消息（废弃方法，保持向下兼容）
+     * 从COS拉取消息 (已废弃)
+     * 
+     * 此方法已废弃,V2模式下完全使用 WebSocket 推送 + 内联消息。
+     * 不再需要主动拉取,仅保留作为历史兼容。
+     * 
+     * @deprecated V2模式使用 WebSocket 推送,不需要 pull 操作
      */
-    @Deprecated("使用 listFiles + downloadFile 替代")
+    @Deprecated(
+        message = "V2模式使用 WebSocket 推送 + 内联消息,不需要 pull",
+        replaceWith = ReplaceWith("使用 WebSocket 推送机制"),
+        level = DeprecationLevel.WARNING
+    )
     override suspend fun pull(metadata: TransportMetadata): TransportResult {
         return withContext(Dispatchers.IO) {
             try {
@@ -2491,7 +2501,8 @@ class CosTransportProvider(
     data class OfflineMessageDescriptor(
         val key: String,
         val size: Long,
-        val lastModified: Long
+        val lastModified: Long,
+        val groupId: String?
     )
 
     suspend fun listOfflineMessages(recipientHash: String): List<OfflineMessageDescriptor> {
@@ -2501,10 +2512,12 @@ class CosTransportProvider(
                 val prefix = buildOfflinePrefix(recipientHash)
                 val files = cosClient.listFiles(prefix)
                 files.map { cosFile ->
+                    val key = cosFile.name
                     OfflineMessageDescriptor(
-                        key = cosFile.name,
+                        key = key,
                         size = cosFile.size,
-                        lastModified = cosFile.lastModified
+                        lastModified = cosFile.lastModified,
+                        groupId = parseGroupIdFromOfflineKey(key)
                     )
                 }.sortedBy { it.lastModified }
             } catch (e: Exception) {
@@ -2547,6 +2560,15 @@ class CosTransportProvider(
         }
     }
 
+    private fun parseGroupIdFromOfflineKey(key: String): String? {
+        val marker = "/group/"
+        val index = key.indexOf(marker)
+        if (index < 0) return null
+        val remainder = key.substring(index + marker.length)
+        val groupSegment = remainder.substringBefore('/')
+        return groupSegment.takeIf { it.isNotBlank() }
+    }
+
     private fun shouldGeneratePresignedUrl(path: String): Boolean {
         return path.contains("/attachments/")
     }
@@ -2586,8 +2608,10 @@ class CosTransportProvider(
         }
         val traceId = UUID.randomUUID().toString()
 
+        val overrides = metadata.groupDispatchOverrides
+        val operation = if (overrides != null) "group_fanout" else "direct_message"
         return JSONObject().apply {
-            put("operation", "direct_message")
+            put("operation", operation)
             put("version", "3.0")
             put("traceId", traceId)
             put("timestamp", System.currentTimeMillis())
@@ -2599,17 +2623,38 @@ class CosTransportProvider(
                 put("provider", cosConfig.provider.name.lowercase())
             })
             put("recipient", JSONObject().apply {
-                put("aci", message.recipientId)
-                put("hash", metadata.peerHashedId)
+                put("aci", overrides?.recipientAci ?: message.recipientId)
+                put("hash", overrides?.recipientHash ?: metadata.peerHashedId)
             })
-            put("recipientHash", metadata.peerHashedId)
+            put("recipientHash", overrides?.recipientHash ?: metadata.peerHashedId)
             put("configBucket", metadata.myBucketName)
+            overrides?.let { groupOverride ->
+                put("groupId", groupOverride.groupId)
+                put("recipientGateway", buildRecipientGatewayPayload(groupOverride.gatewayInfo))
+                put("groupMembers", JSONArray(groupOverride.groupMembers))
+            }
             put("message", messageJson)
             put("attachmentsPresigned", attachmentsArray)
             put("deliveryHint", JSONObject().apply {
                 put("channel", "websocket")
                 put("fallback", "s3-offline")
             })
+        }
+    }
+
+    private fun buildRecipientGatewayPayload(info: GroupMemberGatewayInfo): JSONObject {
+        return JSONObject().apply {
+            putOpt("provider", info.provider)
+            putOpt("endpoint", info.endpoint)
+            putOpt("region", info.region)
+            putOpt("offlineBucket", info.offlineBucket)
+            putOpt("presignDelegation", info.presignDelegation)
+            putOpt("webhookUrl", info.webhookUrl)
+            putOpt("notifySecret", info.notifySecret)
+            putOpt("userId", info.userId)
+            if (info.metadata.isNotEmpty()) {
+                put("metadata", JSONObject(info.metadata))
+            }
         }
     }
 }
