@@ -1805,7 +1805,6 @@ class ConversationFragment :
                   providerType = "cos",
                   tokenData = generatedToken.toMap(),
                   metadata = mapOf(
-                    "providerConfig" to providerConfig,
                     "channelId" to channelId,
                     "recipientAci" to recipientAci
                   ),
@@ -1822,7 +1821,6 @@ class ConversationFragment :
                   providerType = "cos",
                   tokenData = generatedToken.toMap(),
                   metadata = mapOf(
-                    "providerConfig" to providerConfig,
                     "channelId" to channelId,
                     "recipientAci" to recipientAci
                   ),

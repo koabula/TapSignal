@@ -75,24 +75,27 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                if (!gatewayOnly) {
-                    // 3. 解析并保存接收到的Token（A发给B的Token）
+                // 3. 解析并保存接收到的Token（A发给B的Token）
+                // 即使是Gateway-only通道，如果有Token数据也应该保存
+                if (!gatewayOnly || tokenExchangeMessage.tokenData.isNotEmpty()) {
                     val receivedTokenData = tokenExchangeMessage.tokenData
-                    val receivedToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(receivedTokenData)
-                    if (receivedToken == null) {
-                        Log.e(TAG, "无法解析接收到的Token数据")
-                        return@launch
+                    if (receivedTokenData.isNotEmpty()) {
+                        val receivedToken = org.thoughtcrime.securesms.tap.TransportTokenFactory.fromMap(receivedTokenData)
+                        if (receivedToken == null) {
+                            Log.e(TAG, "无法解析接收到的Token数据")
+                            return@launch
+                        }
+                        
+                        val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
+                        if (!saved) {
+                            Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
+                            return@launch
+                        }
+                        
+                        Log.i(TAG, "[Token交换] B端接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
                     }
-                    
-                    val saved = tokenPool.addReceivedToken(senderAci, receivedToken)
-                    if (!saved) {
-                        Log.e(TAG, "保存接收Token失败: senderId=$senderId, senderAci=$senderAci")
-                        return@launch
-                    }
-                    
-                    Log.i(TAG, "[Token交换] B端接收Token保存成功: senderId=$senderId, senderAci=$senderAci, tokenId=${receivedToken.tokenId}")
                 } else {
-                    Log.d(TAG, "Gateway-only握手，跳过接收Token保存: senderAci=$senderAci")
+                    Log.d(TAG, "Gateway-only握手且无Token数据，跳过接收Token保存: senderAci=$senderAci")
                 }
                 
                 // 4. 执行对称操作 - 生成B的Token并发送给A
@@ -287,7 +290,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 Log.w(TAG, "B端清理旧Channel失败", e)
             }
             
-            if (originalMessage.isGatewayOnlyChannel()) {
+            if (originalMessage.isGatewayOnlyChannel() && originalMessage.tokenData.isEmpty()) {
                 handleGatewayOnlyAcceptance(context, senderId, originalMessage, channelVersion, provider, providerConfigMap)
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
                 notificationManager.cancel(senderId.hashCode())
@@ -493,7 +496,6 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
         channelVersion: Int
     ): TapTokenExchangeMessage {
         val metadata = mapOf(
-            "providerConfig" to providerConfig,
             "recipientAci" to originalMessage.senderAci,
             "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
         )

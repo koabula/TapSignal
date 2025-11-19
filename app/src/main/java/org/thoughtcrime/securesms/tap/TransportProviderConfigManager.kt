@@ -619,8 +619,8 @@ class TransportProviderConfigManager private constructor(private val context: Co
             val gatewayProvider = (configMap["gatewayProvider"] as? String).takeUnless { it.isNullOrEmpty() }
             val offlineBucket = (configMap["offlineBucket"] as? String).takeUnless { it.isNullOrEmpty() }
             val presignDelegation = configMap["presignDelegation"] as? Boolean ?: false
-            @Suppress("UNCHECKED_CAST")
-            val gatewayMetadata = configMap["gatewayMetadata"] as? Map<String, Any> ?: emptyMap()
+            val gatewayMetadataAny = configMap["gatewayMetadata"] as? Map<*, *> ?: emptyMap<Any, Any>()
+            val gatewayMetadata = gatewayMetadataAny.entries.associate { (k, v) -> k.toString() to v.toString() }
             
             ContactNotificationConfig(
                 contactId = contactIdValue,

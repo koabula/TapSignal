@@ -598,7 +598,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 }
             }
 
-            if (tokenExchangeMessage.isGatewayOnlyChannel()) {
+            if (tokenExchangeMessage.isGatewayOnlyChannel() && tokenExchangeMessage.tokenData.isEmpty()) {
                 val upgraded = channelManager.upgradeChannelToFullActive(
                     senderId.toString(),
                     tokenExchangeMessage.providerType,
@@ -607,12 +607,22 @@ class TapMessageProcessor private constructor(private val context: Context) {
                         gatewayOnly = true
                     )
                 )
-                return if (upgraded) {
+                if (upgraded) {
                     Log.i(TAG, "[Token交换] Gateway-only通道激活成功: senderId=$senderId")
-                    TapProcessResult.Success("Gateway-only通道已激活")
+                    
+                    // 异步处理后续操作（发送确认消息和插入系统消息）
+                    processorScope.launch {
+                        try {
+                            handlePostUpgradeOperations(senderId, tokenExchangeMessage.providerType)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[Token交换] A端后续操作处理异常: senderId=$senderId", e)
+                        }
+                    }
+                    
+                    return TapProcessResult.Success("Gateway-only通道已激活")
                 } else {
                     Log.w(TAG, "[Token交换] Gateway-only通道升级失败: senderId=$senderId")
-                    TapProcessResult.Failed("通道升级失败")
+                    return TapProcessResult.Failed("通道升级失败")
                 }
             }
             
@@ -655,7 +665,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 senderId.toString(),
                 tokenExchangeMessage.providerType,
                 org.thoughtcrime.securesms.tap.TransportChannelManager.ChannelUpgradeOptions(
-                    channelVersion = channelVersion
+                    channelVersion = channelVersion,
+                    gatewayOnly = tokenExchangeMessage.isGatewayOnlyChannel()
                 )
             )
             if (upgraded) {
@@ -1222,6 +1233,23 @@ private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.rec
             )
             return if (upgraded) {
                 Log.i(TAG, "[Token交换] B端Gateway-only通道升级成功: senderId=$senderId")
+                
+                // B端插入v2 mode启用提示消息
+                try {
+                    // 改为后台Job异步插入，避免与主处理流程争用数据库连接
+                    try {
+                        org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager.add(
+                            org.thoughtcrime.securesms.tap.jobs.TapInsertV2EnabledMessageJob(senderId)
+                        )
+                        Log.i(TAG, "已调度v2模式启用提示消息插入Job: recipientId=$senderId")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "调度v2模式启用消息Job失败，尝试直接插入（可能阻塞）: recipientId=$senderId", e)
+                        insertV2ModeEnabledMessage(senderId)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "插入v2模式提示消息失败: senderId=$senderId", e)
+                }
+
                 TapProcessResult.Success("Gateway-only通道已激活")
             } else {
                 Log.w(TAG, "[Token交换] Gateway-only通道升级失败: senderId=$senderId")

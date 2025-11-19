@@ -120,11 +120,6 @@ data class NotificationConfig(
  *           注意：此字段已废弃，不应再使用。WebSocket管理端点应存储在全局NotificationConfig中，
  *           因为它是本地配置，所有联系人共享，不需要为每个联系人重复存储。
  *           保留此字段仅为向后兼容，新代码应使用NotificationConfig.websocketManagementEndpoint。
- * @property gatewayRegion 【待移除】Gateway区域信息，仅用于Phase 3之前的兼容
- * @property gatewayProvider 【待移除】Gateway提供商，仅用于Phase 3之前的兼容
- * @property offlineBucket 【待移除】离线消息bucket，Phase 3将统一使用Gateway管理
- * @property presignDelegation 【待移除】预签名委托标志，Phase 3将移除
- * @property gatewayMetadata 【待移除】Gateway元数据，Phase 3将移除
  */
 data class ContactNotificationConfig(
     val contactId: String,
@@ -136,16 +131,11 @@ data class ContactNotificationConfig(
     val verified: Boolean = false,
     @Deprecated("使用 NotificationConfig.websocketManagementEndpoint 替代")
     val websocketManagementEndpoint: String? = null,
-    @Deprecated("Phase 3将移除此字段")
     val gatewayRegion: String? = null,
-    @Deprecated("Phase 3将移除此字段")
     val gatewayProvider: String? = null,
-    @Deprecated("Phase 3将移除此字段")
     val offlineBucket: String? = null,
-    @Deprecated("Phase 3将移除此字段")
     val presignDelegation: Boolean = false,
-    @Deprecated("Phase 3将移除此字段")
-    val gatewayMetadata: Map<String, Any> = emptyMap()
+    val gatewayMetadata: Map<String, String> = emptyMap()
 ) {
     fun validate(): Boolean {
         return contactId.isNotEmpty() && 

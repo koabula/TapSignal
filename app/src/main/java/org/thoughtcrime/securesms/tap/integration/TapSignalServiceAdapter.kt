@@ -1262,29 +1262,9 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 }
             }
             
-            // 3. 修复轮询问题
-            try {
-                val pollingService = org.thoughtcrime.securesms.tap.polling.TapPollingService.getInstance(context)
-                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
-                val channels = channelManager.getActiveChannels(recipientAci)
-                
-                if (channels.isNotEmpty()) {
-                    val startResult = pollingService.startPolling()
-                    if (startResult) {
-                        channels.forEach { channel ->
-                            if (channel.metadata != null) {
-                                val addResult = pollingService.addPollingTarget(recipientAci, channel.metadata!!, channel)
-                                if (addResult) {
-                                    Log.i(TAG, "自动修复成功: 已添加轮询目标")
-                                    fixedIssues++
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (pollingEx: Exception) {
-                Log.e(TAG, "自动修复失败: 轮询启动异常", pollingEx)
-            }
+            // 3. 修复轮询问题 (已废弃)
+            // V2模式下不再使用轮询，跳过此步骤
+            Log.i(TAG, "自动修复: 跳过轮询修复 (已废弃)")
             
             Log.i(TAG, "自动修复完成，修复问题数: $fixedIssues")
             return fixedIssues > 0

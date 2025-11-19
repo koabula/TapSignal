@@ -145,7 +145,7 @@ class ContactWebhookManager(
                         offlineBucket = jsonConfig.optString("offlineBucket", null),
                         presignDelegation = jsonConfig.optBoolean("presignDelegation", false),
                         gatewayMetadata = jsonConfig.optJSONObject("gatewayMetadata")?.let { obj ->
-                            obj.keys().asSequence().associateWith { key -> obj.get(key) }
+                            obj.keys().asSequence().associateWith { key -> obj.get(key).toString() }
                         } ?: emptyMap()
                     )
                     
@@ -205,7 +205,7 @@ class ContactWebhookManager(
                                     offlineBucket = jsonConfig.optString("offlineBucket", null),
                                     presignDelegation = jsonConfig.optBoolean("presignDelegation", false),
                                     gatewayMetadata = jsonConfig.optJSONObject("gatewayMetadata")?.let { obj ->
-                                        obj.keys().asSequence().associateWith { key -> obj.get(key) }
+                                        obj.keys().asSequence().associateWith { key -> obj.get(key).toString() }
                                     } ?: emptyMap()
                                 )
                                 

@@ -651,97 +651,53 @@ class CosTransportProvider(
     }
 
     /**
-     * 生成访问Token - 直接使用COS客户端生成临时凭证
+     * 生成访问Token - 简化版，不再创建IAM子用户
+     * 
+     * 在新的Lambda+Gateway架构下，不再需要为每个会话创建独立的IAM子用户。
+     * Token仅作为会话标识和逻辑隔离使用。
      */
     override suspend fun generateToken(request: TransportTokenRequest): TransportToken? {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "开始生成COS传输Token: recipientId=${request.recipientId}")
+                Log.i(TAG, "开始生成COS传输Token (V2 Mode): recipientId=${request.recipientId}")
                 
-                // 1. 使用已有的COS配置
-                val tapCosConfig = cosConfig
-                
-                // 2. 验证请求参数
+                // 1. 验证请求参数
                 if (!request.validate()) {
                     Log.w(TAG, "Token请求参数无效: $request")
                     return@withContext null
                 }
                 
-                // 3. 生成目录名（添加时间戳避免复用旧目录）
+                // 2. 生成目录名（添加时间戳避免复用旧目录）
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
                 val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
                 val timestamp = System.currentTimeMillis()
                 val channelDirectoryName = "${myHashedId}_${timestamp}"
                 val channelDirectoryPath = "/v2-channels/$channelDirectoryName/"
                 
-                // 生成子用户名（包含时间戳确保唯一性）
-                val randomSuffix = (1000..9999).random()
-                val subUserName = "signal-cos-signal-v2-${timestamp}-${randomSuffix}"
-                
-                Log.d(TAG, "生成子用户标识: userName=$subUserName, directoryPath=${channelDirectoryPath}outbox/, hashedId=$myHashedId, timestamp=$timestamp")
-                
-                // 4. 创建COS客户端和子用户管理器
-                val cosClient = CosClientFactory.createClient(tapCosConfig, context)
-                
-                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
-                
-                // 5. 创建通道目录结构
-                try {
-                    Log.d(TAG, "创建COS v2通道目录结构: $channelDirectoryPath")
-                    
-                    // 创建主通道目录
-                    cosClient.createDirectory(channelDirectoryPath)
-                    
-                    // 创建子目录结构 - 只创建messages和attachments目录，符合设计要求
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/")           // outbox主目录
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/messages/")  // 文本消息目录
-                    cosClient.createDirectory("${channelDirectoryPath}outbox/attachments/") // 附件目录
-                    
-                    Log.i(TAG, "COS v2通道目录结构创建成功")
-                } catch (e: Exception) {
-                    Log.e(TAG, "创建COS v2通道目录结构失败", e)
-                    throw e
-                }
-                
-                // 6. 创建子用户并分配权限
-                val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
-                // 修复: 使用通配符路径，允许访问该hash下所有timestamp版本的目录
-                // 这样即使channelId的timestamp部分变化（重新部署、重新握手），IAM权限仍然有效
-                val wildcardDirectoryPath = "/v2-channels/${myHashedId}_*/outbox"
-                val subUserCredential = subUserManager.createSubUser(
-                    userName = subUserName,
-                    directoryPath = wildcardDirectoryPath,
-                    permissions = cosPermission
-                )
-                
-                Log.i(TAG, "子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, " +
-                    "accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}, " +
-                    "wildcardPath=$wildcardDirectoryPath")
-                
-                // 7. 计算过期时间
+                // 3. 计算过期时间
                 val expirationTime = if (request.validityDurationMs > 0L) {
                     System.currentTimeMillis() + request.validityDurationMs
                 } else {
-                    // 按照设计要求，使用长期有效的Token
                     Long.MAX_VALUE
                 }
                 
-                // 8. 创建TransportToken（包含通道目录路径）
+                // 4. 创建TransportToken（使用占位符凭证）
+                // 在新架构中，实际的数据传输通过Lambda/Gateway进行，不需要S3凭证
                 val token = org.thoughtcrime.securesms.tap.CosTransportToken(
-                    tokenId = "cos-${subUserCredential.userName}-${timestamp}",
+                    tokenId = "cos-v2-${timestamp}",
                     recipientId = request.recipientId,
                     permissions = request.requestedPermissions,
                     expirationTime = expirationTime,
-                    accessKeyId = subUserCredential.accessKeyId,
-                    secretAccessKey = subUserCredential.secretAccessKey,
-                    sessionToken = null, // 永久凭证不需要sessionToken
+                    accessKeyId = "PLACEHOLDER_KEY", // 不再创建真实IAM用户
+                    secretAccessKey = "PLACEHOLDER_SECRET",
+                    sessionToken = null,
                     region = cosConfig.region,
                     bucketName = cosConfig.bucketName,
                     cloudProvider = cosConfig.provider.name,
-                    channelPath = "${channelDirectoryPath}outbox/" // 保存完整的通道路径（包含时间戳）
+                    channelPath = "${channelDirectoryPath}outbox/"
                 )
                 
-                Log.i(TAG, "COS传输Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, recipientId=${LogSanitizer.sanitize(request.recipientId)}")
+                Log.i(TAG, "COS传输Token生成成功 (无IAM): tokenId=${LogSanitizer.sanitize(token.tokenId)}")
                 token
                 
             } catch (e: Exception) {
@@ -752,15 +708,12 @@ class CosTransportProvider(
     }
     
     /**
-     * 为群组生成Token
-     * 
-     * 创建群组目录结构：/group/{groupId}/messages/ 和 /group/{groupId}/attachments/
-     * 生成只读Token供其他成员轮询使用
+     * 为群组生成Token - 简化版，不再创建IAM子用户
      */
     override suspend fun generateGroupToken(groupId: String, request: TransportTokenRequest): TransportToken? {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "开始生成群组Token: groupId=${LogSanitizer.sanitize(groupId)}")
+                Log.i(TAG, "开始生成群组Token (V2 Mode): groupId=${LogSanitizer.sanitize(groupId)}")
                 
                 // 1. 验证请求参数
                 if (!request.validate()) {
@@ -768,71 +721,32 @@ class CosTransportProvider(
                     return@withContext null
                 }
                 
-                // 2. 构建群组目录路径（简化路径，直接使用 /group/{groupId}/）
+                // 2. 构建群组目录路径
                 val groupDirectoryPath = "${providerConfig.groupPathPrefix}${groupId}/"
-                
-                Log.d(TAG, "群组目录路径: $groupDirectoryPath")
-                
-                // 3. 创建COS客户端和子用户管理器
-                val cosClient = CosClientFactory.createClient(cosConfig, context)
-                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
-                
-                // 4. 创建群组目录结构
-                try {
-                    Log.d(TAG, "创建群组目录结构: $groupDirectoryPath")
-                    
-                    // 创建群组主目录
-                    cosClient.createDirectory(groupDirectoryPath)
-                    
-                    // 创建子目录：messages 和 attachments（去掉outbox层级）
-                    cosClient.createDirectory("${groupDirectoryPath}messages/")
-                    cosClient.createDirectory("${groupDirectoryPath}attachments/")
-                    
-                    Log.i(TAG, "群组目录结构创建成功: $groupDirectoryPath")
-                } catch (e: Exception) {
-                    Log.e(TAG, "创建群组目录结构失败: groupId=${LogSanitizer.sanitize(groupId)}", e)
-                    throw e
-                }
-                
-                // 5. 生成子用户名（标识为群组token）
                 val timestamp = System.currentTimeMillis()
-                val randomSuffix = (1000..9999).random()
-                val subUserName = "signal-group-${groupId.take(8)}-${timestamp}-${randomSuffix}"
                 
-                Log.d(TAG, "生成群组子用户: userName=$subUserName")
-                
-                // 6. 创建只读子用户，权限范围是群组目录
-                val cosPermission = mapTransportPermissionToCosPermission(request.requestedPermissions)
-                val subUserCredential = subUserManager.createSubUser(
-                    userName = subUserName,
-                    directoryPath = groupDirectoryPath.trimEnd('/'), // 允许其他成员访问我的群组目录
-                    permissions = cosPermission // 应该是READ_ONLY
-                )
-                
-                Log.i(TAG, "群组子用户创建成功: userName=${LogSanitizer.sanitize(subUserName)}, accessKeyId=${LogSanitizer.sanitize(subUserCredential.accessKeyId, "accessKeyId")}")
-                
-                // 7. 计算过期时间
+                // 3. 计算过期时间
                 val expirationTime = if (request.validityDurationMs > 0L) {
                     System.currentTimeMillis() + request.validityDurationMs
                 } else {
-                    Long.MAX_VALUE // 长期有效
+                    Long.MAX_VALUE
                 }
                 
-                // 8. 创建群组TransportToken
+                // 4. 创建群组TransportToken（使用占位符凭证）
                 val token = org.thoughtcrime.securesms.tap.CosTransportToken(
                     tokenId = "cos-group-${groupId}-${timestamp}",
-                    recipientId = groupId, // 使用groupId作为recipientId标识这是群组token
+                    recipientId = groupId,
                     permissions = request.requestedPermissions,
                     expirationTime = expirationTime,
-                    accessKeyId = subUserCredential.accessKeyId,
-                    secretAccessKey = subUserCredential.secretAccessKey,
+                    accessKeyId = "PLACEHOLDER_KEY",
+                    secretAccessKey = "PLACEHOLDER_SECRET",
                     sessionToken = null,
                     region = cosConfig.region,
                     bucketName = cosConfig.bucketName,
                     cloudProvider = cosConfig.provider.name
                 )
                 
-                Log.i(TAG, "群组Token生成成功: tokenId=${LogSanitizer.sanitize(token.tokenId)}, groupId=${LogSanitizer.sanitize(groupId)}")
+                Log.i(TAG, "群组Token生成成功 (无IAM): tokenId=${LogSanitizer.sanitize(token.tokenId)}")
                 token
                 
             } catch (e: Exception) {
@@ -856,17 +770,17 @@ class CosTransportProvider(
 
     /**
      * 验证Token有效性和权限范围
-     * 
-     * 对于长期最高权限Token，验证：
-     * 1. 凭证是否有效（能否访问服务）
-     * 2. 基本连通性测试（能否连接到存储服务）
-     * 3. 权限范围测试（验证完整的读写权限）
-     * 4. 路径访问权限（验证能够访问指定的路径前缀）
      */
     override suspend fun validateToken(token: TransportToken): Boolean {
         return try {
             val cosToken = token as? CosTransportToken ?: return false
-            Log.d(TAG, "开始验证长期最高权限Token: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
+            Log.d(TAG, "开始验证Token: recipientId=${LogSanitizer.sanitize(cosToken.recipientId)}")
+            
+            // 检查是否为占位符Token
+            if (cosToken.accessKeyId == "PLACEHOLDER_KEY") {
+                Log.d(TAG, "验证占位符Token: 视为有效 (V2 Mode)")
+                return true
+            }
             
             val cosClient = createCosClient(cosToken)
             if (cosClient == null) {
@@ -1488,7 +1402,11 @@ class CosTransportProvider(
                     return@withContext false
                 }
                 
-                // 1. 使用已有的COS配置
+                // 检查是否为占位符Token
+                if (token.accessKeyId == "PLACEHOLDER_KEY") {
+                    Log.i(TAG, "撤销占位符Token，无需操作IAM: tokenId=${token.tokenId}")
+                    return@withContext true
+                }
                 
                 // 2. 从tokenId中提取子用户名
                 val subUserName = extractSubUserNameFromTokenId(token.tokenId)

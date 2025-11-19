@@ -33,7 +33,7 @@ data class TapTokenExchangeMessage(
     @JsonProperty("webhookConfig")
     val webhookConfig: Map<String, Any>? = null,
 
-    // Gateway配置 (Phase 2新增)
+    // 网关配置 (Phase 5新增)
     @JsonProperty("gatewayConfig")
     val gatewayConfig: Map<String, Any>? = null
 ) {
@@ -109,8 +109,8 @@ data class TapTokenExchangeMessage(
             webhookUrl: String?,
             notifySecret: String?,
             userId: String?,
-            gatewayConfig: Map<String, Any>? = null,
-            channelVersion: Int = CURRENT_CHANNEL_VERSION
+            channelVersion: Int = CURRENT_CHANNEL_VERSION,
+            gatewayConfig: Map<String, Any>? = null
         ): TapTokenExchangeMessage {
             val webhookConfig = if (webhookUrl != null && notifySecret != null && userId != null) {
                 mapOf(
@@ -152,7 +152,6 @@ data class TapTokenExchangeMessage(
             webhookUrl: String,
             notifySecret: String,
             userId: String,
-            gatewayConfig: Map<String, Any>? = null,
             channelVersion: Int = CURRENT_CHANNEL_VERSION
         ): TapTokenExchangeMessage {
             return TapTokenExchangeMessage(
@@ -171,8 +170,7 @@ data class TapTokenExchangeMessage(
                     "notifySecret" to notifySecret,
                     "userId" to userId,
                     "version" to "2.0"
-                ),
-                gatewayConfig = gatewayConfig
+                )
             )
         }
     }
@@ -211,40 +209,36 @@ data class TapTokenExchangeMessage(
     }
 
     /**
-     * 提取Gateway配置
+     * 提取网关配置
+     * 
+     * @return 网关配置，如果不存在则返回null
      */
     fun extractGatewayConfig(): GatewayConfigData? {
-        val config = gatewayConfig ?: return null
-        return try {
-            val endpoint = config["endpoint"] as? String ?: return null
-            val region = config["region"] as? String ?: return null
-            val provider = config["provider"] as? String ?: "unknown"
-            val offlineBucket = config["offlineBucket"] as? String
-            val presignDelegation = when (val raw = config["presignDelegation"]) {
-                is Boolean -> raw
-                is Number -> raw.toInt() != 0
-                else -> false
+        return if (gatewayConfig != null) {
+            try {
+                val endpoint = gatewayConfig["endpoint"] as? String
+                val region = gatewayConfig["region"] as? String
+                val provider = gatewayConfig["provider"] as? String
+                val offlineBucket = gatewayConfig["offlineBucket"] as? String
+                val presignDelegation = gatewayConfig["presignDelegation"] as? Boolean ?: false
+                @Suppress("UNCHECKED_CAST")
+                val metadata = gatewayConfig["metadata"] as? Map<String, String> ?: emptyMap()
+                
+                GatewayConfigData(
+                    endpoint = endpoint,
+                    region = region,
+                    provider = provider,
+                    offlineBucket = offlineBucket,
+                    presignDelegation = presignDelegation,
+                    metadata = metadata
+                )
+            } catch (e: Exception) {
+                null
             }
-            val metadata = (config["metadata"] as? Map<*, *>)?.mapNotNull { (k, v) ->
-                if (k is String && (v is String || v is Number || v is Boolean)) {
-                    k to v
-                } else null
-            }?.toMap() ?: emptyMap()
-
-            GatewayConfigData(
-                endpoint = endpoint,
-                region = region,
-                provider = provider,
-                offlineBucket = offlineBucket,
-                presignDelegation = presignDelegation,
-                metadata = metadata
-            )
-        } catch (e: Exception) {
+        } else {
             null
         }
     }
-
-    fun hasGatewayConfig(): Boolean = extractGatewayConfig() != null
 
     fun isGatewayOnlyChannel(): Boolean = channelVersion >= CHANNEL_VERSION_GATEWAY_ONLY
 }
@@ -266,17 +260,14 @@ data class WebhookConfigData(
     }
 }
 
+/**
+ * 网关配置数据
+ */
 data class GatewayConfigData(
-    val endpoint: String,
-    val region: String,
-    val provider: String,
-    val offlineBucket: String? = null,
-    val presignDelegation: Boolean = false,
-    val metadata: Map<String, Any> = emptyMap()
-) {
-    fun validate(): Boolean {
-        return endpoint.isNotEmpty() &&
-               region.isNotEmpty() &&
-               provider.isNotEmpty()
-    }
-}
+    val endpoint: String?,
+    val region: String?,
+    val provider: String?,
+    val offlineBucket: String?,
+    val presignDelegation: Boolean,
+    val metadata: Map<String, String>
+)
