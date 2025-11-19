@@ -1016,16 +1016,23 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 return false
             }
             
-            // 3. 验证Token状态（使用ACI格式查询，与Token保存格式一致）
-            val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
-            for (channel in fullActiveChannels) {
-                val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
-                val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
-                
-                if (!hasReceivedToken || !hasSharedToken) {
-                    Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken, recipientId=$recipientId, recipientAci=$recipientAci")
-                    return false
+            // 3. 验证Token状态（仅对非Gateway-only通道要求Token）
+            val requireTokenChannels = fullActiveChannels.filterNot { channel ->
+                channel.config["gatewayOnly"] as? Boolean ?: false
+            }
+            if (requireTokenChannels.isNotEmpty()) {
+                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
+                for (channel in requireTokenChannels) {
+                    val hasReceivedToken = tokenPool.getValidReceivedToken(recipientAci, channel.providerType) != null
+                    val hasSharedToken = tokenPool.getValidSharedToken(recipientAci, channel.providerType) != null
+                    
+                    if (!hasReceivedToken || !hasSharedToken) {
+                        Log.w(TAG, "发送前验证失败：Token状态不完整 provider=${channel.providerType}, hasReceived=$hasReceivedToken, hasShared=$hasSharedToken, recipientId=$recipientId, recipientAci=$recipientAci")
+                        return false
+                    }
                 }
+            } else {
+                Log.d(TAG, "全部FULL_ACTIVE通道为Gateway-only，跳过Token验证: recipientId=$recipientId")
             }
             
             // 4. 验证Provider状态
