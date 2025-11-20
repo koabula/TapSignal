@@ -219,6 +219,10 @@ class TapNotificationService private constructor(
                     // 启动生命周期集成
                     lifecycleIntegrator.start(userId, onMessage)
                     
+                    // 首次启动立即尝试建立连接并做一次离线同步，避免依赖生命周期回调
+                    ensureInitialConnection(userId, onMessage)
+                    notificationManager.triggerOfflineSync("service_start")
+                    
                     // 启动Doze处理器
                     dozeHandler.start(
                         onStateChange = { inDoze ->
@@ -236,6 +240,22 @@ class TapNotificationService private constructor(
                     Log.e(TAG, "启动推送服务异常", e)
                 }
             }
+        }
+    }
+    
+    private suspend fun ensureInitialConnection(
+        userId: String,
+        onMessage: (NotificationMessage) -> Unit
+    ) {
+        try {
+            val result = notificationManager.connect(userId, onMessage)
+            if (!result.success) {
+                Log.e(TAG, "首次连接推送服务失败: ${result.errorMessage}")
+            } else {
+                Log.i(TAG, "首次连接推送服务成功")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "首次连接推送服务异常", e)
         }
     }
     

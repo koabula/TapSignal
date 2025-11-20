@@ -515,6 +515,13 @@ public class IndividualSendJob extends PushSendJob {
         // Signal Server发送则根据实际情况返回
         return successResult.getMethod().toString().equals("SIGNAL_SERVER");
 
+      } else if (result instanceof IntegratedTapSendResult.Fallback) {
+        IntegratedTapSendResult.Fallback fallbackResult = (IntegratedTapSendResult.Fallback) result;
+        Log.w(TAG, "Tap不可用，回退到Signal Server发送: messageId=" + messageId + ", reason=" + fallbackResult.getReason());
+        boolean unidentifiedFallback = deliver(message, originalEditedMessage);
+        Log.i(TAG, "Signal Server回退发送完成: messageId=" + messageId);
+        return unidentifiedFallback;
+
       } else if (result instanceof IntegratedTapSendResult.Failed) {
         IntegratedTapSendResult.Failed failedResult = (IntegratedTapSendResult.Failed) result;
         Log.e(TAG, "Tap传输层集成发送失败: messageId=" + messageId + ", reason=" + failedResult.getReason());

@@ -172,6 +172,11 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
                     Log.w(TAG, "Tap传输层发送需要重试: messageId=$messageId, reason=${sendResult.reason}")
                     IntegratedTapSendResult.RetryScheduled("Tap发送重试: ${sendResult.reason}")
                 }
+
+                is TapSignalSendResult.Fallback -> {
+                    Log.w(TAG, "Tap传输层不可用，准备回退: messageId=$messageId, reason=${sendResult.reason}")
+                    IntegratedTapSendResult.Fallback(sendResult.reason)
+                }
             }
             
         } catch (e: Exception) {
@@ -210,4 +215,5 @@ sealed class IntegratedTapSendResult {
     
     data class Failed(val reason: String) : IntegratedTapSendResult()
     data class RetryScheduled(val message: String) : IntegratedTapSendResult()
-} 
+    data class Fallback(val reason: String) : IntegratedTapSendResult()
+}

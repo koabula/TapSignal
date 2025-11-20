@@ -70,10 +70,15 @@ class TapLifecycleIntegrator private constructor(
             handleNetworkChange(isAvailable)
         }
         
-        // 如果当前在前台，立即连接
-        if (AppForegroundObserver.isForegrounded()) {
-            scope.launch {
+        // 无论当前是否前台，都主动建立一次连接并执行离线同步
+        scope.launch {
+            try {
                 connectionManager.onEnterForeground(userId, onNotification)
+                notificationManager.triggerOfflineSync(
+                    if (AppForegroundObserver.isForegrounded()) "initial_foreground_connect" else "initial_background_connect"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "初始化推送连接失败", e)
             }
         }
     }
@@ -219,4 +224,3 @@ class TapLifecycleIntegrator private constructor(
         connectionManager.cleanup()
     }
 }
-

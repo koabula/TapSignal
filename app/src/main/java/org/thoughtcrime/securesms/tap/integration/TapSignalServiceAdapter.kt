@@ -12,6 +12,8 @@ import org.thoughtcrime.securesms.tap.TransportMessage
 import org.thoughtcrime.securesms.tap.TransportMessageType
 import org.thoughtcrime.securesms.tap.TransportContentMetadata
 import org.thoughtcrime.securesms.tap.TransportAttachment
+import org.thoughtcrime.securesms.tap.TransportError
+import org.thoughtcrime.securesms.tap.TransportResult
 import org.whispersystems.signalservice.api.SignalServiceMessageSender
 import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment
@@ -200,10 +202,14 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
                     Log.e(TAG, "TAP传输失败: messageId=$messageId, error=${sendResult.error}")
                     clearSendingContext() // 清理发送上下文
-                    if (sendResult.retryable) {
-                        TapSignalSendResult.RetryLater("TAP传输失败: ${sendResult.errorMessage}")
-                    } else {
-                        TapSignalSendResult.Failed("TAP传输失败: ${sendResult.errorMessage}")
+                    val errorMessage = sendResult.errorMessage.ifBlank { sendResult.error.displayName }
+                    when {
+                        sendResult.error == TransportError.NETWORK_ERROR ||
+                        sendResult.error == TransportError.PROVIDER_UNAVAILABLE -> {
+                            TapSignalSendResult.Fallback("TAP网络不可用: $errorMessage")
+                        }
+                        sendResult.retryable -> TapSignalSendResult.RetryLater("TAP传输失败: $errorMessage")
+                        else -> TapSignalSendResult.Failed("TAP传输失败: $errorMessage")
                     }
                 }
                 
@@ -1287,4 +1293,5 @@ sealed class TapSignalSendResult {
     data class Success(val transportPath: String?, val providerType: String) : TapSignalSendResult()
     data class Failed(val reason: String) : TapSignalSendResult()
     data class RetryLater(val reason: String) : TapSignalSendResult()
+    data class Fallback(val reason: String) : TapSignalSendResult()
 } 
