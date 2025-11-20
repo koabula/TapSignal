@@ -1,11 +1,16 @@
 package org.thoughtcrime.securesms.tap.notification
 
+import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
 
 /**
  * 推送通知处理器
  */
-class NotificationHandler {
+class NotificationHandler(private val context: Context) {
     
     companion object {
         private val TAG = Log.tag(NotificationHandler::class.java)
@@ -43,11 +48,20 @@ class NotificationHandler {
     private fun handleNewMessageNotification(notification: NotificationMessage) {
         try {
             val senderId = notification.senderId
+            val payload = notification.payload
             
-            Log.d(TAG, "处理新消息通知: senderId=$senderId")
+            Log.d(TAG, "处理新消息通知: senderId=$senderId, hasPayload=${payload != null}")
             
-            downloadTriggerCallback?.invoke(senderId)
-                ?: Log.w(TAG, "下载触发回调未设置")
+            if (payload != null) {
+                // V2 Mode: 直接处理推送的消息Payload
+                CoroutineScope(Dispatchers.IO).launch {
+                    TapMessageProcessor.getInstance(context).processPushMessage(payload)
+                }
+            } else {
+                // V1 Mode: 触发下载
+                downloadTriggerCallback?.invoke(senderId)
+                    ?: Log.w(TAG, "下载触发回调未设置")
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "处理新消息通知失败", e)

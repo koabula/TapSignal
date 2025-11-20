@@ -229,7 +229,8 @@ class TencentWebSocketClient(
                     metaJson.keys().asSequence().associateWith { key ->
                         metaJson.get(key)
                     }
-                } ?: emptyMap()
+                } ?: emptyMap(),
+                payload = json.optString("payload", null)
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse notification message", e)

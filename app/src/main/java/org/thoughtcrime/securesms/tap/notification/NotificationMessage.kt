@@ -7,18 +7,20 @@ data class NotificationMessage(
     val type: String,
     val senderId: String,
     val timestamp: Long,
-    val metadata: Map<String, Any> = emptyMap()
+    val metadata: Map<String, Any> = emptyMap(),
+    val payload: String? = null
 ) {
     companion object {
         const val TYPE_NEW_MESSAGE = "new_message"
         const val TYPE_HEARTBEAT = "heartbeat"
         
-        fun newMessage(senderId: String, metadata: Map<String, Any> = emptyMap()): NotificationMessage {
+        fun newMessage(senderId: String, metadata: Map<String, Any> = emptyMap(), payload: String? = null): NotificationMessage {
             return NotificationMessage(
                 type = TYPE_NEW_MESSAGE,
                 senderId = senderId,
                 timestamp = System.currentTimeMillis(),
-                metadata = metadata
+                metadata = metadata,
+                payload = payload
             )
         }
     }

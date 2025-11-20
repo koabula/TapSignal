@@ -131,6 +131,31 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 
                 Log.i(TAG, "群组token已保存: groupId=$groupId, tokenId=${myGroupToken.tokenId}")
                 
+                // 确保群组处于 PROPOSING 状态（如果是收到提议）
+                if (isProposer) {
+                    val statusResult = groupManager.getGroupStatus(groupId)
+                    val currentStatus = if (statusResult is GroupOperationResult.Success) statusResult.data else GroupV2Status.NATIVE
+                    
+                    if (currentStatus == GroupV2Status.NATIVE) {
+                        Log.i(TAG, "收到提议，初始化群组状态为 PROPOSING: groupId=$groupId")
+                        val memberAcis = memberRecipientIds.mapNotNull { 
+                            try { Recipient.resolved(it).requireAci().toString() } catch(e: Exception) { null } 
+                        }.toSet()
+                        
+                        val newState = GroupV2State(
+                            groupId = groupId,
+                            status = GroupV2Status.PROPOSING,
+                            proposerAci = proposerAci,
+                            agreedMembers = setOf(proposerAci),
+                            totalMembers = memberAcis,
+                            providerType = originalMessage.providerType,
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        groupManager.createOrUpdateGroupState(groupId, newState)
+                    }
+                }
+
                 // 7. 标记自己为已同意
                 // 注意: 群组状态已经由提议者创建，这里不需要调用 proposeV2Mode()
                 // 直接调用 acceptV2Proposal 将自己加入 agreedMembers

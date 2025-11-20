@@ -1,0 +1,37 @@
+--------- beginning of main
+--------- beginning of system
+2025-11-20 22:38:19.164 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  开始完整的群组 V2 提议流程: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, members=2
+2025-11-20 22:38:19.166 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  为群组生成我的token: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=
+2025-11-20 22:38:19.172 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  开始为群组生成我的Token: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, provider=cos
+2025-11-20 22:38:19.174 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           D  未找到有效的群组Token，生成新Token: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=
+2025-11-20 22:38:19.176 10407-10442 CosTransportProvider    org.thoughtcrime.securesms           I  开始生成群组Token (V2 Mode): groupId=Dpg1************************************BKM=
+2025-11-20 22:38:19.177 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  群组Token生成成功: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, tokenId=cos-************************************************************9168
+2025-11-20 22:38:19.210 10407-10435 TransportTokenPool      org.thoughtcrime.securesms           I  添加共享Token成功: tokenId=cos-************************************************************9168, recipientId=Dpg1************************************BKM=, providerType=cos, groupId=Dpg1************************************BKM=
+2025-11-20 22:38:19.212 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  群组token已保存: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, tokenId=cos-************************************************************9168
+2025-11-20 22:38:19.587 10407-10442 GroupV2StatusTable      org.thoughtcrime.securesms           D  更新群组状态: Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, version: 3 -> 4
+2025-11-20 22:38:19.589 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  群组 V2 模式提议成功: Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, proposer=********-****-****-****-*********973, members=2
+2025-11-20 22:38:19.591 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  发送群组提议消息: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=
+2025-11-20 22:38:19.594 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           I  发送群组 V2 提议消息: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, members=2
+2025-11-20 22:38:19.594 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  群组成员 ACIs: totalMembers=2
+2025-11-20 22:38:19.840 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM= -> RecipientId::18
+2025-11-20 22:38:19.842 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  成功转换 groupId 到 RecipientId: Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM= -> RecipientId::18
+2025-11-20 22:38:19.844 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  发送群组消息: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=, groupRecipientId=RecipientId::18, threadId=15
+2025-11-20 22:38:19.864 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  使用 PushGroupSendJob 发送群组消息: messageId=5706
+2025-11-20 22:38:19.878 10407-10442 Job                     org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob] onSubmit() (Time Since Submission: 2 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+2025-11-20 22:38:19.899 10407-10442 JobRunner               org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob][5] Running job. (Time Since Submission: 19 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+2025-11-20 22:38:19.900 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           D  数据消息已加入发送队列: recipientId=RecipientId::18, messageId=5706, groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=
+2025-11-20 22:38:19.900 10407-10442 GroupTokenExchangeHelpe org.thoughtcrime.securesms           I  群组提议消息发送完成: success=true
+2025-11-20 22:38:19.900 10407-10442 GroupTransportManager   org.thoughtcrime.securesms           I  群组 V2 提议完成: groupId=Dpg17kvrRBE9xACHdyVeuOO4vOeAXdumz20hPGPcBKM=
+2025-11-20 22:38:19.911 10407-10442 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob][1763649499843] Sending message: 5706, Recipient: RecipientId::18, Thread: 15, Attachments:  (Time Since Submission: 37 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+2025-11-20 22:38:19.948 10407-10442 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob] Beginning message send. (Time Since Submission: 73 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+2025-11-20 22:38:19.987 10407-10442 GroupSendUtil           org.thoughtcrime.securesms           I  Starting group send. GroupId: GV2::***a3, DistributionId: ********-****-****-****-*********440 RelatedMessageId: MessageId(id=5706), Targets: 1, RecipientUpdate: false, Operation: DataSendOperation
+2025-11-20 22:38:19.988 10407-10442 GroupSendUtil           org.thoughtcrime.securesms           I  Too few sender-key-capable users (1) for non-story send. Doing all legacy sends.
+2025-11-20 22:38:19.988 10407-10442 GroupSendUtil           org.thoughtcrime.securesms           I  Need to do 1 legacy sends.
+2025-11-20 22:38:20.392 10407-10442 GroupSendUtil           org.thoughtcrime.securesms           D  Successfully sent using 1:1 to 1/1 legacy targets.
+2025-11-20 22:38:20.447 10407-10442 PushGroupSendJob        org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob] Finished send. (Time Since Submission: 565 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+2025-11-20 22:38:20.451 10407-10442 JobRunner               org.thoughtcrime.securesms           I  [JOB::25506eef-1e32-4efc-a4bb-60a28b0af1ea][PushGroupSendJob][5] Job finished with result SUCCESS in 547 ms. (Time Since Submission: 566 ms, Lifespan: 86400000 ms, Run Attempt: 1/Unlimited, Queue: RecipientId::18)
+--------- beginning of kernel
+2025-11-20 22:38:29.351 10407-10442 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 开始状态同步检查
+2025-11-20 22:38:29.359 10407-10442 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 检查 PROPOSING 状态群组: 9个
+2025-11-20 22:38:29.361 10407-10442 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 没有处于 FULL_V2_ACTIVE 状态的群组
+2025-11-20 22:38:29.362 10407-10442 GroupV2StateSynchronize org.thoughtcrime.securesms           D  [状态同步] 状态同步检查完成，耗时: 10ms

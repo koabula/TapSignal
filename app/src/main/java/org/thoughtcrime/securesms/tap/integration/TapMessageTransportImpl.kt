@@ -192,14 +192,14 @@ class TapMessageTransportImpl(private val context: Context) : TapMessageTranspor
                 encryptionAlgorithm = "signal-protocol",
                 sourceDeviceId = org.thoughtcrime.securesms.keyvalue.SignalStore.account.deviceId,
                 isSessionCipherEncrypted = true,
-                deliveryChannel = "tap-control"
+                deliveryChannel = "tap-direct"
             )
             val transportMessage = TransportMessage(
                 messageId = TransportMessage.generateMessageId(),
                 timestamp = timestamp,
                 senderId = senderAci,
                 recipientId = recipientAci,
-                messageType = TransportMessageType.CONTROL_MESSAGE,
+                messageType = TransportMessageType.TEXT_MESSAGE,
                 signalCiphertext = Base64.encodeToString(ciphertext, Base64.NO_WRAP),
                 signalCiphertextType = signalCiphertextType,
                 contentMetadata = metadata,

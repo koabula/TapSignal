@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.tap.utils.TransportIdHasher
+import org.thoughtcrime.securesms.tap.integration.TapMessageProcessor
 
 /**
  * 推送服务管理器
@@ -211,33 +212,46 @@ class NotificationManager private constructor(private val context: Context) {
     
     /**
      * 处理新消息通知
-     * 收到推送后触发下载
+     * 收到推送后触发下载或直接处理Payload
      */
     private fun handleNewMessageNotification(notification: NotificationMessage) {
         try {
             val senderId = notification.senderId
             val fileKey = notification.metadata["key"] as? String
+            val payload = notification.payload
             
-            Log.i(TAG, "处理新消息通知，触发下载: senderId=$senderId, key=$fileKey")
+            Log.i(TAG, "处理新消息通知: senderId=$senderId, key=$fileKey, hasPayload=${payload != null}")
             
-            // 异步执行下载任务
-            notificationScope.launch {
-                try {
-                    // 使用新的直接下载方案
-                    val result = downloadExecutor.executeDirectDownload(notification)
-                    
-                    if (result.isSuccess) {
-                        Log.i(TAG, "推送触发下载成功: senderId=$senderId, " +
-                            "messagesProcessed=${result.messagesProcessed}, " +
-                            "filesProcessed=${result.filesProcessed}, " +
-                            "responseTime=${result.responseTime}ms")
-                    } else {
-                        Log.w(TAG, "推送触发下载失败: senderId=$senderId, " +
-                            "error=${result.error}, " +
-                            "responseTime=${result.responseTime}ms")
+            if (payload != null) {
+                // V2 Mode: 直接处理推送的消息Payload
+                notificationScope.launch {
+                    try {
+                        TapMessageProcessor.getInstance(context).processPushMessage(payload)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "处理推送Payload异常: senderId=$senderId", e)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "推送触发下载异常: senderId=$senderId", e)
+                }
+            } else {
+                // V1 Mode: 触发下载
+                Log.i(TAG, "无Payload，触发下载: senderId=$senderId")
+                notificationScope.launch {
+                    try {
+                        // 使用新的直接下载方案
+                        val result = downloadExecutor.executeDirectDownload(notification)
+                        
+                        if (result.isSuccess) {
+                            Log.i(TAG, "推送触发下载成功: senderId=$senderId, " +
+                                "messagesProcessed=${result.messagesProcessed}, " +
+                                "filesProcessed=${result.filesProcessed}, " +
+                                "responseTime=${result.responseTime}ms")
+                        } else {
+                            Log.w(TAG, "推送触发下载失败: senderId=$senderId, " +
+                                "error=${result.error}, " +
+                                "responseTime=${result.responseTime}ms")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "推送触发下载异常: senderId=$senderId", e)
+                    }
                 }
             }
         } catch (e: Exception) {
