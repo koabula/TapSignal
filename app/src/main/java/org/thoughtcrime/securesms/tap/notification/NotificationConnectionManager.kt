@@ -53,6 +53,9 @@ class NotificationConnectionManager private constructor(
             backgroundDisconnectJob?.cancel()
             backgroundDisconnectJob = null
             
+            // 无论连接状态如何，回到前台立即触发离线同步，确保消息不丢失
+            notificationManager.triggerOfflineSync("foreground_resume")
+            
             if (!notificationManager.isConnected()) {
                 connectWithRetry(userId, onNotification)
             }
@@ -67,17 +70,12 @@ class NotificationConnectionManager private constructor(
             
             isInForeground.set(false)
             
+            // 移除后台自动断开逻辑，尽可能保持连接
             backgroundDisconnectJob?.cancel()
-            backgroundDisconnectJob = scope.launch {
-                delay(BACKGROUND_DISCONNECT_DELAY_MS)
-                
-                if (!isInForeground.get()) {
-                    Log.i(TAG, "后台延迟断开连接")
-                    shouldMaintainConnection.set(false)
-                    notificationManager.disconnect()
-                    reconnectJob?.cancel()
-                }
-            }
+            backgroundDisconnectJob = null
+            
+            // 保持 shouldMaintainConnection 为 true，允许后台重连
+            // 依赖系统层面的网络切断，而不是主动断开
         } catch (e: Exception) {
             Log.e(TAG, "进入后台模式失败", e)
         }
