@@ -35,6 +35,7 @@ data class LambdaDispatchResult(
 
 interface TapLambdaDispatcher {
     suspend fun dispatch(payload: JSONObject): LambdaDispatchResult
+    suspend fun resolveFunctionName(): String?
 }
 
 object TapLambdaDispatcherFactory {
@@ -124,7 +125,7 @@ private class AwsTapLambdaDispatcher(
         }
     }
 
-    private suspend fun resolveFunctionName(): String? {
+    override suspend fun resolveFunctionName(): String? {
         cachedFunctionName?.let { return it }
         return mutex.withLock {
             cachedFunctionName?.let { return@withLock it }
@@ -213,7 +214,7 @@ private class TencentTapLambdaDispatcher(
         }
     }
 
-    private suspend fun resolveFunctionName(): String? {
+    override suspend fun resolveFunctionName(): String? {
         cachedFunctionName?.let { return it }
         return mutex.withLock {
             cachedFunctionName?.let { return@withLock it }

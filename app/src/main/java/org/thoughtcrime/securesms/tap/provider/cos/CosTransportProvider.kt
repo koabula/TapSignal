@@ -2541,16 +2541,40 @@ class CosTransportProvider(
     private suspend fun getLambdaDispatcher(): TapLambdaDispatcher? {
         lambdaDispatcher?.let { return it }
         return withContext(Dispatchers.IO) {
-            val config = org.thoughtcrime.securesms.tap.TransportProviderConfigManager
-                .getInstance(context)
-                .getNotificationConfig()
+            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val config = configManager.getNotificationConfig()
+            
             if (config == null) {
                 Log.w(TAG, "未找到推送服务配置，无法创建Lambda分发器")
                 null
             } else {
-                TapLambdaDispatcherFactory.create(context, cosConfig, config).also {
-                    lambdaDispatcher = it
+                val dispatcher = TapLambdaDispatcherFactory.create(context, cosConfig, config)
+                
+                // 优化：如果配置中缺失triggerFunctionName，主动解析并保存
+                if (dispatcher != null && config.pushServiceInfo.metadata["triggerFunctionName"] == null) {
+                    Log.i(TAG, "配置中缺失triggerFunctionName，尝试主动解析...")
+                    try {
+                        val functionName = dispatcher.resolveFunctionName()
+                        if (!functionName.isNullOrEmpty()) {
+                            Log.i(TAG, "解析到触发函数名: $functionName，更新本地配置")
+                            
+                            // 更新metadata
+                            val newMetadata = config.pushServiceInfo.metadata.toMutableMap()
+                            newMetadata["triggerFunctionName"] = functionName
+                            
+                            val newPushServiceInfo = config.pushServiceInfo.copy(metadata = newMetadata)
+                            val newConfig = config.copy(pushServiceInfo = newPushServiceInfo)
+                            
+                            // 保存更新后的配置
+                            configManager.saveNotificationConfig(newConfig)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "主动解析触发函数名失败", e)
+                    }
                 }
+                
+                lambdaDispatcher = dispatcher
+                dispatcher
             }
         }
     }
