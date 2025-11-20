@@ -163,12 +163,6 @@ class TransportChannelManager private constructor(private val context: Context) 
                         return@write null
                     }
                     
-                    // 确保recipientId已经规范化为ACI格式
-                    val normalizedRecipientId = normalizeRecipientIdSafe(recipientId)
-                    if (normalizedRecipientId != recipientId) {
-                        Log.w(TAG, "establishChannel收到未规范化的recipientId: 原始=$recipientId, 规范化=$normalizedRecipientId")
-                    }
-                    
                     // 检查是否超过最大通道数限制
                     if (channels.size >= config.maxChannels) {
                         Log.w(TAG, "已达到最大通道数限制: ${config.maxChannels}")
@@ -179,18 +173,18 @@ class TransportChannelManager private constructor(private val context: Context) 
                         }
                     }
                     
-                    val channelId = generateChannelId(normalizedRecipientId, providerType)
+                    val channelId = generateChannelId(recipientId, providerType)
                     val currentTime = System.currentTimeMillis()
                     
                     val newChannel = TransportChannel(
                         channelId = channelId,
-                        recipientId = normalizedRecipientId,
+                        recipientId = recipientId,
                         providerType = providerType,
                         metadata = metadata,
                         status = TransportChannelStatus.ESTABLISHING,
                         createdAt = currentTime,
                         lastActiveAt = currentTime,
-                        priority = calculateChannelPriority(normalizedRecipientId, providerType),
+                        priority = calculateChannelPriority(recipientId, providerType),
                         config = emptyMap<String, Any>().withEntries(initialConfig)
                     )
                     
@@ -199,12 +193,11 @@ class TransportChannelManager private constructor(private val context: Context) 
                     channelToSave = newChannel
                     channelIdToActivate = channelId
                     
-                    // 更新索引(使用规范化后的ID)
-                    recipientChannels.computeIfAbsent(normalizedRecipientId) { mutableSetOf() }.add(channelId)
+                    // 更新索引
+                    recipientChannels.computeIfAbsent(recipientId) { mutableSetOf() }.add(channelId)
                     providerChannels.computeIfAbsent(providerType) { mutableSetOf() }.add(channelId)
                     
-                    Log.i(TAG, "建立通道: $channelId, 接收者: $normalizedRecipientId, 提供者: $providerType")
-                    Log.i(TAG, "通道索引已更新: recipientChannels[$normalizedRecipientId] = ${recipientChannels[normalizedRecipientId]}")
+                    Log.d(TAG, "建立通道: $channelId, 接收者: $recipientId, 提供者: $providerType")
                     newChannel
                     
                 } catch (e: Exception) {
@@ -220,14 +213,12 @@ class TransportChannelManager private constructor(private val context: Context) 
             Log.d(TAG, "通道激活完成: $channelIdToActivate")
         } catch (e: Exception) {
             Log.e(TAG, "通道激活失败: $channelIdToActivate", e)
-            // 激活失败时清理通道(使用从通道对象中获取的规范化recipientId)
+            // 激活失败时清理通道
             withContext(Dispatchers.IO) {
                 channelLock.write {
-                    val channelToRemove = channels.remove(channelIdToActivate)
-                    if (channelToRemove != null) {
-                        recipientChannels[channelToRemove.recipientId]?.remove(channelIdToActivate)
-                        providerChannels[providerType]?.remove(channelIdToActivate)
-                    }
+                    channels.remove(channelIdToActivate)
+                    recipientChannels[recipientId]?.remove(channelIdToActivate)
+                    providerChannels[providerType]?.remove(channelIdToActivate)
                 }
             }
             return null
@@ -288,31 +279,19 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 获取活跃通道
      */
     fun getActiveChannels(recipientId: String): List<TransportChannel> {
+        // ✅ 规范化RecipientId为ACI格式，确保与通道创建时的格式一致
+        val normalizedId = normalizeRecipientId(recipientId)
+        
         channelLock.read {
-            // ✅ 在锁内规范化RecipientId,避免竞态条件
-            val normalizedId = normalizeRecipientIdSafe(recipientId)
-            
-            Log.i(TAG, "getActiveChannels查询: recipientId=$recipientId, normalizedId=$normalizedId")
+            Log.d(TAG, "getActiveChannels查询: recipientId=$recipientId, normalizedId=$normalizedId")
             Log.d(TAG, "recipientChannels映射大小: ${recipientChannels.size}")
-            
-            // 记录ID格式信息用于诊断
-            val recipientIdIsAci = recipientId.contains("-") && recipientId.length >= 32
-            val normalizedIdIsAci = normalizedId.contains("-") && normalizedId.length >= 32
-            val idFormatMatch = recipientId == normalizedId
-            Log.i(TAG, "ID格式分析: recipientId是ACI=$recipientIdIsAci, normalizedId是ACI=$normalizedIdIsAci, 格式一致=$idFormatMatch")
-            
-            if (recipientChannels.isNotEmpty()) {
-                Log.i(TAG, "现有recipientChannels keys前5个: ${recipientChannels.keys.take(5).joinToString(\", \")}")
-            } else {
-                Log.w(TAG, "recipientChannels映射为空!")
-            }
+            Log.d(TAG, "现有recipientChannels keys: ${recipientChannels.keys.joinToString(", ")}")
             
             // ✅ 先用规范化ID查找，如果找不到则fallback到原始ID（向后兼容）
             val channelIds = recipientChannels[normalizedId] 
                 ?: recipientChannels[recipientId] 
                 ?: run {
                     Log.w(TAG, "recipientChannels中没有找到recipientId: $recipientId (normalized: $normalizedId)")
-                    Log.w(TAG, "所有可用的recipientChannels keys: ${recipientChannels.keys.joinToString(\", \")}")
                     return emptyList()
                 }
             
@@ -345,10 +324,10 @@ class TransportChannelManager private constructor(private val context: Context) 
      * 获取指定Provider的活跃通道
      */
     fun getActiveChannel(recipientId: String, providerType: String): TransportChannel? {
+        // ✅ 规范化RecipientId为ACI格式，确保与通道创建时的格式一致
+        val normalizedId = normalizeRecipientId(recipientId)
+        
         channelLock.read {
-            // ✅ 在锁内规范化RecipientId,避免竞态条件
-            val normalizedId = normalizeRecipientIdSafe(recipientId)
-            
             // ✅ 先用规范化ID查找，如果找不到则fallback到原始ID（向后兼容）
             val channelIds = recipientChannels[normalizedId] 
                 ?: recipientChannels[recipientId]
@@ -979,10 +958,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                     }
                     
                     // 清理索引：清理所有可能的格式
-                    val removed1 = recipientChannels.remove(recipientId)
-                    val removed2 = recipientChannels.remove(normalizedRecipientId)
-                    Log.i(TAG, "清理通道索引: recipientId=$recipientId(removed=$removed1), normalizedId=$normalizedRecipientId(removed=$removed2)")
-                    
+                    recipientChannels.remove(recipientId)
+                    recipientChannels.remove(normalizedRecipientId)
                     channelsToClose.forEach { channel ->
                         providerChannels[channel.providerType]?.remove(channel.channelId)
                         if (providerChannels[channel.providerType]?.isEmpty() == true) {
@@ -1192,48 +1169,6 @@ class TransportChannelManager private constructor(private val context: Context) 
     private fun normalizeRecipientId(recipientId: String): String {
         return try {
             when {
-                // 已经是ACI格式（UUID样式），直接返回（最常见情况，优先判断）
-                recipientId.contains("-") && recipientId.length >= 32 -> {
-                    Log.d(TAG, "normalizeRecipientId: $recipientId (already ACI format)")
-                    recipientId
-                }
-                // 处理 "RecipientId::数字" 格式
-                recipientId.startsWith("RecipientId::") -> {
-                    val idNumber = recipientId.removePrefix("RecipientId::")
-                    val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(idNumber.toLong())
-                    val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
-                    val aci = recipient.requireAci().toString()
-                    Log.i(TAG, "normalizeRecipientId: RecipientId::格式转换 $recipientId -> $aci")
-                    aci
-                }
-                // 处理纯数字格式
-                recipientId.all { it.isDigit() } -> {
-                    val recipientIdObj = org.thoughtcrime.securesms.recipients.RecipientId.from(recipientId.toLong())
-                    val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
-                    val aci = recipient.requireAci().toString()
-                    Log.i(TAG, "normalizeRecipientId: 数字格式转换 $recipientId -> $aci")
-                    aci
-                }
-                // 其他情况，记录警告并返回原值
-                else -> {
-                    Log.w(TAG, "normalizeRecipientId: 未知格式，返回原值: $recipientId")
-                    recipientId
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "normalizeRecipientId异常: recipientId=$recipientId, error=${e.message}, stackTrace=${e.stackTrace.take(3).joinToString()}", e)
-            // 返回原值，避免破坏现有流程
-            recipientId
-        }
-    }
-    
-    private fun normalizeRecipientIdSafe(recipientId: String): String {
-        return try {
-            when {
-                // 已经是ACI格式（UUID样式），直接返回（最常见的情况,优先处理）
-                recipientId.contains("-") && recipientId.length >= 32 -> {
-                    recipientId
-                }
                 // 处理 "RecipientId::数字" 格式
                 recipientId.startsWith("RecipientId::") -> {
                     val idNumber = recipientId.removePrefix("RecipientId::")
@@ -1247,13 +1182,17 @@ class TransportChannelManager private constructor(private val context: Context) 
                     val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientIdObj)
                     recipient.requireAci().toString()
                 }
-                // 其他情况，返回原值（可能是已经规范化的ACI）
+                // 已经是ACI格式（UUID样式），直接返回
+                recipientId.contains("-") && recipientId.length >= 32 -> {
+                    recipientId
+                }
+                // 其他情况，尝试作为ACI处理
                 else -> {
                     recipientId
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "normalizeRecipientIdSafe失败,返回原值: recipientId=$recipientId", e)
+            Log.w(TAG, "Recipient ID格式转换失败: $recipientId", e)
             recipientId
         }
     }
@@ -2228,21 +2167,8 @@ class TransportChannelManager private constructor(private val context: Context) 
                     for (channel in validChannels) {
                         channels[channel.channelId] = channel
                         
-                        // 规范化recipientId,确保索引使用一致的格式
-                        val normalizedRecipientId = normalizeRecipientIdSafe(channel.recipientId)
-                        
-                        // 如果数据库中的recipientId与规范化后的不一致,更新通道对象
-                        val finalChannel = if (normalizedRecipientId != channel.recipientId) {
-                            Log.w(TAG, "数据库通道recipientId格式不一致: channelId=${channel.channelId}, 数据库=${channel.recipientId}, 规范化=$normalizedRecipientId")
-                            channel.copy(recipientId = normalizedRecipientId).also {
-                                channels[channel.channelId] = it
-                            }
-                        } else {
-                            channel
-                        }
-                        
-                        // 重建recipientChannels索引(使用规范化后的ID)
-                        recipientChannels.computeIfAbsent(normalizedRecipientId) { mutableSetOf() }
+                        // 重建recipientChannels索引
+                        recipientChannels.computeIfAbsent(channel.recipientId) { mutableSetOf() }
                             .add(channel.channelId)
                         
                         // 重建providerChannels索引
