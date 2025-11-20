@@ -10,11 +10,17 @@ import kotlin.concurrent.read
 import kotlin.concurrent.write
 
 /**
- * 轮询任务调度器
+ * 轮询任务调度器 (已废弃)
  * 
- * 专门负责轮询任务的调度管理，包括任务创建、启动、停止和清理。
- * 从TapPollingService中分离出来，实现职责单一化。
+ * 此类已被废弃,V2模式下完全依赖 WebSocket 推送,不再需要周期性轮询调度。
+ * 仅保留作为历史兼容,在 TapPollingService.ENABLE_POLLING = false 时不会被使用。
+ * 
+ * @deprecated V2模式使用 WebSocket 推送,不需要轮询调度
  */
+@Deprecated(
+    message = "V2模式使用 WebSocket 推送,不需要轮询调度",
+    level = DeprecationLevel.WARNING
+)
 class PollingTaskScheduler(
     private val pollingExecutor: ScheduledThreadPoolExecutor,
     private val deviceCapabilityProvider: DeviceCapabilityProvider

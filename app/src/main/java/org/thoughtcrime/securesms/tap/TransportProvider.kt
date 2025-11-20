@@ -41,13 +41,24 @@ interface TransportProvider {
     suspend fun push(message: TransportMessage, metadata: TransportMetadata): TransportResult
     
     /**
-     * 从传输服务拉取文件
+     * 从传输服务拉取文件 (已废弃)
+     * 
+     * 此方法已废弃,V2模式下使用 WebSocket 推送 + 内联消息替代主动拉取。
+     * 
+     * V2架构:
+     * - 实时: WebSocket 推送通知 + 内联消息 (notification.metadata.message)
+     * - 离线: 离线轮询 (tap-offline/ 目录)
+     * - 不需要: 周期性主动拉取
      * 
      * @param metadata 传输元数据（源地址、路径等）
      * @return 拉取结果和消息内容
-     * @deprecated 使用 listFiles + downloadFile 替代
+     * @deprecated V2模式使用 WebSocket 推送,不需要 pull 操作
      */
-    @Deprecated("使用 listFiles + downloadFile 替代，将在后续版本中移除")
+    @Deprecated(
+        message = "V2模式使用 WebSocket 推送 + 内联消息,不需要 pull",
+        replaceWith = ReplaceWith("使用 WebSocket 推送机制"),
+        level = DeprecationLevel.WARNING
+    )
     suspend fun pull(metadata: TransportMetadata): TransportResult
     
     /**

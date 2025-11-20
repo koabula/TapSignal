@@ -143,6 +143,7 @@ import org.thoughtcrime.securesms.database.helpers.migration.V285_AddEpochToCall
 import org.thoughtcrime.securesms.database.helpers.migration.V286_FixRemoteKeyEncoding
 import org.thoughtcrime.securesms.database.helpers.migration.V287_TransportTablesCreation
 import org.thoughtcrime.securesms.database.helpers.migration.V288_GroupV2TablesCreation
+import org.thoughtcrime.securesms.database.helpers.migration.V289_GroupV2GatewayInfo
 import org.thoughtcrime.securesms.database.SQLiteDatabase as SignalSqliteDatabase
 
 /**
@@ -291,10 +292,11 @@ object SignalDatabaseMigrations {
     285 to V285_AddEpochToCallLinksTable,
     286 to V286_FixRemoteKeyEncoding,
     287 to V287_TransportTablesCreation,
-    288 to V288_GroupV2TablesCreation
+    288 to V288_GroupV2TablesCreation,
+    289 to V289_GroupV2GatewayInfo
   )
 
-  const val DATABASE_VERSION = 289
+  const val DATABASE_VERSION = 290
 
   @JvmStatic
   fun migrate(context: Application, db: SignalSqliteDatabase, oldVersion: Int, newVersion: Int) {

@@ -134,7 +134,7 @@ async function pushToWebSocket(connectionId, notification) {
     }
 }
 
-async function saveOfflineMessage(recipientHash, notification) {
+async function saveOfflineMessage(recipientHash, notification, groupId = null) {
     if (!BUCKET_NAME || !recipientHash) {
         log('WARN', '无法保存离线消息，缺少bucket或recipientHash', { recipientHash });
         return;
@@ -142,7 +142,8 @@ async function saveOfflineMessage(recipientHash, notification) {
 
     const safeHash = recipientHash.trim().toLowerCase();
     const messageId = notification.metadata?.message?.messageId || notification.metadata?.traceId || notification.timestamp;
-    const key = `${OFFLINE_PREFIX}${safeHash}/${Date.now()}-${messageId || 'message'}.json`;
+    const groupSegment = groupId ? `group/${encodeURIComponent(groupId)}/` : '';
+    const key = `${OFFLINE_PREFIX}${safeHash}/${groupSegment}${Date.now()}-${messageId || 'message'}.json`;
 
     try {
         await s3Client.send(new PutObjectCommand({
@@ -265,10 +266,11 @@ exports.handler = async (event) => {
         }
         
         const recipientHash = request.recipient?.hash || request.recipientHash || request.notification.metadata?.recipientHash || userId;
+        const groupId = request.notification.metadata?.groupId || null;
         const connectionId = await getConnectionId(userId);
         if (!connectionId) {
             log('WARN', 'User not connected', { requestId, userId });
-            await saveOfflineMessage(recipientHash, request.notification);
+            await saveOfflineMessage(recipientHash, request.notification, groupId);
             return {
                 statusCode: 200,
                 body: JSON.stringify({
@@ -293,9 +295,10 @@ exports.handler = async (event) => {
             log('WARN', 'Push failed, storing offline', {
                 requestId,
                 userId,
-                error: error.message
+                error: error.message,
+                groupId
             });
-            await saveOfflineMessage(recipientHash, request.notification);
+            await saveOfflineMessage(recipientHash, request.notification, groupId);
         }
         
         return {

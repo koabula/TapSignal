@@ -11,11 +11,22 @@ import org.thoughtcrime.securesms.database.SignalDatabase
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 文件轮询执行器
+ * 文件轮询执行器 (已废弃)
  * 
- * 专门负责文件轮询的具体执行逻辑，包括文件列表获取、下载、解析和处理。
- * 从TapPollingService中分离出来，实现职责单一化。
+ * 此类已被废弃，V2模式下完全依赖 WebSocket 推送 + 内联消息机制。
+ * 仅保留作为历史兼容性，在 TapPollingService.ENABLE_POLLING = false 时不会被调用。
+ * 
+ * V2 架构:
+ * - 实时通知: WebSocket 推送 + 内联消息 (notification.metadata.message)
+ * - 离线通知: 离线轮询 (tap-offline/)
+ * - 不再需要: 周期性文件列举 + 轮询
+ * 
+ * @deprecated V2模式不再使用轮询,此类将在未来版本中移除
  */
+@Deprecated(
+    message = "V2模式使用 WebSocket 推送,不再需要文件轮询",
+    level = DeprecationLevel.WARNING
+)
 class FilePollingExecutor(
     private val context: Context,
     private val transportManager: TransportManager,

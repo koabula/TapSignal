@@ -207,6 +207,80 @@ class GroupTransportManager private constructor(private val context: Context) {
             }
         }
     }
+
+    /**
+     * 保存或更新群成员的Gateway信息
+     */
+    suspend fun updateMemberGatewayInfo(
+        groupId: String,
+        memberAci: String,
+        gatewayInfo: GroupMemberGatewayInfo
+    ): Boolean {
+        return updateMemberGatewayInfoInternal(groupId, memberAci, gatewayInfo)
+    }
+
+    /**
+     * 移除某个成员的Gateway信息
+     */
+    suspend fun removeMemberGatewayInfo(groupId: String, memberAci: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val currentState = groupV2StatusTable.getGroupState(groupId) ?: return@withContext true
+                if (!currentState.memberGatewayInfo.containsKey(memberAci)) {
+                    return@withContext true
+                }
+                val updatedState = currentState.withoutMemberGateway(memberAci)
+                groupV2StatusTable.insertOrUpdateGroupState(updatedState, expectedVersion = currentState.version)
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "移除群成员Gateway信息失败: groupId=$groupId", e)
+                false
+            }
+        }
+    }
+
+    suspend fun updateMemberGatewayInfo(
+        groupId: String,
+        memberAci: String,
+        webhookConfig: org.thoughtcrime.securesms.tap.WebhookConfigData?,
+        gatewayConfig: org.thoughtcrime.securesms.tap.GatewayConfigData?
+    ): Boolean {
+        val info = GroupMemberGatewayInfo.fromConfigs(memberAci, webhookConfig, gatewayConfig) ?: return false
+        return updateMemberGatewayInfoInternal(groupId, memberAci, info)
+    }
+
+    private suspend fun updateMemberGatewayInfoInternal(
+        groupId: String,
+        memberAci: String,
+        gatewayInfo: GroupMemberGatewayInfo
+    ): Boolean {
+        if (memberAci.isBlank()) return false
+        return withContext(Dispatchers.IO) {
+            var attempt = 0
+            while (attempt < 3) {
+                val currentState = groupV2StatusTable.getGroupState(groupId) ?: return@withContext false
+                val sanitizedState = currentState.withMemberGateway(memberAci, gatewayInfo)
+
+                if (!sanitizedState.validate()) {
+                    Log.w(TAG, "更新群成员Gateway信息失败，状态校验未通过: groupId=$groupId")
+                    return@withContext false
+                }
+
+                try {
+                    groupV2StatusTable.insertOrUpdateGroupState(sanitizedState, expectedVersion = currentState.version)
+                    Log.i(TAG, "群成员Gateway信息已更新: groupId=$groupId, member=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(memberAci)}")
+                    return@withContext true
+                } catch (e: GroupV2StatusTable.OptimisticLockException) {
+                    Log.w(TAG, "更新群成员Gateway信息时出现乐观锁冲突，重试: groupId=$groupId", e)
+                    attempt++
+                } catch (e: Exception) {
+                    Log.e(TAG, "更新群成员Gateway信息失败: groupId=$groupId", e)
+                    return@withContext false
+                }
+            }
+            false
+        }
+    }
     
     /**
      * 创建或更新群组状态（用于接收者初始化）
@@ -816,9 +890,17 @@ class GroupTransportManager private constructor(private val context: Context) {
                 // 2. 获取我的 ACI
                 val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
                 
-                // 3. 获取群组其他成员数量（用于返回结果）
-                val otherMembersCount = groupState.totalMembers.filter { it != myAci }.size
-                
+                val targetMembers = groupState.totalMembers.filter { it != myAci }
+                if (targetMembers.isEmpty()) {
+                    Log.w(TAG, "sendGroupMessage: 无其他成员，跳过发送")
+                    return@withContext GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = messageId,
+                        reason = "无可发送对象",
+                        memberCount = 0
+                    )
+                }
+
                 // 4. 获取 Provider
                 val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
                 val provider = transportManager.getProvider(groupState.providerType)
@@ -828,74 +910,130 @@ class GroupTransportManager private constructor(private val context: Context) {
                         groupId = groupId,
                         messageId = messageId,
                         reason = "Provider 不可用",
-                        memberCount = otherMembersCount
+                        memberCount = targetMembers.size
                     )
                 }
-                
-                // 5. 获取我的群组sharedToken
-                val tokenPool = org.thoughtcrime.securesms.tap.TransportTokenPool.getInstance(context)
-                val myGroupToken = tokenPool.getGroupSharedToken(groupId, groupState.providerType)
-                if (myGroupToken == null) {
-                    Log.e(TAG, "无法获取群组SharedToken: groupId=$groupId")
-                    return@withContext GroupSendResult.Failed(
-                        groupId = groupId,
-                        messageId = messageId,
-                        reason = "群组Token不可用",
-                        memberCount = otherMembersCount
-                    )
+
+                val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
+                val allMemberHashes = groupState.totalMembers.map {
+                    org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(it)
                 }
-                
-                // 6. 构建群组消息metadata（指向我的群组目录）
-                val metadata = buildGroupSendMetadata(groupId, myGroupToken, groupState.providerType)
-                
-                // 7. 构建TransportMessage (保持原始messageId，简洁清晰)
-                val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
-                    messageId = messageId,
-                    timestamp = System.currentTimeMillis(),
-                    senderId = myAci,
-                    recipientId = groupId, // 使用groupId作为recipientId
-                    messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
-                    signalCiphertext = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage),
-                    contentMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
-                        originalSize = encryptedMessage.size.toLong(),
-                        isSessionCipherEncrypted = isSessionCipherEncrypted
-                    )
+
+                val normalizedMessageId = if (messageId.startsWith("group_")) messageId else "group_${groupId}_$messageId"
+                val ciphertextBase64 = org.signal.core.util.Base64.encodeWithPadding(encryptedMessage)
+                val baseMetadata = org.thoughtcrime.securesms.tap.TransportContentMetadata(
+                    originalSize = encryptedMessage.size.toLong(),
+                    isSessionCipherEncrypted = isSessionCipherEncrypted,
+                    deliveryChannel = "lambda-websocket",
+                    gatewayFailoverHints = mapOf("groupId" to groupId)
                 )
-                
-                Log.d(TAG, "上传群组消息到我的目录: groupId=$groupId, messageId=$messageId")
-                
-                // 8. 上传消息到我的群组目录（只上传一次）
-                val result = provider.push(transportMessage, metadata)
-                
-                // 9. 返回结果
-                when (result) {
-                    is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
-                        Log.i(TAG, "群组消息上传成功: groupId=$groupId, messageId=$messageId")
-                        GroupSendResult.Success(
+
+                val successMembers = mutableSetOf<String>()
+                val failedMembers = mutableMapOf<String, String>()
+
+                for (member in targetMembers) {
+                    val memberMessage = org.thoughtcrime.securesms.tap.TransportMessage(
+                        messageId = normalizedMessageId,
+                        timestamp = System.currentTimeMillis(),
+                        senderId = myAci,
+                        recipientId = member,
+                        messageType = org.thoughtcrime.securesms.tap.TransportMessageType.TEXT_MESSAGE,
+                        signalCiphertext = ciphertextBase64,
+                        contentMetadata = baseMetadata
+                    )
+
+                    val gatewayInfo = groupState.memberGatewayInfo[member]
+                    var delivered = false
+                    var failureReason: String? = null
+
+                    if (gatewayInfo != null && gatewayInfo.isDeliverable) {
+                        val cosMetadata = buildGroupSendMetadata(
                             groupId = groupId,
-                            messageId = messageId,
-                            memberCount = otherMembersCount
+                            providerType = groupState.providerType,
+                            targetMemberAci = member,
+                            gatewayInfo = gatewayInfo,
+                            groupMembersHashes = allMemberHashes
                         )
+
+                        if (cosMetadata != null) {
+                            when (val result = provider.push(memberMessage, cosMetadata)) {
+                                is org.thoughtcrime.securesms.tap.TransportResult.Success -> {
+                                    successMembers.add(member)
+                                    delivered = true
+                                }
+                                is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
+                                    Log.w(TAG, "群组Gateway投递失败，准备COS回退: member=${org.thoughtcrime.securesms.tap.utils.LogSanitizer.sanitize(member)} error=${result.errorMessage}")
+                                    failureReason = result.errorMessage ?: "push_failed"
+                                }
+                                else -> {
+                                    failureReason = "unknown_result"
+                                }
+                            }
+                        } else {
+                            failureReason = "metadata_unavailable"
+                        }
+                    } else {
+                        failureReason = "gateway_info_missing"
                     }
-                    is org.thoughtcrime.securesms.tap.TransportResult.Failed -> {
-                        Log.e(TAG, "群组消息上传失败: groupId=$groupId, messageId=$messageId, error=${result.errorMessage}")
-                        GroupSendResult.Failed(
-                            groupId = groupId,
-                            messageId = messageId,
-                            reason = result.errorMessage ?: "上传失败",
-                            memberCount = otherMembersCount
-                        )
+
+                    if (!delivered) {
+                        val fallbackChannel = channelManager.getActiveChannel(member, groupState.providerType)
+                        if (fallbackChannel != null) {
+                            val fallbackResult = uploadMessageToMember(
+                                memberAci = member,
+                                groupId = groupId,
+                                messageId = normalizedMessageId,
+                                encryptedMessage = encryptedMessage,
+                                channel = fallbackChannel,
+                                provider = provider
+                            )
+
+                            if (fallbackResult is org.thoughtcrime.securesms.tap.TransportResult.Success) {
+                                successMembers.add(member)
+                                failureReason = null
+                                delivered = true
+                            } else {
+                                failureReason = (fallbackResult as? org.thoughtcrime.securesms.tap.TransportResult.Failed)?.errorMessage ?: "fallback_failed"
+                            }
+                        } else {
+                            if (failureReason == null) {
+                                failureReason = "channel_missing"
+                            }
+                        }
                     }
-                    else -> {
-                        GroupSendResult.Failed(
-                            groupId = groupId,
-                            messageId = messageId,
-                            reason = "未知错误",
-                            memberCount = otherMembersCount
-                        )
+
+                    if (!delivered && failureReason != null) {
+                        failedMembers[member] = failureReason
+                    } else {
+                        failedMembers.remove(member)
                     }
                 }
-                
+
+                if (failedMembers.isEmpty()) {
+                    Log.i(TAG, "群组消息发送成功: groupId=$groupId, messageId=$normalizedMessageId")
+                    GroupSendResult.Success(
+                        groupId = groupId,
+                        messageId = normalizedMessageId,
+                        memberCount = targetMembers.size
+                    )
+                } else if (successMembers.isEmpty()) {
+                    Log.e(TAG, "群组消息全部失败: groupId=$groupId, failed=${failedMembers.size}")
+                    GroupSendResult.Failed(
+                        groupId = groupId,
+                        messageId = normalizedMessageId,
+                        reason = "发送失败",
+                        memberCount = targetMembers.size
+                    )
+                } else {
+                    Log.w(TAG, "群组消息部分成功: success=${successMembers.size}, failed=${failedMembers.size}")
+                    GroupSendResult.PartialSuccess(
+                        groupId = groupId,
+                        messageId = normalizedMessageId,
+                        successMembers = successMembers,
+                        failedMembers = failedMembers
+                    )
+                }
+
             } catch (e: Exception) {
                 Log.e(TAG, "群组消息发送异常: groupId=$groupId", e)
                 GroupSendResult.Failed(
@@ -916,37 +1054,49 @@ class GroupTransportManager private constructor(private val context: Context) {
      */
     private fun buildGroupSendMetadata(
         groupId: String,
-        myGroupToken: org.thoughtcrime.securesms.tap.TransportToken,
-        providerType: String
-    ): org.thoughtcrime.securesms.tap.TransportMetadata {
-        // 构建COS群组metadata
-        if (providerType == "cos" && myGroupToken is org.thoughtcrime.securesms.tap.CosTransportToken) {
-            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
-            val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
-            
-            // 群组目录路径：/group/{groupId}/ (简化路径，不需要outbox层级)
-            val groupPath = "/group/${groupId}/"
-            
-            return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
-                recipientId = groupId,
-                providerType = providerType,
-                myAddress = "${myGroupToken.bucketName}.cos.${myGroupToken.region}.myqcloud.com",
-                myToken = null, // ✅ 使用null让CosTransportProvider使用主账户凭证（有写权限）
-                myRegion = myGroupToken.region,
-                myBucketName = myGroupToken.bucketName,
-                mySendPath = groupPath, // 发送到我的群组目录
-                peerAddress = "${myGroupToken.bucketName}.cos.${myGroupToken.region}.myqcloud.com",
-                peerToken = myGroupToken, // 对端token保留（虽然发送时不使用）
-                peerRegion = myGroupToken.region,
-                peerBucketName = myGroupToken.bucketName,
-                peerReceivePath = groupPath,
-                myHashedId = myHashedId,
-                peerHashedId = myHashedId
-            )
+        providerType: String,
+        targetMemberAci: String,
+        gatewayInfo: GroupMemberGatewayInfo,
+        groupMembersHashes: List<String>
+    ): org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata? {
+        if (providerType != "cos") {
+            Log.e(TAG, "当前仅支持COS群组发送: provider=$providerType")
+            return null
         }
-        
-        // 默认实现（其他provider）
-        throw UnsupportedOperationException("不支持的providerType: $providerType")
+
+        val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+        val providerConfig = configManager.getProviderConfig(providerType) ?: return null
+        val bucketName = providerConfig["bucketName"]?.toString() ?: return null
+        val region = providerConfig["region"]?.toString() ?: return null
+        val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+        val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+        val peerHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(targetMemberAci)
+        val address = "$bucketName.cos.$region.myqcloud.com"
+        val groupPath = "/group/${groupId}/"
+
+        return org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+            recipientId = targetMemberAci,
+            providerType = providerType,
+            myAddress = address,
+            myToken = null,
+            myRegion = region,
+            myBucketName = bucketName,
+            mySendPath = groupPath,
+            peerAddress = address,
+            peerToken = null,
+            peerRegion = region,
+            peerBucketName = bucketName,
+            peerReceivePath = groupPath,
+            myHashedId = myHashedId,
+            peerHashedId = peerHashedId,
+            groupDispatchOverrides = org.thoughtcrime.securesms.tap.provider.cos.GroupDispatchOverrides(
+                groupId = groupId,
+                recipientAci = targetMemberAci,
+                recipientHash = peerHashedId,
+                gatewayInfo = gatewayInfo,
+                groupMembers = groupMembersHashes
+            )
+        )
     }
     
     /**
@@ -997,8 +1147,11 @@ class GroupTransportManager private constructor(private val context: Context) {
     ): org.thoughtcrime.securesms.tap.TransportResult {
         return try {
             // 构建 TransportMessage
-            // 使用特殊的 messageId 格式来标识群组消息：group_{groupId}_{originalMessageId}
-            val groupMessageId = "group_${groupId}_${messageId}"
+            val groupMessageId = if (messageId.startsWith("group_")) {
+                messageId
+            } else {
+                "group_${groupId}_${messageId}"
+            }
             
             val transportMessage = org.thoughtcrime.securesms.tap.TransportMessage(
                 messageId = groupMessageId,
@@ -1285,6 +1438,7 @@ class GroupTransportManager private constructor(private val context: Context) {
                 val updatedState = currentState.copy(
                     totalMembers = updatedMembers,
                     agreedMembers = updatedAgreedMembers,
+                    memberGatewayInfo = currentState.memberGatewayInfo - leftMemberAci,
                     updatedAt = System.currentTimeMillis()
                 )
                 
@@ -2168,4 +2322,3 @@ data class GroupStateInconsistency(
     val currentStatus: GroupV2Status,
     val expectedStatus: GroupV2Status
 )
-

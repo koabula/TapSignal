@@ -1938,7 +1938,18 @@ class ConversationFragment :
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
           
           // 使用完整的disableV2Mode方法，支持多种ID格式
-          val disableSuccess = channelManager.disableV2Mode(recipient.id.toString())
+          val recipientAci = try {
+            recipient.requireAci().toString()
+          } catch (e: Exception) {
+            Log.w(TAG, "无法获取recipient ACI,取消v2禁用操作", e)
+            null
+          }
+          
+          val disableSuccess = if (recipientAci != null) {
+            channelManager.disableV2Mode(recipientAci)
+          } else {
+            false
+          }
           
           requireActivity().runOnUiThread {
             if (disableSuccess) {
