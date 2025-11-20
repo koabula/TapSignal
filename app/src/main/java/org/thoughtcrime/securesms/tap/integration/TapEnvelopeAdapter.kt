@@ -775,11 +775,11 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
             val clientUuid = UUID.randomUUID().toString()
             builder.clientUuid = ByteString.of(*clientUuid.toByteArray(Charsets.UTF_8))
             
-            // 设置加密密钥 - 直接使用原始字节数据
-            val transportPath = tapAttachment.transportPath ?: "attachments/${tapAttachment.attachmentId}/$fileName"
-            val keyContent = "TAP:$transportPath"
+            val pathDescriptor = resolveAttachmentTransportPath(tapAttachment, fileName)
+            val keyPayload = buildTapAttachmentKeyPayload(pathDescriptor.canonicalPath, pathDescriptor.presignedUrl)
+            val keyContent = "TAP:$keyPayload"
             builder.key = ByteString.of(*keyContent.toByteArray(Charsets.UTF_8))
-            
+
             // 设置基本字段
             builder.fileName = fileName
             builder.size = tapAttachment.size.toInt()
@@ -793,7 +793,7 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 builder.height = 768   // 默认高度
             }
             
-            Log.d(TAG, "修复TAP附件指针: fileName=$fileName, contentType=$contentType, size=${tapAttachment.size}, cdnKey=$cdnKey")
+            Log.d(TAG, "修复TAP附件指针: fileName=$fileName, contentType=$contentType, size=${tapAttachment.size}, cdnKey=$cdnKey, canonicalPath=${pathDescriptor.canonicalPath}")
             
             // 设置digest（如果有哈希）
             if (tapAttachment.fileHash != null) {
@@ -823,6 +823,78 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
         return builder.build()
     }
     
+    private data class TapAttachmentPathDescriptor(
+        val canonicalPath: String,
+        val presignedUrl: String?
+    )
+
+    private fun resolveAttachmentTransportPath(
+        tapAttachment: org.thoughtcrime.securesms.tap.TransportAttachment,
+        fileName: String
+    ): TapAttachmentPathDescriptor {
+        val fallback = ensureLeadingSlash("attachments/${tapAttachment.attachmentId}/$fileName")
+        val rawPath = tapAttachment.transportPath?.takeIf { it.isNotBlank() }
+        val presignedUrl = tapAttachment.presignedUrl?.takeIf { it.isNotBlank() }
+
+        return when {
+            rawPath.isNullOrBlank() && presignedUrl != null -> {
+                TapAttachmentPathDescriptor(
+                    canonicalPath = canonicalizeUrlPath(presignedUrl, fallback),
+                    presignedUrl = presignedUrl
+                )
+            }
+            rawPath.isNullOrBlank() -> TapAttachmentPathDescriptor(fallback, null)
+            isHttpUrl(rawPath) -> {
+                TapAttachmentPathDescriptor(
+                    canonicalPath = canonicalizeUrlPath(rawPath, fallback),
+                    presignedUrl = presignedUrl ?: rawPath
+                )
+            }
+            else -> TapAttachmentPathDescriptor(
+                canonicalPath = canonicalizePath(rawPath, fallback),
+                presignedUrl = presignedUrl
+            )
+        }
+    }
+
+    private fun canonicalizePath(rawPath: String, fallback: String): String {
+        val trimmed = rawPath.trim().substringBefore('?')
+        val normalized = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+        return if (normalized.isNotBlank()) normalized else fallback
+    }
+
+    private fun canonicalizeUrlPath(url: String, fallback: String): String {
+        return try {
+            val uri = java.net.URI(url)
+            val path = uri.path?.takeIf { it.isNotBlank() } ?: fallback
+            canonicalizePath(path, fallback)
+        } catch (e: Exception) {
+            Log.w(TAG, "解析预签名URL失败，使用回退路径", e)
+            fallback
+        }
+    }
+
+    private fun buildTapAttachmentKeyPayload(canonicalPath: String, presignedUrl: String?): String {
+        return if (presignedUrl.isNullOrBlank()) {
+            canonicalPath
+        } else {
+            org.json.JSONObject().apply {
+                put("path", canonicalPath)
+                put("http", presignedUrl)
+            }.toString()
+        }
+    }
+
+    private fun ensureLeadingSlash(path: String): String {
+        return if (path.startsWith("/")) path else "/$path"
+    }
+
+    private fun isHttpUrl(path: String?): Boolean {
+        if (path.isNullOrBlank()) return false
+        val lower = path.lowercase()
+        return lower.startsWith("http://") || lower.startsWith("https://")
+    }
+
     /**
      * 根据MIME类型和文件名确定正确的内容类型
      * 确保图片类型能被正确识别

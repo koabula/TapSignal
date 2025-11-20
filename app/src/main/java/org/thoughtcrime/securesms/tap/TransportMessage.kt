@@ -703,7 +703,15 @@ data class TransportAttachment(
     
     /** 传输服务存储路径 */
     @JsonProperty("transportPath")
-    val transportPath: String? = null
+    val transportPath: String? = null,
+
+    /** 附件预签名直链（可选） */
+    @JsonProperty("presignedUrl")
+    val presignedUrl: String? = null,
+
+    /** 预签名直链过期时间（毫秒, 可选） */
+    @JsonProperty("presignedExpiresAt")
+    val presignedExpiresAt: Long? = null
 ) {
     companion object {
         /**
@@ -729,6 +737,8 @@ data class TransportAttachment(
         if (size != other.size) return false
         if (fileHash != other.fileHash) return false
         if (transportPath != other.transportPath) return false
+        if (presignedUrl != other.presignedUrl) return false
+        if (presignedExpiresAt != other.presignedExpiresAt) return false
 
         return true
     }
@@ -740,6 +750,8 @@ data class TransportAttachment(
         result = 31 * result + size.hashCode()
         result = 31 * result + (fileHash?.hashCode() ?: 0)
         result = 31 * result + (transportPath?.hashCode() ?: 0)
+        result = 31 * result + (presignedUrl?.hashCode() ?: 0)
+        result = 31 * result + (presignedExpiresAt?.hashCode() ?: 0)
         return result
     }
 } 

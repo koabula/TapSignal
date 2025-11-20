@@ -19,6 +19,8 @@ import org.thoughtcrime.securesms.tap.TransportResult
 import org.thoughtcrime.securesms.tap.FileInfo
 import java.io.File
 import java.io.FileInputStream
+import org.json.JSONObject
+import java.net.URI
 
 /**
  * Tap附件下载拦截器
@@ -48,6 +50,11 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
             .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .build()
     }
+
+    private data class AttachmentPathInfo(
+        val canonicalPath: String,
+        val presignedUrl: String?
+    )
     
     /**
      * 检查附件是否为Tap传输的附件
@@ -143,9 +150,34 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
                 return false
             }
             
+            val pathInfo = resolveAttachmentPaths(attachment)
+            if (pathInfo == null) {
+                Log.w(TAG, "无法解析附件路径: attachmentId=${attachment.attachmentId}")
+                return false
+            }
+            
+            // 优先尝试HTTP直链
+            val httpUrl = pathInfo.presignedUrl
+            if (!httpUrl.isNullOrBlank()) {
+                val httpData = runBlocking { downloadAttachmentFromUrl(httpUrl) }
+                if (httpData != null && httpData.isNotEmpty()) {
+                    saveAttachmentDataToSignal(messageId, attachment.attachmentId, httpData)
+                    cleanupPreDownloadedFile(attachment)
+                    Log.i(TAG, "通过HTTP下载Tap附件成功: attachmentId=${attachment.attachmentId}, size=${httpData.size}")
+                    SignalDatabase.attachments.setTransferState(
+                        messageId,
+                        attachment.attachmentId,
+                        AttachmentTable.TRANSFER_PROGRESS_DONE
+                    )
+                    return true
+                } else {
+                    Log.w(TAG, "HTTP下载Tap附件失败或数据为空，尝试回退: url=$httpUrl")
+                }
+            }
+            
             // 通过Tap下载附件
             val downloadResult = runBlocking {
-                downloadAttachmentViaTap(senderAci, attachment)
+                downloadAttachmentViaTap(senderAci, attachment, pathInfo.canonicalPath)
             }
             
             if (downloadResult) {
@@ -173,26 +205,12 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
     /**
      * 通过Tap下载附件
      */
-    private suspend fun downloadAttachmentViaTap(senderId: String, attachment: DatabaseAttachment): Boolean {
+    private suspend fun downloadAttachmentViaTap(
+        senderId: String,
+        attachment: DatabaseAttachment,
+        attachmentPath: String
+    ): Boolean {
         return try {
-            val attachmentPath = buildAttachmentPath(attachment)
-            if (attachmentPath.isNullOrBlank()) {
-                Log.w(TAG, "无法构建附件路径: attachmentId=${attachment.attachmentId}")
-                return false
-            }
-
-            // 优先使用预签名URL或HTTP直链
-            if (isHttpUrl(attachmentPath)) {
-                val httpData = downloadAttachmentFromUrl(attachmentPath)
-                if (httpData != null && httpData.isNotEmpty()) {
-                    saveAttachmentDataToSignal(attachment.mmsId, attachment.attachmentId, httpData)
-                    Log.i(TAG, "通过HTTP下载Tap附件成功: url=$attachmentPath, size=${httpData.size}")
-                    return true
-                } else {
-                    Log.w(TAG, "HTTP下载Tap附件失败或数据为空，尝试回退: url=$attachmentPath")
-                }
-            }
-
             val activeChannels = channelManager.getActiveChannels(senderId)
             if (activeChannels.isEmpty()) {
                 Log.w(TAG, "没有活跃的传输通道: senderId=$senderId")
@@ -236,74 +254,95 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
     }
     
     /**
-     * 构建附件在Tap传输层的路径
-     * 方案一优化：从CDN 999附件的key字段解析传输路径
+     * 解析附件路径信息（规范路径 + 预签名URL）
      */
-    private fun buildAttachmentPath(attachment: DatabaseAttachment): String? {
+    private fun resolveAttachmentPaths(attachment: DatabaseAttachment): AttachmentPathInfo? {
         return try {
-            // 方案一：对于CDN 999附件，从key字段解析传输路径
             if (attachment.cdn.cdnNumber == 999) {
                 val remoteKey = attachment.remoteKey
                 if (remoteKey != null) {
-                    try {
-                        // 解码key字段获取传输路径，使用统一的解码逻辑
-                        val keyContent = decodeAttachmentKey(remoteKey)
-                        
-                        val transportPath = if (keyContent.startsWith("TAP:")) {
-                            keyContent.substring(4)  // 去掉"TAP:"前缀
-                        } else {
-                            keyContent
-                        }
-                        
-                        Log.d(TAG, "从CDN 999附件key解析路径: attachmentId=${attachment.attachmentId}, path=$transportPath")
-                        return transportPath
-                    } catch (e: Exception) {
-                        Log.w(TAG, "解码CDN 999附件key失败: attachmentId=${attachment.attachmentId}", e)
-                    }
+                    parseTapKey(remoteKey, attachment)?.let { return it }
                 }
             }
             
-            // 兼容性处理：从附件的remote信息中提取Tap路径
-            val remoteDigest = attachment.remoteDigest
-            val remoteKey = attachment.remoteKey
-            val fileName = attachment.fileName
-            val attachmentId = attachment.attachmentId.id
-            
-            // 根据Tap附件的路径格式构建
-            when {
-                // 优先使用cdnKey中的路径信息
-                remoteKey?.toString()?.startsWith("tap_attachment:") == true -> {
-                    // 从cdnKey中提取时间戳和哈希信息
-                    val keyInfo = remoteKey.toString().substring(15) // 去掉"tap_attachment:"前缀
-                    "attachments/$attachmentId/${fileName ?: "data"}"
-                }
-                
-                // 其次使用remoteDigest中的信息
-                remoteDigest?.toString()?.startsWith("tap_") == true -> {
-                    val tapPath = remoteDigest.toString().substring(4) // 去掉"tap_"前缀
-                    "attachments/$tapPath"
-                }
-                
-                // 检查fileName是否包含消息ID信息
-                fileName?.contains("attachment_msg_") == true -> {
-                    "attachments/$attachmentId/$fileName"
-                }
-                
-                else -> {
-                    // 默认路径构建方式
-                    val safeFileName = fileName ?: "attachment_${attachmentId}"
-                    "attachments/$attachmentId/$safeFileName"
-                }
-            }
-            
+            val fallback = legacyFallbackPath(attachment)
+            AttachmentPathInfo(fallback, null)
         } catch (e: Exception) {
-            Log.e(TAG, "构建附件路径异常: attachmentId=${attachment.attachmentId}", e)
+            Log.e(TAG, "解析附件路径异常: attachmentId=${attachment.attachmentId}", e)
             null
         }
     }
 
     private fun isHttpUrl(path: String): Boolean {
         return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
+    }
+
+    private fun parseTapKey(remoteKey: String, attachment: DatabaseAttachment): AttachmentPathInfo? {
+        return try {
+            val decoded = decodeAttachmentKey(remoteKey)
+            val payload = if (decoded.startsWith("TAP:")) decoded.substring(4) else decoded
+            val fallback = legacyFallbackPath(attachment)
+            val trimmed = payload.trim()
+            
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                val json = JSONObject(trimmed)
+                val path = json.optString("path")
+                val http = json.optString("http").takeIf { !it.isNullOrBlank() }
+                val canonical = canonicalizePath(path, fallback)
+                AttachmentPathInfo(canonical, http)
+            } else if (isHttpUrl(trimmed)) {
+                val canonical = canonicalizeUrlPath(trimmed, fallback)
+                AttachmentPathInfo(canonical, trimmed)
+            } else {
+                val canonical = canonicalizePath(trimmed, fallback)
+                AttachmentPathInfo(canonical, null)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "解析TAP附件key失败: attachmentId=${attachment.attachmentId}", e)
+            null
+        }
+    }
+
+    private fun legacyFallbackPath(attachment: DatabaseAttachment): String {
+        val attachmentId = attachment.attachmentId.id
+        val safeFileName = attachment.fileName ?: "attachment_${attachmentId}"
+        val defaultPath = ensureLeadingSlash("attachments/$attachmentId/$safeFileName")
+        
+        val remoteKey = attachment.remoteKey
+        val remoteDigestString = attachment.remoteDigest?.toString()
+        
+        return when {
+            remoteKey?.startsWith("tap_attachment:") == true -> {
+                ensureLeadingSlash("attachments/$attachmentId/${attachment.fileName ?: "data"}")
+            }
+            remoteDigestString?.startsWith("tap_") == true -> {
+                ensureLeadingSlash("attachments/${remoteDigestString.substring(4)}")
+            }
+            safeFileName.contains("attachment_msg_") -> defaultPath
+            else -> defaultPath
+        }
+    }
+
+    private fun canonicalizePath(rawPath: String?, fallback: String): String {
+        if (rawPath.isNullOrBlank()) return fallback
+        val withoutQuery = rawPath.trim().substringBefore('?')
+        val normalized = ensureLeadingSlash(withoutQuery)
+        return if (normalized.isNotBlank()) normalized else fallback
+    }
+
+    private fun canonicalizeUrlPath(url: String, fallback: String): String {
+        return try {
+            val uri = URI(url)
+            val path = uri.path?.takeIf { it.isNotBlank() } ?: fallback
+            canonicalizePath(path, fallback)
+        } catch (e: Exception) {
+            Log.w(TAG, "解析HTTP附件路径失败: url=$url", e)
+            fallback
+        }
+    }
+
+    private fun ensureLeadingSlash(path: String): String {
+        return if (path.startsWith("/")) path else "/$path"
     }
 
     private suspend fun downloadAttachmentFromUrl(url: String): ByteArray? = withContext(Dispatchers.IO) {
@@ -424,22 +463,13 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
      */
     private fun getPreDownloadedAttachmentData(attachment: DatabaseAttachment): ByteArray? {
         return try {
-            // 从attachment的key中解析出路径信息，使用统一的解码逻辑
-            val attachmentKey = attachment.remoteKey
-            if (attachmentKey == null) {
-                Log.d(TAG, "附件key为空: attachmentId=${attachment.attachmentId}")
+            val pathInfo = resolveAttachmentPaths(attachment)
+            if (pathInfo == null) {
+                Log.d(TAG, "无法解析附件路径: attachmentId=${attachment.attachmentId}")
                 return null
             }
             
-            // 使用与buildAttachmentPath相同的key解码逻辑
-            val keyContent = decodeAttachmentKey(attachmentKey)
-            if (!keyContent.startsWith("TAP:")) {
-                Log.d(TAG, "非TAP附件key: attachmentId=${attachment.attachmentId}")
-                return null
-            }
-            
-            // 解析TAP通道路径：TAP:/v2-channels/{hash}/outbox/attachments/{fileName}
-            val fullTapPath = keyContent.substring(4) // 去掉"TAP:"前缀
+            val fullTapPath = pathInfo.canonicalPath
             
             // 从完整路径中提取文件名
             val fileName = fullTapPath.substringAfterLast("/")
@@ -475,13 +505,12 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
      */
     private fun cleanupPreDownloadedFile(attachment: DatabaseAttachment) {
         try {
-            val attachmentKey = attachment.remoteKey
-            if (attachmentKey == null || !attachmentKey.startsWith("TAP:")) {
+            val pathInfo = resolveAttachmentPaths(attachment)
+            if (pathInfo == null) {
                 return
             }
             
-            // 解析TAP通道路径
-            val fullTapPath = attachmentKey.substring(4)
+            val fullTapPath = pathInfo.canonicalPath
             val fileName = fullTapPath.substringAfterLast("/")
             if (fileName.isBlank()) {
                 return
@@ -505,7 +534,7 @@ class TapAttachmentDownloadInterceptor private constructor(private val context: 
     }
     
     /**
-     * 统一的附件key解码逻辑，确保buildAttachmentPath和getPreDownloadedAttachmentData使用相同逻辑
+     * 统一的附件key解码逻辑，供路径解析和缓存使用
      */
     private fun decodeAttachmentKey(remoteKey: String): String {
         return if (remoteKey.startsWith("TAP:")) {

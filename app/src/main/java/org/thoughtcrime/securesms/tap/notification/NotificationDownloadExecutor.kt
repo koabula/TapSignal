@@ -1019,9 +1019,26 @@ class NotificationDownloadExecutor(
         var changed = false
         val updated = message.attachments.map { attachment ->
             val presignedEntry = index[attachment.attachmentId]
-            if (presignedEntry != null && (attachment.transportPath.isNullOrBlank() || !isHttpUrl(attachment.transportPath))) {
-                changed = true
-                attachment.copy(transportPath = presignedEntry.url)
+            if (presignedEntry != null) {
+                var updatedAttachment = attachment
+
+                if (attachment.presignedUrl != presignedEntry.url || attachment.presignedExpiresAt != presignedEntry.expiresAt) {
+                    changed = true
+                    updatedAttachment = updatedAttachment.copy(
+                        presignedUrl = presignedEntry.url,
+                        presignedExpiresAt = presignedEntry.expiresAt
+                    )
+                }
+
+                if (updatedAttachment.transportPath.isNullOrBlank()) {
+                    val derivedPath = extractPathFromUrl(presignedEntry.url)
+                    if (!derivedPath.isNullOrBlank()) {
+                        changed = true
+                        updatedAttachment = updatedAttachment.copy(transportPath = derivedPath)
+                    }
+                }
+
+                updatedAttachment
             } else {
                 attachment
             }
@@ -1037,6 +1054,19 @@ class NotificationDownloadExecutor(
     private fun isHttpUrl(path: String?): Boolean {
         if (path.isNullOrBlank()) return false
         return path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)
+    }
+
+    private fun extractPathFromUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        return try {
+            val uri = java.net.URI(url)
+            val rawPath = uri.path ?: return null
+            val normalized = rawPath.substringBefore('?')
+            if (normalized.isNotBlank()) normalized else null
+        } catch (e: Exception) {
+            Log.w(TAG, "无法从预签名URL提取路径", e)
+            null
+        }
     }
 
 /**

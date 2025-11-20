@@ -39,7 +39,18 @@ class S3CompatiblePresignedUrlGenerator(
                 return null
             }
 
-            val expires = min(expiresInSeconds, MAX_EXPIRATION_SECONDS).coerceAtLeast(1)
+            val providerMax = when (cosConfig.provider) {
+                CosConfig.Provider.AWS -> AWS_MAX_EXPIRATION_SECONDS
+                CosConfig.Provider.TENCENT -> TENCENT_MAX_EXPIRATION_SECONDS
+            }
+            val expires = min(expiresInSeconds, providerMax).coerceAtLeast(1)
+            if (expiresInSeconds > providerMax) {
+                Log.w(
+                    tag,
+                    "Requested presign expiry ${expiresInSeconds}s exceeds ${cosConfig.provider} limit " +
+                        "$providerMax s. Clamping to $expires s."
+                )
+            }
             val now = Instant.now()
             val amzDate = dateTimeFormatter.format(now)
             val dateStamp = dateFormatter.format(now)
@@ -129,6 +140,7 @@ class S3CompatiblePresignedUrlGenerator(
     }
 
     companion object {
-        private const val MAX_EXPIRATION_SECONDS = 14 * 24 * 60 * 60 // 14天
+        private const val AWS_MAX_EXPIRATION_SECONDS = 7 * 24 * 60 * 60 // AWS: 7天上限
+        private const val TENCENT_MAX_EXPIRATION_SECONDS = 14 * 24 * 60 * 60 // COS默认14天
     }
 }

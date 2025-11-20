@@ -699,7 +699,9 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 mimeType = attachment.contentType ?: "application/octet-stream",
                 size = attachment.size,
                 fileHash = calculateAttachmentHashForTransport(attachment),
-                transportPath = fullTapPath
+                transportPath = fullTapPath,
+                presignedUrl = descriptor.presignedUrl,
+                presignedExpiresAt = descriptor.presignedExpiresAt
             )
         }
         
@@ -910,7 +912,9 @@ class TapSignalServiceAdapter private constructor(private val context: Context) 
                 mimeType = mimeType,
                 size = size,
                 fileHash = fileHash,
-                transportPath = null // 将在上传时设置
+                transportPath = null,
+                presignedUrl = null,
+                presignedExpiresAt = null // 上传时填充
             )
         }
     }
