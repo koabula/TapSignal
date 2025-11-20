@@ -6,7 +6,21 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 /**
  * COS子用户管理器
  * 负责创建、管理和清理COS子用户账号
+ * 
+ * 已废弃: V2架构使用WebSocket推送和主账户凭证,不再需要子账户管理。
+ * 
+ * V2架构变更:
+ * - 消息通过Lambda + WebSocket推送传输,无需子账户共享
+ * - 使用主账户凭证 + 临时访问密钥(STS)
+ * - 附件使用预签名URL,无需子账户权限
+ * 
+ * @deprecated V2架构不再使用子账户,此接口保留仅用于兼容旧代码
  */
+@Deprecated(
+    message = "V2架构使用WebSocket推送,不需要子账户管理",
+    replaceWith = ReplaceWith("使用主账户凭证 + 预签名URL"),
+    level = DeprecationLevel.WARNING
+)
 interface CosSubUserManager {
     
     /**
@@ -156,7 +170,13 @@ enum class CosPermission(val actions: List<String>) {
 
 /**
  * 子用户管理器工厂
+ * 
+ * @deprecated V2架构不再使用子账户管理,此工厂类保留仅用于兼容旧代码
  */
+@Deprecated(
+    message = "V2架构不再使用子账户管理",
+    level = DeprecationLevel.WARNING
+)
 object CosSubUserManagerFactory {
     private val TAG = Log.tag(CosSubUserManagerFactory::class.java)
 

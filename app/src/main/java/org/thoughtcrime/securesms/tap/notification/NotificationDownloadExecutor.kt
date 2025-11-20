@@ -418,6 +418,7 @@ class NotificationDownloadExecutor(
             )
             
             // 4. 执行完整的下载流程 (list -> filter -> download)
+            @Suppress("DEPRECATION")
             val downloadResult = performCompleteDownload(
                 provider,
                 metadata,
@@ -520,18 +521,24 @@ class NotificationDownloadExecutor(
     }
     
     /**
-     * 执行完整的下载流程 (旧式回退逻辑)
+     * 执行完整的下载流程 (已废弃)
      * 
-     * 此方法仅用于处理不包含内联消息的旧式通知。
-     * V2 模式下优先使用 processInlineNotification()。
+     * 此方法已废弃,V2模式完全使用内联消息传输,不需要listFiles。
      * 
-     * 流程: listFiles -> filter -> downloadFile -> process
-     * 性能影响: 需要列举文件,比内联消息慢
+     * V2架构:
+     * - 实时消息: WebSocket推送 + 内联消息 (notification.metadata.message)
+     * - 离线消息: 离线队列 (tap-offline/) + 内联消息
+     * - 附件: 预签名URL直接下载
      * 
-     * @deprecated V2模式主要使用内联消息,此方法仅作为回退逻辑
+     * 不再需要:
+     * - 列举文件 (listFiles)
+     * - 主动下载密文 (downloadFile)
+     * - 基于marker的过滤
+     * 
+     * @deprecated V2模式使用内联消息,完全不需要此方法
      */
     @Deprecated(
-        message = "V2模式使用内联消息,不需要 listFiles",
+        message = "V2模式使用内联消息,完全不需要listFiles和主动下载",
         level = DeprecationLevel.WARNING
     )
     private suspend fun performCompleteDownload(

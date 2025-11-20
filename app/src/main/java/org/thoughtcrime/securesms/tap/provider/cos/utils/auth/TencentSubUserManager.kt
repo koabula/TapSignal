@@ -17,7 +17,15 @@ import java.util.concurrent.TimeUnit
 /**
  * 腾讯云CAM子用户管理器
  * 使用腾讯云CAM API管理子用户和访问密钥
+ * 
+ * 已废弃: V2架构不再使用子账户管理。
+ * 
+ * @deprecated V2架构使用WebSocket推送和主账户凭证,不需要CAM子用户
  */
+@Deprecated(
+    message = "V2架构不再使用CAM子用户",
+    level = DeprecationLevel.WARNING
+)
 class TencentSubUserManager(
     private val config: CosConfig,
     private val context: Context

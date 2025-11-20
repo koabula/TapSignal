@@ -9,7 +9,6 @@ import org.thoughtcrime.securesms.tap.provider.cos.utils.client.CosClientFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosConfig
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosFileInfo
 import org.thoughtcrime.securesms.tap.provider.cos.utils.common.CosAccessToken
-import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosSubUserManagerFactory
 import org.thoughtcrime.securesms.tap.provider.cos.utils.auth.CosPermission
 import org.thoughtcrime.securesms.tap.*
 import org.thoughtcrime.securesms.tap.GroupTransportManager.GroupTransportMetadata
@@ -1402,77 +1401,43 @@ class CosTransportProvider(
         }
     }
     
+    /**
+     * 撤销传输Token
+     * 
+     * 已废弃: V2架构不再使用子账户和长期Token,改用临时访问密钥。
+     * 
+     * @deprecated V2架构使用临时密钥,此方法无需实现
+     */
+    @Deprecated(
+        message = "V2架构不使用长期Token,改用临时密钥",
+        level = DeprecationLevel.WARNING
+    )
     override suspend fun revokeToken(token: TransportToken): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "开始撤销COS传输Token: tokenId=${LogSanitizer.sanitize(token.tokenId)}")
+                Log.i(TAG, "revokeToken调用: tokenId=${LogSanitizer.sanitize(token.tokenId)}")
                 
                 if (token !is CosTransportToken) {
-                    Log.w(TAG, "Token类型不匹配，无法撤销: ${token::class.simpleName}")
+                    Log.w(TAG, "Token类型不匹配: ${token::class.simpleName}")
                     return@withContext false
                 }
                 
-                // 检查是否为占位符Token
                 if (token.accessKeyId == "PLACEHOLDER_KEY") {
-                    Log.i(TAG, "撤销占位符Token，无需操作IAM: tokenId=${token.tokenId}")
+                    Log.i(TAG, "占位符Token,无需撤销: tokenId=${token.tokenId}")
                     return@withContext true
                 }
                 
-                // 2. 从tokenId中提取子用户名
-                val subUserName = extractSubUserNameFromTokenId(token.tokenId)
-                if (subUserName == null) {
-                    Log.w(TAG, "无法从tokenId中提取子用户名: ${LogSanitizer.sanitize(token.tokenId)}")
-                    return@withContext false
-                }
-                
-                // 3. 创建子用户管理器
-                val subUserManager = CosSubUserManagerFactory.createManager(cosConfig, context)
-                
-                // 4. 删除子用户（这会自动撤销所有相关权限和访问密钥）
-                val success = subUserManager.deleteSubUser(subUserName)
-                
-                if (success) {
-                    Log.i(TAG, "COS传输Token撤销成功: tokenId=${token.tokenId}, subUser=$subUserName")
-                } else {
-                    Log.w(TAG, "COS传输Token撤销失败: tokenId=${token.tokenId}, subUser=$subUserName")
-                }
-                
-                success
+                Log.w(TAG, "V2架构不使用长期Token,revokeToken为空操作")
+                true
                 
             } catch (e: Exception) {
-                Log.e(TAG, "撤销COS传输Token时发生异常: tokenId=${token.tokenId}", e)
+                Log.e(TAG, "撤销Token时发生异常: tokenId=${token.tokenId}", e)
                 false
             }
         }
     }
     
-    /**
-     * 从tokenId中提取子用户名
-     */
-    private fun extractSubUserNameFromTokenId(tokenId: String): String? {
-        return try {
-            // tokenId格式: cos-signal-cos-signal-v2-{timestamp}-{randomSuffix}-{timestamp}
-            // 需要提取: signal-cos-signal-v2-{timestamp}-{randomSuffix}
-            if (tokenId.startsWith("cos-")) {
-                val parts = tokenId.split("-")
-                if (parts.size >= 6) {
-                    // 重构子用户名: signal-cos-signal-v2-{timestamp}-{randomSuffix}
-                    val userName = parts.drop(1).dropLast(1).joinToString("-")
-                    Log.d(TAG, "提取子用户名: $userName from tokenId: $tokenId")
-                    userName
-                } else {
-                    Log.w(TAG, "tokenId格式不正确: $tokenId")
-                    null
-                }
-            } else {
-                Log.w(TAG, "tokenId不是COS格式: $tokenId")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "提取子用户名失败: tokenId=$tokenId", e)
-            null
-        }
-    }
+
 
     /**
      * 从配置创建CosConfig

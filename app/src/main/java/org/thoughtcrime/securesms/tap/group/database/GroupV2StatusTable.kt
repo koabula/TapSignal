@@ -23,6 +23,10 @@ import java.io.IOException
 class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: SignalDatabase) :
     DatabaseTable(context, databaseHelper) {
 
+    init {
+        ensureMemberGatewaysColumn()
+    }
+
     companion object {
         private val TAG = Log.tag(GroupV2StatusTable::class.java)
 
@@ -500,6 +504,42 @@ class GroupV2StatusTable(@NonNull context: Context, @NonNull databaseHelper: Sig
         } catch (e: Exception) {
             Log.w(TAG, "反序列化群成员Gateway信息失败，返回空映射", e)
             emptyMap()
+        }
+    }
+
+    /**
+     * 确保member_gateways列存在
+     * 
+     * 防御性检查,修复因数据库迁移不完整导致的schema不一致问题
+     */
+    private fun ensureMemberGatewaysColumn() {
+        try {
+            val cursor = readableDatabase.rawQuery(
+                "PRAGMA table_info($TABLE_NAME)",
+                null
+            )
+            
+            var hasColumn = false
+            cursor.use {
+                val nameIndex = it.getColumnIndexOrThrow("name")
+                while (it.moveToNext()) {
+                    val columnName = it.getString(nameIndex)
+                    if (columnName == MEMBER_GATEWAYS) {
+                        hasColumn = true
+                        break
+                    }
+                }
+            }
+            
+            if (!hasColumn) {
+                Log.w(TAG, "检测到member_gateways列缺失,正在修复数据库schema...")
+                writableDatabase.execSQL(
+                    "ALTER TABLE $TABLE_NAME ADD COLUMN $MEMBER_GATEWAYS TEXT NOT NULL DEFAULT '{}'"
+                )
+                Log.i(TAG, "member_gateways列添加成功,数据库schema已修复")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "检查或添加member_gateways列失败", e)
         }
     }
 }
