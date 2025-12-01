@@ -619,6 +619,9 @@ dependencies {
   implementation(libs.aws.sdk.iam)
   implementation(libs.aws.sdk.apigatewayv2)
   implementation(libs.aws.sdk.dynamodb)
+  
+  // UnifiedPush for Tap v3
+  implementation("com.github.UnifiedPush:android-connector:2.2.0")
 
   "playImplementation"(project(":billing"))
   "nightlyImplementation"(project(":billing"))

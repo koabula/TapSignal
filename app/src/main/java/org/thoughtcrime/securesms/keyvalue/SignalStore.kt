@@ -38,6 +38,7 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
   val apkUpdateValues = ApkUpdateValues(store)
   val backupValues = BackupValues(store)
   val tapValues = TapValues(store)
+  val tapV3Values = TapV3Values(store)
 
   val plainTextValues = PlainTextSharedPrefsDataStore(context)
 
@@ -83,6 +84,7 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
       notificationProfile.onFirstEverAppLaunch()
       releaseChannel.onFirstEverAppLaunch()
       story.onFirstEverAppLaunch()
+      tapV3.onFirstEverAppLaunch()
     }
 
     @JvmStatic
@@ -112,7 +114,8 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
           imageEditor.keysToIncludeInBackup +
           notificationProfile.keysToIncludeInBackup +
           releaseChannel.keysToIncludeInBackup +
-          story.keysToIncludeInBackup
+          story.keysToIncludeInBackup +
+          tapV3.keysToIncludeInBackup
       }
 
     /**
@@ -261,6 +264,9 @@ class SignalStore(context: Application, private val store: KeyValueStore) {
     
     val tap: TapValues
       get() = instance!!.tapValues
+    
+    val tapV3: TapV3Values
+      get() = instance!!.tapV3Values
 
     val groupsV2AciAuthorizationCache: GroupsV2AuthorizationSignalStoreCache
       get() = GroupsV2AuthorizationSignalStoreCache.createAciCache(instance!!.store)
