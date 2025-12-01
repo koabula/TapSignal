@@ -39,15 +39,17 @@ class IpfsContentTable(context: Context, databaseHelper: SignalDatabase) :
             )
         """.trimIndent()
         
-        val CREATE_INDEX = """
+        val CREATE_INDEX = arrayOf(
+            """
             CREATE INDEX IF NOT EXISTS tap_v3_ipfs_content_cid_index 
             ON $TABLE_NAME ($CID)
-        """.trimIndent()
-        
-        val CREATE_EXPIRES_INDEX = """
+            """.trimIndent(),
+            
+            """
             CREATE INDEX IF NOT EXISTS tap_v3_ipfs_content_expires_index 
             ON $TABLE_NAME ($EXPIRES_AT)
-        """.trimIndent()
+            """.trimIndent()
+        )
     }
     
     enum class ContentType {

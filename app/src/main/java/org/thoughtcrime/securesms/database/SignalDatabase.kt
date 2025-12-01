@@ -84,6 +84,8 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
   val transportPollingStateTable: org.thoughtcrime.securesms.tap.database.TransportPollingStateTable = org.thoughtcrime.securesms.tap.database.TransportPollingStateTable(context, this)
   val transportTokenTable: org.thoughtcrime.securesms.tap.database.TransportTokenTable = org.thoughtcrime.securesms.tap.database.TransportTokenTable(context, this)
   val groupV2StatusTable: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable = org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, this)
+  val tapV3ChannelTable: org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable = org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable(context, this)
+  val ipfsContentTable: org.thoughtcrime.securesms.tapv3.database.IpfsContentTable = org.thoughtcrime.securesms.tapv3.database.IpfsContentTable(context, this)
 
   override fun onOpen(db: net.zetetic.database.sqlcipher.SQLiteDatabase) {
     db.setForeignKeyConstraintsEnabled(true)
@@ -159,6 +161,10 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     db.execSQL(org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_PROCESSED_MESSAGES_TABLE)
     db.execSQL(org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_TABLE)
     db.execSQL(org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable.CREATE_TABLE)
+    
+    // Tap v3 模块数据库表
+    db.execSQL(org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable.CREATE_TABLE)
+    db.execSQL(org.thoughtcrime.securesms.tapv3.database.IpfsContentTable.CREATE_TABLE)
 
     executeStatements(db, RecipientTable.CREATE_INDEXS)
     executeStatements(db, MessageTable.CREATE_INDEXS)
@@ -189,6 +195,10 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportPollingStateTable.CREATE_INDEXES)
     executeStatements(db, org.thoughtcrime.securesms.tap.database.TransportTokenTable.CREATE_INDEXES)
     executeStatements(db, org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable.CREATE_INDEXES)
+    
+    // Tap v3 模块索引
+    executeStatements(db, org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable.CREATE_INDEX)
+    executeStatements(db, org.thoughtcrime.securesms.tapv3.database.IpfsContentTable.CREATE_INDEX)
 
     executeStatements(db, MessageSendLogTables.CREATE_TRIGGERS)
 
@@ -619,5 +629,15 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     @get:JvmName("groupV2Status")
     val groupV2Status: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable
       get() = instance!!.groupV2StatusTable
+
+    @get:JvmStatic
+    @get:JvmName("tapV3Channels")
+    val tapV3Channels: org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable
+      get() = instance!!.tapV3ChannelTable
+
+    @get:JvmStatic
+    @get:JvmName("ipfsContent")
+    val ipfsContent: org.thoughtcrime.securesms.tapv3.database.IpfsContentTable
+      get() = instance!!.ipfsContentTable
   }
 }

@@ -65,6 +65,16 @@ tapv3/
 │   ├── TapV3Crypto.kt          # 加密工具
 │   └── KPushManager.kt         # k_push 管理
 │
+├── protocol/                   # 协议子模块
+│   ├── TapV3ControlMessage.kt  # 控制消息
+│   ├── TapV3MessageCodec.kt    # 消息编解码
+│   └── TapV3HandshakeManager.kt # 握手管理器
+│
+├── integration/                # 集成子模块
+│   ├── TapV3SendIntegrator.kt  # 发送集成
+│   ├── TapV3ReceiveIntegrator.kt # 接收集成
+│   └── TapV3MessageRouter.kt   # 消息路由
+│
 ├── database/                   # 数据库子模块
 │   ├── TapV3ChannelTable.kt    # 通道表
 │   └── IpfsContentTable.kt     # 内容表
@@ -94,12 +104,64 @@ val result = manager.receiveMessage(
 )
 ```
 
+## Phase 2 完成状态
+
+### 已完成
+- ✅ 协议层实现
+  - TapV3ControlMessage: 控制消息定义（握手请求/响应/确认、密钥轮换、通道关闭）
+  - TapV3MessageCodec: 消息编解码器
+  - TapV3HandshakeManager: 握手管理器
+  
+- ✅ 握手协议
+  - 三次握手流程：Request -> Response -> Ack
+  - 握手状态机管理
+  - 版本和能力协商
+  - 参数验证（端点、密钥、网关）
+  
+- ✅ 消息编解码
+  - 消息类型标识（Inline/IpfsRefs/Control）
+  - 版本头部
+  - k_push 加密/解密集成
+  - Base64 编码
+  - 大小阈值判断逻辑
+  
+- ✅ 数据验证
+  - CID 格式验证
+  - IpfsRefs 结构验证
+  - 消息大小验证
+
+## Phase 3 完成状态
+
+### 已完成
+- ✅ 集成层实现
+  - TapV3SendIntegrator: 发送端集成
+  - TapV3ReceiveIntegrator: 接收端集成
+  - TapV3MessageRouter: 消息路由器
+  
+- ✅ 发送流程
+  - 内联消息发送（< 2KB）
+  - IPFS 消息发送（> 2KB）
+  - 附件上传到 IPFS
+  - 自动清理失败的上传
+  - 完整的错误处理和重试
+  
+- ✅ 接收流程
+  - UnifiedPush 消息接收
+  - 内联消息解密
+  - IPFS 内容下载
+  - 附件下载和保存
+  
+- ✅ 消息路由
+  - 自动判断是否使用 Tap v3
+  - 通道状态检查
+  - 握手完成验证
+
 ## 下一步
 
-### Phase 2: 协议层实现
-- [ ] TapV3HandshakeManager: 握手管理
-- [ ] TapV3MessageCodec: 消息编解码
-- [ ] TapV3ControlMessage: 控制消息
+### Phase 4: UI 和用户体验
+- [ ] TapV3ConfigActivity: 配置界面
+- [ ] TapV3HandshakeDialog: 握手对话框
+- [ ] TapV3StatusIndicator: 状态指示器
 
 ### Phase 3: 端到端消息传输
 - [ ] 集成到 IndividualSendJob

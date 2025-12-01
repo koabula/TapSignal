@@ -42,10 +42,12 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
             )
         """.trimIndent()
         
-        val CREATE_INDEX = """
+        val CREATE_INDEX = arrayOf(
+            """
             CREATE INDEX IF NOT EXISTS tap_v3_channels_recipient_id_index 
             ON $TABLE_NAME ($RECIPIENT_ID)
-        """.trimIndent()
+            """.trimIndent()
+        )
     }
     
     enum class ChannelStatus {
