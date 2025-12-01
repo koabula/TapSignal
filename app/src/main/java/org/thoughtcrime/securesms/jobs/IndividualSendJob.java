@@ -194,20 +194,31 @@ public class IndividualSendJob extends PushSendJob {
         Log.i(TAG, "检测到TAP控制消息，强制使用Signal Server发送: messageId=" + messageId);
         unidentified = deliver(message, originalEditedMessage);
       } else {
-        // 检查是否可以使用Tap传输层发送普通消息
+        // 优先检查Tap v3通道
         try {
-          TapMessageSendIntegrator integrator = TapMessageSendIntegrator.Companion.getInstance(context);
-          boolean canUseTap = integrator.canUseTapForSending(recipient.getId());
+          org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter tapV3Router = 
+              org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter.Companion.getInstance(context);
+          org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter.RoutingDecision v3Decision = 
+              tapV3Router.shouldUseTapV3(recipient);
 
-          if (canUseTap) {
-            Log.i(TAG, "检测到Tap v2通道，通过Tap传输层发送: messageId=" + messageId);
-            unidentified = sendMessageViaTapIntegration(messageId, recipient, message, originalEditedMessage);
+          if (v3Decision.getUseTapV3()) {
+            Log.i(TAG, "Using Tap v3 to send: messageId=" + messageId + ", reason=" + v3Decision.getReason());
+            unidentified = sendMessageViaTapV3(messageId, recipient, message, originalEditedMessage);
           } else {
-            Log.d(TAG, "未检测到Tap v2通道，使用Signal Server发送: messageId=" + messageId);
-            unidentified = deliver(message, originalEditedMessage);
+            // 回退到Tap v2检查
+            TapMessageSendIntegrator integrator = TapMessageSendIntegrator.Companion.getInstance(context);
+            boolean canUseTapV2 = integrator.canUseTapForSending(recipient.getId());
+
+            if (canUseTapV2) {
+              Log.i(TAG, "使用Tap v2发送: messageId=" + messageId);
+              unidentified = sendMessageViaTapIntegration(messageId, recipient, message, originalEditedMessage);
+            } else {
+              Log.d(TAG, "使用Signal Server发送: messageId=" + messageId);
+              unidentified = deliver(message, originalEditedMessage);
+            }
           }
         } catch (Exception e) {
-          Log.w(TAG, "Tap检查异常，回退到原生发送: messageId=" + messageId, e);
+          Log.w(TAG, "Tap路由检查异常，回退到原生发送: messageId=" + messageId, e);
           unidentified = deliver(message, originalEditedMessage);
         }
       }
@@ -473,6 +484,52 @@ public class IndividualSendJob extends PushSendJob {
     @Override
     public void onSyncMessageSent() {
       SignalLocalMetrics.IndividualMessageSend.onSyncMessageSent(messageId);
+    }
+  }
+
+  /**
+   * 通过Tap v3发送消息
+   * 使用IPFS存储和UnifiedPush通知
+   *
+   * @param messageId 消息ID
+   * @param recipient 接收方
+   * @param message 待发送消息
+   * @param originalEditedMessage 原始编辑消息（如果是编辑消息）
+   * @return 是否使用未识别模式发送
+   */
+  private boolean sendMessageViaTapV3(long messageId, Recipient recipient, OutgoingMessage message, MessageRecord originalEditedMessage) 
+      throws IOException {
+    try {
+      Log.i(TAG, "Starting Tap v3 send: messageId=" + messageId + ", recipient=" + recipient.getId());
+
+      org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator sendIntegrator = 
+          org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.Companion.getInstance(context);
+
+      String recipientId = recipient.getId().serialize();
+      byte[] signalEncrypted = message.getBody() != null ? message.getBody().getBytes() : new byte[0];
+      java.util.List<org.thoughtcrime.securesms.attachments.Attachment> attachments = 
+          new java.util.ArrayList<>();
+
+      kotlinx.coroutines.Dispatchers dispatchers = kotlinx.coroutines.Dispatchers.INSTANCE;
+      Object result = kotlinx.coroutines.BuildersKt.runBlocking(
+          dispatchers.getIO(),
+          (scope, continuation) -> sendIntegrator.sendMessage(recipientId, signalEncrypted, attachments, continuation)
+      );
+
+      org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.SendResult sendResult = 
+          (org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.SendResult) result;
+
+      if (sendResult.getSuccess()) {
+        Log.i(TAG, "Tap v3 send successful: messageId=" + messageId);
+        return false;
+      } else {
+        Log.e(TAG, "Tap v3 send failed: messageId=" + messageId + ", error=" + sendResult.getError());
+        throw new IOException("Tap v3 send failed: " + sendResult.getError());
+      }
+
+    } catch (Exception e) {
+      Log.e(TAG, "Tap v3 send exception: messageId=" + messageId, e);
+      throw new IOException("Tap v3 send exception", e);
     }
   }
 

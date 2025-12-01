@@ -292,6 +292,16 @@ private fun AppSettingsContent(
 
         item {
           Rows.TextRow(
+            text = stringResource(R.string.TapV3ConfigFragment__tap_v3_config),
+            icon = painterResource(R.drawable.symbol_link_24),
+            onClick = {
+              callbacks.navigate(R.id.action_appSettingsFragment_to_tapV3ConfigFragment)
+            }
+          )
+        }
+
+        item {
+          Rows.TextRow(
             text = stringResource(R.string.preferences__linked_devices),
             icon = painterResource(R.drawable.symbol_devices_24),
             onClick = {

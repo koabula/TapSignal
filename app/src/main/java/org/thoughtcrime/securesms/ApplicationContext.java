@@ -567,6 +567,15 @@ public class ApplicationContext extends Application implements AppForegroundObse
     } catch (Exception e) {
       Log.w(TAG, "初始化Tap传输层模块失败", e);
     }
+
+    try {
+      // 初始化Tap v3模块
+      org.thoughtcrime.securesms.tapv3.TapV3Manager.Companion.getInstance(this);
+      
+      Log.i(TAG, "Tap v3模块已初始化");
+    } catch (Exception e) {
+      Log.w(TAG, "初始化Tap v3模块失败", e);
+    }
   }
 
   @Override

@@ -63,4 +63,7 @@
     <!-- Tap v3 Settings -->
     <string name="preferences__tap_v3">Tap v3</string>
     <string name="preferences__tap_v3_summary">Decentralized messaging with IPFS and UnifiedPush</string>
+
+    <!-- Tap v3 Recipient Actions -->
+    <string name="RecipientBottomSheet_initiate_tap_v3_handshake">Initiate Tap v3 Handshake</string>
 </resources>

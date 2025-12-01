@@ -138,6 +138,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
   private int                 thumbSize;
   private GlideLiveDataTarget thumbTarget;
   private org.thoughtcrime.securesms.tap.ui.TapV2ModeIndicator tapV2Indicator;
+  private org.thoughtcrime.securesms.tapv3.ui.TapV3StatusIndicator tapV3Indicator;
 
   private int                     unreadCount;
   private AvatarImageView         contactPhotoImage;
@@ -173,6 +174,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
     this.checkedView             = findViewById(R.id.conversation_list_item_checked);
     this.unreadMentions          = findViewById(R.id.conversation_list_item_unread_mentions_indicator);
     this.tapV2Indicator          = findViewById(R.id.conversation_list_item_cos_v2_indicator);
+    this.tapV3Indicator          = findViewById(R.id.conversation_list_item_tap_v3_indicator);
     this.thumbSize               = (int) DimensionUnit.SP.toPixels(16f);
     this.thumbTarget             = new GlideLiveDataTarget(thumbSize, thumbSize);
     this.searchStyleFactory      = () -> new CharacterStyle[] { new ForegroundColorSpan(ContextCompat.getColor(getContext(), R.color.signal_colorOnSurface)), SpanUtil.getBoldSpan() };
@@ -290,6 +292,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
     setSelectedConversations(selectedConversations);
     setBadgeFromRecipient(recipient.get());
     setTapV2Indicator(recipient.get());
+    setTapV3Indicator(recipient.get());
     setUnreadIndicator(thread);
     this.contactPhotoImage.setAvatar(requestManager, recipient.get(), !batchMode);
   }
@@ -310,6 +313,17 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
         tapV2Indicator.updateStatus(recipient);
       } else {
         tapV2Indicator.setVisibility(View.GONE);
+      }
+    }
+  }
+
+  private void setTapV3Indicator(Recipient recipient) {
+    if (tapV3Indicator != null) {
+      // Only show indicator for individual recipients, not for groups
+      if (!recipient.isGroup()) {
+        tapV3Indicator.updateStatus(recipient);
+      } else {
+        tapV3Indicator.setVisibility(View.GONE);
       }
     }
   }
@@ -345,6 +359,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
     setActiveThreadId(0);
     setBadgeFromRecipient(recipient.get());
     setTapV2Indicator(recipient.get());
+    setTapV3Indicator(recipient.get());
     contactPhotoImage.setAvatar(requestManager, recipient.get(), !batchMode, false);
   }
 
@@ -384,6 +399,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
     setActiveThreadId(0);
     setBadgeFromRecipient(recipient.get());
     setTapV2Indicator(recipient.get());
+    setTapV3Indicator(recipient.get());
     contactPhotoImage.setAvatar(requestManager, recipient.get(), !batchMode);
   }
 

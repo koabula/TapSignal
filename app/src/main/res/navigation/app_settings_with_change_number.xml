@@ -161,6 +161,13 @@
             app:exitAnim="@anim/fragment_open_exit"
             app:popEnterAnim="@anim/fragment_close_enter"
             app:popExitAnim="@anim/fragment_close_exit" />
+        <action
+            android:id="@+id/action_appSettingsFragment_to_tapV3ConfigFragment"
+            app:destination="@id/tapV3ConfigFragment"
+            app:enterAnim="@anim/fragment_open_enter"
+            app:exitAnim="@anim/fragment_open_exit"
+            app:popEnterAnim="@anim/fragment_close_enter"
+            app:popExitAnim="@anim/fragment_close_exit" />
     </fragment>
 
     <activity
@@ -1165,6 +1172,12 @@
         android:id="@+id/tapConfigFragment"
         android:name="org.thoughtcrime.securesms.tap.ui.TapConfigFragment"
         android:label="tap_config_fragment"
+        tools:layout="@layout/dsl_settings_fragment" />
+
+    <fragment
+        android:id="@+id/tapV3ConfigFragment"
+        android:name="org.thoughtcrime.securesms.tapv3.ui.TapV3ConfigFragment"
+        android:label="tap_v3_config_fragment"
         tools:layout="@layout/dsl_settings_fragment" />
 
 </navigation>

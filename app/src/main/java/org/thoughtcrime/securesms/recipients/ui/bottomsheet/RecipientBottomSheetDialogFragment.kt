@@ -127,6 +127,7 @@ class RecipientBottomSheetDialogFragment : BottomSheetDialogFragment() {
     val makeGroupAdminButton: TextView = view.findViewById(R.id.rbs_make_group_admin_button)
     val removeAdminButton: TextView = view.findViewById(R.id.rbs_remove_group_admin_button)
     val removeFromGroupButton: TextView = view.findViewById(R.id.rbs_remove_from_group_button)
+    val tapV3HandshakeButton: TextView = view.findViewById(R.id.rbs_tap_v3_handshake_button)
     val adminActionBusy: ProgressBar = view.findViewById(R.id.rbs_admin_action_busy)
     val noteToSelfDescription: View = view.findViewById(R.id.rbs_note_to_self_description)
     val buttonStrip: View = view.findViewById(R.id.button_strip)
@@ -343,6 +344,29 @@ class RecipientBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
       } else {
         contactDetailsButton.visible = false
+      }
+
+      // Tap v3 handshake button visibility
+      if (!recipient.isGroup && !recipient.isSelf && !recipient.isBlocked && recipient.isRegistered) {
+        val hasTapV3Channel = try {
+          val router = org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter.getInstance(requireContext())
+          val decision = router.shouldUseTapV3(recipient)
+          decision.useTapV3
+        } catch (e: Exception) {
+          Log.w(TAG, "Failed to check Tap v3 channel status", e)
+          false
+        }
+        
+        tapV3HandshakeButton.visible = !hasTapV3Channel
+        if (!hasTapV3Channel) {
+          tapV3HandshakeButton.setOnClickListener {
+            org.thoughtcrime.securesms.tapv3.ui.TapV3HandshakeDialog
+              .create(recipient.id)
+              .show(childFragmentManager, "tap_v3_handshake")
+          }
+        }
+      } else {
+        tapV3HandshakeButton.visible = false
       }
     }
 

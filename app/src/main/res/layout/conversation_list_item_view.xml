@@ -84,6 +84,17 @@
         android:layout_marginEnd="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="@id/conversation_list_item_name"
+        app:layout_constraintEnd_toStartOf="@id/conversation_list_item_tap_v3_indicator"
+        app:layout_constraintTop_toTopOf="@id/conversation_list_item_name"
+        tools:visibility="visible" />
+
+    <org.thoughtcrime.securesms.tapv3.ui.TapV3StatusIndicator
+        android:id="@+id/conversation_list_item_tap_v3_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/conversation_list_item_name"
         app:layout_constraintEnd_toStartOf="@id/conversation_list_item_date"
         app:layout_constraintTop_toTopOf="@id/conversation_list_item_name"
         tools:visibility="visible" />
