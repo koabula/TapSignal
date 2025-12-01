@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tap v3 Configuration -->
+    <string name="TapV3ConfigFragment__tap_v3_config">Tap v3 Configuration</string>
+    <string name="TapV3ConfigFragment__loading">Loading</string>
+    <string name="TapV3ConfigFragment__loading_config">Loading configuration…</string>
+    <string name="TapV3ConfigFragment__please_wait">Please wait</string>
+    <string name="TapV3ConfigFragment__ipfs_gateway_config">IPFS Gateway Configuration</string>
+    <string name="TapV3ConfigFragment__ipfs_help_text">Configure IPFS gateways for storing message content. At least one gateway is required.</string>
+    <string name="TapV3ConfigFragment__pinata_api_key">Pinata API Key</string>
+    <string name="TapV3ConfigFragment__pinata_api_secret">Pinata API Secret</string>
+    <string name="TapV3ConfigFragment__web3storage_token">Web3.Storage Token</string>
+    <string name="TapV3ConfigFragment__optional">Optional</string>
+    <string name="TapV3ConfigFragment__enter_api_key">Enter API key</string>
+    <string name="TapV3ConfigFragment__enter_api_secret">Enter API secret</string>
+    <string name="TapV3ConfigFragment__enter_token">Enter token</string>
+    <string name="TapV3ConfigFragment__unifiedpush_config">UnifiedPush Configuration</string>
+    <string name="TapV3ConfigFragment__unifiedpush_help_text">UnifiedPush is used for real-time message notifications. You need to install a distributor app.</string>
+    <string name="TapV3ConfigFragment__push_status">Push Status</string>
+    <string name="TapV3ConfigFragment__registered">Registered</string>
+    <string name="TapV3ConfigFragment__not_registered">Not Registered</string>
+    <string name="TapV3ConfigFragment__my_endpoint">My Endpoint</string>
+    <string name="TapV3ConfigFragment__register_push">Register UnifiedPush</string>
+    <string name="TapV3ConfigFragment__register_push_summary">Register for push notifications</string>
+    <string name="TapV3ConfigFragment__unregister_push">Unregister UnifiedPush</string>
+    <string name="TapV3ConfigFragment__unregister_push_summary">Unregister from push notifications</string>
+    <string name="TapV3ConfigFragment__actions">Actions</string>
+    <string name="TapV3ConfigFragment__test_config">Test Configuration</string>
+    <string name="TapV3ConfigFragment__test_config_summary">Upload and download test data</string>
+    <string name="TapV3ConfigFragment__testing">Testing…</string>
+    <string name="TapV3ConfigFragment__test_success">Test successful</string>
+    <string name="TapV3ConfigFragment__test_failed">Test failed</string>
+    <string name="TapV3ConfigFragment__save_config">Save Configuration</string>
+    <string name="TapV3ConfigFragment__save_config_summary">Save your configuration</string>
+    <string name="TapV3ConfigFragment__save_success">Configuration saved successfully</string>
+    <string name="TapV3ConfigFragment__save_failed">Failed to save configuration</string>
+    <string name="TapV3ConfigFragment__clear_config">Clear Configuration</string>
+    <string name="TapV3ConfigFragment__clear_config_summary">Remove all configuration</string>
+    <string name="TapV3ConfigFragment__clear_success">Configuration cleared</string>
+    <string name="TapV3ConfigFragment__confirm">Confirm</string>
+    <string name="TapV3ConfigFragment__cancel">Cancel</string>
+    <string name="TapV3ConfigFragment__clear">Clear</string>
+    <string name="TapV3ConfigFragment__unregister_push_dialog_title">Unregister UnifiedPush?</string>
+    <string name="TapV3ConfigFragment__unregister_push_dialog_message">You will no longer receive real-time push notifications for Tap v3 messages.</string>
+    <string name="TapV3ConfigFragment__clear_config_dialog_title">Clear Configuration?</string>
+    <string name="TapV3ConfigFragment__clear_config_dialog_message">This will remove all IPFS gateway configuration. You can configure again later.</string>
+
+    <!-- Tap v3 Handshake Dialog -->
+    <string name="TapV3HandshakeDialog__title">Tap v3 Handshake</string>
+    <string name="TapV3HandshakeDialog__ready_to_initiate">Ready to initiate handshake</string>
+    <string name="TapV3HandshakeDialog__initiating">Initiating handshake…</string>
+    <string name="TapV3HandshakeDialog__waiting_for_response">Waiting for peer response…</string>
+    <string name="TapV3HandshakeDialog__completing">Completing handshake…</string>
+    <string name="TapV3HandshakeDialog__handshake_successful">Handshake successful!</string>
+    <string name="TapV3HandshakeDialog__handshake_failed">Handshake failed</string>
+    <string name="TapV3HandshakeDialog__completed">Completed</string>
+    <string name="TapV3HandshakeDialog__retry">Retry</string>
+    <string name="TapV3HandshakeDialog__peer_endpoint">Peer Endpoint</string>
+    <string name="TapV3HandshakeDialog__initiate_handshake">Initiate Handshake</string>
+    <string name="TapV3HandshakeDialog__cancel">Cancel</string>
+    <string name="TapV3HandshakeDialog__close">Close</string>
+
+    <!-- Tap v3 Settings -->
+    <string name="preferences__tap_v3">Tap v3</string>
+    <string name="preferences__tap_v3_summary">Decentralized messaging with IPFS and UnifiedPush</string>
+</resources>

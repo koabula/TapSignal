@@ -156,26 +156,50 @@ val result = manager.receiveMessage(
   - 通道状态检查
   - 握手完成验证
 
+## Phase 4 完成状态
+
+### 已完成
+- ✅ UI 层实现
+  - TapV3ConfigFragment: 配置界面
+  - TapV3ConfigViewModel: 配置业务逻辑
+  - TapV3HandshakeDialog: 握手对话框
+  - TapV3HandshakeViewModel: 握手业务逻辑
+  - TapV3StatusIndicator: 状态指示器
+  
+- ✅ 配置功能
+  - IPFS Gateway 配置 (Pinata + Web3.Storage)
+  - UnifiedPush 注册/注销
+  - 配置测试功能
+  - 配置持久化
+  
+- ✅ 握手功能
+  - 握手对话框 UI
+  - 状态轮询和更新
+  - 错误处理和重试
+  - 通道信息显示
+  
+- ✅ 状态显示
+  - 对话列表 v3 标识
+  - 通道状态实时更新
+  - 异步状态查询
+  
+- ✅ 资源文件
+  - 字符串资源 (strings_tapv3.xml)
+  - 布局文件
+  - Drawable 资源
+
 ## 下一步
 
-### Phase 4: UI 和用户体验
-- [ ] TapV3ConfigActivity: 配置界面
-- [ ] TapV3HandshakeDialog: 握手对话框
-- [ ] TapV3StatusIndicator: 状态指示器
+### Phase 5: Signal 核心集成
+- [ ] 集成到 IndividualSendJob (发送端)
+- [ ] 集成到 PushMessageReceiver (接收端)
+- [ ] 集成到 Settings 页面
+- [ ] 集成到联系人详情页
 
-### Phase 3: 端到端消息传输
-- [ ] 集成到 IndividualSendJob
-- [ ] 集成到消息接收流程
-- [ ] 附件处理
-
-### Phase 4: UI 和用户体验
-- [ ] TapV3ConfigActivity: 配置界面
-- [ ] TapV3HandshakeDialog: 握手对话框
-- [ ] TapV3StatusIndicator: 状态指示器
-
-### Phase 5: 测试和优化
+### Phase 6: 测试和优化
 - [ ] 单元测试
 - [ ] 集成测试
+- [ ] 端到端测试
 - [ ] 性能优化
 
 ## 注意事项
