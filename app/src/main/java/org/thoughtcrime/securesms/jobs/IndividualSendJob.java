@@ -187,7 +187,10 @@ public class IndividualSendJob extends PushSendJob {
           messageBody.startsWith("TAP_RESP:") || 
           messageBody.startsWith("TAP_REVOKE:") || 
           messageBody.startsWith("TAP_MSG:") ||
-          messageBody.startsWith("TAP_TOKEN_EXCHANGE:")
+          messageBody.startsWith("TAP_TOKEN_EXCHANGE:") ||
+          messageBody.startsWith("TAP_V3_REQ:") ||
+          messageBody.startsWith("TAP_V3_RESP:") ||
+          messageBody.startsWith("TAP_V3_ACK:")
       );
 
       if (isTapControlMessage) {
@@ -506,9 +509,22 @@ public class IndividualSendJob extends PushSendJob {
           org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.Companion.getInstance(context);
 
       String recipientId = recipient.getId().serialize();
-      byte[] signalEncrypted = message.getBody() != null ? message.getBody().getBytes() : new byte[0];
+      
+      // For Tap v3, create a minimal DataMessage protobuf
+      org.whispersystems.signalservice.internal.push.DataMessage.Builder dataMessageBuilder = 
+          new org.whispersystems.signalservice.internal.push.DataMessage.Builder()
+              .body(message.getBody())
+              .timestamp(message.getSentTimeMillis());
+      
+      if (message.getExpiresIn() > 0) {
+        dataMessageBuilder.expireTimer((int) (message.getExpiresIn() / 1000));
+      }
+      
+      org.whispersystems.signalservice.internal.push.DataMessage dataMessage = dataMessageBuilder.build();
+      byte[] signalEncrypted = dataMessage.encode();
+      
       java.util.List<org.thoughtcrime.securesms.attachments.Attachment> attachments = 
-          new java.util.ArrayList<>();
+          message.getAttachments();
 
       kotlinx.coroutines.Dispatchers dispatchers = kotlinx.coroutines.Dispatchers.INSTANCE;
       Object result = kotlinx.coroutines.BuildersKt.runBlocking(

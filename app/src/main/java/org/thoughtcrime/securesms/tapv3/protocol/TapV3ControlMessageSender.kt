@@ -1,0 +1,139 @@
+package org.thoughtcrime.securesms.tapv3.protocol
+
+import android.content.Context
+import android.util.Base64
+import org.signal.core.util.logging.Log
+import org.thoughtcrime.securesms.database.SignalDatabase
+import org.thoughtcrime.securesms.dependencies.AppDependencies
+import org.thoughtcrime.securesms.recipients.Recipient
+import org.thoughtcrime.securesms.recipients.RecipientId
+import org.thoughtcrime.securesms.sms.MessageSender
+import org.thoughtcrime.securesms.mms.OutgoingMessage
+import org.thoughtcrime.securesms.tapv3.TapV3Result
+import org.thoughtcrime.securesms.tapv3.TapV3Error
+import java.util.concurrent.TimeUnit
+
+class TapV3ControlMessageSender private constructor(
+    private val context: Context
+) {
+    
+    fun sendHandshakeRequest(
+        recipientId: String,
+        request: TapV3ControlMessage.HandshakeRequest
+    ): TapV3Result<Unit> {
+        return sendControlMessage(recipientId, request, "TAP_V3_REQ:")
+    }
+    
+    fun sendHandshakeResponse(
+        recipientId: String,
+        response: TapV3ControlMessage.HandshakeResponse
+    ): TapV3Result<Unit> {
+        return sendControlMessage(recipientId, response, "TAP_V3_RESP:")
+    }
+    
+    fun sendHandshakeAck(
+        recipientId: String,
+        ack: TapV3ControlMessage.HandshakeAck
+    ): TapV3Result<Unit> {
+        return sendControlMessage(recipientId, ack, "TAP_V3_ACK:")
+    }
+    
+    fun sendKeyRotation(
+        recipientId: String,
+        keyRotation: TapV3ControlMessage.KeyRotation
+    ): TapV3Result<Unit> {
+        return sendControlMessage(recipientId, keyRotation, "TAP_V3_KEY_ROTATION:")
+    }
+    
+    fun sendChannelClose(
+        recipientId: String,
+        channelClose: TapV3ControlMessage.ChannelClose
+    ): TapV3Result<Unit> {
+        return sendControlMessage(recipientId, channelClose, "TAP_V3_CLOSE:")
+    }
+    
+    private fun sendControlMessage(
+        recipientId: String,
+        message: TapV3ControlMessage,
+        prefix: String
+    ): TapV3Result<Unit> {
+        return try {
+            val serialized = TapV3ControlMessage.serialize(message)
+            val base64 = Base64.encodeToString(serialized, Base64.NO_WRAP)
+            val messageBody = "$prefix$base64"
+            
+            val recipient = try {
+                Recipient.resolved(RecipientId.from(recipientId))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to resolve recipient: ${recipientId.take(8)}...", e)
+                return TapV3Result.Failure(
+                    TapV3Error.INVALID_DATA,
+                    "Invalid recipient ID",
+                    e
+                )
+            }
+            
+            if (!recipient.isRegistered) {
+                return TapV3Result.Failure(
+                    TapV3Error.INVALID_DATA,
+                    "Recipient not registered on Signal"
+                )
+            }
+            
+            val outgoingMessage = OutgoingMessage(
+                recipient = recipient,
+                body = messageBody,
+                attachments = emptyList(),
+                timestamp = System.currentTimeMillis(),
+                expiresIn = 0L,
+                viewOnce = false,
+                isSecure = true,
+                mentions = emptyList(),
+                bodyRanges = null
+            )
+            
+            val threadId = SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+            
+            val messageId = SignalDatabase.messages.insertMessageOutbox(
+                outgoingMessage,
+                threadId,
+                false,
+                null
+            )
+            
+            MessageSender.send(
+                context,
+                outgoingMessage,
+                threadId,
+                MessageSender.SendType.SIGNAL,
+                null,
+                null
+            )
+            
+            Log.i(TAG, "Sent Tap v3 control message: $prefix to ${recipientId.take(8)}...")
+            TapV3Result.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send control message", e)
+            TapV3Result.Failure(
+                TapV3Error.UNKNOWN_ERROR,
+                "Failed to send control message: ${e.message}",
+                e
+            )
+        }
+    }
+    
+    companion object {
+        private val TAG = Log.tag(TapV3ControlMessageSender::class.java)
+        
+        @Volatile
+        private var INSTANCE: TapV3ControlMessageSender? = null
+        
+        fun getInstance(context: Context): TapV3ControlMessageSender {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TapV3ControlMessageSender(context.applicationContext).also {
+                    INSTANCE = it
+                }
+            }
+        }
+    }
+}

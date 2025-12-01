@@ -144,6 +144,8 @@ import org.thoughtcrime.securesms.database.helpers.migration.V286_FixRemoteKeyEn
 import org.thoughtcrime.securesms.database.helpers.migration.V287_TransportTablesCreation
 import org.thoughtcrime.securesms.database.helpers.migration.V288_GroupV2TablesCreation
 import org.thoughtcrime.securesms.database.helpers.migration.V289_GroupV2GatewayInfo
+import org.thoughtcrime.securesms.database.helpers.migration.V290_TapV3TablesCreation
+import org.thoughtcrime.securesms.database.helpers.migration.V291_EnsureTapV3Tables
 import org.thoughtcrime.securesms.database.SQLiteDatabase as SignalSqliteDatabase
 
 /**
@@ -293,10 +295,12 @@ object SignalDatabaseMigrations {
     286 to V286_FixRemoteKeyEncoding,
     287 to V287_TransportTablesCreation,
     288 to V288_GroupV2TablesCreation,
-    289 to V289_GroupV2GatewayInfo
+    289 to V289_GroupV2GatewayInfo,
+    290 to V290_TapV3TablesCreation,
+    291 to V291_EnsureTapV3Tables
   )
 
-  const val DATABASE_VERSION = 290
+  const val DATABASE_VERSION = 292
 
   @JvmStatic
   fun migrate(context: Application, db: SignalSqliteDatabase, oldVersion: Int, newVersion: Int) {

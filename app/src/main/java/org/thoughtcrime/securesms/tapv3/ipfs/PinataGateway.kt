@@ -2,6 +2,7 @@ package org.thoughtcrime.securesms.tapv3.ipfs
 
 import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -33,7 +34,18 @@ class PinataGateway(
     override suspend fun pin(data: ByteArray): TapV3Result<String> {
         return try {
             withTimeout(TapV3Constants.IPFS_UPLOAD_TIMEOUT_MS) {
-                val requestBody = data.toRequestBody("application/octet-stream".toMediaType())
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart(
+                        "file",
+                        "file",
+                        data.toRequestBody("application/octet-stream".toMediaType())
+                    )
+                    .addFormDataPart(
+                        "pinataMetadata",
+                        """{"name":"tap_v3_${System.currentTimeMillis()}"}"""
+                    )
+                    .build()
                 
                 val request = Request.Builder()
                     .url("https://api.pinata.cloud/pinning/pinFileToIPFS")
@@ -45,10 +57,12 @@ class PinataGateway(
                 val response = client.newCall(request).execute()
                 
                 if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "No error details"
                     Log.e(TAG, "Pinata pin failed: ${response.code}")
+                    Log.e(TAG, "Error response body: $errorBody")
                     return@withTimeout TapV3Result.Failure(
                         TapV3Error.IPFS_UPLOAD_ERROR,
-                        "Pinata upload failed: HTTP ${response.code}"
+                        "Pinata upload failed: HTTP ${response.code} - $errorBody"
                     )
                 }
                 

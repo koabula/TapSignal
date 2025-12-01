@@ -1009,23 +1009,44 @@ object DataMessageProcessor {
 
     val body = message.body ?: ""
 
-    // 检查是否为Tap传输层控制消息（请求/响应/撤销）
+    // 检查是否为Tap v3控制消息（TAP_V3_REQ/RESP/ACK）
+    if (body.startsWith("TAP_V3_REQ:") || body.startsWith("TAP_V3_RESP:") || body.startsWith("TAP_V3_ACK:") ||
+        body.startsWith("TAP_V3_KEY_ROTATION:") || body.startsWith("TAP_V3_CLOSE:")) {
+      log(envelope.timestamp!!, "Tap v3 control message detected, processing: bodyLength=${body.length}")
+
+      // 异步处理Tap v3控制消息，避免阻塞当前线程
+      GlobalScope.launch(Dispatchers.IO) {
+        try {
+          val handler = org.thoughtcrime.securesms.tapv3.protocol.TapV3ControlMessageHandler.getInstance(context)
+          handler.handleControlMessage(body, senderRecipient.id.serialize())
+          Log.i(TAG, "Tap v3 control message processed successfully: timestamp=${envelope.timestamp}")
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to process Tap v3 control message: timestamp=${envelope.timestamp}", e)
+        }
+      }
+      log(envelope.timestamp!!, "Tap v3 control message queued for async processing, not inserting into message database")
+
+      // Tap v3控制消息不插入普通消息数据库
+      return null
+    }
+
+    // 检查是否为Tap v2传输层控制消息（请求/响应/撤销）
     val tapMessageProcessor = org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.getInstance(context)
     if (tapMessageProcessor.isTapMessage(body)) {
-      log(envelope.timestamp!!, "Tap control message detected, processing asynchronously: bodyLength=${body.length}")
+      log(envelope.timestamp!!, "Tap v2 control message detected, processing asynchronously: bodyLength=${body.length}")
 
-      // 异步处理Tap传输层控制消息，避免阻塞当前线程和死锁
+      // 异步处理Tap v2传输层控制消息，避免阻塞当前线程和死锁
       GlobalScope.launch(Dispatchers.IO) {
         try {
           tapMessageProcessor.processTapMessage(senderRecipient.id, body)
-          Log.i(TAG, "Tap control message processed successfully: timestamp=${envelope.timestamp}")
+          Log.i(TAG, "Tap v2 control message processed successfully: timestamp=${envelope.timestamp}")
         } catch (e: Exception) {
-          Log.e(TAG, "Failed to process Tap control message: timestamp=${envelope.timestamp}", e)
+          Log.e(TAG, "Failed to process Tap v2 control message: timestamp=${envelope.timestamp}", e)
         }
       }
-      log(envelope.timestamp!!, "Tap control message queued for async processing, not inserting into message database")
+      log(envelope.timestamp!!, "Tap v2 control message queued for async processing, not inserting into message database")
 
-      // Tap传输层控制消息不插入普通消息数据库
+      // Tap v2传输层控制消息不插入普通消息数据库
       return null
     }
 

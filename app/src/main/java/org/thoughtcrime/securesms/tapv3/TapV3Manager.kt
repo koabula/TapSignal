@@ -17,18 +17,47 @@ class TapV3Manager private constructor(
     val pushEndpointManager: PushEndpointManager = PushEndpointManager.getInstance(context)
     val kPushManager: KPushManager = KPushManager.getInstance(context)
     
+    private val signalStore = org.thoughtcrime.securesms.keyvalue.SignalStore.tapV3
+    
+    init {
+        restoreConfiguration()
+    }
+    
     fun isConfigured(): Boolean {
-        return pushProvider.isRegistered()
+        val hasPinata = signalStore.getStringValue("tapv3.pinata.api_key", null) != null
+        val hasWeb3 = signalStore.getStringValue("tapv3.web3storage.token", null) != null
+        return (hasPinata || hasWeb3) && pushProvider.isRegistered()
     }
     
     fun configurePinata(apiKey: String, apiSecret: String) {
         ipfsGatewayManager.configurePinata(apiKey, apiSecret)
+        signalStore.putStringValue("tapv3.pinata.api_key", apiKey)
+        signalStore.putStringValue("tapv3.pinata.api_secret", apiSecret)
         Log.d(TAG, "Configured Pinata")
     }
     
     fun configureWeb3Storage(token: String) {
         ipfsGatewayManager.configureWeb3Storage(token)
+        signalStore.putStringValue("tapv3.web3storage.token", token)
         Log.d(TAG, "Configured Web3.Storage")
+    }
+    
+    private fun restoreConfiguration() {
+        val pinataKey = signalStore.getStringValue("tapv3.pinata.api_key", null)
+        val pinataSecret = signalStore.getStringValue("tapv3.pinata.api_secret", null)
+        if (pinataKey != null && pinataSecret != null) {
+            ipfsGatewayManager.configurePinata(pinataKey, pinataSecret)
+        }
+        
+        val web3Token = signalStore.getStringValue("tapv3.web3storage.token", null)
+        if (web3Token != null) {
+            ipfsGatewayManager.configureWeb3Storage(web3Token)
+        }
+        
+        val endpoint = signalStore.getStringValue("tapv3.my_push_endpoint", null)
+        if (endpoint != null) {
+            pushEndpointManager.saveMyEndpoint(endpoint)
+        }
     }
     
     fun registerPush(onSuccess: (String) -> Unit, onError: (String) -> Unit) {

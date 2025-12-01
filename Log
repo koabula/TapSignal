@@ -1,12 +1,27 @@
-> Task :Signal-Android:compilePlayProdDebugKotlin
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:67:17 Unresolved reference 'showTextInputDialog'.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:70:21 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:83:17 Unresolved reference 'showTextInputDialog'.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:86:21 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:101:17 Unresolved reference 'showTextInputDialog'.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3ConfigFragment.kt:104:21 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///D:/Research/Signal/Signal-Android/app/src/main/java/org/thoughtcrime/securesms/tapv3/ui/TapV3HandshakeViewModel.kt:75:43 Unresolved reference 'SignalDatabase'.
-
-> Task :Signal-Android:compilePlayProdDebugKotlin FAILED
-[Incubating] Problems report is available at: file:///D:/Research/Signal/Signal-Android/build/reports/problems/problems-report.html
-
+2025-12-01 16:02:02.745 15386-15452 EGL_emulation           org.thoughtcrime.securesms           D  app_time_stats: avg=1824.39ms min=14.06ms max=43382.92ms count=24
+2025-12-01 16:02:02.745   429-429   audioserver             audioserver                          D  FGS Logger Transaction failed
+2025-12-01 16:02:02.746   429-429   audioserver             audioserver                          D  -129
+2025-12-01 16:02:02.746 15386-15423 IpfsGatewayManager      org.thoughtcrime.securesms           D  Pinata gateway configured
+2025-12-01 16:02:02.748 15386-15423 TapV3Manager            org.thoughtcrime.securesms           D  Configured Pinata
+2025-12-01 16:02:02.749 15386-15423 IpfsGatewayManager      org.thoughtcrime.securesms           D  Uploading 11 bytes to Pinata
+2025-12-01 16:02:02.751   429-552   AudioFlinger            audioserver                          D  mixer(0x7cde8a155930) throttle end: throttle time(30)
+2025-12-01 16:02:02.753   380-16602 resolv                  netd                                 I  GetAddrInfoHandler::run: {101 262245 101 983141 10194 0}
+2025-12-01 16:02:02.753   380-16604 resolv                  netd                                 I  res_nmkquery: (QUERY, IN, A)
+2025-12-01 16:02:02.753   380-16603 resolv                  netd                                 I  res_nmkquery: (QUERY, IN, AAAA)
+2025-12-01 16:02:02.763   380-16604 resolv                  netd                                 W  SSL_connect ssl error =5, mark 0xf0065: Success
+2025-12-01 16:02:02.763   380-16604 resolv                  netd                                 W  TLS Handshake failed
+2025-12-01 16:02:02.765   380-16604 resolv                  netd                                 I  res_tls_send: TLS query result: 1
+2025-12-01 16:02:02.769   380-16603 resolv                  netd                                 W  SSL_connect ssl error =5, mark 0xf0065: Success
+2025-12-01 16:02:02.769   380-16603 resolv                  netd                                 W  TLS Handshake failed
+2025-12-01 16:02:02.770   380-16603 resolv                  netd                                 I  res_tls_send: TLS query result: 1
+2025-12-01 16:02:02.772   380-16604 resolv                  netd                                 I  res_nsend: used send_dg 160 terrno: 0
+2025-12-01 16:02:02.774   380-16604 resolv                  netd                                 I  doQuery: rcode=0, ancount=1, return value=160
+2025-12-01 16:02:02.774   380-16603 resolv                  netd                                 I  res_nsend: used send_dg 34 terrno: 0
+2025-12-01 16:02:02.774   380-16603 resolv                  netd                                 I  doQuery: rcode=0, ancount=0, return value=34
+2025-12-01 16:02:02.781 15386-16578 TrafficStats            org.thoughtcrime.securesms           D  tagSocket(151) with statsTag=0xffffffff, statsUid=-1
+2025-12-01 16:02:02.911   429-552   audioserver             audioserver                          D  FGS Logger Transaction failed
+2025-12-01 16:02:02.911   429-552   audioserver             audioserver                          D  -129
+2025-12-01 16:02:04.741 15386-15423 PinataGateway           org.thoughtcrime.securesms           E  Pinata pin failed: 400
+2025-12-01 16:02:04.768 15386-15452 EGL_emulation           org.thoughtcrime.securesms           D  app_time_stats: avg=36.58ms min=13.36ms max=1122.16ms count=55
+2025-12-01 16:02:04.976   844-844   StatusBarIconController com.android.systemui                 D  ignoring old pipeline callback because the new wifi icon is enabled
+2025-12-01 16:02:05.791   386-4148  android.ha...mpl.ranchu android.hardware.audio.service       D  threadLoop: entering standby, frames: 26828992

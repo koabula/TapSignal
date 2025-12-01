@@ -52,6 +52,34 @@ class IpfsContentTable(context: Context, databaseHelper: SignalDatabase) :
         )
     }
     
+    /**
+     * 确保表存在,如果不存在则创建
+     * 这是一个防御性措施,防止迁移未执行导致的表不存在错误
+     */
+    private fun ensureTableExists() {
+        try {
+            // 尝试查询表是否存在
+            readableDatabase.query(
+                TABLE_NAME,
+                arrayOf(ID),
+                null, null, null, null, null, "0"
+            ).use { /* 表存在 */ }
+        } catch (e: Exception) {
+            // 表不存在,创建它
+            Log.w(TAG, "Table $TABLE_NAME does not exist, creating it now...", e)
+            try {
+                writableDatabase.execSQL(CREATE_TABLE)
+                for (index in CREATE_INDEX) {
+                    writableDatabase.execSQL(index)
+                }
+                Log.i(TAG, "Table $TABLE_NAME created successfully")
+            } catch (createError: Exception) {
+                Log.e(TAG, "Failed to create table $TABLE_NAME", createError)
+                throw createError
+            }
+        }
+    }
+    
     enum class ContentType {
         MESSAGE,
         ATTACHMENT
@@ -78,6 +106,8 @@ class IpfsContentTable(context: Context, databaseHelper: SignalDatabase) :
         recipientId: String? = null,
         messageId: String? = null
     ): Long {
+        ensureTableExists()
+        
         val values = contentValuesOf(
             CID to cid,
             CONTENT_TYPE to contentType?.name,
@@ -95,6 +125,8 @@ class IpfsContentTable(context: Context, databaseHelper: SignalDatabase) :
     }
     
     fun getContent(cid: String): ContentRecord? {
+        ensureTableExists()
+        
         readableDatabase.query(
             TABLE_NAME,
             null,
@@ -125,11 +157,15 @@ class IpfsContentTable(context: Context, databaseHelper: SignalDatabase) :
     }
     
     fun deleteContent(cid: String) {
+        ensureTableExists()
+        
         writableDatabase.delete(TABLE_NAME, "$CID = ?", arrayOf(cid))
         Log.d(TAG, "Deleted IPFS content: $cid")
     }
     
     fun getExpiredContent(currentTime: Long): List<ContentRecord> {
+        ensureTableExists()
+        
         val contents = mutableListOf<ContentRecord>()
         
         readableDatabase.query(

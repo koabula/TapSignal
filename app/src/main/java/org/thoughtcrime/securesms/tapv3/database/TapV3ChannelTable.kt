@@ -50,6 +50,34 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
         )
     }
     
+    /**
+     * 确保表存在,如果不存在则创建
+     * 这是一个防御性措施,防止迁移未执行导致的表不存在错误
+     */
+    private fun ensureTableExists() {
+        try {
+            // 尝试查询表是否存在
+            readableDatabase.query(
+                TABLE_NAME,
+                arrayOf(ID),
+                null, null, null, null, null, "0"
+            ).use { /* 表存在 */ }
+        } catch (e: Exception) {
+            // 表不存在,创建它
+            Log.w(TAG, "Table $TABLE_NAME does not exist, creating it now...", e)
+            try {
+                writableDatabase.execSQL(CREATE_TABLE)
+                for (index in CREATE_INDEX) {
+                    writableDatabase.execSQL(index)
+                }
+                Log.i(TAG, "Table $TABLE_NAME created successfully")
+            } catch (createError: Exception) {
+                Log.e(TAG, "Failed to create table $TABLE_NAME", createError)
+                throw createError
+            }
+        }
+    }
+    
     enum class ChannelStatus {
         PENDING,
         ACTIVE,
@@ -105,6 +133,8 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
         keyVersion: Int,
         ipfsGateways: List<String>
     ): Long {
+        ensureTableExists()
+        
         val now = System.currentTimeMillis()
         val gatewaysJson = ipfsGateways.joinToString(",")
         
@@ -133,6 +163,8 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
     }
     
     fun getChannel(recipientId: String): ChannelRecord? {
+        ensureTableExists()
+        
         readableDatabase.query(
             TABLE_NAME,
             null,
@@ -151,6 +183,8 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
     }
     
     fun updateStatus(recipientId: String, status: ChannelStatus) {
+        ensureTableExists()
+        
         val values = contentValuesOf(
             STATUS to status.name,
             UPDATED_AT to System.currentTimeMillis()
@@ -161,11 +195,15 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
     }
     
     fun deleteChannel(recipientId: String) {
+        ensureTableExists()
+        
         writableDatabase.delete(TABLE_NAME, "$RECIPIENT_ID = ?", arrayOf(recipientId))
         Log.d(TAG, "Deleted channel for recipient: ${recipientId.take(8)}...")
     }
     
     fun getAllActiveChannels(): List<ChannelRecord> {
+        ensureTableExists()
+        
         val channels = mutableListOf<ChannelRecord>()
         
         readableDatabase.query(

@@ -24,6 +24,7 @@ class TapV3HandshakeManager private constructor(
     private val pushEndpointManager = PushEndpointManager.getInstance(context)
     private val ipfsGatewayManager = IpfsGatewayManager.getInstance(context)
     private val channelTable = SignalDatabase.tapV3Channels
+    private val controlMessageSender = TapV3ControlMessageSender.getInstance(context)
     
     data class HandshakeState(
         val recipientId: String,
@@ -135,6 +136,17 @@ class TapV3HandshakeManager private constructor(
                 handshakeInfo = handshakeInfo
             )
             
+            val sendResult = controlMessageSender.sendHandshakeRequest(recipientId, request)
+            if (sendResult.isFailure()) {
+                updateHandshakeState(recipientId, HandshakeState.State.FAILED, 
+                    "Failed to send handshake request")
+                return TapV3Result.Failure(
+                    (sendResult as TapV3Result.Failure).error,
+                    sendResult.message,
+                    sendResult.cause
+                )
+            }
+            
             return TapV3Result.Success(request)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initiate handshake", e)
@@ -241,6 +253,17 @@ class TapV3HandshakeManager private constructor(
                 accepted = true
             )
             
+            val sendResult = controlMessageSender.sendHandshakeResponse(recipientId, response)
+            if (sendResult.isFailure()) {
+                updateHandshakeState(recipientId, HandshakeState.State.FAILED, 
+                    "Failed to send handshake response")
+                return TapV3Result.Failure(
+                    (sendResult as TapV3Result.Failure).error,
+                    sendResult.message,
+                    sendResult.cause
+                )
+            }
+            
             return TapV3Result.Success(response)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to handle handshake request", e)
@@ -316,6 +339,17 @@ class TapV3HandshakeManager private constructor(
             Log.d(TAG, "Handshake completed successfully for recipient: ${recipientId.take(8)}...")
             
             val ack = TapV3ControlMessage.HandshakeAck(success = true)
+            
+            val sendResult = controlMessageSender.sendHandshakeAck(recipientId, ack)
+            if (sendResult.isFailure()) {
+                updateHandshakeState(recipientId, HandshakeState.State.FAILED, 
+                    "Failed to send handshake ack")
+                return TapV3Result.Failure(
+                    (sendResult as TapV3Result.Failure).error,
+                    sendResult.message,
+                    sendResult.cause
+                )
+            }
             
             return TapV3Result.Success(ack)
         } catch (e: Exception) {
