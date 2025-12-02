@@ -57,3 +57,5 @@ b. 建立一个最小权限的AccessKey:
 暂不支持Sunup,还有一些bug正在修复
 
 
+## Notes
+在使用中可能会提示"Google Play服务缺失",这是正常的,因为我们禁用了Google的fcm服务. 如果你需要app在后台也能收到消息,请允许app在后台运行.

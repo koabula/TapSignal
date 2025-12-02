@@ -50,3 +50,6 @@ For v3 mode, you need: a UnifiedPush Distributor, and a Pinata or web3.storage A
 
 For UnifiedPush Distributor, we recommend [ntfy](https://unifiedpush.org/users/distributors/ntfy/) and [NextPush](https://unifiedpush.org/users/distributors/nextpush/).
 Sunup is not supported yet due to some bugs being fixed.
+
+## Notes
+You may see a "Google Play services missing" message. This is normal because we disabled Google FCM service. If you need the app to receive messages in the background, please allow the app to run in the background.
