@@ -1,0 +1,283 @@
+--------- beginning of main
+--------- beginning of system
+--------- beginning of kernel
+2025-12-02 20:45:57.284 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  创建TransportManager实例: 140690909
+2025-12-02 20:45:57.326 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  创建TransportChannelManager实例: 164009396
+2025-12-02 20:45:57.667 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  初始化传输管理器...
+2025-12-02 20:45:57.703 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  开始初始化Provider管理器...
+2025-12-02 20:45:57.711 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  Provider管理器初始化结果: true
+2025-12-02 20:45:57.805 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  I  初始化通道管理器...
+2025-12-02 20:45:57.805 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  开始从数据库恢复通道状态...
+2025-12-02 20:45:57.811 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  恢复启用Provider: cos
+2025-12-02 20:45:57.813 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  自动启用活跃Provider: cos
+2025-12-02 20:45:57.813 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  最终启用Provider: cos
+2025-12-02 20:45:57.814 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:45:57.828 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  I  通道状态恢复完成，有效通道=0, 清理无效通道=0
+2025-12-02 20:45:57.834 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  停止通道清理任务
+2025-12-02 20:45:57.842 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:45:57.842 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  传输管理器初始化完成，可用Provider数量: 1，已启用: 1
+2025-12-02 20:45:57.845 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  D  可用Provider: cos - 云对象存储 (COS)
+2025-12-02 20:45:57.848 16998-17024 TransportManager        org...ughtcrime.securesms.tapsignal  I  传输管理器初始化完成
+2025-12-02 20:45:57.858 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  启动通道清理任务，间隔: 3600000ms
+2025-12-02 20:45:57.870 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  I  通道管理器初始化完成
+2025-12-02 20:45:57.908 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  通道管理器已经初始化
+2025-12-02 20:46:03.432 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:03.435 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:03.437 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:03.440 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:03.566 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********755, normalizedId=********-****-****-****-*********755
+2025-12-02 20:46:03.592 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:03.606 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:03.622 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********755 (normalized: ********-****-****-****-*********755)
+2025-12-02 20:46:08.191 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:08.206 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:08.209 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:08.213 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:08.730 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:08.731 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:08.731 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:08.731 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:10.055 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:10.055 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:10.055 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:10.060 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:10.238 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:10.238 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:10.239 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:10.240 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:10.359 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:10.359 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:10.360 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:10.361 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:10.780 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:10.784 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:10.786 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:10.793 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:19.498 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:19.498 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:19.499 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:19.507 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:19.509 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:19.509 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:19.510 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:19.511 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:21.627 16998-17185 TransportManager        org...ughtcrime.securesms.tapsignal  W  传输管理器已经初始化
+2025-12-02 20:46:21.676 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  通道管理器已经初始化
+2025-12-02 20:46:21.749 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:21.756 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 0
+2025-12-02 20:46:21.756 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: 
+2025-12-02 20:46:21.757 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  recipientChannels中没有找到recipientId: ********-****-****-****-*********8e9 (normalized: ********-****-****-****-*********8e9)
+2025-12-02 20:46:21.758 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  I  开始生成COS传输Token (V2 Mode): recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:21.789 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  I  COS传输Token生成成功 (无IAM): tokenId=cos-************1761
+2025-12-02 20:46:21.815 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  创建通道: recipientId=RecipientId::4
+2025-12-02 20:46:21.819 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  解析Token信息成功: providerType=cos, tokenId=cos-************1761
+2025-12-02 20:46:21.819 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  处理包含完整token数据的通道创建请求
+2025-12-02 20:46:21.825 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取或创建通道: 原始ID=RecipientId::4, 规范化ID=********-****-****-****-*********8e9, provider=cos
+2025-12-02 20:46:21.829 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  创建通道元数据: normalizedId=********-****-****-****-*********8e9, originalId=RecipientId::4, providerType=cos
+2025-12-02 20:46:21.834 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  使用ACI格式查询peerToken失败,尝试使用RecipientId格式: recipientAci=********-****-****-****-*********8e9, originalRecipientId=RecipientId::4
+2025-12-02 20:46:21.838 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  未找到对端Token信息(已尝试两种格式)，使用默认配置进行通道建立: originalRecipientId=RecipientId::4, recipientAci=********-****-****-****-*********8e9
+2025-12-02 20:46:21.846 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  复用已有的sharedToken: recipientAci=********-****-****-****-*********8e9, tokenId=cos-************1761
+2025-12-02 20:46:21.863 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=fd1d410562f89e24, peerHashedId=c984b439a7fc90e4, mySendPath=/v2-channels/fd1d410562f89e24_1764679581761/outbox/, peerReceivePath=/v2-channels/c984b439a7fc90e4/outbox/, useTokenPath=true
+2025-12-02 20:46:21.875 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  I  通道元数据创建成功: cos
+2025-12-02 20:46:21.886 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  建立通道: ch_********-****-****-****-*********8e9_cos_1764679581881, 接收者: ********-****-****-****-*********8e9, 提供者: cos
+2025-12-02 20:46:21.894 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  健康检查：单向模式，测试发送能力
+2025-12-02 20:46:21.898 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  D  测试发送能力: recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:22.799 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  D  发送能力测试成功: 可访问发送目录 /v2-channels/fd1d410562f89e24_1764679581761/outbox/，包含 0 个文件
+2025-12-02 20:46:22.802 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  发送能力测试通过
+2025-12-02 20:46:22.804 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道激活成功: SEND_READY, ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:22.806 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道激活完成: ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:23.270 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  V  保存通道到独立数据库成功: ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:23.270 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道创建成功: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:23.629 16998-17186 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:23.629 16998-17186 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:23.636 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:23.637 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:23.647 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:23.649 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:23.650 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=SEND_READY, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:23.656 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:23.657 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=SEND_READY
+2025-12-02 20:46:27.891 16998-17039 GroupTransportManager   org...ughtcrime.securesms.tapsignal  D  创建 GroupTransportManager 实例
+2025-12-02 20:46:29.456 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  升级通道到FULL_ACTIVE: 原始ID=RecipientId::4, 规范化ID=********-****-****-****-*********8e9, provider=cos, options=ChannelUpgradeOptions(channelVersion=3, gatewayOnly=true)
+2025-12-02 20:46:29.461 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  COS元数据创建: myAddress=https://****.com/***, peerAddress=https://****.com/***, myHashedId=fd1d410562f89e24, peerHashedId=c984b439a7fc90e4, mySendPath=/v2-channels/fd1d410562f89e24/outbox/, peerReceivePath=/v2-channels/c984b439a7fc90e4_1764679587507/outbox/, useTokenPath=false
+2025-12-02 20:46:29.464 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  I  通道升级为FULL_ACTIVE: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, 原始ID=RecipientId::4, 规范化ID=********-****-****-****-*********8e9, providerType=cos, fromStatus=SEND_READY, metadataUpdated=true
+2025-12-02 20:46:29.494 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  V  保存通道到独立数据库成功: ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:29.496 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道数据库保存完成: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:29.497 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  轮询已禁用或通道为Gateway-only，跳过轮询任务更新: recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:29.570 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:29.577 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:29.581 16998-17186 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:29.586 16998-17186 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:29.587 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:29.590 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:29.596 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:29.598 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:29.604 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:38.968 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:38.969 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:38.970 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:38.977 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:38.977 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:38.977 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:38.978 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:39.057 16998-17075 resms.tapsignal         org...ughtcrime.securesms.tapsignal  W  Verification of java.lang.Object org.thoughtcrime.securesms.tap.TransportManager$routeMessage$2.invokeSuspend(java.lang.Object) took 129.088ms (33604.77 bytecodes/s) (77304B approximate peak alloc)
+2025-12-02 20:46:39.061 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  原始recipientId: 97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:39.067 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  recipientId格式检查: isUUID=true, isRecipientIdFormat=false
+2025-12-02 20:46:39.067 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  recipientId已是UUID格式，直接使用
+2025-12-02 20:46:39.067 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  标准化后recipientId: 97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:39.071 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  开始消息路由诊断: messageId=2e58076b-d5af-4f29-bbe9-4ce95e2b8b73, 原始recipientId=97fed1b0-f41b-4482-b807-759d1b6418e9, 标准化recipientId=97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:39.071 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  路由诊断 - 系统状态:
+2025-12-02 20:46:39.074 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 初始化状态: true
+2025-12-02 20:46:39.079 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 配置启用Provider: [cos]
+2025-12-02 20:46:39.079 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - ProviderManager状态: 已初始化
+2025-12-02 20:46:39.081 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 活跃Provider数量: 1
+2025-12-02 20:46:39.083 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D      * cos: 云对象存储 (COS)
+2025-12-02 20:46:39.087 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:39.090 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:39.091 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:39.095 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 通道状态: hasActiveChannel=true (使用标准化recipientId)
+2025-12-02 20:46:39.097 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:39.100 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:39.101 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  当前启用Provider列表: [cos(CosTransportProvider)]
+2025-12-02 20:46:39.104 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  Provider状态正常: 启用Provider数量=1
+2025-12-02 20:46:39.123 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:39.124 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:39.128 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:39.134 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:39.162 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:39.166 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:39.168 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:39.176 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:39.178 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:39.182 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:39.185 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:39.255 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === selectBestProvider成功 ===
+2025-12-02 20:46:39.256 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  选择的Provider: cos
+2025-12-02 20:46:39.257 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  开始创建/获取通道...
+2025-12-02 20:46:39.261 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取或创建通道: 原始ID=********-****-****-****-*********8e9, 规范化ID=********-****-****-****-*********8e9, provider=cos
+2025-12-02 20:46:39.262 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  使用现有通道: ch_********-****-****-****-*********8e9_cos_1764679581881, 原始ID=********-****-****-****-*********8e9
+2025-12-02 20:46:39.266 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === getOrCreateChannel结果 ===
+2025-12-02 20:46:39.270 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  channel: ch_97fed1b0-f41b-4482-b807-759d1b6418e9_cos_1764679581881
+2025-12-02 20:46:39.271 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === metadata检查 ===
+2025-12-02 20:46:39.274 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  通道信息: channelId=ch_97fed1b0-f41b-4482-b807-759d1b6418e9_cos_1764679581881, status=FULL_ACTIVE
+2025-12-02 20:46:39.274 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  metadata != null: true
+2025-12-02 20:46:39.277 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === 开始provider.push ===
+2025-12-02 20:46:39.280 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  provider: cos
+2025-12-02 20:46:39.280 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  message详情:
+2025-12-02 20:46:39.282 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - messageId: 2e58076b-d5af-4f29-bbe9-4ce95e2b8b73
+2025-12-02 20:46:39.286 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - messageType: TEXT_MESSAGE
+2025-12-02 20:46:39.286 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - encryptedContent大小: 715
+2025-12-02 20:46:39.288 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - attachments数量: 0
+2025-12-02 20:46:39.289 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  metadata详情:
+2025-12-02 20:46:39.291 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - metadata类型: CosTransportMetadata
+2025-12-02 20:46:39.297 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  I  开始推送消息: messageId=********-****-****-****-*********b73, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:42.312 16998-17039 AwsTapLambdaDispatcher  org...ughtcrime.securesms.tapsignal  W  Lambda业务失败: statusCode=404, deliveredCount=0, error=contact config missing
+2025-12-02 20:46:42.313 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  W  Lambda推送失败 (attempt 1/3): contact config missing, traceId=********-****-****-****-*********dab
+2025-12-02 20:46:43.585 16998-17039 AwsTapLambdaDispatcher  org...ughtcrime.securesms.tapsignal  W  Lambda业务失败: statusCode=404, deliveredCount=0, error=contact config missing
+2025-12-02 20:46:43.586 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  W  Lambda推送失败 (attempt 2/3): contact config missing, traceId=********-****-****-****-*********dab
+2025-12-02 20:46:44.713 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:44.716 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:44.720 16998-17108 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:44.735 16998-17108 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:44.741 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:44.744 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:44.747 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:44.757 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:44.761 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.042 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.070 16998-17070 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:45.090 16998-17070 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:45.095 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.098 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.103 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.110 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.118 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.283 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.300 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.301 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.301 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.302 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.302 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.303 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.328 16998-17226 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:45.328 16998-17226 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:45.361 16998-17226 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:45.361 16998-17226 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  原始recipientId: 97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  recipientId格式检查: isUUID=true, isRecipientIdFormat=false
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  recipientId已是UUID格式，直接使用
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  标准化后recipientId: 97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  开始消息路由诊断: messageId=056af8a3-4cad-41ae-9ddc-92f54d3d0684, 原始recipientId=97fed1b0-f41b-4482-b807-759d1b6418e9, 标准化recipientId=97fed1b0-f41b-4482-b807-759d1b6418e9
+2025-12-02 20:46:45.371 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  路由诊断 - 系统状态:
+2025-12-02 20:46:45.372 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 初始化状态: true
+2025-12-02 20:46:45.372 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 配置启用Provider: [cos]
+2025-12-02 20:46:45.372 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - ProviderManager状态: 已初始化
+2025-12-02 20:46:45.372 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 活跃Provider数量: 1
+2025-12-02 20:46:45.372 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D      * cos: 云对象存储 (COS)
+2025-12-02 20:46:45.373 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - 通道状态: hasActiveChannel=true (使用标准化recipientId)
+2025-12-02 20:46:45.373 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  获取启用Provider: 活跃Provider数量=1, 配置启用列表=[cos]
+2025-12-02 20:46:45.373 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  根据配置过滤Provider: 结果=[cos]
+2025-12-02 20:46:45.373 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  当前启用Provider列表: [cos(CosTransportProvider)]
+2025-12-02 20:46:45.373 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  Provider状态正常: 启用Provider数量=1
+2025-12-02 20:46:45.405 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.458 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === selectBestProvider成功 ===
+2025-12-02 20:46:45.469 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  选择的Provider: cos
+2025-12-02 20:46:45.490 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  开始创建/获取通道...
+2025-12-02 20:46:45.504 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === getOrCreateChannel结果 ===
+2025-12-02 20:46:45.504 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  channel: ch_97fed1b0-f41b-4482-b807-759d1b6418e9_cos_1764679581881
+2025-12-02 20:46:45.504 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === metadata检查 ===
+2025-12-02 20:46:45.504 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  通道信息: channelId=ch_97fed1b0-f41b-4482-b807-759d1b6418e9_cos_1764679581881, status=FULL_ACTIVE
+2025-12-02 20:46:45.509 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  metadata != null: true
+2025-12-02 20:46:45.509 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === 开始provider.push ===
+2025-12-02 20:46:45.509 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  provider: cos
+2025-12-02 20:46:45.520 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  message详情:
+2025-12-02 20:46:45.521 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - messageId: 056af8a3-4cad-41ae-9ddc-92f54d3d0684
+2025-12-02 20:46:45.521 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - messageType: TEXT_MESSAGE
+2025-12-02 20:46:45.526 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - encryptedContent大小: 66
+2025-12-02 20:46:45.526 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - attachments数量: 0
+2025-12-02 20:46:45.526 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  metadata详情:
+2025-12-02 20:46:45.529 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D    - metadata类型: CosTransportMetadata
+2025-12-02 20:46:45.558 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.559 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.559 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.585 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.585 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.586 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.597 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.626 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.626 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.626 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.626 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.627 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.628 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.628 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.631 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.631 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.631 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.631 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.662 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.662 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.663 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.663 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  getActiveChannels查询: recipientId=********-****-****-****-*********8e9, normalizedId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.663 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  recipientChannels映射大小: 1
+2025-12-02 20:46:45.664 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  现有recipientChannels keys: ********-****-****-****-*********8e9
+2025-12-02 20:46:45.664 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  找到channelIds: [ch_********-****-****-****-*********8e9_cos_1764679581881]
+2025-12-02 20:46:45.665 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道详情: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, status=FULL_ACTIVE, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:45.673 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取到1个通道快照
+2025-12-02 20:46:45.674 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  通道活跃状态检查: channelId=ch_********-****-****-****-*********8e9_cos_1764679581881, isActive=true, status=FULL_ACTIVE
+2025-12-02 20:46:45.674 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  获取或创建通道: 原始ID=********-****-****-****-*********8e9, 规范化ID=********-****-****-****-*********8e9, provider=cos
+2025-12-02 20:46:45.674 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  D  使用现有通道: ch_********-****-****-****-*********8e9_cos_1764679581881, 原始ID=********-****-****-****-*********8e9
+2025-12-02 20:46:45.675 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  I  开始推送消息: messageId=********-****-****-****-*********684, recipientId=********-****-****-****-*********8e9
+2025-12-02 20:46:46.208 16998-17039 AwsTapLambdaDispatcher  org...ughtcrime.securesms.tapsignal  W  Lambda业务失败: statusCode=404, deliveredCount=0, error=contact config missing
+2025-12-02 20:46:46.222 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  === provider.push成功 ===
+2025-12-02 20:46:46.239 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  W  Lambda推送失败 (attempt 3/3): contact config missing, traceId=********-****-****-****-*********dab
+2025-12-02 20:46:46.242 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  D  result类型: Failed
+2025-12-02 20:46:46.246 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  W  推送失败: NETWORK_ERROR
+2025-12-02 20:46:46.258 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  E  Lambda推送最终失败: messageId=********-****-****-****-*********b73, traceId=********-****-****-****-*********dab, error=contact config missing
+2025-12-02 20:46:46.258 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  W  通道操作失败: ch_********-****-****-****-*********8e9_cos_1764679581881, 错误: NETWORK_ERROR, 失败次数: 1
+2025-12-02 20:46:46.398 16998-17184 TransportManager        org...ughtcrime.securesms.tapsignal  W  消息路由失败: messageId=2e58076b-d5af-4f29-bbe9-4ce95e2b8b73, error=NETWORK_ERROR
+2025-12-02 20:46:46.399 16998-17039 TransportChannelManager org...ughtcrime.securesms.tapsignal  V  保存通道到独立数据库成功: ch_********-****-****-****-*********8e9_cos_1764679581881
+2025-12-02 20:46:47.086 16998-17039 AwsTapLambdaDispatcher  org...ughtcrime.securesms.tapsignal  W  Lambda业务失败: statusCode=404, deliveredCount=0, error=contact config missing
+2025-12-02 20:46:47.089 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  W  Lambda推送失败 (attempt 1/3): contact config missing, traceId=********-****-****-****-*********55d
+2025-12-02 20:46:48.382 16998-17039 AwsTapLambdaDispatcher  org...ughtcrime.securesms.tapsignal  W  Lambda业务失败: statusCode=404, deliveredCount=0, error=contact config missing
+2025-12-02 20:46:48.383 16998-17039 CosTransportProvider    org...ughtcrime.securesms.tapsignal  W  Lambda推送失败 (attempt 2/3): contact config missing, traceId=********-****-****-****-*********55d

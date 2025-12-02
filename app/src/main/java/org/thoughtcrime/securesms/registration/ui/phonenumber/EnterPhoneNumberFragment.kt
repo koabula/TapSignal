@@ -652,12 +652,14 @@ class EnterPhoneNumberFragment : LoggingFragment(R.layout.fragment_registration_
         setTitle(R.string.RegistrationActivity_missing_google_play_services)
         setMessage(R.string.RegistrationActivity_this_device_is_missing_google_play_services)
         setPositiveButton(R.string.RegistrationActivity_i_understand) { _, _ ->
-          Log.d(TAG, "User confirmed number.")
-          sharedViewModel.onUserConfirmedPhoneNumber(AppDependencies.application)
+          Log.d(TAG, "User confirmed no Play Services, requesting SMS code directly.")
+          fragmentViewModel.clearError()
+          // Bypass FCM check and request SMS verification code directly
+          sharedViewModel.requestSmsCode(requireContext())
         }
-        setNegativeButton(android.R.string.cancel, null)
+        setNegativeButton(android.R.string.cancel) { _, _ -> fragmentViewModel.clearError() }
         setOnCancelListener { fragmentViewModel.clearError() }
-        setOnDismissListener { fragmentViewModel.clearError() }
+        // Removed setOnDismissListener to avoid clearing error after positive button action
         show()
       }
     }

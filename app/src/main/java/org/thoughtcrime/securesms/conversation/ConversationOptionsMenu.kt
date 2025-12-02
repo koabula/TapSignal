@@ -320,11 +320,20 @@ internal object ConversationOptionsMenu {
           // 处理私聊的 v2 mode 状态
           val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(context)
           
-          // 修复：使用ACI字符串查询通道状态，与通道管理保持一致（只检查私聊通道）
+          // 修复：先检查 ACI 是否存在，避免对新联系人（只有 PNI）调用 requireAci() 导致崩溃
+          val recipientAci = recipient.serviceId.orElse(null)
+          if (recipientAci == null || !recipientAci.isValid) {
+            // 新搜索的联系人可能还没有 ACI，显示默认状态
+            Log.d(TAG, "Recipient没有有效的ACI，显示默认v2 mode菜单")
+            cosMenuItem.isVisible = true
+            cosMenuItem.setTitle(R.string.conversation__menu_use_v2_mode)
+            return
+          }
+          
+          // 使用ACI字符串查询通道状态，与通道管理保持一致（只检查私聊通道）
           val hasActiveChannel = try {
-              val recipientAci = recipient.requireAci().toString()
-              channelManager.hasActivePrivateChannel(recipientAci)
-          } catch (e: Exception) {
+              channelManager.hasActivePrivateChannel(recipientAci.toString())
+          } catch (e: Throwable) {
               Log.w(TAG, "无法获取recipient ACI进行Tap通道查询: ${e.message}")
               false
           }
@@ -335,7 +344,7 @@ internal object ConversationOptionsMenu {
           } else {
             cosMenuItem.setTitle(R.string.conversation__menu_use_v2_mode)
           }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
           // 如果出错，使用默认标题但保持可见
           cosMenuItem.isVisible = true
           cosMenuItem.setTitle(R.string.conversation__menu_use_v2_mode)

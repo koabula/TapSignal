@@ -237,12 +237,13 @@ class CosProviderConfigDescriptor : ProviderConfigDescriptor {
                 else -> return ConfigTestResult.Failed("不支持的提供商")
             }
             
+            // 对字符串值进行trim处理，清理用户输入时可能不小心添加的首尾空格
             val cosConfig = CosConfig(
                 provider = provider,
-                secretId = config["secretId"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥ID"),
-                secretKey = config["secretKey"]?.toString() ?: return ConfigTestResult.Failed("缺少访问密钥"),
-                region = config["region"]?.toString() ?: return ConfigTestResult.Failed("缺少区域"),
-                bucketName = config["bucketName"]?.toString() ?: return ConfigTestResult.Failed("缺少存储桶名称")
+                secretId = config["secretId"]?.toString()?.trim() ?: return ConfigTestResult.Failed("缺少访问密钥ID"),
+                secretKey = config["secretKey"]?.toString()?.trim() ?: return ConfigTestResult.Failed("缺少访问密钥"),
+                region = config["region"]?.toString()?.trim() ?: return ConfigTestResult.Failed("缺少区域"),
+                bucketName = config["bucketName"]?.toString()?.trim() ?: return ConfigTestResult.Failed("缺少存储桶名称")
             )
             
             // 创建测试客户端（使用tap模块的CosClientFactory，传入有效的Context）

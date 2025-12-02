@@ -52,9 +52,16 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
         return try {
             Log.d(TAG, "检查Tap传输层可用性: recipientId=$recipientId")
             
-            // 获取接收方ACI
+            // 获取接收方
             val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(recipientId)
-            val recipientAci = recipient.requireAci().toString()
+            
+            // 修复：先检查ACI是否存在，避免对新联系人（只有PNI）调用requireAci()导致崩溃
+            val recipientServiceId = recipient.serviceId.orElse(null)
+            if (recipientServiceId == null || !recipientServiceId.isValid) {
+                Log.d(TAG, "Recipient没有有效的ACI，无法使用Tap传输: recipientId=$recipientId")
+                return false
+            }
+            val recipientAci = recipientServiceId.toString()
             
             // 1. 检查是否有活跃的私聊传输通道（只检查私聊v2 mode）
             val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientAci)
@@ -92,7 +99,7 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
             Log.i(TAG, "Tap传输层可用: recipientId=$recipientId, providers=${enabledProviders.size}")
             true
             
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "检查Tap传输层可用性失败: recipientId=$recipientId", e)
             false
         }
@@ -115,8 +122,15 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
         
         return CompletableFuture.supplyAsync {
             try {
+                // 修复：先检查ACI是否存在，避免对新联系人（只有PNI）调用requireAci()导致崩溃
+                val recipientServiceId = recipient.serviceId.orElse(null)
+                if (recipientServiceId == null || !recipientServiceId.isValid) {
+                    Log.w(TAG, "Recipient没有有效的ACI，无法使用Tap发送: messageId=$messageId")
+                    return@supplyAsync IntegratedTapSendResult.Fallback("Recipient没有ACI")
+                }
+                
                 // 检查是否有可用的私聊传输通道（只检查私聊v2 mode）
-                val hasActiveChannel = channelManager.hasActivePrivateChannel(recipient.requireAci().toString())
+                val hasActiveChannel = channelManager.hasActivePrivateChannel(recipientServiceId.toString())
                 
                 if (hasActiveChannel) {
                     Log.i(TAG, "使用Tap传输层发送: messageId=$messageId")
@@ -128,7 +142,7 @@ class TapMessageSendIntegrator private constructor(private val context: Context)
                     IntegratedTapSendResult.Failed("没有可用的Tap传输通道")
                 }
                 
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "消息发送失败: messageId=$messageId", e)
                 IntegratedTapSendResult.Failed("发送异常: ${e.message}")
             }

@@ -22,6 +22,8 @@ public class PlayServicesUtil {
   }
 
   public static PlayServicesStatus getPlayServicesStatus(Context context) {
+    return PlayServicesStatus.MISSING;
+    /*
     int gcmStatus = 0;
 
     try {
@@ -57,6 +59,7 @@ public class PlayServicesUtil {
       default:
         return PlayServicesStatus.TRANSIENT_ERROR;
     }
+    */
   }
 
 }

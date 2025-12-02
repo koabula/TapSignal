@@ -622,8 +622,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     val webhookConfigData = tokenExchangeMessage.extractWebhookConfig()
                     val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
                     if (webhookConfigData != null) {
-                        val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
-                        val senderAci = recipient.requireAci().toString()
+                        // 使用消息中的senderAci，避免本地Recipient解析不一致
+                        val senderAci = tokenExchangeMessage.senderAci
                         saveContactWebhookConfig(
                             senderAci,
                             webhookConfigData,
@@ -652,8 +652,8 @@ class TapMessageProcessor private constructor(private val context: Context) {
         
         return try {
             // 获取对方的ACI（用于Token保存）
-            val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
-            val peerAci = recipient.requireAci().toString()
+            // 使用消息中的senderAci作为peerAci，避免本地Recipient解析不一致
+            val peerAci = tokenExchangeMessage.senderAci
             Log.d(TAG, "[Token交换] A端: senderId=$senderId, peerAci=$peerAci")
             val channelVersion = resolveChannelVersion(tokenExchangeMessage)
             
@@ -663,13 +663,26 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 val gatewayConfigData = tokenExchangeMessage.extractGatewayConfig()
                 if (webhookConfigData != null) {
                     Log.d(TAG, "[notifySecret调试] A端接收ACCEPT: notifySecret=${webhookConfigData.notifySecret.take(4)}...${webhookConfigData.notifySecret.takeLast(4)}, webhookUrl=${webhookConfigData.webhookUrl}, userId=${webhookConfigData.userId}")
+                    
+                    // 1. 保存到本地
                     saveContactWebhookConfig(
                         peerAci,
                         webhookConfigData,
                         tokenExchangeMessage.providerType,
                         gatewayConfigData
                     )
-                    Log.i(TAG, "已保存Token Accept中的Webhook配置: peerAci=$peerAci")
+                    
+                    // 2. 直接上传到 S3（确保 Lambda 能查找到 B 的配置）
+                    val uploadSuccess = uploadContactConfigToS3(
+                        peerAci,
+                        webhookConfigData,
+                        gatewayConfigData
+                    )
+                    if (uploadSuccess) {
+                        Log.i(TAG, "已保存并上传Token Accept中的Webhook配置到S3: peerAci=$peerAci")
+                    } else {
+                        Log.w(TAG, "已保存Token Accept中的Webhook配置到本地，但上传S3失败: peerAci=$peerAci")
+                    }
                 }
             }
 
@@ -1135,8 +1148,13 @@ class TapMessageProcessor private constructor(private val context: Context) {
 
     /**
      * 保存联系人的Webhook配置
+     * 
+     * 使用 NotificationConfigManager 保存，会同时：
+     * 1. 保存配置到本地
+     * 2. 上传配置到 S3 (tap-state/contacts/{contactHash}.json)
+     * 这样 Lambda 函数才能读取到接收方的 webhook 配置
      */
-    private fun saveContactWebhookConfig(
+    private suspend fun saveContactWebhookConfig(
         senderAci: String,
         webhookConfigData: org.thoughtcrime.securesms.tap.WebhookConfigData,
         providerType: String,
@@ -1159,10 +1177,29 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 gatewayMetadata = gatewayConfigData?.metadata ?: emptyMap()
             )
             
-            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            configManager.saveContactNotificationConfig(senderAci, contactConfig)
+            // 使用 NotificationConfigManager 保存，会同时上传到 S3
+            val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+            notificationConfigManager.saveContactConfig(senderAci, contactConfig)
         } catch (e: Exception) {
             Log.e(TAG, "保存联系人Webhook配置异常: senderAci=$senderAci", e)
+            false
+        }
+    }
+
+    /**
+     * 直接上传联系人配置到 S3
+     * 确保 A 发送给 B 消息时，Lambda_A 能在 S3_A 找到 B 的配置
+     */
+    private suspend fun uploadContactConfigToS3(
+        contactAci: String,
+        webhookConfig: org.thoughtcrime.securesms.tap.WebhookConfigData,
+        gatewayConfig: org.thoughtcrime.securesms.tap.GatewayConfigData?
+    ): Boolean {
+        return try {
+            val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+            notificationConfigManager.forceUploadContactConfig(contactAci, webhookConfig, gatewayConfig)
+        } catch (e: Exception) {
+            Log.e(TAG, "[S3上传] 联系人配置上传失败: contactAci=$contactAci", e)
             false
         }
     }
@@ -1436,7 +1473,47 @@ class TapMessageProcessor private constructor(private val context: Context) {
     }
     
     private fun sendTapConfirmationMessage(senderId: org.thoughtcrime.securesms.recipients.RecipientId, providerType: String) {
-        Log.i(TAG, "Sending Tap confirmation message to $senderId via $providerType")
+        Log.i(TAG, "发送Tap确认消息: senderId=$senderId, providerType=$providerType")
+        
+        processorScope.launch {
+            try {
+                val recipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+                val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                
+                // 创建CONFIRM消息
+                val confirmMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage(
+                    senderAci = myAci,
+                    providerType = providerType,
+                    tokenData = emptyMap(),
+                    metadata = mapOf("confirmationType" to "channel_established"),
+                    requestType = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_CONFIRM
+                )
+                
+                val encodedMessage = org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.encode(confirmMessage)
+                
+                val outgoingMessage = org.thoughtcrime.securesms.mms.OutgoingMessage.tapTokenExchangeMessage(
+                    threadRecipient = recipient,
+                    sentTimeMillis = System.currentTimeMillis(),
+                    expiresIn = 0,
+                    tokenExchangeData = encodedMessage
+                )
+                
+                val threadId = org.thoughtcrime.securesms.database.SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+                
+                org.thoughtcrime.securesms.sms.MessageSender.send(
+                    context,
+                    outgoingMessage,
+                    threadId,
+                    org.thoughtcrime.securesms.sms.MessageSender.SendType.SIGNAL,
+                    null,
+                    null
+                )
+                
+                Log.i(TAG, "Tap确认消息已发送: senderId=$senderId, providerType=$providerType")
+            } catch (e: Exception) {
+                Log.e(TAG, "发送Tap确认消息失败: senderId=$senderId", e)
+            }
+        }
     }
 
     private fun parseChannelRequest(data: String): ChannelRequestInfo? {

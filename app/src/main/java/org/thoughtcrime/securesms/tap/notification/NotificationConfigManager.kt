@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.tap.TransportProviderConfigManager
 import org.thoughtcrime.securesms.tap.WebhookConfigData
+import org.thoughtcrime.securesms.tap.GatewayConfigData
 import java.security.MessageDigest
 
 /**
@@ -170,10 +171,8 @@ class NotificationConfigManager private constructor(private val context: Context
                 return
             }
             
-            val contactHash = java.security.MessageDigest.getInstance("SHA-256")
-                .digest(contactAci.toByteArray())
-                .joinToString("") { "%02x".format(it) }
-                .take(16)
+            // 使用统一的 TransportIdHasher 计算 hash，确保与 Lambda payload 中的 recipientHash 一致
+            val contactHash = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(contactAci)
             
             val configJson = org.json.JSONObject().apply {
                 put("webhookUrl", config.webhookUrl)
@@ -211,10 +210,14 @@ class NotificationConfigManager private constructor(private val context: Context
             // 从cosConfig提取必要信息
             val bucketName = cosConfig["bucketName"] as? String ?: return
             val region = cosConfig["region"] as? String ?: return
-            val myAddress = when (cosConfig["provider"] as? String) {
-                "aws" -> "https://${bucketName}.s3.${region}.amazonaws.com"
-                "tencent" -> "https://${bucketName}.cos.${region}.myqcloud.com"
-                else -> return
+            val providerStr = (cosConfig["provider"] as? String)?.uppercase()
+            val myAddress = when (providerStr) {
+                "AWS" -> "https://${bucketName}.s3.${region}.amazonaws.com"
+                "TENCENT" -> "https://${bucketName}.cos.${region}.myqcloud.com"
+                else -> {
+                    Log.w(TAG, "未知的COS provider类型: $providerStr")
+                    return
+                }
             }
             
             // 创建最小化的CosTransportMetadata
@@ -249,6 +252,131 @@ class NotificationConfigManager private constructor(private val context: Context
             
         } catch (e: Exception) {
             Log.e(TAG, "上传联系人配置到COS失败: contactAci=$contactAci", e)
+        }
+    }
+    
+    /**
+     * 强制上传联系人配置到 S3/COS（不依赖本地存储结果）
+     * 用于确保 Token Accept 接收后，Lambda 能找到联系人配置
+     * 
+     * @param contactAci 联系人ACI
+     * @param webhookData Webhook配置数据
+     * @param gatewayData Gateway配置数据（可选）
+     * @return 上传是否成功
+     */
+    suspend fun forceUploadContactConfig(
+        contactAci: String,
+        webhookData: WebhookConfigData,
+        gatewayData: GatewayConfigData? = null
+    ): Boolean {
+        return try {
+            Log.i(TAG, "[强制上传] 开始上传联系人配置到S3: contactAci=$contactAci")
+            
+            val config = ContactNotificationConfig(
+                contactId = contactAci,
+                platform = "android",
+                webhookUrl = webhookData.webhookUrl,
+                notifySecret = webhookData.notifySecret,
+                userId = webhookData.userId,
+                lastUpdated = System.currentTimeMillis(),
+                verified = false,
+                gatewayRegion = gatewayData?.region,
+                gatewayProvider = gatewayData?.provider,
+                offlineBucket = gatewayData?.offlineBucket,
+                presignDelegation = gatewayData?.presignDelegation ?: false,
+                gatewayMetadata = gatewayData?.metadata ?: emptyMap()
+            )
+            
+            val transportManager = org.thoughtcrime.securesms.tap.TransportManager.getInstance(context)
+            val provider = transportManager.getProvider("cos")
+            
+            if (provider == null) {
+                Log.w(TAG, "[强制上传] COS Provider未找到")
+                return false
+            }
+            
+            val contactHash = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAciString(contactAci)
+            
+            val configJson = org.json.JSONObject().apply {
+                put("webhookUrl", config.webhookUrl)
+                put("notifySecret", config.notifySecret)
+                put("userId", config.userId)
+                put("platform", config.platform)
+                put("lastUpdated", config.lastUpdated)
+                put("version", "2.0")
+                config.gatewayRegion?.let { put("gatewayRegion", it) }
+                config.gatewayProvider?.let { put("gatewayProvider", it) }
+                config.offlineBucket?.let { put("offlineBucket", it) }
+                if (config.presignDelegation) {
+                    put("presignDelegation", true)
+                }
+                if (config.gatewayMetadata.isNotEmpty()) {
+                    put("gatewayMetadata", org.json.JSONObject(config.gatewayMetadata))
+                }
+            }.toString()
+            
+            val uploadPath = "tap-state/contacts/${contactHash}.json"
+            
+            val configManagerInstance = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+            val cosConfig = configManagerInstance.getProviderConfig("cos")
+            if (cosConfig == null) {
+                Log.w(TAG, "[强制上传] COS配置未找到")
+                return false
+            }
+            
+            val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci()
+            val myHashedId = org.thoughtcrime.securesms.tap.utils.TransportIdHasher.hashAci(myAci)
+            
+            val bucketName = cosConfig["bucketName"] as? String
+            val region = cosConfig["region"] as? String
+            if (bucketName == null || region == null) {
+                Log.w(TAG, "[强制上传] COS配置不完整: bucket=$bucketName, region=$region")
+                return false
+            }
+            
+            val providerStr = (cosConfig["provider"] as? String)?.uppercase()
+            val myAddress = when (providerStr) {
+                "AWS" -> "https://${bucketName}.s3.${region}.amazonaws.com"
+                "TENCENT" -> "https://${bucketName}.cos.${region}.myqcloud.com"
+                else -> {
+                    Log.w(TAG, "[强制上传] 未知的COS provider类型: $providerStr")
+                    return false
+                }
+            }
+            
+            val metadata = org.thoughtcrime.securesms.tap.provider.cos.CosTransportMetadata(
+                recipientId = contactAci,
+                providerType = "cos",
+                myAddress = myAddress,
+                myToken = null,
+                myRegion = region,
+                myBucketName = bucketName,
+                mySendPath = "tap-state/contacts/",
+                peerAddress = myAddress,
+                peerToken = null,
+                peerRegion = region,
+                peerBucketName = bucketName,
+                peerReceivePath = "tap-state/contacts/",
+                myHashedId = myHashedId,
+                peerHashedId = contactHash
+            )
+            
+            val uploadResult = provider.uploadFile(
+                data = configJson.toByteArray(),
+                path = uploadPath,
+                metadata = metadata
+            )
+            
+            if (uploadResult is org.thoughtcrime.securesms.tap.TransportResult.Success) {
+                Log.i(TAG, "[强制上传] 联系人配置上传成功: path=$uploadPath, contactAci=$contactAci")
+                true
+            } else {
+                Log.w(TAG, "[强制上传] 联系人配置上传失败: $uploadResult")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[强制上传] 上传联系人配置异常: contactAci=$contactAci", e)
+            false
         }
     }
     

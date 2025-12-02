@@ -62,7 +62,7 @@ class TencentApiGatewayNotificationProvider(
         }
     }
 
-    override suspend fun deploy(apiKey: String, region: String): DeployResult {
+    override suspend fun deploy(apiKey: String, region: String, bucketName: String?): DeployResult {
         return try {
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
@@ -78,21 +78,29 @@ class TencentApiGatewayNotificationProvider(
             val tencentDeployer = TencentApiGatewayDeployer(context, secretId, secretKey, effectiveRegion)
             deployer = tencentDeployer
 
-            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            val cosConfig = configManager.getProviderConfig("cos")
-            val bucketName: String? = cosConfig?.get("bucketName") as? String
+            // 优先使用传入的bucketName参数（来自当前配置界面），其次从持久化存储读取
+            val effectiveBucketName: String? = if (!bucketName.isNullOrEmpty()) {
+                Log.i(TAG, "Using bucket name from current config: $bucketName")
+                bucketName
+            } else {
+                val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                val cosConfig = configManager.getProviderConfig("cos")
+                val storedBucketName = cosConfig?.get("bucketName") as? String
+                Log.i(TAG, "Using bucket name from persistent storage: $storedBucketName")
+                storedBucketName
+            }
             
             // 设置用户bucket名称（用于配置存储）
-            tencentDeployer.setUserBucketName(bucketName)
+            tencentDeployer.setUserBucketName(effectiveBucketName)
             
-            val pushServiceInfo = tencentDeployer.deployPushService(userBucketName = bucketName)
+            val pushServiceInfo = tencentDeployer.deployPushService(userBucketName = effectiveBucketName)
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
 
             val webhookUrl = tencentDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
             // 部署触发器函数（客户端直调用作推送触发），不再配置COS事件通知
-            val triggerInfo = tencentDeployer.setupEventTrigger(userBucketName = bucketName)
+            val triggerInfo = tencentDeployer.setupEventTrigger(userBucketName = effectiveBucketName)
             Log.d(TAG, "Trigger function deployed (client-invocation mode): ${triggerInfo.triggerName}")
 
             val secret = generateNotifySecret()
@@ -104,7 +112,7 @@ class TencentApiGatewayNotificationProvider(
             val envUpdateResult = tencentDeployer.updateWebhookEnvironment(
                 secret, 
                 userId, 
-                bucketName,
+                effectiveBucketName,
                 wsFunctionUrl // 传入WebSocket函数URL用于推送
             )
             if (!envUpdateResult) {

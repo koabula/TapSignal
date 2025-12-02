@@ -1418,7 +1418,7 @@ class ConversationFragment :
    * 显示Tap v2模式请求确认对话框
    */
   private fun showTapV2ModeRequestDialog(recipient: Recipient) {
-    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+    MaterialAlertDialogBuilder(requireContext())
       .setTitle("启用 Tap 传输模式")
       .setMessage("是否要向 ${recipient.getDisplayName(requireContext())} 发送 Tap 传输连接请求？")
       .setPositiveButton("发送") { _, _ ->
@@ -1432,7 +1432,7 @@ class ConversationFragment :
    * 显示Tap v2模式断开确认对话框
    */
   private fun showTapV2ModeDisconnectDialog(recipient: Recipient) {
-    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+    MaterialAlertDialogBuilder(requireContext())
       .setTitle("断开 Tap 传输模式")
       .setMessage("是否要断开与 ${recipient.getDisplayName(requireContext())} 的 Tap 传输连接？")
       .setPositiveButton("断开") { _, _ ->

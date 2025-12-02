@@ -108,15 +108,46 @@ private class AwsTapLambdaDispatcher(
                 }
             )
 
-            val statusCode = response.statusCode ?: 0
+            val httpStatus = response.statusCode ?: 0
             val body = response.payload?.let { String(it, Charsets.UTF_8) }
             val functionError = response.functionError
-            val success = functionError.isNullOrEmpty() && statusCode in 200..299
+
+            // 先检查 Lambda 执行是否成功 (HTTP层面)
+            if (!functionError.isNullOrEmpty() || httpStatus !in 200..299) {
+                Log.w(tag, "Lambda执行失败: httpStatus=$httpStatus, functionError=$functionError")
+                return LambdaDispatchResult(
+                    success = false,
+                    statusCode = httpStatus,
+                    errorMessage = functionError ?: body,
+                    requestId = response.executedVersion
+                )
+            }
+
+            // 解析业务响应 - Lambda返回的JSON包含业务状态码
+            val businessResult = try {
+                JSONObject(body ?: "{}")
+            } catch (e: Exception) {
+                Log.w(tag, "Lambda响应解析失败，假定成功: body=$body")
+                return LambdaDispatchResult(success = true, statusCode = httpStatus)
+            }
+
+            val businessStatusCode = businessResult.optInt("statusCode", 200)
+            val deliveredCount = businessResult.optInt("deliveredCount", 0)
+            val businessError = businessResult.optString("error", null)
+
+            // 业务层成功条件：statusCode 2xx 且 deliveredCount > 0
+            val businessSuccess = businessStatusCode in 200..299 && deliveredCount > 0
+
+            if (!businessSuccess) {
+                Log.w(tag, "Lambda业务失败: statusCode=$businessStatusCode, deliveredCount=$deliveredCount, error=$businessError")
+            } else {
+                Log.d(tag, "Lambda业务成功: statusCode=$businessStatusCode, deliveredCount=$deliveredCount")
+            }
 
             LambdaDispatchResult(
-                success = success,
-                statusCode = statusCode,
-                errorMessage = functionError ?: body,
+                success = businessSuccess,
+                statusCode = businessStatusCode,
+                errorMessage = if (!businessSuccess) (businessError ?: "deliveredCount=$deliveredCount") else null,
                 requestId = response.executedVersion
             )
         } catch (e: Exception) {
@@ -198,14 +229,47 @@ private class TencentTapLambdaDispatcher(
                 action = "Invoke",
                 params = params
             )
-            val status = response.optJSONObject("Result")?.optInt("RetCode") ?: 0
-            val success = status == 0
-            val errorMessage = if (success) null else response.optJSONObject("Result")?.optString("ErrMsg")
+            val retCode = response.optJSONObject("Result")?.optInt("RetCode") ?: 0
+            val scfSuccess = retCode == 0
+            val scfErrorMessage = if (scfSuccess) null else response.optJSONObject("Result")?.optString("ErrMsg")
+
+            // 先检查 SCF 执行是否成功
+            if (!scfSuccess) {
+                Log.w(tag, "SCF执行失败: retCode=$retCode, error=$scfErrorMessage")
+                return LambdaDispatchResult(
+                    success = false,
+                    statusCode = retCode,
+                    errorMessage = scfErrorMessage,
+                    requestId = response.optString("RequestId")
+                )
+            }
+
+            // 解析业务响应 - SCF返回的结果包含业务状态码
+            val resultBody = response.optJSONObject("Result")?.optString("RetMsg") ?: "{}"
+            val businessResult = try {
+                JSONObject(resultBody)
+            } catch (e: Exception) {
+                Log.w(tag, "SCF响应解析失败，假定成功: body=$resultBody")
+                return LambdaDispatchResult(success = true, statusCode = 0, requestId = response.optString("RequestId"))
+            }
+
+            val businessStatusCode = businessResult.optInt("statusCode", 200)
+            val deliveredCount = businessResult.optInt("deliveredCount", 0)
+            val businessError = businessResult.optString("error", null)
+
+            // 业务层成功条件：statusCode 2xx 且 deliveredCount > 0
+            val businessSuccess = businessStatusCode in 200..299 && deliveredCount > 0
+
+            if (!businessSuccess) {
+                Log.w(tag, "SCF业务失败: statusCode=$businessStatusCode, deliveredCount=$deliveredCount, error=$businessError")
+            } else {
+                Log.d(tag, "SCF业务成功: statusCode=$businessStatusCode, deliveredCount=$deliveredCount")
+            }
 
             LambdaDispatchResult(
-                success = success,
-                statusCode = status,
-                errorMessage = errorMessage,
+                success = businessSuccess,
+                statusCode = businessStatusCode,
+                errorMessage = if (!businessSuccess) (businessError ?: "deliveredCount=$deliveredCount") else null,
                 requestId = response.optString("RequestId")
             )
         } catch (e: Exception) {

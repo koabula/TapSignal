@@ -177,6 +177,7 @@ android {
   }
 
   defaultConfig {
+    applicationId = "org.thoughtcrime.securesms.tapsignal"
     versionCode = (canonicalVersionCode * maxHotfixVersions) + currentHotfixVersion
     versionName = canonicalVersionName
 

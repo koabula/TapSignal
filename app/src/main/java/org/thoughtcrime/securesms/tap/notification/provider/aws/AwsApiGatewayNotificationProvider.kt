@@ -62,7 +62,7 @@ class AwsApiGatewayNotificationProvider(
         }
     }
 
-    override suspend fun deploy(apiKey: String, region: String): DeployResult {
+    override suspend fun deploy(apiKey: String, region: String, bucketName: String?): DeployResult {
         return try {
             val effectiveRegion = region.ifEmpty { defaultRegion }
             Log.i(TAG, "Starting deployment for region: $effectiveRegion")
@@ -78,27 +78,35 @@ class AwsApiGatewayNotificationProvider(
             val awsDeployer = AwsApiGatewayDeployer(context, accessKeyId, secretAccessKey, effectiveRegion)
             deployer = awsDeployer
 
-            val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
-            val cosConfig = configManager.getProviderConfig("cos")
-            val bucketName: String? = cosConfig?.get("bucketName") as? String
+            // 优先使用传入的bucketName参数（来自当前配置界面），其次从持久化存储读取
+            val effectiveBucketName: String? = if (!bucketName.isNullOrEmpty()) {
+                Log.i(TAG, "Using bucket name from current config: $bucketName")
+                bucketName
+            } else {
+                val configManager = org.thoughtcrime.securesms.tap.TransportProviderConfigManager.getInstance(context)
+                val cosConfig = configManager.getProviderConfig("cos")
+                val storedBucketName = cosConfig?.get("bucketName") as? String
+                Log.i(TAG, "Using bucket name from persistent storage: $storedBucketName")
+                storedBucketName
+            }
             
-            awsDeployer.setUserBucketName(bucketName)
+            awsDeployer.setUserBucketName(effectiveBucketName)
             
-            val pushServiceInfo = awsDeployer.deployPushService(userBucketName = bucketName)
+            val pushServiceInfo = awsDeployer.deployPushService(userBucketName = effectiveBucketName)
             Log.d(TAG, "Push service deployed: ${pushServiceInfo.endpoint}")
 
             val webhookUrl = awsDeployer.deployWebhook()
             Log.d(TAG, "Webhook deployed: $webhookUrl")
 
-            val triggerInfo = awsDeployer.setupEventTrigger(userBucketName = bucketName)
+            val triggerInfo = awsDeployer.setupEventTrigger(userBucketName = effectiveBucketName)
             Log.d(TAG, "Event trigger configured: ${triggerInfo.triggerName}")
 
             // 方案二：客户端直接触发云函数，不需要配置S3事件触发器
             // S3事件触发器配置已标记为可选，如果配置失败也不影响功能
-            if (bucketName != null && triggerInfo.triggerArn != null) {
+            if (effectiveBucketName != null && triggerInfo.triggerArn != null) {
                 Log.i(TAG, "Attempting to configure S3 event notification (optional, client-triggered mode is primary)")
                 val s3EventConfigured = awsDeployer.configureS3EventNotification(
-                    userBucketName = bucketName,
+                    userBucketName = effectiveBucketName,
                     triggerFunctionArn = triggerInfo.triggerArn!!,
                     filterPrefix = "v2-channels/"
                 )
@@ -116,7 +124,7 @@ class AwsApiGatewayNotificationProvider(
             val apiGatewayId = pushServiceInfo.credentials["apiGatewayId"] 
                 ?: throw Exception("API Gateway ID not found in push service info")
             
-            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret, userId, bucketName)
+            val envUpdateResult = awsDeployer.updateWebhookEnvironment(secret, userId, effectiveBucketName)
             if (!envUpdateResult) {
                 Log.e(TAG, "Failed to update webhook environment variables")
                 throw Exception("Failed to configure webhook environment variables")

@@ -7,7 +7,7 @@ interface NotificationProvider {
     
     val providerType: String
     
-    suspend fun deploy(apiKey: String, region: String): DeployResult
+    suspend fun deploy(apiKey: String, region: String, bucketName: String? = null): DeployResult
     
     fun getWebhookConfig(): WebhookConfig
     

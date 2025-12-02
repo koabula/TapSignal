@@ -193,13 +193,18 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
             val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
             val localNotificationConfig = notificationConfigManager.getLocalConfig()
+            
+            val resolvedUserId = localNotificationConfig?.pushServiceInfo?.metadata?.get("userId") as? String
+                ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+
             val responseMessage = buildAcceptResponse(
                 myAci = myAci,
                 originalMessage = originalMessage,
                 tokenPayload = emptyMap(),
                 providerConfig = providerConfig,
                 localNotificationConfig = localNotificationConfig,
-                channelVersion = channelVersion
+                channelVersion = channelVersion,
+                forcedUserId = resolvedUserId
             )
 
             sendTokenExchangeResponse(context, senderId, responseMessage)
@@ -423,13 +428,56 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
             val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
             val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
             val localNotificationConfig = notificationConfigManager.getLocalConfig()
+            
+            // 提前解析或生成 userId
+            val resolvedUserId = localNotificationConfig?.pushServiceInfo?.metadata?.get("userId") as? String
+                ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+
+            // 9.5 上传B自己的contact config到S3（让Lambda能找到B的webhook配置）
+            // 这是关键步骤：当A发送消息给B时，Lambda需要查找B的webhook配置
+            val hasValidUrl = !localNotificationConfig?.webhookUrl.isNullOrEmpty()
+            val hasValidSecret = !localNotificationConfig?.notifySecret.isNullOrEmpty()
+
+            if (localNotificationConfig != null && hasValidUrl && hasValidSecret) {
+                try {
+                    val myContactConfig = org.thoughtcrime.securesms.tap.notification.ContactNotificationConfig(
+                        contactId = myAci,
+                        platform = originalMessage.providerType,
+                        webhookUrl = localNotificationConfig.webhookUrl,
+                        notifySecret = localNotificationConfig.notifySecret,
+                        userId = resolvedUserId,
+                        lastUpdated = System.currentTimeMillis(),
+                        verified = false,
+                        websocketManagementEndpoint = localNotificationConfig.pushServiceInfo.metadata["endpoint"] as? String,
+                        gatewayRegion = localNotificationConfig.pushServiceInfo.metadata["region"] as? String,
+                        gatewayProvider = localNotificationConfig.pushServiceInfo.metadata["provider"] as? String,
+                        offlineBucket = localNotificationConfig.pushServiceInfo.metadata["offlineBucket"] as? String,
+                        presignDelegation = localNotificationConfig.pushServiceInfo.metadata["presignDelegation"] as? Boolean ?: false,
+                        gatewayMetadata = emptyMap()
+                    )
+                    
+                    // 上传到S3：tap-state/contacts/{myHash}.json
+                    val uploadSuccess = notificationConfigManager.saveContactConfig(myAci, myContactConfig)
+                    if (uploadSuccess) {
+                        Log.i(TAG, "B端已上传自己的contact config到S3: myAci=$myAci")
+                    } else {
+                        Log.w(TAG, "B端上传contact config失败: myAci=$myAci")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "B端上传contact config异常: myAci=$myAci", e)
+                }
+            } else {
+                Log.w(TAG, "B端本地NotificationConfig无效，无法上传contact config到S3")
+            }
+
             val responseMessage = buildAcceptResponse(
                 myAci = myAci,
                 originalMessage = originalMessage,
                 tokenPayload = generatedToken.toMap(),
                 providerConfig = providerConfigMap,
                 localNotificationConfig = localNotificationConfig,
-                channelVersion = channelVersion
+                channelVersion = channelVersion,
+                forcedUserId = resolvedUserId
             )
             
             // 10. 发送响应消息
@@ -524,17 +572,19 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
         tokenPayload: Map<String, Any>,
         providerConfig: Map<String, Any>,
         localNotificationConfig: NotificationConfig?,
-        channelVersion: Int
+        channelVersion: Int,
+        forcedUserId: String
     ): TapTokenExchangeMessage {
         val metadata = mapOf(
             "recipientAci" to originalMessage.senderAci,
             "responseToTokenId" to (originalMessage.tokenData["tokenId"] ?: "")
         )
 
-        return if (localNotificationConfig != null && localNotificationConfig.validate()) {
-            val userId = localNotificationConfig.pushServiceInfo.metadata["userId"] as? String
-                ?: java.util.UUID.randomUUID().toString().replace("-", "").take(16)
-            Log.d(TAG, "[notifySecret调试] 发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$userId")
+        val hasValidUrl = !localNotificationConfig?.webhookUrl.isNullOrEmpty()
+        val hasValidSecret = !localNotificationConfig?.notifySecret.isNullOrEmpty()
+
+        return if (localNotificationConfig != null && hasValidUrl && hasValidSecret) {
+            Log.d(TAG, "[notifySecret调试] 发送ACCEPT: notifySecret=${localNotificationConfig.notifySecret.take(4)}...${localNotificationConfig.notifySecret.takeLast(4)}, webhookUrl=${localNotificationConfig.webhookUrl}, userId=$forcedUserId")
             val gatewayConfig = org.thoughtcrime.securesms.tap.utils.TapGatewayConfigBuilder.build(localNotificationConfig)
             TapTokenExchangeMessage.createWithWebhook(
                 senderAci = myAci,
@@ -544,7 +594,7 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 requestType = TapTokenExchangeMessage.REQUEST_TYPE_ACCEPT,
                 webhookUrl = localNotificationConfig.webhookUrl,
                 notifySecret = localNotificationConfig.notifySecret,
-                userId = userId,
+                userId = forcedUserId,
                 gatewayConfig = gatewayConfig,
                 channelVersion = channelVersion
             )

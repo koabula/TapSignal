@@ -280,8 +280,16 @@ class TapConfigViewModel : ViewModel() {
                     testResult = null
                 )
 
-                // 执行测试
-                val testResult = descriptor.testConfig(currentState.configValues, context)
+                // 对字符串值进行trim处理，清理用户输入时可能不小心添加的首尾空格
+                val trimmedConfigValues = currentState.configValues.mapValues { (_, value) ->
+                    when (value) {
+                        is String -> value.trim()
+                        else -> value
+                    }
+                }
+
+                // 执行测试（使用trim后的值）
+                val testResult = descriptor.testConfig(trimmedConfigValues, context)
 
                 // 更新测试结果
                 _state.value = _state.value?.copy(
@@ -308,15 +316,23 @@ class TapConfigViewModel : ViewModel() {
             val providerType = currentState.selectedProviderType ?: return false
             val descriptor = currentState.currentProviderDescriptor ?: return false
 
+            // 对字符串值进行trim处理，清理用户输入时可能不小心添加的首尾空格
+            val trimmedConfigValues = currentState.configValues.mapValues { (_, value) ->
+                when (value) {
+                    is String -> value.trim()
+                    else -> value
+                }
+            }
+
             // 验证配置
-            val validationResult = descriptor.validateConfig(currentState.configValues)
+            val validationResult = descriptor.validateConfig(trimmedConfigValues)
             if (!validationResult.isValid) {
                 Log.w(TAG, "配置验证失败: ${validationResult}")
                 return false
             }
 
-            // 保存配置
-            val success = configManager.saveProviderConfig(providerType, currentState.configValues)
+            // 保存配置（使用trim后的值）
+            val success = configManager.saveProviderConfig(providerType, trimmedConfigValues)
             if (success) {
                 Log.i(TAG, "配置保存成功: providerType=$providerType")
                 
@@ -462,12 +478,14 @@ class TapConfigViewModel : ViewModel() {
             )
             
             // 创建NotificationProvider
-            val secretKeyValue: String = currentState.configValues["secretKey"] as? String ?: ""
-            val regionValue: String = currentState.configValues["region"] as? String ?: ""
+            val secretKeyValue: String = (currentState.configValues["secretKey"] as? String)?.trim() ?: ""
+            val regionValue: String = (currentState.configValues["region"] as? String)?.trim() ?: ""
+            val bucketNameValue: String? = (currentState.configValues["bucketName"] as? String)?.trim()
             val credentials = mapOf(
-                "apiKey" to apiKey,
+                "apiKey" to apiKey.trim(),
                 "secretKey" to secretKeyValue,
-                "region" to regionValue
+                "region" to regionValue,
+                "bucketName" to (bucketNameValue ?: "")
             )
             
             val notificationProvider = notificationProviderFactory.createProvider(
@@ -484,10 +502,11 @@ class TapConfigViewModel : ViewModel() {
                 )
             }
             
-            // 执行部署
+            // 执行部署（传递当前配置中的bucketName，而不是从持久化存储读取）
             val deployResult = notificationProvider.deploy(
-                apiKey = apiKey,
-                region = credentials["region"] ?: ""
+                apiKey = apiKey.trim(),
+                region = credentials["region"] ?: "",
+                bucketName = bucketNameValue
             )
             
             if (!deployResult.success) {
