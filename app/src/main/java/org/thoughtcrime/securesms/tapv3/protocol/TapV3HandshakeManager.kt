@@ -16,6 +16,15 @@ import org.thoughtcrime.securesms.tapv3.push.PushEndpointManager
 import org.thoughtcrime.securesms.tapv3.push.UnifiedPushProvider
 import org.thoughtcrime.securesms.tapv3.utils.TapV3Validator
 
+/**
+ * Tap v3 握手管理器
+ * 
+ * 密钥交换模型:
+ * - 握手时，双方交换各自的 k_push（myKPush）
+ * - A 发送自己的 k_push_A 给 B，B 存储为 peerKPush[A]
+ * - B 发送自己的 k_push_B 给 A，A 存储为 peerKPush[B]
+ * - 之后 A 给 B 发消息时用 k_push_B 加密，B 用自己的 myKPush 解密
+ */
 class TapV3HandshakeManager private constructor(
     private val context: Context
 ) {
@@ -88,7 +97,8 @@ class TapV3HandshakeManager private constructor(
                 )
             }
             
-            val kPush = kPushManager.generateKey()
+            // 获取或创建自己的 myKPush
+            val myKPush = kPushManager.getOrCreateMyKPush()
             
             val ipfsGateways: List<String> = getConfiguredGateways()
             
@@ -104,8 +114,8 @@ class TapV3HandshakeManager private constructor(
             val handshakeInfo = TapV3HandshakeInfo(
                 version = TapV3Constants.VERSION,
                 unifiedPushEndpoint = myEndpoint,
-                kPush = kPush,
-                keyVersion = TapV3Constants.KPUSH_KEY_VERSION_INITIAL,
+                kPush = myKPush,
+                keyVersion = kPushManager.getMyKPushVersion(),
                 ipfsGateways = ipfsGateways,
                 capabilities = setOf("inline", "ipfs", "multi-attachment")
             )
@@ -119,13 +129,12 @@ class TapV3HandshakeManager private constructor(
                 )
             }
             
-            kPushManager.saveKey(recipientId, kPush)
-            
+            // 初始化时先创建一个待定状态的通道记录
             channelTable.insertOrUpdate(
                 recipientId = recipientId,
                 status = TapV3ChannelTable.ChannelStatus.PENDING,
                 pushEndpoint = "",
-                kPush = kPush,
+                kPush = ByteArray(32), // 临时占位
                 keyVersion = TapV3Constants.KPUSH_KEY_VERSION_INITIAL,
                 ipfsGateways = emptyList()
             )
@@ -225,9 +234,11 @@ class TapV3HandshakeManager private constructor(
             
             val myHandshakeInfo = createMyHandshakeInfo()
             
-            kPushManager.saveKey(recipientId, peerInfo.kPush, peerInfo.keyVersion)
+            // 保存对方的 k_push，用于给对方发消息时加密
+            kPushManager.savePeerKPush(recipientId, peerInfo.kPush, peerInfo.keyVersion)
             pushEndpointManager.saveEndpoint(recipientId, peerInfo.unifiedPushEndpoint)
             
+            // 通道表中存储对方的 k_push 和端点信息
             channelTable.insertOrUpdate(
                 recipientId = recipientId,
                 status = TapV3ChannelTable.ChannelStatus.ACTIVE,
@@ -315,9 +326,11 @@ class TapV3HandshakeManager private constructor(
                 return TapV3Result.Failure(TapV3Error.INVALID_DATA, errorMsg)
             }
             
-            kPushManager.saveKey(recipientId, peerInfo.kPush, peerInfo.keyVersion)
+            // 保存对方的 k_push，用于给对方发消息时加密
+            kPushManager.savePeerKPush(recipientId, peerInfo.kPush, peerInfo.keyVersion)
             pushEndpointManager.saveEndpoint(recipientId, peerInfo.unifiedPushEndpoint)
             
+            // 通道表中存储对方的 k_push 和端点信息
             channelTable.insertOrUpdate(
                 recipientId = recipientId,
                 status = TapV3ChannelTable.ChannelStatus.ACTIVE,
@@ -419,15 +432,16 @@ class TapV3HandshakeManager private constructor(
         val myEndpoint = pushEndpointManager.getMyEndpoint()
             ?: throw IllegalStateException("UnifiedPush endpoint not registered")
         
-        val kPush = kPushManager.generateKey()
+        // 获取或创建自己的 myKPush
+        val myKPush = kPushManager.getOrCreateMyKPush()
         
         val ipfsGateways = getConfiguredGateways()
         
         return TapV3HandshakeInfo(
             version = TapV3Constants.VERSION,
             unifiedPushEndpoint = myEndpoint,
-            kPush = kPush,
-            keyVersion = TapV3Constants.KPUSH_KEY_VERSION_INITIAL,
+            kPush = myKPush,
+            keyVersion = kPushManager.getMyKPushVersion(),
             ipfsGateways = ipfsGateways,
             capabilities = setOf("inline", "ipfs", "multi-attachment")
         )

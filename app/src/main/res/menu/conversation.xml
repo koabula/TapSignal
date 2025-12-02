@@ -15,6 +15,10 @@
         android:title="@string/conversation__menu_use_v2_mode" />
 
     <item
+        android:id="@+id/menu_tap_v3_mode"
+        android:title="@string/conversation__menu_use_v3_mode" />
+
+    <item
         android:id="@+id/menu_search"
         android:title="@string/SearchToolbar_search"
         app:actionViewClass="org.thoughtcrime.securesms.components.SearchView"

@@ -1,7 +1,10 @@
 package org.thoughtcrime.securesms.tapv3
 
+import android.util.Base64
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
 
 data class TapV3HandshakeInfo(
@@ -11,7 +14,7 @@ data class TapV3HandshakeInfo(
     @JsonProperty("unifiedPushEndpoint")
     val unifiedPushEndpoint: String,
     
-    @JsonProperty("kPush")
+    @get:JsonIgnore
     val kPush: ByteArray,
     
     @JsonProperty("keyVersion")
@@ -23,6 +26,50 @@ data class TapV3HandshakeInfo(
     @JsonProperty("capabilities")
     val capabilities: Set<String> = setOf("inline", "ipfs", "multi-attachment")
 ) {
+    
+    @get:JsonProperty("kPush")
+    val kPushBase64: String
+        get() = Base64.encodeToString(kPush, Base64.NO_WRAP)
+    
+    companion object {
+        private val objectMapper: ObjectMapper by lazy {
+            ObjectMapper().registerKotlinModule()
+        }
+        
+        fun serialize(info: TapV3HandshakeInfo): ByteArray {
+            return objectMapper.writeValueAsBytes(info)
+        }
+        
+        fun deserialize(data: ByteArray): TapV3HandshakeInfo {
+            val node = objectMapper.readTree(data)
+            return fromJson(
+                version = node.get("version").asInt(),
+                unifiedPushEndpoint = node.get("unifiedPushEndpoint").asText(),
+                kPushBase64 = node.get("kPush").asText(),
+                keyVersion = node.get("keyVersion").asInt(),
+                ipfsGateways = node.get("ipfsGateways").map { it.asText() },
+                capabilities = node.get("capabilities").map { it.asText() }.toSet()
+            )
+        }
+        
+        fun fromJson(
+            version: Int,
+            unifiedPushEndpoint: String,
+            kPushBase64: String,
+            keyVersion: Int,
+            ipfsGateways: List<String>,
+            capabilities: Set<String>
+        ): TapV3HandshakeInfo {
+            return TapV3HandshakeInfo(
+                version = version,
+                unifiedPushEndpoint = unifiedPushEndpoint,
+                kPush = Base64.decode(kPushBase64, Base64.NO_WRAP),
+                keyVersion = keyVersion,
+                ipfsGateways = ipfsGateways,
+                capabilities = capabilities
+            )
+        }
+    }
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -46,15 +93,4 @@ data class TapV3HandshakeInfo(
         return result
     }
     
-    companion object {
-        private val objectMapper = ObjectMapper()
-        
-        fun serialize(info: TapV3HandshakeInfo): ByteArray {
-            return objectMapper.writeValueAsBytes(info)
-        }
-        
-        fun deserialize(data: ByteArray): TapV3HandshakeInfo {
-            return objectMapper.readValue(data)
-        }
-    }
 }

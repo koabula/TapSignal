@@ -5,17 +5,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.jobs.PushProcessMessageJob
+import org.thoughtcrime.securesms.crypto.ReentrantSessionLock
+import org.thoughtcrime.securesms.crypto.SealedSenderAccessUtil
+import org.thoughtcrime.securesms.dependencies.AppDependencies
+import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.messages.MessageContentProcessor
-import org.thoughtcrime.securesms.recipients.Recipient
-import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.tapv3.integration.TapV3ReceiveIntegrator
+import org.thoughtcrime.securesms.util.RemoteConfig
 import org.unifiedpush.android.connector.MessagingReceiver
+import org.whispersystems.signalservice.api.crypto.SignalServiceCipher
+import org.whispersystems.signalservice.api.crypto.SignalServiceCipherResult
+import org.whispersystems.signalservice.api.push.SignalServiceAddress
 import org.whispersystems.signalservice.internal.push.Envelope
-import org.json.JSONObject
-import okio.ByteString
-import org.whispersystems.signalservice.api.push.ServiceId
 
 class PushMessageReceiver : MessagingReceiver() {
     
@@ -30,17 +31,16 @@ class PushMessageReceiver : MessagingReceiver() {
             val messageString = String(message, Charsets.UTF_8)
             Log.d(TAG, "Message content: ${messageString.take(100)}...")
             
-            val json = JSONObject(messageString)
-            val base64Data = json.getString("data")
-            val senderId = json.getString("senderId")
+            val base64Data = messageString.trim()
             
             CoroutineScope(Dispatchers.IO).launch {
                 val receiveIntegrator = TapV3ReceiveIntegrator.getInstance(context)
-                val result = receiveIntegrator.receiveMessage(base64Data, senderId)
+                val result = receiveIntegrator.receiveMessage(base64Data)
                 
                 if (result.success && result.message != null) {
-                    Log.d(TAG, "Message received successfully, injecting into Signal")
-                    injectIntoSignalPipeline(context, result.message!!.signalEncrypted, senderId)
+                    val senderId = result.message.senderId
+                    Log.d(TAG, "Message received successfully from ${senderId.take(8)}..., injecting into Signal")
+                    injectIntoSignalPipeline(context, result.message.signalEncrypted, senderId)
                 } else {
                     Log.e(TAG, "Message processing failed: ${result.error}")
                 }
@@ -51,61 +51,77 @@ class PushMessageReceiver : MessagingReceiver() {
         }
     }
     
+    /**
+     * 将 Tap v3 收到的消息注入 Signal 处理管道
+     * 
+     * signalEncrypted 现在是发送端构建的完整 Envelope protobuf 序列化后的字节，
+     * 包含正确的 type, sourceServiceId, content 等字段。
+     * 直接反序列化后使用 SignalServiceCipher.decrypt() 解密。
+     */
     private suspend fun injectIntoSignalPipeline(
         context: Context,
         signalEncrypted: ByteArray,
         senderId: String
     ) {
         try {
-            val recipientId = RecipientId.from(senderId)
-            val recipient = Recipient.resolved(recipientId)
-            val serviceId = recipient.serviceId.orElse(null) ?: run {
-                Log.e(TAG, "Sender has no ServiceId: ${senderId.take(8)}...")
+            Log.d(TAG, "Processing envelope: size=${signalEncrypted.size}, sender=${senderId.take(8)}...")
+            
+            val envelope = try {
+                Envelope.ADAPTER.decode(signalEncrypted)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to deserialize Envelope from ${senderId.take(8)}...", e)
                 return
             }
             
-            val localRecipient = Recipient.self()
-            val localServiceId = localRecipient.serviceId.orElse(null) ?: run {
-                Log.e(TAG, "Local user has no ServiceId")
+            Log.d(TAG, "Envelope parsed: type=${envelope.type}, timestamp=${envelope.timestamp}, " +
+                       "sourceServiceId=${envelope.sourceServiceId?.take(8)}..., contentSize=${envelope.content?.size ?: 0}")
+            
+            val cipherResult = decryptEnvelope(envelope)
+            if (cipherResult == null) {
+                Log.e(TAG, "Failed to decrypt Signal envelope from ${senderId.take(8)}...")
                 return
             }
-            
-            val envelope = Envelope.Builder()
-                .type(Envelope.Type.CIPHERTEXT)
-                .timestamp(System.currentTimeMillis())
-                .serverTimestamp(System.currentTimeMillis())
-                .content(ByteString.of(*signalEncrypted))
-                .sourceServiceId(serviceId.toString())
-                .sourceDevice(1)
-                .serverGuid(java.util.UUID.randomUUID().toString())
-                .destinationServiceId(localServiceId.toString())
-                .urgent(true)
-                .story(false)
-                .build()
             
             val processor = MessageContentProcessor.create(context)
-            val metadata = org.whispersystems.signalservice.api.crypto.EnvelopeMetadata(
-                sourceServiceId = serviceId,
-                sourceE164 = null,
-                sourceDeviceId = 1,
-                sealedSender = false,
-                groupId = null,
-                destinationServiceId = localServiceId
+            processor.process(
+                envelope = envelope,
+                content = cipherResult.content,
+                metadata = cipherResult.metadata,
+                serverDeliveredTimestamp = System.currentTimeMillis(),
+                processingEarlyContent = false
             )
             
-            // Create Content protobuf message with the encrypted data
-            val content = org.whispersystems.signalservice.internal.push.Content.Builder()
-                .dataMessage(org.whispersystems.signalservice.internal.push.DataMessage.Builder()
-                    .body("Tap v3 message")
-                    .timestamp(System.currentTimeMillis())
-                    .build())
-                .build()
-            
-            processor.process(envelope, content, metadata, System.currentTimeMillis())
-            
-            Log.i(TAG, "Successfully injected Tap v3 message into Signal pipeline")
+            Log.i(TAG, "Successfully injected Tap v3 message into Signal pipeline: type=${envelope.type}")
+        } catch (e: org.signal.libsignal.protocol.NoSessionException) {
+            Log.e(TAG, "No session exists for sender: ${senderId.take(8)}...", e)
+        } catch (e: org.signal.libsignal.protocol.InvalidMessageException) {
+            Log.e(TAG, "Invalid Signal message from ${senderId.take(8)}...", e)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to inject message into Signal pipeline", e)
+        }
+    }
+    
+    private fun decryptEnvelope(envelope: Envelope): SignalServiceCipherResult? {
+        return try {
+            val localAci = SignalStore.account.requireAci()
+            val localDeviceId = SignalStore.account.deviceId
+            val protocolStore = AppDependencies.protocolStore.aci()
+            val sessionLock = ReentrantSessionLock.INSTANCE
+            val localAddress = SignalServiceAddress(localAci, SignalStore.account.e164)
+            val certificateValidator = SealedSenderAccessUtil.getCertificateValidator()
+            
+            val cipher = SignalServiceCipher(
+                localAddress,
+                localDeviceId,
+                protocolStore,
+                sessionLock,
+                certificateValidator
+            )
+            
+            cipher.decrypt(envelope, System.currentTimeMillis(), RemoteConfig.usePqRatchet)
+        } catch (e: Exception) {
+            Log.e(TAG, "Signal decryption failed", e)
+            null
         }
     }
     
@@ -116,7 +132,10 @@ class PushMessageReceiver : MessagingReceiver() {
             val pushProvider = UnifiedPushProvider.getInstance(context)
             pushProvider.updateEndpoint(endpoint)
             
-            Log.i(TAG, "Push endpoint updated")
+            val endpointManager = PushEndpointManager.getInstance(context)
+            endpointManager.saveMyEndpoint(endpoint)
+            
+            Log.i(TAG, "Push endpoint updated and saved to persistent storage")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update Push endpoint", e)
         }
@@ -127,15 +146,15 @@ class PushMessageReceiver : MessagingReceiver() {
     }
     
     override fun onUnregistered(context: Context, instance: String) {
-        Log.i(TAG, "UnifiedPush已注销: instance=$instance")
+        Log.i(TAG, "UnifiedPush unregistered: instance=$instance")
         
         try {
             val pushProvider = UnifiedPushProvider.getInstance(context)
             pushProvider.unregister()
             
-            Log.i(TAG, "Push服务已注销")
+            Log.i(TAG, "Push service unregistered")
         } catch (e: Exception) {
-            Log.e(TAG, "处理注销事件失败", e)
+            Log.e(TAG, "Failed to handle unregister event", e)
         }
     }
 }

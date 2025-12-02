@@ -15,8 +15,9 @@ object TapV3ProtocolTest {
         
         val shortMessage = "Hello, this is a short message".toByteArray()
         val inlinePayload = TapV3Payload.Inline(encrypted = shortMessage)
+        val testSenderId = "test-sender-id-12345"
         
-        val encodeResult = TapV3MessageCodec.encodeMessage(inlinePayload, kPush)
+        val encodeResult = TapV3MessageCodec.encodeMessage(inlinePayload, kPush, testSenderId)
         if (encodeResult.isSuccess()) {
             val encoded = encodeResult.getOrNull()!!
             println("Encoded inline message:")
@@ -27,11 +28,13 @@ object TapV3ProtocolTest {
             val decodeResult = TapV3MessageCodec.decodeMessage(encoded.base64Data, kPush)
             if (decodeResult.isSuccess()) {
                 val decoded = decodeResult.getOrNull()!!
-                println("  Decoded successfully: ${decoded::class.simpleName}")
+                println("  Decoded successfully: ${decoded.payload::class.simpleName}")
+                println("  Sender ID: ${decoded.senderId}")
                 
-                if (decoded is TapV3Payload.Inline) {
-                    val match = decoded.encrypted.contentEquals(shortMessage)
+                if (decoded.payload is TapV3Payload.Inline) {
+                    val match = (decoded.payload as TapV3Payload.Inline).encrypted.contentEquals(shortMessage)
                     println("  Content match: $match")
+                    println("  Sender ID match: ${decoded.senderId == testSenderId}")
                 }
             } else {
                 println("  Decode failed: ${(decodeResult as TapV3Result.Failure).message}")
@@ -51,7 +54,7 @@ object TapV3ProtocolTest {
             )
         )
         
-        val encodeIpfsResult = TapV3MessageCodec.encodeMessage(ipfsPayload, kPush)
+        val encodeIpfsResult = TapV3MessageCodec.encodeMessage(ipfsPayload, kPush, testSenderId)
         if (encodeIpfsResult.isSuccess()) {
             val encoded = encodeIpfsResult.getOrNull()!!
             println("\nEncoded IPFS refs message:")
@@ -60,12 +63,14 @@ object TapV3ProtocolTest {
             
             val decodeIpfsResult = TapV3MessageCodec.decodeMessage(encoded.base64Data, kPush)
             if (decodeIpfsResult.isSuccess()) {
-                val decoded = decodeIpfsResult.getOrNull()!!
-                println("  Decoded successfully: ${decoded::class.simpleName}")
+                val decodedMsg = decodeIpfsResult.getOrNull()!!
+                println("  Decoded successfully: ${decodedMsg.payload::class.simpleName}")
+                println("  Sender ID: ${decodedMsg.senderId}")
                 
-                if (decoded is TapV3Payload.IpfsRefs) {
-                    println("  Message CID: ${decoded.messageCid}")
-                    println("  Attachments: ${decoded.attachments.size}")
+                if (decodedMsg.payload is TapV3Payload.IpfsRefs) {
+                    val ipfsRefs = decodedMsg.payload as TapV3Payload.IpfsRefs
+                    println("  Message CID: ${ipfsRefs.messageCid}")
+                    println("  Attachments: ${ipfsRefs.attachments.size}")
                 }
             }
         }

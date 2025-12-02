@@ -42,7 +42,16 @@ class TapV3MessageRouter private constructor(
             )
         }
         
-        val recipientId = recipient.id.serialize()
+        // 使用 ACI 作为 recipientId，与握手时存储的格式一致
+        val recipientAci = recipient.aci.orElse(null)?.toString()
+        if (recipientAci == null) {
+            TapV3Logger.d(TAG, "Recipient has no ACI, cannot use Tap v3")
+            return RoutingDecision(
+                useTapV3 = false,
+                reason = "Recipient has no ACI"
+            )
+        }
+        val recipientId = recipientAci
         
         val channel = channelTable.getChannel(recipientId)
         if (channel == null) {

@@ -64,6 +64,7 @@ class TapV3Manager private constructor(
         pushProvider.register(
             onNewEndpoint = { endpoint ->
                 Log.d(TAG, "Push registration successful")
+                pushEndpointManager.saveMyEndpoint(endpoint)
                 onSuccess(endpoint)
             },
             onError = { error ->

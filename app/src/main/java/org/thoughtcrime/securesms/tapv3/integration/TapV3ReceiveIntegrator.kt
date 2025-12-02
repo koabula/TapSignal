@@ -25,7 +25,8 @@ class TapV3ReceiveIntegrator private constructor(
     data class ReceivedMessage(
         val signalEncrypted: ByteArray,
         val attachments: List<ReceivedAttachment> = emptyList(),
-        val transportMethod: TransportMethod
+        val transportMethod: TransportMethod,
+        val senderId: String
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -34,6 +35,7 @@ class TapV3ReceiveIntegrator private constructor(
             if (!signalEncrypted.contentEquals(other.signalEncrypted)) return false
             if (attachments != other.attachments) return false
             if (transportMethod != other.transportMethod) return false
+            if (senderId != other.senderId) return false
             return true
         }
 
@@ -41,6 +43,7 @@ class TapV3ReceiveIntegrator private constructor(
             var result = signalEncrypted.contentHashCode()
             result = 31 * result + attachments.hashCode()
             result = 31 * result + transportMethod.hashCode()
+            result = 31 * result + senderId.hashCode()
             return result
         }
     }
@@ -82,40 +85,25 @@ class TapV3ReceiveIntegrator private constructor(
         val error: String? = null
     )
     
-    suspend fun receiveMessage(
-        base64Data: String,
-        senderId: String
-    ): ReceiveResult {
-        TapV3Logger.i(TAG, "Receiving message from sender: ${senderId.take(8)}...")
+    /**
+     * 接收并解密消息
+     * 使用本地的 myKPush 解密，senderId 从解密后的消息中获取
+     */
+    suspend fun receiveMessage(base64Data: String): ReceiveResult {
+        TapV3Logger.i(TAG, "Receiving message, data length: ${base64Data.length}")
         
-        val channel = channelTable.getChannel(senderId)
-        if (channel == null) {
-            TapV3Logger.e(TAG, "Channel not found for sender: ${senderId.take(8)}...")
+        // 获取自己的 k_push 用于解密
+        val myKPush = kPushManager.getMyKPush()
+        if (myKPush == null) {
+            TapV3Logger.e(TAG, "My k_push not found, cannot decrypt message")
             return ReceiveResult(
                 success = false,
-                error = "Tap v3 channel not found"
+                error = "My k_push not configured"
             )
         }
         
-        if (channel.status != TapV3ChannelTable.ChannelStatus.ACTIVE) {
-            TapV3Logger.e(TAG, "Channel not active: ${channel.status}")
-            return ReceiveResult(
-                success = false,
-                error = "Tap v3 channel not active"
-            )
-        }
-        
-        val kPushResult = kPushManager.getKey(senderId)
-        if (kPushResult.isFailure()) {
-            TapV3Logger.e(TAG, "k_push key not found for sender: ${senderId.take(8)}...")
-            return ReceiveResult(
-                success = false,
-                error = "k_push key not found"
-            )
-        }
-        val kPush = (kPushResult as TapV3Result.Success).data
-        
-        val decodeResult = TapV3MessageCodec.decodeMessage(base64Data, kPush)
+        // 解码消息，senderId 包含在加密数据中
+        val decodeResult = TapV3MessageCodec.decodeMessage(base64Data, myKPush)
         if (decodeResult.isFailure()) {
             val failure = decodeResult as TapV3Result.Failure
             TapV3Logger.e(TAG, "Failed to decode message: ${failure.message}")
@@ -125,11 +113,15 @@ class TapV3ReceiveIntegrator private constructor(
             )
         }
         
-        val payload = (decodeResult as TapV3Result.Success).data
+        val decoded = (decodeResult as TapV3Result.Success).data
+        val senderId = decoded.senderId
+        val payload = decoded.payload
+        
+        TapV3Logger.i(TAG, "Message decoded, senderId: ${senderId.take(8)}...")
         
         return when (payload) {
             is TapV3Payload.Inline -> {
-                receiveInlineMessage(payload)
+                receiveInlineMessage(payload, senderId)
             }
             is TapV3Payload.IpfsRefs -> {
                 receiveIpfsMessage(payload, senderId)
@@ -137,16 +129,28 @@ class TapV3ReceiveIntegrator private constructor(
         }
     }
     
-    private fun receiveInlineMessage(payload: TapV3Payload.Inline): ReceiveResult {
+    /**
+     * 兼容旧 API，保留 senderId 参数但不再使用它来获取密钥
+     */
+    @Deprecated("Use receiveMessage(base64Data) instead", ReplaceWith("receiveMessage(base64Data)"))
+    suspend fun receiveMessage(
+        base64Data: String,
+        senderId: String
+    ): ReceiveResult {
+        return receiveMessage(base64Data)
+    }
+    
+    private fun receiveInlineMessage(payload: TapV3Payload.Inline, senderId: String): ReceiveResult {
         TapV3Logger.d(TAG, "Receiving inline message: ${payload.encrypted.size} bytes")
         
         val message = ReceivedMessage(
             signalEncrypted = payload.encrypted,
             attachments = emptyList(),
-            transportMethod = TransportMethod.INLINE
+            transportMethod = TransportMethod.INLINE,
+            senderId = senderId
         )
         
-        TapV3Logger.i(TAG, "Inline message received successfully")
+        TapV3Logger.i(TAG, "Inline message received successfully from ${senderId.take(8)}...")
         
         return ReceiveResult(
             success = true,
@@ -199,10 +203,11 @@ class TapV3ReceiveIntegrator private constructor(
         val message = ReceivedMessage(
             signalEncrypted = signalEncrypted,
             attachments = attachments,
-            transportMethod = TransportMethod.IPFS
+            transportMethod = TransportMethod.IPFS,
+            senderId = senderId
         )
         
-        TapV3Logger.i(TAG, "IPFS message received successfully")
+        TapV3Logger.i(TAG, "IPFS message received successfully from ${senderId.take(8)}...")
         
         return ReceiveResult(
             success = true,

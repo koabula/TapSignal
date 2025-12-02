@@ -43,7 +43,9 @@ class TapV3HandshakeDialog : BottomSheetDialogFragment() {
         binding.recipientName.text = recipient.getDisplayName(requireContext())
 
         binding.initiateHandshakeButton.setOnClickListener {
-            viewModel.initiateHandshake(recipientId.serialize())
+            val recipient = Recipient.resolved(recipientId)
+            val recipientAci = recipient.requireAci().toString()
+            viewModel.initiateHandshake(recipientAci)
         }
 
         binding.cancelButton.setOnClickListener {

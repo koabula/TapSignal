@@ -4481,6 +4481,152 @@ class ConversationFragment :
     override fun handleDeleteConversation() {
       onDeleteConversation()
     }
+    
+    override fun handleTapV3ModeRequest() {
+      val recipient = viewModel.recipientSnapshot ?: return
+      
+      // 检查是否已经处于消息请求状态
+      if (viewModel.hasMessageRequestState && !recipient.isBlocked) {
+        Toast.makeText(requireContext(), R.string.conversation__accept_message_request_first, Toast.LENGTH_SHORT).show()
+        return
+      }
+      
+      // v3 模式仅支持私聊
+      if (recipient.isGroup) {
+        Toast.makeText(requireContext(), R.string.conversation__v3_not_support_group, Toast.LENGTH_SHORT).show()
+        return
+      }
+      
+      handleIndividualV3ModeRequest(recipient)
+    }
+    
+    private fun handleIndividualV3ModeRequest(recipient: Recipient) {
+      val recipientAci = try {
+        recipient.requireAci().toString()
+      } catch (e: Exception) {
+        Log.w(TAG, "无法获取 recipient ACI 进行 Tap v3 通道查询: ${e.message}")
+        return
+      }
+      
+      val tapV3Manager = org.thoughtcrime.securesms.tapv3.TapV3Manager.getInstance(requireContext())
+      val channelTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3Channels
+      
+      try {
+        val channel = channelTable.getChannel(recipientAci)
+        
+        if (channel != null && channel.status == org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable.ChannelStatus.ACTIVE) {
+          // 当前已启用 v3 模式，显示禁用确认对话框
+          showTapV3ModeDisableDialog(recipient)
+        } else {
+          // 当前未启用 v3 模式，显示启用确认对话框
+          showTapV3ModeEnableDialog(recipient)
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "处理 Tap v3 mode 请求失败", e)
+        Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+      }
+    }
+    
+    private fun showTapV3ModeEnableDialog(recipient: Recipient) {
+      val recipientAci = try {
+        recipient.requireAci().toString()
+      } catch (e: Exception) {
+        Log.w(TAG, "无法获取 recipient ACI: ${e.message}")
+        return
+      }
+      
+      // 检查 v2 模式是否已启用
+      val channelManager = org.thoughtcrime.securesms.tap.TransportChannelManager.getInstance(requireContext())
+      if (channelManager.hasActivePrivateChannel(recipientAci)) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle(R.string.conversation__enable_v3_mode)
+          .setMessage(R.string.conversation__disable_v2_first)
+          .setPositiveButton(android.R.string.ok, null)
+          .show()
+        return
+      }
+      
+      com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        .setTitle(R.string.conversation__enable_v3_mode)
+        .setMessage(R.string.conversation__enable_v3_mode_message)
+        .setPositiveButton(android.R.string.ok) { _, _ ->
+          enableTapV3Mode(recipient)
+        }
+        .setNegativeButton(android.R.string.cancel, null)
+        .show()
+    }
+    
+    private fun showTapV3ModeDisableDialog(recipient: Recipient) {
+      com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        .setTitle(R.string.conversation__disable_v3_mode)
+        .setMessage(R.string.conversation__disable_v3_mode_message)
+        .setPositiveButton(android.R.string.ok) { _, _ ->
+          disableTapV3Mode(recipient)
+        }
+        .setNegativeButton(android.R.string.cancel, null)
+        .show()
+    }
+    
+    private fun enableTapV3Mode(recipient: Recipient) {
+      val recipientAci = try {
+        recipient.requireAci().toString()
+      } catch (e: Exception) {
+        Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        return
+      }
+      
+      lifecycleScope.launch {
+        try {
+          val tapV3Manager = org.thoughtcrime.securesms.tapv3.TapV3Manager.getInstance(requireContext())
+          
+          if (!tapV3Manager.isConfigured()) {
+            Toast.makeText(requireContext(), R.string.conversation__v3_not_configured, Toast.LENGTH_SHORT).show()
+            return@launch
+          }
+          
+          val handshakeManager = org.thoughtcrime.securesms.tapv3.protocol.TapV3HandshakeManager.getInstance(requireContext())
+          
+          val result = handshakeManager.initiateHandshake(recipientAci)
+          
+          when (result) {
+            is org.thoughtcrime.securesms.tapv3.TapV3Result.Success -> {
+              Log.i(TAG, "v3 握手请求发送成功")
+              Toast.makeText(requireContext(), R.string.conversation__v3_handshake_initiated, Toast.LENGTH_SHORT).show()
+              requireActivity().invalidateOptionsMenu()
+            }
+            is org.thoughtcrime.securesms.tapv3.TapV3Result.Failure -> {
+              Log.e(TAG, "v3 握手失败: ${result.message}")
+              Toast.makeText(requireContext(), result.message ?: getString(R.string.conversation__v3_handshake_failed), Toast.LENGTH_SHORT).show()
+            }
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "启用 Tap v3 mode 失败", e)
+          Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+    
+    private fun disableTapV3Mode(recipient: Recipient) {
+      val recipientAci = try {
+        recipient.requireAci().toString()
+      } catch (e: Exception) {
+        Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        return
+      }
+      
+      lifecycleScope.launch {
+        try {
+          val channelTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3Channels
+          channelTable.markChannelInactive(recipientAci)
+          
+          Toast.makeText(requireContext(), R.string.conversation__v3_mode_disabled, Toast.LENGTH_SHORT).show()
+          requireActivity().invalidateOptionsMenu()
+        } catch (e: Exception) {
+          Log.e(TAG, "禁用 Tap v3 mode 失败", e)
+          Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
   }
 
   private inner class OnReactionsSelectedListener : ConversationReactionOverlay.OnReactionSelectedListener {

@@ -189,6 +189,7 @@ public class SignalServiceMessageSender {
   private final BooleanSupplier useRestFallback;
   private final UsePqRatchet usePqRatchet;
   private final TapMessageTransport tapTransport;
+  private final TapV3MessageTransport tapV3Transport;
 
   public SignalServiceMessageSender(PushServiceSocket pushServiceSocket,
                                     SignalServiceDataStore store,
@@ -201,7 +202,8 @@ public class SignalServiceMessageSender {
                                     long maxEnvelopeSize,
                                     BooleanSupplier useRestFallback,
                                     UsePqRatchet usePqRatchet,
-                                    TapMessageTransport tapTransport)
+                                    TapMessageTransport tapTransport,
+                                    TapV3MessageTransport tapV3Transport)
   {
     CredentialsProvider credentialsProvider = pushServiceSocket.getCredentialsProvider();
 
@@ -221,6 +223,7 @@ public class SignalServiceMessageSender {
     this.useRestFallback  = useRestFallback;
     this.usePqRatchet     = usePqRatchet;
     this.tapTransport     = tapTransport;
+    this.tapV3Transport   = tapV3Transport;
   }
 
   /**
@@ -247,6 +250,20 @@ public class SignalServiceMessageSender {
 
     EnvelopeContent envelopeContent = EnvelopeContent.encrypted(content, ContentHint.IMPLICIT, Optional.empty());
 
+    // Try Tap v3 first
+    SendMessageResult tapV3Result = tryTapV3DeliveryForRecipient(recipient,
+                                                                 sealedSenderAccess,
+                                                                 message.getWhen(),
+                                                                 envelopeContent,
+                                                                 false,
+                                                                 false,
+                                                                 false,
+                                                                 "receipt");
+    if (tapV3Result != null) {
+      return tapV3Result;
+    }
+
+    // Fall back to Tap v2
     SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
                                                             sealedSenderAccess,
                                                             message.getWhen(),
@@ -280,6 +297,20 @@ public class SignalServiceMessageSender {
     EnvelopeContent  envelopeContent = EnvelopeContent.plaintext(content, groupId);
 
     if (!groupId.isPresent()) {
+      // Try Tap v3 first
+      SendMessageResult tapV3Result = tryTapV3DeliveryForRecipient(recipient,
+                                                                   sealedSenderAccess,
+                                                                   timestamp,
+                                                                   envelopeContent,
+                                                                   false,
+                                                                   false,
+                                                                   false,
+                                                                   "retry_receipt");
+      if (tapV3Result != null) {
+        return;
+      }
+
+      // Fall back to Tap v2
       SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
                                                               sealedSenderAccess,
                                                               timestamp,
@@ -316,6 +347,22 @@ public class SignalServiceMessageSender {
       SignalServiceAddress recipient          = recipients.get(i);
       SealedSenderAccess   sealedSenderAccess = sealedSenderAccesses.get(i);
 
+      // Try Tap v3 first
+      SendMessageResult tapV3Result = tryTapV3DeliveryForRecipient(recipient,
+                                                                   sealedSenderAccess,
+                                                                   message.getTimestamp(),
+                                                                   envelopeContent,
+                                                                   true,
+                                                                   false,
+                                                                   false,
+                                                                   "typing");
+
+      if (tapV3Result != null) {
+        Log.d(TAG, "[" + message.getTimestamp() + "] Typing indicator sent via Tap v3: recipient=" + recipient.getIdentifier());
+        continue;
+      }
+
+      // Try Tap v2
       SendMessageResult tapResult = tryTapDeliveryForRecipient(recipient,
                                                                sealedSenderAccess,
                                                                message.getTimestamp(),
@@ -329,12 +376,12 @@ public class SignalServiceMessageSender {
         remainingRecipients.add(recipient);
         remainingSealedSenderAccess.add(sealedSenderAccess);
       } else {
-        Log.d(TAG, "[" + message.getTimestamp() + "] Typing indicator通过TAP发送: recipient=" + recipient.getIdentifier());
+        Log.d(TAG, "[" + message.getTimestamp() + "] Typing indicator sent via Tap v2: recipient=" + recipient.getIdentifier());
       }
     }
 
     if (remainingRecipients.isEmpty()) {
-      Log.d(TAG, "[" + message.getTimestamp() + "] 所有typing indicator均已通过TAP发送");
+      Log.d(TAG, "[" + message.getTimestamp() + "] All typing indicators sent via Tap");
       return;
     }
 
@@ -556,6 +603,48 @@ public class SignalServiceMessageSender {
     sendEvents.onSyncMessageSent();
 
     return result;
+  }
+
+  /**
+   * Send a data message to a single recipient via Tap v3.
+   * This method encrypts the message using Signal's E2EE and sends it through the Tap v3 transport layer.
+   * 
+   * @param recipient The recipient's address
+   * @param sealedSenderAccess Sealed sender access info
+   * @param contentHint Content hint for the message
+   * @param message The data message to send
+   * @param urgent Whether this is an urgent message
+   * @return SendMessageResult indicating success or failure
+   */
+  public SendMessageResult sendDataMessageViaTapV3(SignalServiceAddress recipient,
+                                                   @Nullable SealedSenderAccess sealedSenderAccess,
+                                                   ContentHint contentHint,
+                                                   SignalServiceDataMessage message,
+                                                   boolean urgent)
+      throws UntrustedIdentityException, IOException
+  {
+    Log.d(TAG, "[" + message.getTimestamp() + "] Sending a data message via Tap v3.");
+
+    Content content = createMessageContent(message);
+    EnvelopeContent envelopeContent = EnvelopeContent.encrypted(content, contentHint, message.getGroupId());
+
+    // Try Tap v3 delivery
+    SendMessageResult tapV3Result = tryTapV3DeliveryForRecipient(recipient,
+                                                                  sealedSenderAccess,
+                                                                  message.getTimestamp(),
+                                                                  envelopeContent,
+                                                                  false,  // online
+                                                                  urgent,
+                                                                  false,  // story
+                                                                  "data");
+
+    if (tapV3Result != null) {
+      Log.d(TAG, "[" + message.getTimestamp() + "] Data message sent via Tap v3: recipient=" + recipient.getIdentifier());
+      return tapV3Result;
+    } else {
+      Log.w(TAG, "[" + message.getTimestamp() + "] Tap v3 delivery failed for data message");
+      throw new IOException("Tap v3 delivery failed");
+    }
   }
 
   /**
@@ -3104,13 +3193,140 @@ public class SignalServiceMessageSender {
     }
   }
 
+  private SendMessageResult tryTapV3DeliveryForRecipient(SignalServiceAddress recipient,
+                                                         @Nullable SealedSenderAccess sealedSenderAccess,
+                                                         long timestamp,
+                                                         EnvelopeContent content,
+                                                         boolean online,
+                                                         boolean urgent,
+                                                         boolean story,
+                                                         String telemetryTag) {
+    if (tapV3Transport == null) {
+      return null;
+    }
+
+    if (!tapV3Transport.shouldUseTapV3ForRecipient(recipient)) {
+      return null;
+    }
+
+    try {
+      OutgoingPushMessageList messages = getEncryptedMessages(recipient,
+                                                              sealedSenderAccess,
+                                                              timestamp,
+                                                              content,
+                                                              online,
+                                                              urgent,
+                                                              story);
+
+      byte[] envelopeBytes = constructEnvelopeForTapV3(messages, recipient, timestamp);
+      if (envelopeBytes == null) {
+        Log.w(TAG, "[" + timestamp + "] Tap v3 delivery failed(" + telemetryTag + "): cannot construct envelope");
+        return null;
+      }
+
+      SendMessageResult result = tapV3Transport.sendMessageViaTapV3(recipient, envelopeBytes, timestamp, urgent, online);
+      Log.d(TAG, "[" + timestamp + "] Tap v3 delivery success(" + telemetryTag + "): recipient=" + recipient.getIdentifier());
+      return result;
+    } catch (IOException | UntrustedIdentityException | InvalidKeyException e) {
+      Log.w(TAG, "[" + timestamp + "] Tap v3 delivery failed(" + telemetryTag + "): " + e.getClass().getSimpleName() + ": " + e.getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * 为 Tap v3 传输构建完整的 Envelope
+   * 
+   * 将 OutgoingPushMessage 的原始密文包装成完整的 Envelope protobuf，
+   * 以便接收端可以使用 SignalServiceCipher.decrypt() 正确解密。
+   * 
+   * @param messages 加密后的消息列表
+   * @param recipient 接收者地址
+   * @param timestamp 消息时间戳
+   * @return 序列化的 Envelope 字节数组，失败返回 null
+   */
+  private byte[] constructEnvelopeForTapV3(OutgoingPushMessageList messages,
+                                           SignalServiceAddress recipient,
+                                           long timestamp) {
+    if (messages == null || messages.getMessages() == null || messages.getMessages().isEmpty()) {
+      Log.w(TAG, "constructEnvelopeForTapV3: messages is null or empty");
+      return null;
+    }
+
+    OutgoingPushMessage primaryMessage = null;
+    
+    for (OutgoingPushMessage message : messages.getMessages()) {
+      if (message.getDestinationDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
+        primaryMessage = message;
+        break;
+      }
+    }
+    
+    if (primaryMessage == null) {
+      primaryMessage = messages.getMessages().get(0);
+    }
+
+    try {
+      byte[] ciphertext = Base64.decode(primaryMessage.content);
+      
+      org.whispersystems.signalservice.internal.push.Envelope.Type envelopeType = 
+          mapOutgoingTypeToEnvelopeType(primaryMessage.type);
+      
+      org.whispersystems.signalservice.internal.push.Envelope.Builder envelopeBuilder = 
+          new org.whispersystems.signalservice.internal.push.Envelope.Builder()
+              .type(envelopeType)
+              .timestamp(timestamp)
+              .serverTimestamp(timestamp)
+              .content(okio.ByteString.of(ciphertext))
+              .sourceServiceId(localAddress.getServiceId().toString())
+              .sourceDevice(localDeviceId)
+              .destinationServiceId(recipient.getServiceId().toString())
+              .serverGuid(java.util.UUID.randomUUID().toString())
+              .urgent(true)
+              .story(false);
+      
+      org.whispersystems.signalservice.internal.push.Envelope envelope = envelopeBuilder.build();
+      byte[] envelopeBytes = envelope.encode();
+      
+      Log.d(TAG, "constructEnvelopeForTapV3: type=" + envelopeType + ", ciphertextSize=" + ciphertext.length + ", envelopeSize=" + envelopeBytes.length);
+      return envelopeBytes;
+      
+    } catch (Exception e) {
+      Log.e(TAG, "constructEnvelopeForTapV3: Failed to construct envelope", e);
+      return null;
+    }
+  }
+
+  /**
+   * 将 OutgoingPushMessage 的类型映射到 Envelope.Type
+   */
+  private org.whispersystems.signalservice.internal.push.Envelope.Type mapOutgoingTypeToEnvelopeType(int outgoingType) {
+    switch (outgoingType) {
+      case 1: return org.whispersystems.signalservice.internal.push.Envelope.Type.CIPHERTEXT;
+      case 3: return org.whispersystems.signalservice.internal.push.Envelope.Type.PREKEY_BUNDLE;
+      case 6: return org.whispersystems.signalservice.internal.push.Envelope.Type.UNIDENTIFIED_SENDER;
+      case 7: return org.whispersystems.signalservice.internal.push.Envelope.Type.SENDERKEY_MESSAGE;
+      case 8: return org.whispersystems.signalservice.internal.push.Envelope.Type.PLAINTEXT_CONTENT;
+      default:
+        Log.w(TAG, "mapOutgoingTypeToEnvelopeType: Unknown type " + outgoingType + ", defaulting to CIPHERTEXT");
+        return org.whispersystems.signalservice.internal.push.Envelope.Type.CIPHERTEXT;
+    }
+  }
+
+  /**
+   * 从 OutgoingPushMessageList 中提取主设备的原始密文
+   * 
+   * 用于 v2 TAP 传输，提取 Base64 编码的密文字节。
+   * 注意：这个方法返回的是原始密文，不是完整的 Envelope。
+   * 
+   * @param messages 加密后的消息列表
+   * @return 主设备的密文字节，失败返回 null
+   */
   private byte[] extractPrimaryCiphertext(OutgoingPushMessageList messages) {
     if (messages == null || messages.getMessages() == null || messages.getMessages().isEmpty()) {
       Log.w(TAG, "extractPrimaryCiphertext: messages is null or empty");
       return null;
     }
 
-    // 优先查找主设备（deviceId = 1）的消息
     for (OutgoingPushMessage message : messages.getMessages()) {
       if (message.getDestinationDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
         try {
@@ -3122,7 +3338,6 @@ public class SignalServiceMessageSender {
       }
     }
 
-    // 如果没有找到主设备，使用第一个设备的消息（作为回退）
     try {
       return Base64.decode(messages.getMessages().get(0).content);
     } catch (Exception e) {

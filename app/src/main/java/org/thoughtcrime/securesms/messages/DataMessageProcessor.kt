@@ -1018,8 +1018,14 @@ object DataMessageProcessor {
       GlobalScope.launch(Dispatchers.IO) {
         try {
           val handler = org.thoughtcrime.securesms.tapv3.protocol.TapV3ControlMessageHandler.getInstance(context)
-          handler.handleControlMessage(body, senderRecipient.id.serialize())
-          Log.i(TAG, "Tap v3 control message processed successfully: timestamp=${envelope.timestamp}")
+          // 使用ACI作为senderId，保持与发起方一致
+          val senderAci = senderRecipient.aci.orElse(null)?.toString()
+          if (senderAci != null) {
+            handler.handleControlMessage(body, senderAci)
+            Log.i(TAG, "Tap v3 control message processed successfully: timestamp=${envelope.timestamp}")
+          } else {
+            Log.e(TAG, "Cannot process Tap v3 control message: sender has no ACI")
+          }
         } catch (e: Exception) {
           Log.e(TAG, "Failed to process Tap v3 control message: timestamp=${envelope.timestamp}", e)
         }

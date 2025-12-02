@@ -492,7 +492,7 @@ public class IndividualSendJob extends PushSendJob {
 
   /**
    * 通过Tap v3发送消息
-   * 使用IPFS存储和UnifiedPush通知
+   * 使用SignalServiceMessageSender进行Signal E2EE加密，然后通过Tap v3传输层发送
    *
    * @param messageId 消息ID
    * @param recipient 接收方
@@ -505,44 +505,86 @@ public class IndividualSendJob extends PushSendJob {
     try {
       Log.i(TAG, "Starting Tap v3 send: messageId=" + messageId + ", recipient=" + recipient.getId());
 
-      org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator sendIntegrator = 
-          org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.Companion.getInstance(context);
-
-      String recipientId = recipient.getId().serialize();
+      // Use SignalServiceMessageSender to properly encrypt the message via Signal E2EE
+      SignalServiceMessageSender messageSender = AppDependencies.getSignalServiceMessageSender();
+      Recipient messageRecipient = message.getThreadRecipient().fresh();
+      SignalServiceAddress address = RecipientUtil.toSignalServiceAddress(context, messageRecipient);
       
-      // For Tap v3, create a minimal DataMessage protobuf
-      org.whispersystems.signalservice.internal.push.DataMessage.Builder dataMessageBuilder = 
-          new org.whispersystems.signalservice.internal.push.DataMessage.Builder()
-              .body(message.getBody())
-              .timestamp(message.getSentTimeMillis());
+      // Build the SignalServiceDataMessage just like in deliver()
+      List<Attachment> attachments = Stream.of(message.getAttachments()).filterNot(Attachment::isSticker).toList();
+      List<SignalServiceAttachment> serviceAttachments = getAttachmentPointersFor(attachments);
+      Optional<byte[]> profileKey = getProfileKey(messageRecipient);
+      Optional<SignalServiceDataMessage.Sticker> sticker = getStickerFor(message);
+      List<SharedContact> sharedContacts = getSharedContactsFor(message);
+      List<SignalServicePreview> previews = getPreviewsFor(message);
+      SignalServiceDataMessage.GiftBadge giftBadge = getGiftBadgeFor(message);
+      SignalServiceDataMessage.Payment payment = getPayment(message);
+      List<BodyRange> bodyRanges = getBodyRanges(message);
       
-      if (message.getExpiresIn() > 0) {
-        dataMessageBuilder.expireTimer((int) (message.getExpiresIn() / 1000));
-      }
+      SignalServiceDataMessage.Builder mediaMessageBuilder = SignalServiceDataMessage.newBuilder()
+          .withBody(message.getBody())
+          .withAttachments(serviceAttachments)
+          .withTimestamp(message.getSentTimeMillis())
+          .withExpiration((int) (message.getExpiresIn() / 1000))
+          .withExpireTimerVersion(message.getExpireTimerVersion())
+          .withViewOnce(message.isViewOnce())
+          .withProfileKey(profileKey.orElse(null))
+          .withSticker(sticker.orElse(null))
+          .withSharedContacts(sharedContacts)
+          .withPreviews(previews)
+          .withGiftBadge(giftBadge)
+          .asExpirationUpdate(message.isExpirationUpdate())
+          .asEndSessionMessage(message.isEndSession())
+          .withPayment(payment)
+          .withBodyRanges(bodyRanges);
       
-      org.whispersystems.signalservice.internal.push.DataMessage dataMessage = dataMessageBuilder.build();
-      byte[] signalEncrypted = dataMessage.encode();
-      
-      java.util.List<org.thoughtcrime.securesms.attachments.Attachment> attachments = 
-          message.getAttachments();
-
-      kotlinx.coroutines.Dispatchers dispatchers = kotlinx.coroutines.Dispatchers.INSTANCE;
-      Object result = kotlinx.coroutines.BuildersKt.runBlocking(
-          dispatchers.getIO(),
-          (scope, continuation) -> sendIntegrator.sendMessage(recipientId, signalEncrypted, attachments, continuation)
-      );
-
-      org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.SendResult sendResult = 
-          (org.thoughtcrime.securesms.tapv3.integration.TapV3SendIntegrator.SendResult) result;
-
-      if (sendResult.getSuccess()) {
-        Log.i(TAG, "Tap v3 send successful: messageId=" + messageId);
-        return false;
+      if (message.getParentStoryId() != null) {
+        try {
+          MessageRecord storyRecord = SignalDatabase.messages().getMessageRecord(message.getParentStoryId().asMessageId().getId());
+          Recipient storyRecipient = storyRecord.getFromRecipient();
+          SignalServiceDataMessage.StoryContext storyContext = new SignalServiceDataMessage.StoryContext(storyRecipient.requireServiceId(), storyRecord.getDateSent());
+          mediaMessageBuilder.withStoryContext(storyContext);
+          
+          Optional<SignalServiceDataMessage.Reaction> reaction = getStoryReactionFor(message, storyContext);
+          if (reaction.isPresent()) {
+            mediaMessageBuilder.withReaction(reaction.get());
+            mediaMessageBuilder.withBody(null);
+          }
+        } catch (NoSuchMessageException e) {
+          throw new IOException("Failed to get story record", e);
+        }
       } else {
-        Log.e(TAG, "Tap v3 send failed: messageId=" + messageId + ", error=" + sendResult.getError());
-        throw new IOException("Tap v3 send failed: " + sendResult.getError());
+        mediaMessageBuilder.withQuote(getQuoteFor(message).orElse(null));
       }
-
+      
+      if (message.getGiftBadge() != null || message.isPaymentsNotification()) {
+        mediaMessageBuilder.withBody(null);
+      }
+      
+      SignalServiceDataMessage mediaMessage = mediaMessageBuilder.build();
+      
+      // Send via Tap v3 using the new method in SignalServiceMessageSender
+      // This will properly encrypt the message using Signal E2EE and send via Tap v3
+      SendMessageResult result = messageSender.sendDataMessageViaTapV3(
+          address,
+          SealedSenderAccessUtil.getSealedSenderAccessFor(messageRecipient),
+          ContentHint.RESENDABLE,
+          mediaMessage,
+          message.isUrgent()
+      );
+      
+      if (result.getSuccess() != null) {
+        Log.i(TAG, "Tap v3 send successful: messageId=" + messageId);
+        SignalDatabase.messageLog().insertIfPossible(messageRecipient.getId(), message.getSentTimeMillis(), result, ContentHint.RESENDABLE, new MessageId(messageId), false);
+        return result.getSuccess().isUnidentified();
+      } else {
+        Log.e(TAG, "Tap v3 send failed: messageId=" + messageId);
+        throw new IOException("Tap v3 send failed");
+      }
+      
+    } catch (UntrustedIdentityException e) {
+      Log.e(TAG, "Tap v3 send untrusted identity: messageId=" + messageId, e);
+      throw new IOException("Tap v3 untrusted identity", e);
     } catch (Exception e) {
       Log.e(TAG, "Tap v3 send exception: messageId=" + messageId, e);
       throw new IOException("Tap v3 send exception", e);

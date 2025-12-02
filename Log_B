@@ -1,0 +1,49 @@
+--------- beginning of main
+--------- beginning of system
+2025-12-02 09:18:42.409 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           D  shouldUseTapV3ForRecipient: using Tap v3 for 5a806149...
+2025-12-02 09:18:42.453 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  constructEnvelopeForTapV3: type=UNIDENTIFIED_SENDER, ciphertextSize=615, envelopeSize=755
+2025-12-02 09:18:42.453 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           I  sendMessageViaTapV3: recipient=5a806149..., ciphertextSize=755, timestamp=1764638322330
+2025-12-02 09:18:42.454 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Sending ciphertext to recipient: 5a806149..., size=755
+2025-12-02 09:18:42.457 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Inline decision: signalSize=755, estimated=822, afterKPush=850, base64=1134, useInline=true
+2025-12-02 09:18:42.458 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Sending inline message: 755 bytes
+2025-12-02 09:18:42.471 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Serialized payload: 1040 bytes
+2025-12-02 09:18:42.472 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Plain data (header + senderId + payload): 1079 bytes
+2025-12-02 09:18:42.473 14089-14128 TapV3Crypto             org.thoughtcrime.securesms           D  Encrypted 1079 bytes to 1107 bytes
+2025-12-02 09:18:42.473 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Encrypted data: 1107 bytes
+2025-12-02 09:18:42.474 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Base64 encoded: 1476 chars
+2025-12-02 09:18:42.475 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Encoded inline message: 1476 chars
+2025-12-02 09:18:43.508 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Inline message sent successfully
+2025-12-02 09:18:43.509 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           I  sendMessageViaTapV3: success for 5a806149...
+2025-12-02 09:18:43.510 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  [1764638322330] Tap v3 delivery success(typing): recipient=********-****-****-****-*********461
+2025-12-02 09:18:43.510 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  [1764638322330] Typing indicator sent via Tap v3: recipient=********-****-****-****-*********461
+2025-12-02 09:18:45.336 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           D  shouldUseTapV3ForRecipient: using Tap v3 for 5a806149...
+2025-12-02 09:18:45.347 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  constructEnvelopeForTapV3: type=UNIDENTIFIED_SENDER, ciphertextSize=615, envelopeSize=755
+2025-12-02 09:18:45.348 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           I  sendMessageViaTapV3: recipient=5a806149..., ciphertextSize=755, timestamp=1764638325329
+2025-12-02 09:18:45.348 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Sending ciphertext to recipient: 5a806149..., size=755
+2025-12-02 09:18:45.348 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Inline decision: signalSize=755, estimated=822, afterKPush=850, base64=1134, useInline=true
+2025-12-02 09:18:45.349 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Sending inline message: 755 bytes
+2025-12-02 09:18:45.349 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Serialized payload: 1040 bytes
+2025-12-02 09:18:45.350 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Plain data (header + senderId + payload): 1079 bytes
+2025-12-02 09:18:45.350 14089-14128 TapV3Crypto             org.thoughtcrime.securesms           D  Encrypted 1079 bytes to 1107 bytes
+2025-12-02 09:18:45.351 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Encrypted data: 1107 bytes
+2025-12-02 09:18:45.351 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Base64 encoded: 1476 chars
+2025-12-02 09:18:45.352 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Encoded inline message: 1476 chars
+2025-12-02 09:18:46.359 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Inline message sent successfully
+2025-12-02 09:18:46.361 14089-14128 TapV3MessageTransportIm org.thoughtcrime.securesms           I  sendMessageViaTapV3: success for 5a806149...
+2025-12-02 09:18:46.362 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  [1764638325329] Tap v3 delivery success(typing): recipient=********-****-****-****-*********461
+2025-12-02 09:18:46.363 14089-14128 SignalServ...sageSender org.thoughtcrime.securesms           D  [1764638325329] Typing indicator sent via Tap v3: recipient=********-****-****-****-*********461
+2025-12-02 09:18:50.371 14089-14128 TapV3MessageRouter      org.thoughtcrime.securesms           D  Using Tap v3 transport for recipient: 5a806149...
+2025-12-02 09:18:50.372 14089-14128 IndividualSendJob       org.thoughtcrime.securesms           I  Using Tap v3 to send: messageId=5791, reason=Tap v3 channel active and ready
+2025-12-02 09:18:50.373 14089-14128 IndividualSendJob       org.thoughtcrime.securesms           I  Starting Tap v3 send: messageId=5791, recipient=RecipientId::4
+2025-12-02 09:18:50.419 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Sending message to recipient: 5a806149...
+2025-12-02 09:18:50.420 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Inline decision: signalSize=12, estimated=79, afterKPush=107, base64=143, useInline=true
+2025-12-02 09:18:50.421 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Sending inline message: 12 bytes
+2025-12-02 09:18:50.425 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Serialized payload: 48 bytes
+2025-12-02 09:18:50.426 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Plain data (header + senderId + payload): 87 bytes
+2025-12-02 09:18:50.428 14089-14128 TapV3Crypto             org.thoughtcrime.securesms           D  Encrypted 87 bytes to 115 bytes
+2025-12-02 09:18:50.429 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Encrypted data: 115 bytes
+2025-12-02 09:18:50.430 14089-14128 TapV3MessageCodec       org.thoughtcrime.securesms           D  Base64 encoded: 156 chars
+2025-12-02 09:18:50.430 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           D  Encoded inline message: 156 chars
+2025-12-02 09:18:51.414 14089-14128 TapV3SendIntegrator     org.thoughtcrime.securesms           I  Inline message sent successfully
+2025-12-02 09:18:51.415 14089-14128 IndividualSendJob       org.thoughtcrime.securesms           I  Tap v3 send successful: messageId=5791
+--------- beginning of kernel

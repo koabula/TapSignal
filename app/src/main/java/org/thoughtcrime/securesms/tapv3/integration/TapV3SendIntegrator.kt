@@ -5,6 +5,7 @@ import android.util.Base64
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.attachments.Attachment
 import org.thoughtcrime.securesms.database.SignalDatabase
+import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tapv3.TapV3Constants
 import org.thoughtcrime.securesms.tapv3.TapV3Error
 import org.thoughtcrime.securesms.tapv3.TapV3Payload
@@ -43,6 +44,16 @@ class TapV3SendIntegrator private constructor(
         IPFS
     }
     
+    /**
+     * 获取本地用户的 ACI 作为 senderId
+     */
+    private fun getLocalSenderId(): String {
+        val localRecipient = Recipient.self()
+        val aci = localRecipient.serviceId.orElse(null)
+            ?: throw IllegalStateException("Local user has no ServiceId")
+        return aci.toString()
+    }
+    
     suspend fun sendMessage(
         recipientId: String,
         signalEncrypted: ByteArray,
@@ -67,34 +78,46 @@ class TapV3SendIntegrator private constructor(
             )
         }
         
-        val kPushResult = kPushManager.getKey(recipientId)
-        if (kPushResult.isFailure()) {
-            TapV3Logger.e(TAG, "k_push key not found for recipient: ${recipientId.take(8)}...")
+        // 获取对方的 k_push，用于加密要发送的消息
+        val peerKPushResult = kPushManager.getPeerKPush(recipientId)
+        if (peerKPushResult.isFailure()) {
+            TapV3Logger.e(TAG, "Peer k_push not found for recipient: ${recipientId.take(8)}...")
             return SendResult(
                 success = false,
-                error = "k_push key not found"
+                error = "Peer k_push not found"
             )
         }
-        val kPush = (kPushResult as TapV3Result.Success).data
+        val peerKPush = (peerKPushResult as TapV3Result.Success).data
+        
+        val senderId = try {
+            getLocalSenderId()
+        } catch (e: Exception) {
+            TapV3Logger.e(TAG, "Failed to get local sender ID", e)
+            return SendResult(
+                success = false,
+                error = "Failed to get local sender ID: ${e.message}"
+            )
+        }
         
         return if (attachments.isEmpty() && TapV3MessageCodec.shouldUseInline(signalEncrypted.size)) {
-            sendInlineMessage(recipientId, signalEncrypted, kPush, channel.pushEndpoint)
+            sendInlineMessage(recipientId, signalEncrypted, peerKPush, channel.pushEndpoint, senderId)
         } else {
-            sendIpfsMessage(recipientId, signalEncrypted, attachments, kPush, channel.pushEndpoint)
+            sendIpfsMessage(recipientId, signalEncrypted, attachments, peerKPush, channel.pushEndpoint, senderId)
         }
     }
     
     private suspend fun sendInlineMessage(
         recipientId: String,
         signalEncrypted: ByteArray,
-        kPush: ByteArray,
-        endpoint: String
+        peerKPush: ByteArray,
+        endpoint: String,
+        senderId: String
     ): SendResult {
         TapV3Logger.d(TAG, "Sending inline message: ${signalEncrypted.size} bytes")
         
         val payload = TapV3Payload.Inline(encrypted = signalEncrypted)
         
-        val encodeResult = TapV3MessageCodec.encodeMessage(payload, kPush)
+        val encodeResult = TapV3MessageCodec.encodeMessage(payload, peerKPush, senderId)
         if (encodeResult.isFailure()) {
             val failure = encodeResult as TapV3Result.Failure
             TapV3Logger.e(TAG, "Failed to encode inline message: ${failure.message}")
@@ -132,8 +155,9 @@ class TapV3SendIntegrator private constructor(
         recipientId: String,
         signalEncrypted: ByteArray,
         attachments: List<Attachment>,
-        kPush: ByteArray,
-        endpoint: String
+        peerKPush: ByteArray,
+        endpoint: String,
+        senderId: String
     ): SendResult {
         TapV3Logger.d(TAG, "Sending IPFS message: ${signalEncrypted.size} bytes, ${attachments.size} attachments")
         
@@ -194,7 +218,7 @@ class TapV3SendIntegrator private constructor(
                 attachments = attachmentRefs
             )
             
-            val encodeResult = TapV3MessageCodec.encodeMessage(payload, kPush)
+            val encodeResult = TapV3MessageCodec.encodeMessage(payload, peerKPush, senderId)
             if (encodeResult.isFailure()) {
                 val failure = encodeResult as TapV3Result.Failure
                 TapV3Logger.e(TAG, "Failed to encode IPFS message: ${failure.message}")
@@ -321,6 +345,61 @@ class TapV3SendIntegrator private constructor(
             } catch (e: Exception) {
                 TapV3Logger.e(TAG, "Failed to cleanup attachment CID: $cid", e)
             }
+        }
+    }
+    
+    /**
+     * Send pre-encrypted ciphertext via Tap v3 transport.
+     * Used by TapV3MessageTransportImpl for typing indicators, receipts, etc.
+     */
+    suspend fun sendCiphertext(
+        recipientId: String,
+        ciphertext: ByteArray
+    ): SendResult {
+        TapV3Logger.i(TAG, "Sending ciphertext to recipient: ${recipientId.take(8)}..., size=${ciphertext.size}")
+        
+        val channel = channelTable.getChannel(recipientId)
+        if (channel == null) {
+            TapV3Logger.e(TAG, "Channel not found for recipient: ${recipientId.take(8)}...")
+            return SendResult(
+                success = false,
+                error = "Tap v3 channel not established"
+            )
+        }
+        
+        if (channel.status != TapV3ChannelTable.ChannelStatus.ACTIVE) {
+            TapV3Logger.e(TAG, "Channel not active: ${channel.status}")
+            return SendResult(
+                success = false,
+                error = "Tap v3 channel not active: ${channel.status}"
+            )
+        }
+        
+        // 获取对方的 k_push
+        val peerKPushResult = kPushManager.getPeerKPush(recipientId)
+        if (peerKPushResult.isFailure()) {
+            TapV3Logger.e(TAG, "Peer k_push not found for recipient: ${recipientId.take(8)}...")
+            return SendResult(
+                success = false,
+                error = "Peer k_push not found"
+            )
+        }
+        val peerKPush = (peerKPushResult as TapV3Result.Success).data
+        
+        val senderId = try {
+            getLocalSenderId()
+        } catch (e: Exception) {
+            TapV3Logger.e(TAG, "Failed to get local sender ID", e)
+            return SendResult(
+                success = false,
+                error = "Failed to get local sender ID: ${e.message}"
+            )
+        }
+        
+        return if (TapV3MessageCodec.shouldUseInline(ciphertext.size)) {
+            sendInlineMessage(recipientId, ciphertext, peerKPush, channel.pushEndpoint, senderId)
+        } else {
+            sendIpfsMessage(recipientId, ciphertext, emptyList(), peerKPush, channel.pushEndpoint, senderId)
         }
     }
     

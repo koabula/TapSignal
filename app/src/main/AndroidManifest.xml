@@ -1393,6 +1393,15 @@
         </intent-filter>
     </receiver>
 
+    <receiver android:name=".tapv3.protocol.TapV3HandshakeReceiver"
+              android:enabled="true"
+              android:exported="false">
+        <intent-filter>
+            <action android:name="org.thoughtcrime.securesms.tapv3.ACCEPT_HANDSHAKE"/>
+            <action android:name="org.thoughtcrime.securesms.tapv3.REJECT_HANDSHAKE"/>
+        </intent-filter>
+    </receiver>
+
     <receiver android:name=".tap.group.GroupTokenExchangeReceiver"
               android:enabled="true"
               android:exported="false">

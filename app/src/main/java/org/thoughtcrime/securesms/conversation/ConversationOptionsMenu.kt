@@ -135,6 +135,7 @@ internal object ConversationOptionsMenu {
 
       // 动态设置COS v2模式菜单项
       updateCosV2MenuItem(menu, recipient)
+      updateTapV3MenuItem(menu, recipient)
 
       if (!recipient.isGroup && !isPushAvailable && !recipient.isReleaseNotes) {
         menuInflater.inflate(R.menu.conversation_insecure, menu)
@@ -218,6 +219,7 @@ internal object ConversationOptionsMenu {
         R.id.menu_unmute_notifications -> callback.handleUnmuteNotifications()
         R.id.menu_conversation_settings -> callback.handleConversationSettings()
         R.id.menu_cos_v2_mode -> callback.handleCosV2ModeRequest()
+        R.id.menu_tap_v3_mode -> callback.handleTapV3ModeRequest()
         R.id.menu_expiring_messages_off, R.id.menu_expiring_messages -> callback.handleSelectMessageExpiration()
         R.id.menu_create_bubble -> callback.handleCreateBubble()
         androidx.appcompat.R.id.home -> callback.handleGoHome()
@@ -341,6 +343,51 @@ internal object ConversationOptionsMenu {
         }
       }
     }
+    
+    private fun updateTapV3MenuItem(menu: Menu, recipient: Recipient) {
+      val v3MenuItem = menu.findItem(R.id.menu_tap_v3_mode)
+      if (v3MenuItem != null) {
+        if (recipient.isSelf || recipient.isReleaseNotes || recipient.isGroup) {
+          v3MenuItem.isVisible = false
+          return
+        }
+        
+        if (recipient.isBlocked) {
+          v3MenuItem.isVisible = false
+          return
+        }
+        
+        try {
+          val context = callback.getContext()
+          val tapV3Manager = org.thoughtcrime.securesms.tapv3.TapV3Manager.getInstance(context)
+          
+          if (!tapV3Manager.isConfigured()) {
+            v3MenuItem.isVisible = false
+            return
+          }
+          
+          val recipientAci = try {
+            recipient.requireAci().toString()
+          } catch (e: Exception) {
+            v3MenuItem.isVisible = false
+            return
+          }
+          
+          val channelTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3Channels
+          val channel = channelTable.getChannel(recipientAci)
+          
+          v3MenuItem.isVisible = true
+          if (channel != null && channel.status == org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable.ChannelStatus.ACTIVE) {
+            v3MenuItem.setTitle(R.string.conversation__menu_disable_v3_mode)
+          } else {
+            v3MenuItem.setTitle(R.string.conversation__menu_use_v3_mode)
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "Error updating v3 menu item", e)
+          v3MenuItem.isVisible = false
+        }
+      }
+    }
 
     private fun MenuItem.applyTitleSpan(span: Any) {
       title = SpannableString(title).apply { setSpan(span, 0, length, MessageStyler.SPAN_FLAGS) }
@@ -388,6 +435,7 @@ internal object ConversationOptionsMenu {
     fun handleUnmuteNotifications()
     fun handleConversationSettings()
     fun handleCosV2ModeRequest()
+    fun handleTapV3ModeRequest()
     fun handleSelectMessageExpiration()
     fun handleCreateBubble()
     fun handleGoHome()

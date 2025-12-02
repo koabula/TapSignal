@@ -174,7 +174,8 @@ public class ApplicationDependencyProvider implements AppDependencies.Provider {
                                             ByteUnit.KILOBYTES.toBytes(256),
                                             RemoteConfig::useMessageSendRestFallback,
                                             RemoteConfig.usePqRatchet(),
-                                            new org.thoughtcrime.securesms.tap.integration.TapMessageTransportImpl(context));
+                                            new org.thoughtcrime.securesms.tap.integration.TapMessageTransportImpl(context),
+                                            new org.thoughtcrime.securesms.tapv3.integration.TapV3MessageTransportImpl(context));
   }
 
   @Override

@@ -201,6 +201,10 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
         Log.d(TAG, "Deleted channel for recipient: ${recipientId.take(8)}...")
     }
     
+    fun markChannelInactive(recipientId: String) {
+        updateStatus(recipientId, ChannelStatus.FAILED)
+    }
+    
     fun getAllActiveChannels(): List<ChannelRecord> {
         ensureTableExists()
         

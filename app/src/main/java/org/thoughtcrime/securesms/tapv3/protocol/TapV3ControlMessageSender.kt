@@ -11,6 +11,7 @@ import org.thoughtcrime.securesms.sms.MessageSender
 import org.thoughtcrime.securesms.mms.OutgoingMessage
 import org.thoughtcrime.securesms.tapv3.TapV3Result
 import org.thoughtcrime.securesms.tapv3.TapV3Error
+import org.whispersystems.signalservice.api.push.ServiceId.ACI
 import java.util.concurrent.TimeUnit
 
 class TapV3ControlMessageSender private constructor(
@@ -63,12 +64,13 @@ class TapV3ControlMessageSender private constructor(
             val messageBody = "$prefix$base64"
             
             val recipient = try {
-                Recipient.resolved(RecipientId.from(recipientId))
+                val recipientIdObj = getRecipientIdFromString(recipientId)
+                Recipient.resolved(recipientIdObj)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to resolve recipient: ${recipientId.take(8)}...", e)
                 return TapV3Result.Failure(
                     TapV3Error.INVALID_DATA,
-                    "Invalid recipient ID",
+                    "Invalid recipient ID: ${e.message}",
                     e
                 )
             }
@@ -94,13 +96,8 @@ class TapV3ControlMessageSender private constructor(
             
             val threadId = SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
             
-            val messageId = SignalDatabase.messages.insertMessageOutbox(
-                outgoingMessage,
-                threadId,
-                false,
-                null
-            )
-            
+            // 只调用 MessageSender.send()，它内部会处理消息的插入
+            // 不要手动调用 insertMessageOutbox()，否则会导致重复插入和唯一约束冲突
             MessageSender.send(
                 context,
                 outgoingMessage,
@@ -119,6 +116,40 @@ class TapV3ControlMessageSender private constructor(
                 "Failed to send control message: ${e.message}",
                 e
             )
+        }
+    }
+    
+    /**
+     * 从字符串获取RecipientId对象
+     * 支持多种输入格式: ACI UUID、纯数字ID、"RecipientId::数字"格式
+     */
+    private fun getRecipientIdFromString(recipientId: String): RecipientId {
+        return try {
+            when {
+                // 处理 "RecipientId::数字" 格式
+                recipientId.startsWith("RecipientId::") -> {
+                    val idNumber = recipientId.removePrefix("RecipientId::")
+                    RecipientId.from(idNumber.toLong())
+                }
+                // 处理纯数字格式
+                recipientId.all { it.isDigit() } -> {
+                    RecipientId.from(recipientId.toLong())
+                }
+                // ACI格式（UUID样式），需要通过ACI反查RecipientId
+                recipientId.contains("-") && recipientId.length >= 32 -> {
+                    val aci = ACI.parseOrThrow(recipientId)
+                    SignalDatabase.recipients.getByAci(aci).orElseThrow {
+                        IllegalArgumentException("Cannot find RecipientId for ACI: ${recipientId.take(8)}...")
+                    }
+                }
+                // 其他情况，尝试作为数字处理
+                else -> {
+                    RecipientId.from(recipientId.toLong())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse RecipientId: ${recipientId.take(8)}...", e)
+            throw IllegalArgumentException("Cannot parse RecipientId: ${recipientId.take(8)}...", e)
         }
     }
     

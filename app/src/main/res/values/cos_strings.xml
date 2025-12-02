@@ -28,6 +28,21 @@
     <!-- 聊天菜单 -->
     <string name="conversation__menu_use_v2_mode">Use v2 mode</string>
     <string name="conversation__menu_disable_v2_mode">Disable v2 mode</string>
+    <string name="conversation__menu_use_v3_mode">Use v3 mode</string>
+    <string name="conversation__menu_disable_v3_mode">Disable v3 mode</string>
+    <string name="conversation__enable_v3_mode">Enable Tap v3 Mode</string>
+    <string name="conversation__enable_v3_mode_message">Enable decentralized transport using IPFS and UnifiedPush?</string>
+    <string name="conversation__disable_v3_mode">Disable Tap v3 Mode</string>
+    <string name="conversation__disable_v3_mode_message">Switch back to Signal Server mode?</string>
+    <string name="conversation__v3_not_configured">Tap v3 not configured. Please configure IPFS and UnifiedPush in settings first.</string>
+    <string name="conversation__v3_not_support_group">Tap v3 mode does not support groups yet</string>
+    <string name="conversation__v3_handshake_initiated">v3 handshake initiated</string>
+    <string name="conversation__v3_handshake_failed">Failed to initiate v3 handshake</string>
+    <string name="conversation__v3_mode_disabled">v3 mode disabled</string>
+    <string name="conversation__v3_mode_enable_failed">Failed to enable v3 mode</string>
+    <string name="conversation__v3_mode_disable_failed">Failed to disable v3 mode</string>
+    <string name="conversation__disable_v2_first">Please disable v2 mode first</string>
+    <string name="conversation__disable_v3_first">Please disable v3 mode first</string>
 
     <!-- COS请求对话框 -->
     <string name="cos_request_dialog_title">COS v2 Mode Request</string>
