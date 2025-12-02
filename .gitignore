@@ -35,3 +35,6 @@ kls_database.db
 
 # APK release output
 release/
+
+# Cursor IDE
+.cursor/

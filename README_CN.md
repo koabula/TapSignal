@@ -1,12 +1,12 @@
 # TapSignal
 [中文](README_CN.md) | [English](README.md)
 
----
+
 
 TapSignal是一个[Signal](https://github.com/signalapp/Signal-Android)的分叉项目. 提供一种Tap模式,允许用户和好友将所有的消息通过新建立的通道而不是Signal Server进行传递.
 
 ## Introduction
----
+
 TapSignal目前支持两种模式:
 
 - v2: 基于aws的云服务
@@ -18,11 +18,11 @@ TapSignal目前支持两种模式:
 目前v3模式的私聊已经完成,群聊支持还在实现中.
 
 ## Download
----
+
 目前你可以在Github的Releases 界面获取apk文件进行安装
 
 ## Usage
----
+
 两个模式都需要在设置中配置一些服务,v2 mode在"Tap Config"界面配置,v3 mode在"Tap v3 Configuration"配置
 ![alt text](./doc/image.png)
 

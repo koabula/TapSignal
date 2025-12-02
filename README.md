@@ -1,12 +1,10 @@
 # TapSignal
 [English](README.md) | [中文](README_CN.md)
 
----
 
 TapSignal is a fork of [Signal](https://github.com/signalapp/Signal-Android). It provides a Tap mode that allows users to send all messages through a new channel instead of the Signal Server.
 
 ## Introduction
----
 TapSignal currently supports two modes:
 
 - v2: Based on AWS cloud services
@@ -18,11 +16,9 @@ We use UnifiedPush to send short messages directly. For long messages and attach
 Currently, v3 mode private chat is complete. Group chat support is still in progress.
 
 ## Download
----
 You can download the APK file from the GitHub Releases page.
 
 ## Usage
----
 Both modes require some configuration in Settings. Configure v2 mode in "Tap Config" and v3 mode in "Tap v3 Configuration".
 ![alt text](./doc/image.png)
 
