@@ -36,11 +36,17 @@ a. Use a full-permission access key. In the AWS console, click your username, se
 
 b. Create a minimal-permission AccessKey:
 Use our CloudFormation template [tap-iam-cloudformation](./tap-iam-cloudformation.yaml) to create a minimal-permission credential for the app.
+
 (1) Go to CloudFormation in the AWS console
+
 (2) Click "Create Stack" → "With new resources"
+
 (3) Upload the template file and fill in the parameters (your S3 bucket info)
+
 (4) Wait for deployment to complete
+
 (5) Copy the AccessKeyId and SecretAccessKey from the Outputs tab
+
 (6) Configure this AccessKey in the app
 
 In the v2 mode config screen, click "Deploy Push Service". This takes a few minutes. Do not exit during deployment.

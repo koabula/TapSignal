@@ -40,12 +40,18 @@ a. 直接使用一个有所有权限的访问密钥. 你可以在aws控制台点
 
 b. 建立一个最小权限的AccessKey:
 你可以在aws的CloudFormation 服务,通过我们提供的模板[tap-iam-cloudformation](./tap-iam-cloudformation.yaml)来建立一个满足app需求的最小权限凭证.
+
 (1). 在aws控制台进入CloudFormation 服务;
+
 (2). 点击 "Create Stack" → "With new resources";
-(3). 上传此模板文件,填写参数(刚刚创建的S3 bucket的信息)
-(4). 等待部署完成
-(5). 在 Outputs 标签页复制 AccessKeyId 和 SecretAccessKey
-(6). 在app中配置这个AccessKey的信息
+
+(3). 上传此模板文件,填写参数(刚刚创建的S3 bucket的信息);
+
+(4). 等待部署完成;
+
+(5). 在 Outputs 标签页复制 AccessKeyId 和 SecretAccessKey;
+
+(6). 在app中配置这个AccessKey的信息;
 
 
 在v2 mode的配置界面,注意要点击"部署推送服务"的选项,这里需要进行几分钟的部署,在这段时间不要退出.
