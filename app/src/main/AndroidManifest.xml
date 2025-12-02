@@ -937,6 +937,11 @@
               android:theme="@style/TextSecure.DialogActivity"
               android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"/>
 
+    <activity android:name=".tap.ui.TapV2ModeRequestActivity"
+              android:exported="false"
+              android:theme="@style/TextSecure.DialogActivity"
+              android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"/>
+
     <activity android:name=".SmsSendtoActivity" android:exported="true">
         <intent-filter>
             <action android:name="android.intent.action.SENDTO" />

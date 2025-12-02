@@ -2119,6 +2119,14 @@
     <string name="MessageRecord_tap_v2_mode_disabled">Tap v2 mode disabled</string>
     <!-- Update message shown in chat when Tap v2 mode is enabled -->
     <string name="MessageRecord_tap_v2_mode_enabled">Tap v2 mode enabled</string>
+    <!-- Tap v2 mode request dialog title -->
+    <string name="TapV2ModeRequest_title">Tap v2 mode request</string>
+    <!-- Tap v2 mode request dialog message -->
+    <string name="TapV2ModeRequest_message">%1$s wants to establish a v2 mode transport channel with you. This will allow messages to be sent through a cloud storage provider instead of Signal servers.</string>
+    <!-- Tap v2 mode request accept button -->
+    <string name="TapV2ModeRequest_accept">Accept</string>
+    <!-- Tap v2 mode request reject button -->
+    <string name="TapV2ModeRequest_reject">Reject</string>
 
     <!-- MessageRequestBottomView -->
     <string name="MessageRequestBottomView_accept">Accept</string>

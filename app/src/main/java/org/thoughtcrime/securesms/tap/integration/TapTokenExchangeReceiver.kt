@@ -36,7 +36,8 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
                 }
             }
             "REJECT_TOKEN_EXCHANGE" -> {
-                handleTokenRejection(context, senderId)
+                val tokenExchangeMessageJson = intent.getStringExtra("tokenExchangeMessage")
+                handleTokenRejection(context, senderId, tokenExchangeMessageJson)
             }
         }
     }
@@ -114,16 +115,26 @@ class TapTokenExchangeReceiver : BroadcastReceiver() {
     /**
      * 处理用户拒绝Token交换请求
      */
-    private fun handleTokenRejection(context: Context, senderId: String) {
+    private fun handleTokenRejection(context: Context, senderId: String, tokenExchangeMessageJson: String?) {
         Log.i(TAG, "用户拒绝Token交换请求: senderId=$senderId")
         
-        // 关闭通知
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-        notificationManager.cancel(senderId.hashCode())
-        
-        // TODO: 可以考虑发送拒绝消息给对方
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (tokenExchangeMessageJson != null) {
+                    // 使用 TapV2ModeRequestHandler 处理拒绝逻辑
+                    TapV2ModeRequestHandler.handleReject(context, senderId, tokenExchangeMessageJson)
+                } else {
+                    // 如果没有消息数据，只关闭通知
+                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    notificationManager.cancel(senderId.hashCode())
+                    Log.w(TAG, "拒绝请求缺少tokenExchangeMessage，无法发送REJECT消息")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "处理Token拒绝失败", e)
+            }
+        }
     }
-    
+
     /**
      * 生成B的Token并发送响应给A
      */

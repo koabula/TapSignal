@@ -42,6 +42,7 @@ data class TapTokenExchangeMessage(
         const val REQUEST_TYPE_OFFER = "OFFER"
         const val REQUEST_TYPE_ACCEPT = "ACCEPT"
         const val REQUEST_TYPE_CONFIRM = "CONFIRM"
+        const val REQUEST_TYPE_REJECT = "REJECT"
         const val REQUEST_TYPE_DISABLE = "DISABLE"
         
         // 群组相关消息类型

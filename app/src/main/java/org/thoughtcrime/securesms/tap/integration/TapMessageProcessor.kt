@@ -19,6 +19,7 @@ import org.thoughtcrime.securesms.tap.TransportTokenPool
 import org.thoughtcrime.securesms.tap.TapDatabaseContext
 import org.thoughtcrime.securesms.tap.WebhookConfigData
 import org.thoughtcrime.securesms.tap.GatewayConfigData
+import org.thoughtcrime.securesms.tap.ui.TapV2ModeRequestActivity
 import org.thoughtcrime.securesms.recipients.Recipient
 import kotlinx.coroutines.runBlocking
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -598,6 +599,10 @@ class TapMessageProcessor private constructor(private val context: Context) {
                     // 处理Webhook配置更新
                     processWebhookUpdate(senderId, tokenExchangeMessage)
                 }
+                org.thoughtcrime.securesms.tap.TapTokenExchangeMessage.REQUEST_TYPE_REJECT -> {
+                    // 处理Token交换拒绝消息
+                    processTokenReject(senderId, tokenExchangeMessage)
+                }
                 else -> {
                     Log.w(TAG, "未知的Token交换类型: ${tokenExchangeMessage.requestType}")
                     TapProcessResult.Failed("未知的Token交换类型")
@@ -825,13 +830,93 @@ class TapMessageProcessor private constructor(private val context: Context) {
     }
     
     /**
-     * 处理Token交换确认（A发送给A）
+     * 处理Token交换确认（A发送给B的确认消息）
+     * B端收到此消息后，应显示v2 mode已启用的系统消息
      */
     private suspend fun processTokenConfirm(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
         Log.i(TAG, "处理Token交换确认: senderId=$senderId")
-        // 确认消息通常用于通知发送方Token交换已完成，可以开始使用v2通道
-        // 这里可以进行一些状态检查或日志记录
+        
+        // B端收到A的CONFIRM消息后，插入系统消息通知用户v2 mode已启用
+        try {
+            insertV2ModeEnabledMessage(senderId)
+            Log.i(TAG, "B端已插入v2 mode启用系统消息: senderId=$senderId")
+        } catch (e: Exception) {
+            Log.e(TAG, "B端插入v2 mode启用系统消息失败: senderId=$senderId", e)
+        }
+        
         return TapProcessResult.Success("Token交换确认已处理")
+    }
+
+    /**
+     * 处理Token交换拒绝消息
+     * A端收到B的REJECT消息后，应清理相关状态并通知用户
+     */
+    private suspend fun processTokenReject(senderId: org.thoughtcrime.securesms.recipients.RecipientId, tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage): TapProcessResult {
+        Log.i(TAG, "处理Token交换拒绝: senderId=$senderId")
+        
+        return try {
+            val senderAci = tokenExchangeMessage.senderAci
+            val reason = tokenExchangeMessage.metadata["reason"] as? String ?: "user_rejected"
+            
+            // 1. 清理已发送的 Token（sharedToken）
+            val providerType = tokenExchangeMessage.providerType
+            try {
+                val removed = tokenPool.removeSharedToken(senderAci, providerType)
+                if (removed) {
+                    Log.i(TAG, "已清理sharedToken: senderAci=$senderAci, providerType=$providerType")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "清理sharedToken失败: senderAci=$senderAci", e)
+            }
+            
+            // 2. 关闭相关通道（如果有）
+            try {
+                val channels = channelManager.getActiveChannels(senderId.toString())
+                channels.forEach { channel ->
+                    channelManager.closeChannel(channel.channelId)
+                }
+                if (channels.isNotEmpty()) {
+                    Log.i(TAG, "已关闭通道数量: ${channels.size}, senderId=$senderId")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "关闭通道失败: senderId=$senderId", e)
+            }
+            
+            // 3. 显示被拒绝的通知
+            showTokenExchangeRejectedNotification(senderId, reason)
+            
+            Log.i(TAG, "Token交换拒绝处理完成: senderId=$senderId, reason=$reason")
+            TapProcessResult.Success("Token交换拒绝已处理")
+        } catch (e: Exception) {
+            Log.e(TAG, "处理Token交换拒绝异常: senderId=$senderId", e)
+            TapProcessResult.Failed("处理异常: ${e.message}")
+        }
+    }
+
+    /**
+     * 显示Token交换被拒绝的通知
+     */
+    private fun showTokenExchangeRejectedNotification(senderId: org.thoughtcrime.securesms.recipients.RecipientId, reason: String) {
+        try {
+            val senderRecipient = org.thoughtcrime.securesms.recipients.Recipient.resolved(senderId)
+            val senderName = senderRecipient.getDisplayName(context)
+            
+            val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            
+            val notification = androidx.core.app.NotificationCompat.Builder(context, "tap_token_exchange")
+                .setSmallIcon(org.thoughtcrime.securesms.R.drawable.ic_notification)
+                .setContentTitle("v2 mode 请求被拒绝")
+                .setContentText("$senderName 拒绝了您的 v2 mode 请求")
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true)
+                .build()
+            
+            notificationManager.notify(("reject_" + senderId.toString()).hashCode(), notification)
+            
+            Log.i(TAG, "Token交换拒绝通知已显示: senderId=$senderId")
+        } catch (e: Exception) {
+            Log.e(TAG, "显示拒绝通知失败: senderId=$senderId", e)
+        }
     }
 
     /**
@@ -886,11 +971,27 @@ class TapMessageProcessor private constructor(private val context: Context) {
             notificationManager.createNotificationChannel(channel)
         }
         
+        val tokenExchangeJson = org.thoughtcrime.securesms.util.JsonUtils.toJson(tokenExchangeMessage)
+        
+        // 创建点击通知时打开对话框的Intent
+        val contentIntent = TapV2ModeRequestActivity.createIntent(
+            context,
+            senderId.toString(),
+            senderName,
+            tokenExchangeJson
+        )
+        val contentPendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            senderId.toString().hashCode(),
+            contentIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        
         // 创建确认按钮的Intent
         val acceptIntent = android.content.Intent(context, TapTokenExchangeReceiver::class.java).apply {
             action = "ACCEPT_TOKEN_EXCHANGE"
             putExtra("senderId", senderId.toString())
-            putExtra("tokenExchangeMessage", org.thoughtcrime.securesms.util.JsonUtils.toJson(tokenExchangeMessage))
+            putExtra("tokenExchangeMessage", tokenExchangeJson)
         }
         val acceptPendingIntent = android.app.PendingIntent.getBroadcast(
             context,
@@ -903,6 +1004,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
         val rejectIntent = android.content.Intent(context, TapTokenExchangeReceiver::class.java).apply {
             action = "REJECT_TOKEN_EXCHANGE"
             putExtra("senderId", senderId.toString())
+            putExtra("tokenExchangeMessage", tokenExchangeJson)
         }
         val rejectPendingIntent = android.app.PendingIntent.getBroadcast(
             context,
@@ -920,6 +1022,7 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 .bigText("$senderName 想要与您建立v2模式传输通道。这将允许消息通过${tokenExchangeMessage.providerType}传输层发送，而不是通过Signal服务器。"))
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .setContentIntent(contentPendingIntent)
             .addAction(org.thoughtcrime.securesms.R.drawable.v2_media_check, "接受", acceptPendingIntent)
             .addAction(org.thoughtcrime.securesms.R.drawable.symbol_x_white_24, "拒绝", rejectPendingIntent)
             .build()
