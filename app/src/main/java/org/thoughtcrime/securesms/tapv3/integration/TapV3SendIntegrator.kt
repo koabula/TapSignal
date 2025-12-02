@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Base64
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.attachments.Attachment
+import org.thoughtcrime.securesms.attachments.DatabaseAttachment
+import org.thoughtcrime.securesms.attachments.UriAttachment
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tapv3.TapV3Constants
@@ -166,11 +168,41 @@ class TapV3SendIntegrator private constructor(
         val attachmentRefs = mutableListOf<TapV3Payload.AttachmentRef>()
         
         try {
+            // 先上传附件到 IPFS，获取 CIDs
+            if (attachments.isNotEmpty()) {
+                for (attachment in attachments) {
+                    val attachmentResult = uploadAttachment(attachment, recipientId)
+                    if (attachmentResult.isFailure()) {
+                        val failure = attachmentResult as TapV3Result.Failure
+                        TapV3Logger.e(TAG, "Failed to upload attachment: ${failure.message}")
+                        
+                        cleanupUploadedContent(messageCid, attachmentCids)
+                        
+                        return SendResult(
+                            success = false,
+                            error = "Attachment upload failed: ${failure.message}"
+                        )
+                    }
+                    
+                    val ref = (attachmentResult as TapV3Result.Success).data
+                    attachmentRefs.add(ref)
+                    attachmentCids.add(ref.cid)
+                    
+                    TapV3Logger.d(TAG, "Uploaded attachment to IPFS: ${ref.cid}")
+                }
+            }
+            
+            // 上传 Signal 加密的消息到 IPFS
+            // 注意：signalEncrypted 包含带有占位符的 AttachmentPointer
+            // 真正的 CID 会通过 attachmentRefs 单独传递，接收端在解密后修复 Content
             if (signalEncrypted.isNotEmpty()) {
                 val uploadResult = ipfsGatewayManager.upload(signalEncrypted)
                 if (uploadResult.isFailure()) {
                     val failure = uploadResult as TapV3Result.Failure
                     TapV3Logger.e(TAG, "Failed to upload message to IPFS: ${failure.message}")
+                    
+                    cleanupUploadedContent(null, attachmentCids)
+                    
                     return SendResult(
                         success = false,
                         error = "IPFS upload failed: ${failure.message}"
@@ -192,27 +224,8 @@ class TapV3SendIntegrator private constructor(
                 )
             }
             
-            for (attachment in attachments) {
-                val attachmentResult = uploadAttachment(attachment, recipientId)
-                if (attachmentResult.isFailure()) {
-                    val failure = attachmentResult as TapV3Result.Failure
-                    TapV3Logger.e(TAG, "Failed to upload attachment: ${failure.message}")
-                    
-                    cleanupUploadedContent(messageCid, attachmentCids)
-                    
-                    return SendResult(
-                        success = false,
-                        error = "Attachment upload failed: ${failure.message}"
-                    )
-                }
-                
-                val ref = (attachmentResult as TapV3Result.Success).data
-                attachmentRefs.add(ref)
-                attachmentCids.add(ref.cid)
-                
-                TapV3Logger.d(TAG, "Uploaded attachment to IPFS: ${ref.cid}")
-            }
-            
+            // 构建 UnifiedPush payload，包含消息 CID 和附件引用
+            // 接收端会根据 attachmentRefs 中的 CID 来修复解密后的 Content
             val payload = TapV3Payload.IpfsRefs(
                 messageCid = messageCid,
                 attachments = attachmentRefs
@@ -240,7 +253,8 @@ class TapV3SendIntegrator private constructor(
             )
             
             return if (sendResult.isSuccess()) {
-                TapV3Logger.i(TAG, "IPFS message sent successfully")
+                TapV3Logger.i(TAG, "IPFS message sent successfully: messageCid=$messageCid, " +
+                             "attachmentCids=${attachmentCids.size}")
                 SendResult(
                     success = true,
                     transportMethod = TransportMethod.IPFS,
@@ -306,22 +320,64 @@ class TapV3SendIntegrator private constructor(
             mimeType = attachment.contentType
         )
         
+        // 存储 CID 映射，供发送端构建 AttachmentPointer 使用
+        if (attachment is DatabaseAttachment) {
+            TapV3AttachmentCidMapping.storeCid(
+                attachment.attachmentId.id,
+                cid,
+                attachmentData.size.toLong(),
+                attachment.contentType
+            )
+            TapV3Logger.d(TAG, "Stored CID mapping: attachmentId=${attachment.attachmentId.id}, cid=${cid.take(8)}...")
+        }
+        
         return TapV3Result.Success(ref)
     }
     
+    /**
+     * 读取附件数据
+     * 参考 Tap v2 的实现：区分 DatabaseAttachment 和 UriAttachment
+     */
     private fun readAttachmentData(attachment: Attachment): ByteArray? {
         return try {
-            val uri = attachment.uri
-            if (uri == null) {
-                TapV3Logger.e(TAG, "Attachment has no URI")
-                return null
-            }
-            
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
+            when (attachment) {
+                is DatabaseAttachment -> {
+                    // 情况1：附件已经存储在数据库中
+                    // 直接从 AttachmentTable 读取，不通过 Content Provider
+                    if (attachment.hasData) {
+                        TapV3Logger.d(TAG, "Reading DatabaseAttachment: id=${attachment.attachmentId}, hasData=true")
+                        SignalDatabase.attachments
+                            .getAttachmentStream(attachment.attachmentId, 0)
+                            .use { it.readBytes() }
+                    } else {
+                        TapV3Logger.w(TAG, "DatabaseAttachment has no data: id=${attachment.attachmentId}")
+                        null
+                    }
+                }
+                
+                is UriAttachment -> {
+                    // 情况2：附件是通过 URI 引用的（如从相册选择的图片）
+                    // 通过 ContentResolver 读取
+                    TapV3Logger.d(TAG, "Reading UriAttachment: uri=${attachment.uri}")
+                    context.contentResolver.openInputStream(attachment.uri)
+                        ?.use { it.readBytes() }
+                }
+                
+                else -> {
+                    // 其他类型的附件，尝试使用 URI 读取
+                    TapV3Logger.d(TAG, "Reading unknown Attachment type: ${attachment.javaClass.simpleName}")
+                    val uri = attachment.uri
+                    if (uri != null) {
+                        context.contentResolver.openInputStream(uri)
+                            ?.use { it.readBytes() }
+                    } else {
+                        TapV3Logger.w(TAG, "Attachment has no URI: type=${attachment.javaClass.simpleName}")
+                        null
+                    }
+                }
             }
         } catch (e: Exception) {
-            TapV3Logger.e(TAG, "Failed to read attachment data", e)
+            TapV3Logger.e(TAG, "Failed to read attachment data: type=${attachment.javaClass.simpleName}, fileName=${attachment.fileName}", e)
             null
         }
     }

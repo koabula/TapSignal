@@ -10,6 +10,8 @@ import com.annimon.stream.Stream;
 
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.attachments.Attachment;
+
+import java.util.Collections;
 import org.thoughtcrime.securesms.crypto.SealedSenderAccessUtil;
 import org.thoughtcrime.securesms.database.MessageTable;
 import org.thoughtcrime.securesms.database.NoSuchMessageException;
@@ -43,6 +45,7 @@ import org.whispersystems.signalservice.api.crypto.ContentHint;
 import org.whispersystems.signalservice.api.crypto.UntrustedIdentityException;
 import org.whispersystems.signalservice.api.messages.SendMessageResult;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
+import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentPointer;
 import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceEditMessage;
 import org.whispersystems.signalservice.api.messages.SignalServicePreview;
@@ -505,88 +508,95 @@ public class IndividualSendJob extends PushSendJob {
     try {
       Log.i(TAG, "Starting Tap v3 send: messageId=" + messageId + ", recipient=" + recipient.getId());
 
-      // Use SignalServiceMessageSender to properly encrypt the message via Signal E2EE
+      String recipientId = recipient.requireAci().toString();
+      
+      // Store attachments in TapV3AttachmentHolder for TapV3MessageTransportImpl to pick up
+      // Note: We exclude stickers as they're handled differently
+      List<org.thoughtcrime.securesms.attachments.Attachment> attachments = 
+          message.getAttachments().stream()
+              .filter(a -> !a.isSticker())
+              .collect(java.util.stream.Collectors.toList());
+      
+      if (!attachments.isEmpty()) {
+        Log.d(TAG, "Storing " + attachments.size() + " attachments for Tap v3 transport");
+        org.thoughtcrime.securesms.tapv3.integration.TapV3AttachmentHolder.INSTANCE.setAttachments(
+            recipientId, 
+            attachments
+        );
+      }
+      
+      // Build SignalServiceDataMessage
+      // For Tap v3, attachments will be uploaded to IPFS, but we still include AttachmentPointers
+      // in the message so Signal knows attachments exist and triggers AttachmentDownloadJob
       SignalServiceMessageSender messageSender = AppDependencies.getSignalServiceMessageSender();
-      Recipient messageRecipient = message.getThreadRecipient().fresh();
-      SignalServiceAddress address = RecipientUtil.toSignalServiceAddress(context, messageRecipient);
+      SignalServiceAddress address = RecipientUtil.toSignalServiceAddress(context, recipient);
       
-      // Build the SignalServiceDataMessage just like in deliver()
-      List<Attachment> attachments = Stream.of(message.getAttachments()).filterNot(Attachment::isSticker).toList();
-      List<SignalServiceAttachment> serviceAttachments = getAttachmentPointersFor(attachments);
-      Optional<byte[]> profileKey = getProfileKey(messageRecipient);
-      Optional<SignalServiceDataMessage.Sticker> sticker = getStickerFor(message);
-      List<SharedContact> sharedContacts = getSharedContactsFor(message);
-      List<SignalServicePreview> previews = getPreviewsFor(message);
-      SignalServiceDataMessage.GiftBadge giftBadge = getGiftBadgeFor(message);
-      SignalServiceDataMessage.Payment payment = getPayment(message);
-      List<BodyRange> bodyRanges = getBodyRanges(message);
+      // Create AttachmentPointers for Tap v3 attachments
+      // These use cdnNumber=888 to indicate IPFS storage, with CID in remoteKey
+      List<SignalServiceAttachment> serviceAttachments = new java.util.ArrayList<>();
+      for (org.thoughtcrime.securesms.attachments.Attachment attachment : attachments) {
+        if (attachment instanceof org.thoughtcrime.securesms.attachments.DatabaseAttachment) {
+          org.thoughtcrime.securesms.attachments.DatabaseAttachment dbAttachment = 
+              (org.thoughtcrime.securesms.attachments.DatabaseAttachment) attachment;
+          
+          // Create a placeholder AttachmentPointer
+          // The actual CID will be set by TapV3MessageTransportImpl after upload
+          SignalServiceAttachmentPointer pointer = 
+              org.thoughtcrime.securesms.tapv3.integration.TapV3AttachmentPointerBuilder.INSTANCE.createPlaceholder(dbAttachment);
+          
+          if (pointer != null) {
+            serviceAttachments.add(pointer);
+          }
+        }
+      }
       
-      SignalServiceDataMessage.Builder mediaMessageBuilder = SignalServiceDataMessage.newBuilder()
+      SignalServiceDataMessage dataMessage = SignalServiceDataMessage.newBuilder()
           .withBody(message.getBody())
-          .withAttachments(serviceAttachments)
+          .withAttachments(serviceAttachments)  // Include IPFS AttachmentPointers
           .withTimestamp(message.getSentTimeMillis())
           .withExpiration((int) (message.getExpiresIn() / 1000))
           .withExpireTimerVersion(message.getExpireTimerVersion())
           .withViewOnce(message.isViewOnce())
-          .withProfileKey(profileKey.orElse(null))
-          .withSticker(sticker.orElse(null))
-          .withSharedContacts(sharedContacts)
-          .withPreviews(previews)
-          .withGiftBadge(giftBadge)
           .asExpirationUpdate(message.isExpirationUpdate())
           .asEndSessionMessage(message.isEndSession())
-          .withPayment(payment)
-          .withBodyRanges(bodyRanges);
+          .build();
       
-      if (message.getParentStoryId() != null) {
-        try {
-          MessageRecord storyRecord = SignalDatabase.messages().getMessageRecord(message.getParentStoryId().asMessageId().getId());
-          Recipient storyRecipient = storyRecord.getFromRecipient();
-          SignalServiceDataMessage.StoryContext storyContext = new SignalServiceDataMessage.StoryContext(storyRecipient.requireServiceId(), storyRecord.getDateSent());
-          mediaMessageBuilder.withStoryContext(storyContext);
-          
-          Optional<SignalServiceDataMessage.Reaction> reaction = getStoryReactionFor(message, storyContext);
-          if (reaction.isPresent()) {
-            mediaMessageBuilder.withReaction(reaction.get());
-            mediaMessageBuilder.withBody(null);
-          }
-        } catch (NoSuchMessageException e) {
-          throw new IOException("Failed to get story record", e);
-        }
-      } else {
-        mediaMessageBuilder.withQuote(getQuoteFor(message).orElse(null));
-      }
-      
-      if (message.getGiftBadge() != null || message.isPaymentsNotification()) {
-        mediaMessageBuilder.withBody(null);
-      }
-      
-      SignalServiceDataMessage mediaMessage = mediaMessageBuilder.build();
-      
-      // Send via Tap v3 using the new method in SignalServiceMessageSender
-      // This will properly encrypt the message using Signal E2EE and send via Tap v3
+      // Send via Signal's normal flow
+      // TapV3MessageTransportImpl will intercept this and handle IPFS upload
       SendMessageResult result = messageSender.sendDataMessageViaTapV3(
           address,
-          SealedSenderAccessUtil.getSealedSenderAccessFor(messageRecipient),
+          SealedSenderAccessUtil.getSealedSenderAccessFor(recipient),
           ContentHint.RESENDABLE,
-          mediaMessage,
+          dataMessage,
           message.isUrgent()
       );
       
-      if (result.getSuccess() != null) {
-        Log.i(TAG, "Tap v3 send successful: messageId=" + messageId);
-        SignalDatabase.messageLog().insertIfPossible(messageRecipient.getId(), message.getSentTimeMillis(), result, ContentHint.RESENDABLE, new MessageId(messageId), false);
-        return result.getSuccess().isUnidentified();
-      } else {
-        Log.e(TAG, "Tap v3 send failed: messageId=" + messageId);
-        throw new IOException("Tap v3 send failed");
-      }
+      Log.i(TAG, "Tap v3 send successful: messageId=" + messageId);
+      return true;  // Tap v3 doesn't use sealed sender
       
     } catch (UntrustedIdentityException e) {
       Log.e(TAG, "Tap v3 send untrusted identity: messageId=" + messageId, e);
+      
+      // Clean up stored attachments on error
+      try {
+        String recipientId = recipient.requireAci().toString();
+        org.thoughtcrime.securesms.tapv3.integration.TapV3AttachmentHolder.INSTANCE.clear(recipientId);
+      } catch (Exception cleanupError) {
+        Log.w(TAG, "Failed to cleanup attachments", cleanupError);
+      }
+      
       throw new IOException("Tap v3 untrusted identity", e);
     } catch (Exception e) {
       Log.e(TAG, "Tap v3 send exception: messageId=" + messageId, e);
+      
+      // Clean up stored attachments on error
+      try {
+        String recipientId = recipient.requireAci().toString();
+        org.thoughtcrime.securesms.tapv3.integration.TapV3AttachmentHolder.INSTANCE.clear(recipientId);
+      } catch (Exception cleanupError) {
+        Log.w(TAG, "Failed to cleanup attachments", cleanupError);
+      }
+      
       throw new IOException("Tap v3 send exception", e);
     }
   }

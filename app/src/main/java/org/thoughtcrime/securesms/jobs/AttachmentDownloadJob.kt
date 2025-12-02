@@ -215,16 +215,31 @@ class AttachmentDownloadJob private constructor(
     Log.i(TAG, "Downloading push part $attachmentId")
     SignalDatabase.attachments.setTransferState(messageId, attachmentId, AttachmentTable.TRANSFER_PROGRESS_STARTED)
 
-    // 🔧 方案B：检查是否为Tap附件，如果是则使用Tap下载机制
+    // Check for Tap v2 attachment
     val tapInterceptor = TapAttachmentDownloadInterceptor.getInstance(context)
     if (tapInterceptor.isTapAttachment(attachment)) {
-      Log.i(TAG, "检测到Tap附件，使用Tap下载机制: attachmentId=$attachmentId")
+      Log.i(TAG, "Detected Tap v2 attachment, using Tap download: attachmentId=$attachmentId")
       val success = tapInterceptor.interceptAndDownload(messageId, attachment)
       if (success) {
-        Log.i(TAG, "Tap附件下载完成: attachmentId=$attachmentId")
-        return  // Tap下载成功，直接返回，跳过Signal原生下载
+        Log.i(TAG, "Tap v2 attachment download complete: attachmentId=$attachmentId")
+        return
       } else {
-        Log.e(TAG, "Tap附件下载失败，标记为失败: attachmentId=$attachmentId")
+        Log.e(TAG, "Tap v2 attachment download failed: attachmentId=$attachmentId")
+        markFailed(messageId, attachmentId)
+        return
+      }
+    }
+    
+    // Check for Tap v3 IPFS attachment
+    val tapV3Interceptor = org.thoughtcrime.securesms.tapv3.integration.TapV3AttachmentDownloadInterceptor.getInstance(context)
+    if (tapV3Interceptor.isTapV3Attachment(attachment)) {
+      Log.i(TAG, "Detected Tap v3 IPFS attachment, using IPFS download: attachmentId=$attachmentId")
+      val success = tapV3Interceptor.interceptAndDownload(messageId, attachment)
+      if (success) {
+        Log.i(TAG, "Tap v3 IPFS attachment download complete: attachmentId=$attachmentId")
+        return
+      } else {
+        Log.e(TAG, "Tap v3 IPFS attachment download failed: attachmentId=$attachmentId")
         markFailed(messageId, attachmentId)
         return
       }

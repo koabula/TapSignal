@@ -16,7 +16,8 @@ enum class Cdn(private val value: Int) {
   CDN_0(0),
   CDN_2(2),
   CDN_3(3),
-  COS(999); // 添加COS CDN支持，用于Signal v2 mode
+  IPFS(888), // 添加IPFS CDN支持，用于Tap v3 mode
+  COS(999); // 添加COS CDN支持，用于Tap v2 mode
 
   val cdnNumber: Int
     get() {
@@ -25,6 +26,7 @@ enum class Cdn(private val value: Int) {
         CDN_0 -> 0
         CDN_2 -> 2
         CDN_3 -> 3
+        IPFS -> 888 // 添加IPFS CDN号码支持
         COS -> 999 // 添加COS CDN号码支持
       }
     }
@@ -48,6 +50,7 @@ enum class Cdn(private val value: Int) {
         0 -> CDN_0
         2 -> CDN_2
         3 -> CDN_3
+        888 -> IPFS // 添加IPFS CDN号码支持
         999 -> COS // 添加COS CDN号码支持
         else -> throw UnsupportedOperationException("Invalid CDN number: $cdnNumber")
       }

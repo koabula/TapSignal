@@ -77,12 +77,30 @@ class TapV3MessageTransportImpl(private val context: Context) : TapV3MessageTran
         Log.i(TAG, "sendMessageViaTapV3: recipient=${recipientId.take(8)}..., ciphertextSize=${ciphertext.size}, timestamp=$timestamp")
         
         try {
-            val result = runBlocking {
-                sendIntegrator.sendCiphertext(recipientId, ciphertext)
+            // Get attachments from TapV3AttachmentHolder if available
+            // TapV3AttachmentHolder is set by IndividualSendJob before sending
+            val attachments = TapV3AttachmentHolder.getAndClearAttachments(recipientId)
+            
+            val result = if (attachments.isNotEmpty()) {
+                Log.d(TAG, "sendMessageViaTapV3: sending with ${attachments.size} attachments")
+                runBlocking {
+                    sendIntegrator.sendMessage(recipientId, ciphertext, attachments)
+                }
+            } else {
+                Log.d(TAG, "sendMessageViaTapV3: sending without attachments")
+                runBlocking {
+                    sendIntegrator.sendCiphertext(recipientId, ciphertext)
+                }
             }
             
             return if (result.success) {
                 Log.i(TAG, "sendMessageViaTapV3: success for ${recipientId.take(8)}...")
+                if (result.messageCid != null) {
+                    Log.d(TAG, "sendMessageViaTapV3: message CID=${result.messageCid}")
+                }
+                if (result.attachmentCids.isNotEmpty()) {
+                    Log.d(TAG, "sendMessageViaTapV3: attachment CIDs=${result.attachmentCids}")
+                }
                 SendMessageResult.success(
                     recipient,
                     emptyList(),

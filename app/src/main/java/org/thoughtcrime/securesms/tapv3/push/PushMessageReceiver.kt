@@ -10,6 +10,7 @@ import org.thoughtcrime.securesms.crypto.SealedSenderAccessUtil
 import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.messages.MessageContentProcessor
+import org.thoughtcrime.securesms.tapv3.integration.TapV3ContentRepairer
 import org.thoughtcrime.securesms.tapv3.integration.TapV3ReceiveIntegrator
 import org.thoughtcrime.securesms.util.RemoteConfig
 import org.unifiedpush.android.connector.MessagingReceiver
@@ -39,8 +40,10 @@ class PushMessageReceiver : MessagingReceiver() {
                 
                 if (result.success && result.message != null) {
                     val senderId = result.message.senderId
-                    Log.d(TAG, "Message received successfully from ${senderId.take(8)}..., injecting into Signal")
-                    injectIntoSignalPipeline(context, result.message.signalEncrypted, senderId)
+                    val attachmentCids = result.message.attachmentCids
+                    Log.d(TAG, "Message received successfully from ${senderId.take(8)}..., " +
+                              "attachments=${attachmentCids.size}, injecting into Signal")
+                    injectIntoSignalPipeline(context, result.message.signalEncrypted, senderId, attachmentCids)
                 } else {
                     Log.e(TAG, "Message processing failed: ${result.error}")
                 }
@@ -57,14 +60,18 @@ class PushMessageReceiver : MessagingReceiver() {
      * signalEncrypted 现在是发送端构建的完整 Envelope protobuf 序列化后的字节，
      * 包含正确的 type, sourceServiceId, content 等字段。
      * 直接反序列化后使用 SignalServiceCipher.decrypt() 解密。
+     * 
+     * @param attachmentCids 附件的 IPFS CID 列表，用于在解密后修复 Content 中的 AttachmentPointer
      */
     private suspend fun injectIntoSignalPipeline(
         context: Context,
         signalEncrypted: ByteArray,
-        senderId: String
+        senderId: String,
+        attachmentCids: List<String>
     ) {
         try {
-            Log.d(TAG, "Processing envelope: size=${signalEncrypted.size}, sender=${senderId.take(8)}...")
+            Log.d(TAG, "Processing envelope: size=${signalEncrypted.size}, sender=${senderId.take(8)}..., " +
+                      "attachmentCids=${attachmentCids.size}")
             
             val envelope = try {
                 Envelope.ADAPTER.decode(signalEncrypted)
@@ -82,10 +89,19 @@ class PushMessageReceiver : MessagingReceiver() {
                 return
             }
             
+            // 在解密后修复 Content 中的 AttachmentPointer，将占位符替换为真实的 CID
+            val repairedContent = if (attachmentCids.isNotEmpty()) {
+                val repaired = TapV3ContentRepairer.repairContentWithCids(cipherResult.content, attachmentCids)
+                Log.d(TAG, "Content repaired with ${attachmentCids.size} CIDs")
+                repaired
+            } else {
+                cipherResult.content
+            }
+            
             val processor = MessageContentProcessor.create(context)
             processor.process(
                 envelope = envelope,
-                content = cipherResult.content,
+                content = repairedContent,
                 metadata = cipherResult.metadata,
                 serverDeliveredTimestamp = System.currentTimeMillis(),
                 processingEarlyContent = false

@@ -25,6 +25,7 @@ class TapV3ReceiveIntegrator private constructor(
     data class ReceivedMessage(
         val signalEncrypted: ByteArray,
         val attachments: List<ReceivedAttachment> = emptyList(),
+        val attachmentCids: List<String> = emptyList(),
         val transportMethod: TransportMethod,
         val senderId: String
     ) {
@@ -34,6 +35,7 @@ class TapV3ReceiveIntegrator private constructor(
             other as ReceivedMessage
             if (!signalEncrypted.contentEquals(other.signalEncrypted)) return false
             if (attachments != other.attachments) return false
+            if (attachmentCids != other.attachmentCids) return false
             if (transportMethod != other.transportMethod) return false
             if (senderId != other.senderId) return false
             return true
@@ -42,6 +44,7 @@ class TapV3ReceiveIntegrator private constructor(
         override fun hashCode(): Int {
             var result = signalEncrypted.contentHashCode()
             result = 31 * result + attachments.hashCode()
+            result = 31 * result + attachmentCids.hashCode()
             result = 31 * result + transportMethod.hashCode()
             result = 31 * result + senderId.hashCode()
             return result
@@ -146,6 +149,7 @@ class TapV3ReceiveIntegrator private constructor(
         val message = ReceivedMessage(
             signalEncrypted = payload.encrypted,
             attachments = emptyList(),
+            attachmentCids = emptyList(),
             transportMethod = TransportMethod.INLINE,
             senderId = senderId
         )
@@ -182,6 +186,7 @@ class TapV3ReceiveIntegrator private constructor(
         }
         
         val attachments = mutableListOf<ReceivedAttachment>()
+        val attachmentCids = mutableListOf<String>()
         
         for (ref in payload.attachments) {
             val attachmentResult = downloadAttachment(ref)
@@ -197,12 +202,17 @@ class TapV3ReceiveIntegrator private constructor(
             
             val attachment = (attachmentResult as TapV3Result.Success).data
             attachments.add(attachment)
+            attachmentCids.add(ref.cid)
             TapV3Logger.d(TAG, "Downloaded attachment from IPFS: ${attachment.cid}, ${attachment.size} bytes")
+            
+            // 将附件数据存入缓存，供 AttachmentDownloadJob 使用
+            TapV3AttachmentCache.store(ref.cid, attachment.data)
         }
         
         val message = ReceivedMessage(
             signalEncrypted = signalEncrypted,
             attachments = attachments,
+            attachmentCids = attachmentCids,
             transportMethod = TransportMethod.IPFS,
             senderId = senderId
         )
