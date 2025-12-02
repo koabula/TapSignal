@@ -1,61 +1,56 @@
-# Signal Android
+# TapSignal
+[English](README.md) | [中文](README_CN.md)
 
-Signal is a simple, powerful, and secure messenger.
+---
 
-Signal uses your phone's data connection (WiFi/3G/4G/5G) to communicate securely. Millions of people use Signal every day for free and instantaneous communication anywhere in the world. Send and receive high-fidelity messages, participate in HD voice/video calls, and explore a growing set of new features that help you stay connected. Signal’s advanced privacy-preserving technology is always enabled, so you can focus on sharing the moments that matter with the people who matter to you.
+TapSignal is a fork of [Signal](https://github.com/signalapp/Signal-Android). It provides a Tap mode that allows users to send all messages through a new channel instead of the Signal Server.
 
-Currently available on the Play Store and [signal.org](https://signal.org/android/apk/).
+## Introduction
+---
+TapSignal currently supports two modes:
 
-<a href='https://play.google.com/store/apps/details?id=org.thoughtcrime.securesms&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png' height='80px'/></a>
+- v2: Based on AWS cloud services
+We use AWS S3, Lambda functions, and API Gateway to build a decentralized Signal Server. In short, Lambda functions send messages, API Gateway receives messages, and S3 stores attachments and offline messages. This recreates the message delivery functionality of Signal Server.
 
-## Contributing Bug reports
-We use GitHub for bug tracking. Please search the existing issues for your bug and create a new one if the issue is not yet tracked!
+- v3: Based on UnifiedPush and IPFS
+We use UnifiedPush to send short messages directly. For long messages and attachments, we upload them to IPFS to get a CID, then send the CID via UnifiedPush. For offline messages, we use the message queue provided by UnifiedPush.
 
-https://github.com/signalapp/Signal-Android/issues
+Currently, v3 mode private chat is complete. Group chat support is still in progress.
 
-## Joining the Beta
-Want to live life on the bleeding edge and help out with testing?
+## Download
+---
+You can download the APK file from the GitHub Releases page.
 
-You can subscribe to Signal Android Beta releases here:
-https://play.google.com/apps/testing/org.thoughtcrime.securesms
+## Usage
+---
+Both modes require some configuration in Settings. Configure v2 mode in "Tap Config" and v3 mode in "Tap v3 Configuration".
+![alt text](./doc/image.png)
 
-If you're interested in a life of peace and tranquility, stick with the standard releases.
+### v2 mode
+Currently v2 mode only supports AWS. Tencent support is not yet implemented.
 
-## Contributing Code
+For v2 mode, you need:
+1. Create an AWS S3 bucket
+2. Get an AWS AccessKey
 
-If you're new to the Signal codebase, we recommend going through our issues and picking out a simple bug to fix in order to get yourself familiar. Also please have a look at the [CONTRIBUTING.md](https://github.com/signalapp/Signal-Android/blob/main/CONTRIBUTING.md), that might answer some of your questions.
+First, create a new S3 bucket in the AWS console. Remember the bucket name and region (like us-west-1).
+Then get an AWS AccessKey for the app. You can:
 
-For larger changes and feature ideas, we ask that you propose it on the [unofficial Community Forum](https://community.signalusers.org) for a high-level discussion with the wider community before implementation.
+a. Use a full-permission access key. In the AWS console, click your username, select "Security Credentials", and create an AccessKey. Enter this AccessKey in the app.
 
-## Contributing Ideas
-Have something you want to say about Signal projects or want to be part of the conversation? Get involved in the [community forum](https://community.signalusers.org).
+b. Create a minimal-permission AccessKey:
+Use our CloudFormation template [tap-iam-cloudformation](./tap-iam-cloudformation.yaml) to create a minimal-permission credential for the app.
+(1) Go to CloudFormation in the AWS console
+(2) Click "Create Stack" → "With new resources"
+(3) Upload the template file and fill in the parameters (your S3 bucket info)
+(4) Wait for deployment to complete
+(5) Copy the AccessKeyId and SecretAccessKey from the Outputs tab
+(6) Configure this AccessKey in the app
 
-Help
-====
-## Support
-For troubleshooting and questions, please visit our support center!
+In the v2 mode config screen, click "Deploy Push Service". This takes a few minutes. Do not exit during deployment.
 
-https://support.signal.org/
+### v3 mode
+For v3 mode, you need: a UnifiedPush Distributor, and a Pinata or web3.storage API key (or both).
 
-## Documentation
-Looking for documentation? Check out the wiki!
-
-https://github.com/signalapp/Signal-Android/wiki
-
-# Legal things
-## Cryptography Notice
-
-This distribution includes cryptographic software. The country in which you currently reside may have restrictions on the import, possession, use, and/or re-export to another country, of encryption software.
-BEFORE using any encryption software, please check your country's laws, regulations and policies concerning the import, possession, or use, and re-export of encryption software, to see if this is permitted.
-See <http://www.wassenaar.org/> for more information.
-
-The U.S. Government Department of Commerce, Bureau of Industry and Security (BIS), has classified this software as Export Commodity Control Number (ECCN) 5D002.C.1, which includes information security software using or performing cryptographic functions with asymmetric algorithms.
-The form and manner of this distribution makes it eligible for export under the License Exception ENC Technology Software Unrestricted (TSU) exception (see the BIS Export Administration Regulations, Section 740.13) for both object code and source code.
-
-## License
-
-Copyright 2013-2025 Signal Messenger, LLC
-
-Licensed under the GNU AGPLv3: https://www.gnu.org/licenses/agpl-3.0.html
-
-Google Play and the Google Play logo are trademarks of Google LLC.
+For UnifiedPush Distributor, we recommend [ntfy](https://unifiedpush.org/users/distributors/ntfy/) and [NextPush](https://unifiedpush.org/users/distributors/nextpush/).
+Sunup is not supported yet due to some bugs being fixed.

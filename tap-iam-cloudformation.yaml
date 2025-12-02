@@ -1,0 +1,217 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Signal Tap Mode - Minimal IAM User Setup
+  Creates an IAM user with minimum required permissions for Signal Tap Mode.
+  This template creates a dedicated IAM user with only the permissions needed
+  for S3 storage, Lambda functions, API Gateway, and related services.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: The name of your S3 bucket for Tap Mode (must already exist)
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: ^[a-z0-9][a-z0-9.-]*[a-z0-9]$
+    ConstraintDescription: Bucket name must be lowercase, 3-63 characters, and follow S3 naming rules.
+
+  UserName:
+    Type: String
+    Default: signal-tap-user
+    Description: Name for the IAM user
+    MinLength: 1
+    MaxLength: 64
+    AllowedPattern: ^[a-zA-Z0-9_+=,.@-]+$
+
+  Region:
+    Type: String
+    Default: us-east-1
+    Description: AWS region for Lambda and API Gateway resources
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+      - us-west-1
+      - us-west-2
+      - eu-west-1
+      - eu-west-2
+      - eu-central-1
+      - ap-northeast-1
+      - ap-northeast-2
+      - ap-southeast-1
+      - ap-southeast-2
+
+Resources:
+  # IAM Policy with minimum required permissions
+  TapModePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${UserName}-policy'
+      Description: Minimum permissions required for Signal Tap Mode
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # S3 Object Operations - for message/attachment storage
+          - Sid: S3ObjectOperations
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:HeadObject
+            Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
+
+          # S3 Bucket Operations - for listing and notifications
+          - Sid: S3BucketOperations
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketNotificationConfiguration
+              - s3:PutBucketNotificationConfiguration
+            Resource: !Sub 'arn:aws:s3:::${BucketName}'
+
+          # Lambda Function Management - for deploying cloud functions
+          - Sid: LambdaManagement
+            Effect: Allow
+            Action:
+              - lambda:CreateFunction
+              - lambda:GetFunction
+              - lambda:UpdateFunctionConfiguration
+              - lambda:UpdateFunctionCode
+              - lambda:DeleteFunction
+              - lambda:InvokeFunction
+              - lambda:ListFunctions
+              - lambda:CreateFunctionUrlConfig
+              - lambda:GetFunctionUrlConfig
+              - lambda:DeleteFunctionUrlConfig
+              - lambda:AddPermission
+              - lambda:RemovePermission
+              - lambda:GetPolicy
+            Resource:
+              - !Sub 'arn:aws:lambda:${Region}:${AWS::AccountId}:function:tap-*'
+
+          # API Gateway V2 (WebSocket) Management
+          - Sid: APIGatewayManagement
+            Effect: Allow
+            Action:
+              - apigateway:POST
+              - apigateway:GET
+              - apigateway:DELETE
+              - apigateway:PUT
+              - apigateway:PATCH
+            Resource:
+              - !Sub 'arn:aws:apigateway:${Region}::/apis'
+              - !Sub 'arn:aws:apigateway:${Region}::/apis/*'
+
+          # Execute API - for WebSocket connection management
+          - Sid: ExecuteAPIConnections
+            Effect: Allow
+            Action:
+              - execute-api:ManageConnections
+            Resource: !Sub 'arn:aws:execute-api:${Region}:${AWS::AccountId}:*/@connections/*'
+
+          # IAM Role Management - for Lambda execution roles
+          - Sid: IAMRoleManagement
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:GetRole
+              - iam:DeleteRole
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:ListAttachedRolePolicies
+              - iam:ListRolePolicies
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole'
+
+          # IAM Policy Management - for Lambda custom policy
+          - Sid: IAMPolicyManagement
+            Effect: Allow
+            Action:
+              - iam:CreatePolicy
+              - iam:GetPolicy
+              - iam:DeletePolicy
+              - iam:GetPolicyVersion
+              - iam:ListPolicyVersions
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/TapNotificationLambdaPolicy'
+
+          # IAM PassRole - required to assign roles to Lambda
+          - Sid: IAMPassRole
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole'
+            Condition:
+              StringEquals:
+                iam:PassedToService: lambda.amazonaws.com
+
+          # STS - for getting account information
+          - Sid: STSIdentity
+            Effect: Allow
+            Action:
+              - sts:GetCallerIdentity
+            Resource: '*'
+
+          # CloudWatch Logs - for Lambda function logging (optional but recommended)
+          - Sid: CloudWatchLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+            Resource:
+              - !Sub 'arn:aws:logs:${Region}:${AWS::AccountId}:log-group:/aws/lambda/tap-*'
+              - !Sub 'arn:aws:logs:${Region}:${AWS::AccountId}:log-group:/aws/lambda/tap-*:*'
+
+  # IAM User
+  TapModeUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref UserName
+      ManagedPolicyArns:
+        - !Ref TapModePolicy
+      Tags:
+        - Key: Purpose
+          Value: Signal-Tap-Mode
+        - Key: CreatedBy
+          Value: CloudFormation
+
+  # Access Key for the user
+  TapModeAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref TapModeUser
+
+Outputs:
+  AccessKeyId:
+    Description: Access Key ID for Signal Tap Mode (copy this to your app)
+    Value: !Ref TapModeAccessKey
+
+  SecretAccessKey:
+    Description: Secret Access Key for Signal Tap Mode (copy this to your app - KEEP SECRET!)
+    Value: !GetAtt TapModeAccessKey.SecretAccessKey
+
+  UserArn:
+    Description: ARN of the created IAM user
+    Value: !GetAtt TapModeUser.Arn
+
+  Region:
+    Description: AWS Region configured for this setup
+    Value: !Ref Region
+
+  BucketName:
+    Description: S3 Bucket name configured for Tap Mode
+    Value: !Ref BucketName
+
+  Instructions:
+    Description: Next steps
+    Value: >
+      1. Copy the AccessKeyId and SecretAccessKey above.
+      2. Open Signal app -> Settings -> Tap Mode -> AWS Configuration.
+      3. Paste the credentials and bucket name.
+      4. The app will automatically deploy Lambda functions and API Gateway.
+      IMPORTANT: Keep your SecretAccessKey safe and never share it!
