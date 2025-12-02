@@ -19,7 +19,7 @@ TapSignal目前支持两种模式:
 
 ## Download
 
-目前你可以在Github的Releases 界面获取apk文件进行安装
+目前你可以在Github的[Releases](https://github.com/koabula/TapSignal/releases/) 界面获取apk文件进行安装
 
 ## Usage
 

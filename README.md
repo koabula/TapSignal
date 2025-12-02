@@ -16,7 +16,7 @@ We use UnifiedPush to send short messages directly. For long messages and attach
 Currently, v3 mode private chat is complete. Group chat support is still in progress.
 
 ## Download
-You can download the APK file from the GitHub Releases page.
+You can download the APK file from the GitHub [Releases page](https://github.com/koabula/TapSignal/releases/).
 
 ## Usage
 Both modes require some configuration in Settings. Configure v2 mode in "Tap Config" and v3 mode in "Tap v3 Configuration".
