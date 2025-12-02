@@ -1,4 +1,0 @@
----
-description: 我们的tap模块分为抽象层和provider实现层.在工作是请注意思考该工作应该在抽象层实现还是具体某一个provider实现层实现. (大部分工作可能是在抽象层实现)
-alwaysApply: false
----
