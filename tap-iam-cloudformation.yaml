@@ -78,7 +78,6 @@ Resources:
               - lambda:UpdateFunctionCode
               - lambda:DeleteFunction
               - lambda:InvokeFunction
-              - lambda:ListFunctions
               - lambda:CreateFunctionUrlConfig
               - lambda:GetFunctionUrlConfig
               - lambda:DeleteFunctionUrlConfig
@@ -87,6 +86,14 @@ Resources:
               - lambda:GetPolicy
             Resource:
               - !Sub 'arn:aws:lambda:${Region}:${AWS::AccountId}:function:tap-*'
+
+          # Lambda ListFunctions - requires Resource: * (account-level operation)
+          # This is an AWS API limitation: ListFunctions cannot be scoped to specific functions
+          - Sid: LambdaListFunctions
+            Effect: Allow
+            Action:
+              - lambda:ListFunctions
+            Resource: '*'
 
           # API Gateway V2 (WebSocket) Management
           - Sid: APIGatewayManagement
