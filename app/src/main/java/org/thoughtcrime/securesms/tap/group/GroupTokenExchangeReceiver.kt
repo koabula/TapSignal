@@ -72,7 +72,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // 2. 如果是提议消息，保存提议者的 token（修复：提取myToken而不是tokens map）
+                // 2. 如果是提议消息，保存提议者的 token 和 gateway 配置
                 if (isProposer) {
                     val proposerTokenData = originalMessage.metadata["myToken"] as? Map<*, *>
                     if (proposerTokenData != null) {
@@ -92,6 +92,49 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                         } catch (e: Exception) {
                             Log.e(TAG, "解析提议者token失败", e)
                         }
+                    }
+                    
+                    // 保存提议者的 webhook/gateway 配置（关键修复！）
+                    // Lambda 推送需要目标用户的配置才能发送通知
+                    val groupManager = GroupTransportManager.getInstance(context)
+                    val webhookConfig = originalMessage.extractWebhookConfig()
+                    val gatewayConfig = originalMessage.extractGatewayConfig()
+                    
+                    if (webhookConfig != null || gatewayConfig != null) {
+                        // 1. 保存到本地 memberGatewayInfo
+                        val gatewayUpdated = groupManager.updateMemberGatewayInfo(
+                            groupId = groupId,
+                            memberAci = proposerAci,
+                            webhookConfig = webhookConfig,
+                            gatewayConfig = gatewayConfig
+                        )
+                        if (gatewayUpdated) {
+                            Log.i(TAG, "已保存提议者的gateway配置到本地: proposer=$proposerAci, hasWebhook=${webhookConfig != null}, hasGateway=${gatewayConfig != null}")
+                        } else {
+                            Log.w(TAG, "保存提议者gateway配置到本地失败: proposer=$proposerAci")
+                        }
+                        
+                        // 2. 上传到 S3，确保 Lambda 能找到提议者的配置
+                        // 这是群组消息发送的关键 - 没有 S3 配置 Lambda 会报 "contact config missing"
+                        if (webhookConfig != null) {
+                            try {
+                                val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+                                val uploaded = notificationConfigManager.forceUploadContactConfig(
+                                    contactAci = proposerAci,
+                                    webhookData = webhookConfig,
+                                    gatewayData = gatewayConfig
+                                )
+                                if (uploaded) {
+                                    Log.i(TAG, "[S3] 已上传提议者配置到S3: proposer=$proposerAci")
+                                } else {
+                                    Log.w(TAG, "[S3] 上传提议者配置到S3失败: proposer=$proposerAci")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[S3] 上传提议者配置到S3异常: proposer=$proposerAci", e)
+                            }
+                        }
+                    } else {
+                        Log.w(TAG, "提议消息中缺少webhook/gateway配置: proposer=$proposerAci")
                     }
                 }
                 
@@ -156,7 +199,18 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     }
                 }
 
-                // 7. 标记自己为已同意
+                // 7. 处理之前缓存的其他成员的接受消息
+                // 这些消息在本地用户接受之前收到，当时状态为 NATIVE，被缓存起来
+                Log.d(TAG, "处理缓存的群组接受消息: groupId=$groupId")
+                val messageProcessor = org.thoughtcrime.securesms.tap.integration.TapMessageProcessor.getInstance(context)
+                val pendingCount = messageProcessor.getPendingGroupAcceptCount(groupId)
+                if (pendingCount > 0) {
+                    Log.i(TAG, "发现 $pendingCount 条缓存的接受消息，开始处理: groupId=$groupId")
+                    val processedCount = messageProcessor.processPendingGroupAccepts(groupId)
+                    Log.i(TAG, "缓存接受消息处理完成: groupId=$groupId, 成功=$processedCount/$pendingCount")
+                }
+                
+                // 8. 标记自己为已同意
                 // 注意: 群组状态已经由提议者创建，这里不需要调用 proposeV2Mode()
                 // 直接调用 acceptV2Proposal 将自己加入 agreedMembers
                 Log.d(TAG, "标记自己为已同意: groupId=$groupId, myAci=$myAci")
@@ -168,7 +222,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 
                 Log.i(TAG, "成功标记为已同意: groupId=$groupId, myAci=$myAci")
                 
-                // 8. 发送接受消息给所有成员（包含我的token）
+                // 9. 发送接受消息给所有成员（包含我的token）
                 Log.i(TAG, "发送群组接受消息: groupId=$groupId")
                 val helper = GroupTokenExchangeHelper.getInstance(context)
                 val sent = helper.sendGroupAcceptMessage(
@@ -183,10 +237,10 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                 if (sent) {
                     Log.i(TAG, "群组接受消息已发送: groupId=$groupId")
                     
-                    // 9. 检查是否可以激活 V2 mode
+                    // 10. 检查是否可以激活 V2 mode
                     checkAndActivateIfReady(context, groupId)
                     
-                    // 10. 插入系统消息（自定义文本）
+                    // 11. 插入系统消息（自定义文本）
                     helper.insertCustomSystemMessage(
                         recipientId = groupRecipientId,
                         messageBody = "你已同意使用 v2 mode"
@@ -195,7 +249,7 @@ class GroupTokenExchangeReceiver : BroadcastReceiver() {
                     Log.w(TAG, "群组接受消息发送失败")
                 }
                 
-                // 11. 取消通知
+                // 12. 取消通知
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
                 notificationManager.cancel(groupId.hashCode())
                 

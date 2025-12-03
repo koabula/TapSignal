@@ -65,6 +65,27 @@ class TapMessageProcessor private constructor(private val context: Context) {
     private val processorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     /**
+     * 待处理的群组接受消息缓存
+     * 
+     * 当收到其他成员的 GROUP_ACCEPT 消息但本地群组状态尚未初始化时（status=NATIVE），
+     * 将消息缓存起来，等待本地用户接受后再处理
+     * 
+     * Key: groupId
+     * Value: 待处理的接受消息列表
+     */
+    private val pendingGroupAccepts = mutableMapOf<String, MutableList<PendingGroupAccept>>()
+    private val pendingAcceptsLock = Any()
+    
+    /**
+     * 待处理的群组接受消息
+     */
+    data class PendingGroupAccept(
+        val accepterAci: String,
+        val tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+    
+    /**
      * 检查是否为Tap传输层控制消息
      * 
      * @param messageBody 消息体
@@ -1100,11 +1121,33 @@ class TapMessageProcessor private constructor(private val context: Context) {
             // 同步更新群组状态
             val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
             
+            // 先检查群组状态
+            val statusResult = groupManager.getGroupStatus(groupId)
+            val currentStatus = if (statusResult is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success) {
+                statusResult.data
+            } else {
+                org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE
+            }
+            
+            // 如果群组状态是 NATIVE（本地用户尚未接受），则缓存此消息
+            if (currentStatus == org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE) {
+                Log.i(TAG, "[状态转换] 群组状态为 NATIVE，缓存接受消息: accepter=$accepterAci, groupId=$groupId")
+                cachePendingGroupAccept(groupId, accepterAci, tokenExchangeMessage)
+                
+                // 同时保存接受者的 token（如果有）
+                saveAccepterToken(groupId, accepterAci, tokenExchangeMessage)
+                
+                return TapProcessResult.Success("群组接受消息已缓存，等待本地用户接受")
+            }
+            
             // 标记成员已同意
             try {
                 val marked = groupManager.acceptV2Proposal(groupId, accepterAci)
                 if (marked) {
                     Log.i(TAG, "[状态转换] 标记群组成员同意: accepter=$accepterAci, groupId=$groupId")
+                    
+                    // 保存接受者的 token（如果有）
+                    saveAccepterToken(groupId, accepterAci, tokenExchangeMessage)
                     
                     // 检查是否所有成员都已同意，如果是则激活 V2 mode
                     val activated = groupManager.checkAndActivateV2Mode(groupId)
@@ -1134,6 +1177,220 @@ class TapMessageProcessor private constructor(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "处理群组 V2 接受失败: senderId=$senderId", e)
             TapProcessResult.Failed("处理失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 缓存待处理的群组接受消息
+     */
+    private fun cachePendingGroupAccept(
+        groupId: String,
+        accepterAci: String,
+        tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
+    ) {
+        synchronized(pendingAcceptsLock) {
+            val pendingList = pendingGroupAccepts.getOrPut(groupId) { mutableListOf() }
+            
+            // 检查是否已存在相同的接受消息（避免重复）
+            val exists = pendingList.any { it.accepterAci == accepterAci }
+            if (!exists) {
+                pendingList.add(PendingGroupAccept(accepterAci, tokenExchangeMessage))
+                Log.i(TAG, "[缓存] 已缓存群组接受消息: groupId=$groupId, accepter=$accepterAci, 缓存数量=${pendingList.size}")
+            } else {
+                Log.d(TAG, "[缓存] 接受消息已存在，跳过: groupId=$groupId, accepter=$accepterAci")
+            }
+        }
+    }
+    
+    /**
+     * 保存接受者的 token 和 gateway 配置
+     * 
+     * 群组消息发送时需要知道每个成员的 webhook/gateway 配置才能推送通知
+     * 这些配置包含在 GROUP_ACCEPT 消息中
+     */
+    private suspend fun saveAccepterToken(
+        groupId: String,
+        accepterAci: String,
+        tokenExchangeMessage: org.thoughtcrime.securesms.tap.TapTokenExchangeMessage
+    ) {
+        try {
+            // 1. 从消息中提取并保存 token
+            val myTokenData = tokenExchangeMessage.metadata["myToken"] as? Map<*, *>
+            if (myTokenData != null) {
+                @Suppress("UNCHECKED_CAST")
+                val tokenMap = myTokenData as Map<String, Any>
+                val token = org.thoughtcrime.securesms.tap.CosTransportToken.fromMap(tokenMap)
+                if (token != null) {
+                    val saved = tokenPool.addReceivedToken(accepterAci, token, groupId)
+                    if (saved) {
+                        Log.i(TAG, "[Token] 已保存接受者的 token: accepter=$accepterAci, groupId=$groupId")
+                    } else {
+                        Log.w(TAG, "[Token] 保存接受者 token 失败: accepter=$accepterAci, groupId=$groupId")
+                    }
+                }
+            }
+            
+            // 2. 保存 webhook/gateway 配置到 memberGatewayInfo
+            // 这对于群组消息发送至关重要 - Lambda 需要目标用户的配置才能推送
+            val webhookConfig = tokenExchangeMessage.extractWebhookConfig()
+            val gatewayConfig = tokenExchangeMessage.extractGatewayConfig()
+            
+            if (webhookConfig != null || gatewayConfig != null) {
+                // 2.1 保存到本地 memberGatewayInfo
+                val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+                val updated = groupManager.updateMemberGatewayInfo(
+                    groupId = groupId,
+                    memberAci = accepterAci,
+                    webhookConfig = webhookConfig,
+                    gatewayConfig = gatewayConfig
+                )
+                if (updated) {
+                    Log.i(TAG, "[Gateway] 已保存接受者的 gateway 配置到本地: accepter=$accepterAci, groupId=$groupId, " +
+                            "hasWebhook=${webhookConfig != null}, hasGateway=${gatewayConfig != null}")
+                } else {
+                    Log.w(TAG, "[Gateway] 保存接受者 gateway 配置到本地失败: accepter=$accepterAci, groupId=$groupId")
+                }
+                
+                // 2.2 上传到 S3，确保 Lambda 能找到接受者的配置
+                // 这是群组消息发送的关键 - 没有 S3 配置 Lambda 会报 "contact config missing"
+                if (webhookConfig != null) {
+                    try {
+                        val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+                        val uploaded = notificationConfigManager.forceUploadContactConfig(
+                            contactAci = accepterAci,
+                            webhookData = webhookConfig,
+                            gatewayData = gatewayConfig
+                        )
+                        if (uploaded) {
+                            Log.i(TAG, "[S3] 已上传接受者配置到S3: accepter=$accepterAci, groupId=$groupId")
+                        } else {
+                            Log.w(TAG, "[S3] 上传接受者配置到S3失败: accepter=$accepterAci, groupId=$groupId")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "[S3] 上传接受者配置到S3异常: accepter=$accepterAci, groupId=$groupId", e)
+                    }
+                }
+            } else {
+                Log.d(TAG, "[Gateway] 接受消息中没有 webhook/gateway 配置: accepter=$accepterAci, groupId=$groupId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[Token] 保存接受者 token/gateway 异常: accepter=$accepterAci, groupId=$groupId", e)
+        }
+    }
+    
+    /**
+     * 处理缓存的群组接受消息
+     * 
+     * 当本地用户接受群组 V2 提议后调用此方法，处理之前缓存的其他成员的接受消息
+     * 
+     * @param groupId 群组 ID
+     * @return 成功处理的消息数量
+     */
+    suspend fun processPendingGroupAccepts(groupId: String): Int {
+        val pendingList: List<PendingGroupAccept>
+        
+        synchronized(pendingAcceptsLock) {
+            pendingList = pendingGroupAccepts.remove(groupId)?.toList() ?: emptyList()
+        }
+        
+        if (pendingList.isEmpty()) {
+            Log.d(TAG, "[缓存] 没有待处理的群组接受消息: groupId=$groupId")
+            return 0
+        }
+        
+        Log.i(TAG, "[缓存] 开始处理缓存的群组接受消息: groupId=$groupId, 数量=${pendingList.size}")
+        
+        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(context)
+        var processedCount = 0
+        
+        for (pending in pendingList) {
+            try {
+                // 检查消息是否过期（超过 5 分钟）
+                val age = System.currentTimeMillis() - pending.timestamp
+                if (age > 5 * 60 * 1000) {
+                    Log.w(TAG, "[缓存] 缓存消息已过期，跳过: accepter=${pending.accepterAci}, age=${age}ms")
+                    continue
+                }
+                
+                val marked = groupManager.acceptV2Proposal(groupId, pending.accepterAci)
+                if (marked) {
+                    Log.i(TAG, "[缓存] 成功处理缓存的接受消息: accepter=${pending.accepterAci}, groupId=$groupId")
+                    
+                    // 保存缓存消息中的 gateway 配置（之前缓存时可能还没有群组状态）
+                    val webhookConfig = pending.tokenExchangeMessage.extractWebhookConfig()
+                    val gatewayConfig = pending.tokenExchangeMessage.extractGatewayConfig()
+                    if (webhookConfig != null || gatewayConfig != null) {
+                        // 保存到本地 memberGatewayInfo
+                        val gatewayUpdated = groupManager.updateMemberGatewayInfo(
+                            groupId = groupId,
+                            memberAci = pending.accepterAci,
+                            webhookConfig = webhookConfig,
+                            gatewayConfig = gatewayConfig
+                        )
+                        if (gatewayUpdated) {
+                            Log.i(TAG, "[缓存] 已保存缓存消息的 gateway 配置到本地: accepter=${pending.accepterAci}")
+                        }
+                        
+                        // 上传到 S3，确保 Lambda 能找到配置
+                        if (webhookConfig != null) {
+                            try {
+                                val notificationConfigManager = org.thoughtcrime.securesms.tap.notification.NotificationConfigManager.getInstance(context)
+                                val uploaded = notificationConfigManager.forceUploadContactConfig(
+                                    contactAci = pending.accepterAci,
+                                    webhookData = webhookConfig,
+                                    gatewayData = gatewayConfig
+                                )
+                                if (uploaded) {
+                                    Log.i(TAG, "[缓存][S3] 已上传缓存消息配置到S3: accepter=${pending.accepterAci}")
+                                } else {
+                                    Log.w(TAG, "[缓存][S3] 上传缓存消息配置到S3失败: accepter=${pending.accepterAci}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[缓存][S3] 上传缓存消息配置到S3异常: accepter=${pending.accepterAci}", e)
+                            }
+                        }
+                    }
+                    
+                    processedCount++
+                } else {
+                    Log.w(TAG, "[缓存] 处理缓存的接受消息失败: accepter=${pending.accepterAci}, groupId=$groupId")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[缓存] 处理缓存消息异常: accepter=${pending.accepterAci}", e)
+            }
+        }
+        
+        Log.i(TAG, "[缓存] 缓存处理完成: groupId=$groupId, 成功=${processedCount}/${pendingList.size}")
+        return processedCount
+    }
+    
+    /**
+     * 获取指定群组的缓存接受消息数量
+     */
+    fun getPendingGroupAcceptCount(groupId: String): Int {
+        synchronized(pendingAcceptsLock) {
+            return pendingGroupAccepts[groupId]?.size ?: 0
+        }
+    }
+    
+    /**
+     * 清理过期的缓存消息（超过 10 分钟）
+     */
+    fun cleanupExpiredPendingAccepts() {
+        synchronized(pendingAcceptsLock) {
+            val now = System.currentTimeMillis()
+            val expireThreshold = 10 * 60 * 1000L // 10 分钟
+            
+            pendingGroupAccepts.forEach { (groupId, list) ->
+                val expiredCount = list.count { now - it.timestamp > expireThreshold }
+                if (expiredCount > 0) {
+                    list.removeAll { now - it.timestamp > expireThreshold }
+                    Log.d(TAG, "[缓存] 清理过期消息: groupId=$groupId, 清理数量=$expiredCount")
+                }
+            }
+            
+            // 移除空列表
+            pendingGroupAccepts.entries.removeAll { it.value.isEmpty() }
         }
     }
     

@@ -586,10 +586,143 @@ async function handleGroupFanout(event) {
     };
 }
 
+async function handleS3Event(event) {
+    const requestId = generateTraceId();
+    log('INFO', 'S3 event trigger activated', { 
+        requestId,
+        recordCount: event.Records?.length || 0
+    });
+    
+    if (!event.Records || event.Records.length === 0) {
+        log('WARN', 'No S3 records in event', { requestId });
+        return {
+            statusCode: 200,
+            deliveredCount: 0,
+            results: []
+        };
+    }
+    
+    const results = [];
+    
+    for (const record of event.Records) {
+        try {
+            const bucket = record.s3?.bucket?.name;
+            const key = decodeURIComponent((record.s3?.object?.key || '').replace(/\+/g, ' '));
+            
+            log('DEBUG', 'Processing S3 record', { bucket, key });
+            
+            if (!key.startsWith(CHANNEL_PREFIX)) {
+                log('DEBUG', 'Skipping non-channel object', { key });
+                continue;
+            }
+            
+            const senderId = extractSenderIdFromKey(key);
+            if (!senderId) {
+                log('WARN', 'Cannot extract sender ID from key', { key });
+                continue;
+            }
+            
+            const configBucket = CONFIG_BUCKET || bucket;
+            
+            // 列出所有联系人配置
+            let contactConfigs = [];
+            try {
+                const objects = await listContactConfigs(configBucket);
+                
+                for (const obj of objects) {
+                    try {
+                        const config = await getS3Object(configBucket, obj.Key);
+                        contactConfigs.push(config);
+                    } catch (err) {
+                        log('WARN', 'Failed to load contact config', { 
+                            key: obj.Key,
+                            error: err.message
+                        });
+                    }
+                }
+            } catch (err) {
+                log('ERROR', 'Failed to list contact configs', { 
+                    bucket: configBucket,
+                    error: err.message
+                });
+                continue;
+            }
+            
+            // 向所有已配置的联系人发送通知
+            for (const contactConfig of contactConfigs) {
+                if (!contactConfig.webhookUrl || !contactConfig.notifySecret) {
+                    log('DEBUG', 'Skipping contact with incomplete config', { 
+                        contactId: contactConfig.contactId 
+                    });
+                    continue;
+                }
+                
+                // 跳过发送者自己
+                if (contactConfig.contactId === senderId) {
+                    log('DEBUG', 'Skipping sender as recipient', { senderId });
+                    continue;
+                }
+                
+                const notification = {
+                    type: 'new_message',
+                    senderId: senderId,
+                    timestamp: Date.now(),
+                    metadata: {
+                        delivery: 's3_event',
+                        traceId: requestId,
+                        bucket: bucket,
+                        key: key,
+                        userId: contactConfig.userId
+                    }
+                };
+                
+                try {
+                    const result = await sendWebhookNotification(
+                        contactConfig.webhookUrl,
+                        notification,
+                        contactConfig.notifySecret
+                    );
+                    
+                    results.push({
+                        contactId: contactConfig.contactId,
+                        success: result.success,
+                        statusCode: result.statusCode,
+                        error: result.error || null
+                    });
+                } catch (err) {
+                    log('ERROR', 'Webhook notification failed', {
+                        contactId: contactConfig.contactId,
+                        error: err.message
+                    });
+                    results.push({
+                        contactId: contactConfig.contactId,
+                        success: false,
+                        error: err.message
+                    });
+                }
+            }
+        } catch (err) {
+            log('ERROR', 'Failed to process S3 record', {
+                error: err.message,
+                record: JSON.stringify(record).substring(0, 200)
+            });
+        }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    return {
+        statusCode: 200,
+        deliveredCount: successCount,
+        results: results
+    };
+}
+
 exports.handler = async (event) => {
-    const requestId = event.requestId || 'unknown';
+    const requestId = event.requestId || event.traceId || 'unknown';
     
     try {
+        // 优先处理直接调用的操作
         if (event && event.operation === 'direct_message') {
             return await handleDirectMessage(event);
         }
@@ -598,9 +731,15 @@ exports.handler = async (event) => {
             return await handleGroupFanout(event);
         }
 
+        // S3 Event 触发（有 Records 数组）
+        if (event && event.Records && Array.isArray(event.Records)) {
+            return await handleS3Event(event);
+        }
+
         log('WARN', 'Unsupported operation for F_A', {
             requestId,
-            operation: event?.operation
+            operation: event?.operation,
+            hasRecords: !!(event?.Records)
         });
 
         return {

@@ -1,0 +1,764 @@
+/**
+ * AWS Lambda S3 Event Trigger (Function F_A)
+ * 
+ * 功能：S3上传事件触发后，读取联系人webhook配置，发送通知
+ * 
+ * 触发方式：S3 Event Notification (ObjectCreated)
+ * 输入：S3 Event { Records: [{ s3: { object: { key } } }] }
+ * 输出：{ statusCode, deliveredCount, results }
+ */
+
+const { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } = require('@aws-sdk/client-s3');
+const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
+
+const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
+const CONFIG_BUCKET = process.env.CONFIG_BUCKET;
+const CONFIG_KEY = process.env.CONFIG_KEY || 'notification-config.json';
+const CONTACTS_PREFIX = 'tap-state/contacts/';
+const CHANNEL_PREFIX = 'v2-channels/';
+const DEDUP_PREFIX = 'tap-dedup/';
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000; // 24小时
+
+const s3Client = new S3Client({
+    region: process.env.AWS_REGION
+});
+
+function log(level, message, data = {}) {
+    const levels = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
+    if (levels[level] >= levels[LOG_LEVEL]) {
+        console.log(JSON.stringify({
+            level,
+            message,
+            timestamp: new Date().toISOString(),
+            ...data
+        }));
+    }
+}
+
+async function getS3Object(bucket, key) {
+    log('DEBUG', 'Fetching S3 object', { bucket, key });
+    
+    const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key
+    });
+    
+    const response = await s3Client.send(command);
+    const bodyContents = await streamToString(response.Body);
+    return JSON.parse(bodyContents);
+}
+
+async function streamToString(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    });
+}
+
+async function listContactConfigs(bucket) {
+    log('DEBUG', 'Listing contact configurations', { bucket });
+    
+    const command = new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: CONTACTS_PREFIX
+    });
+    
+    const response = await s3Client.send(command);
+    return response.Contents || [];
+}
+
+async function sendWebhookNotification(webhookUrl, notification, notifySecret) {
+    log('DEBUG', 'Sending webhook notification', { webhookUrl });
+    
+    const requestBody = {
+        version: '2.0',
+        notification: notification
+    };
+    
+    const signature = crypto
+        .createHmac('sha256', notifySecret)
+        .update(JSON.stringify(requestBody))
+        .digest('hex');
+    
+    const fullRequest = {
+        ...requestBody,
+        signature: signature
+    };
+    
+    const payload = JSON.stringify(fullRequest);
+    const url = new URL(webhookUrl);
+    const protocol = url.protocol === 'https:' ? https : http;
+    
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload),
+                'User-Agent': 'TapNotification/1.0'
+            },
+            timeout: 10000
+        };
+        
+        const req = protocol.request(options, (res) => {
+            let data = '';
+            
+            res.on('data', chunk => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    log('INFO', 'Webhook notification sent successfully', { 
+                        webhookUrl,
+                        statusCode: res.statusCode
+                    });
+                    resolve({
+                        success: true,
+                        statusCode: res.statusCode,
+                        response: data
+                    });
+                } else {
+                    log('WARN', 'Webhook returned error status', {
+                        webhookUrl,
+                        statusCode: res.statusCode,
+                        response: data
+                    });
+                    resolve({
+                        success: false,
+                        statusCode: res.statusCode,
+                        error: `HTTP ${res.statusCode}`
+                    });
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            log('ERROR', 'Webhook request failed', {
+                webhookUrl,
+                error: error.message
+            });
+            resolve({
+                success: false,
+                error: error.message
+            });
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            log('ERROR', 'Webhook request timeout', { webhookUrl });
+            resolve({
+                success: false,
+                error: 'Request timeout'
+            });
+        });
+        
+        req.write(payload);
+        req.end();
+    });
+}
+
+function extractSenderIdFromKey(key) {
+    const match = key.match(/v2-channels\/([^/]+)\//);
+    if (!match) return null;
+    
+    // 提取channelId，格式: {hash}_{timestamp}
+    const channelId = match[1];
+    
+    // 修复: 只返回hash部分，去掉timestamp后缀
+    // 这样Android端可以直接通过hash查找通道，不需要额外处理
+    const hashOnly = channelId.split('_')[0];
+    
+    return hashOnly;
+}
+
+function hashString(str) {
+    return crypto.createHash('sha256').update(str).digest('hex').substring(0, 16);
+}
+
+function generateTraceId() {
+    return typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex');
+}
+
+async function loadContactConfig(bucket, hash) {
+    const key = `${CONTACTS_PREFIX}${hash}.json`;
+    try {
+        return await getS3Object(bucket, key);
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            log('WARN', 'Contact config not found', { bucket, key });
+            return null;
+        }
+        throw error;
+    }
+}
+
+async function checkDuplicate(bucket, traceId) {
+    if (!traceId) return false;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    
+    try {
+        const response = await s3Client.send(new GetObjectCommand({
+            Bucket: bucket,
+            Key: key
+        }));
+        
+        const metadata = response.Metadata || {};
+        const timestamp = parseInt(metadata.timestamp || '0', 10);
+        const age = Date.now() - timestamp;
+        
+        if (age < DEDUP_TTL_MS) {
+            log('INFO', 'Duplicate request detected', { traceId, age });
+            return true;
+        } else {
+            log('DEBUG', 'Dedup marker expired, treating as new', { traceId, age });
+            return false;
+        }
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            return false;
+        }
+        log('WARN', 'Failed to check duplicate', { traceId, error: error.message });
+        return false;
+    }
+}
+
+async function markProcessed(bucket, traceId) {
+    if (!traceId) return;
+    
+    const key = `${DEDUP_PREFIX}${traceId}.marker`;
+    const now = Date.now();
+    
+    try {
+        await s3Client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: JSON.stringify({ traceId, processedAt: now }),
+            Metadata: {
+                timestamp: now.toString(),
+                ttl: (now + DEDUP_TTL_MS).toString()
+            }
+        }));
+        log('DEBUG', 'Request marked as processed', { traceId });
+    } catch (error) {
+        log('WARN', 'Failed to mark request as processed', { traceId, error: error.message });
+    }
+}
+
+function extractRecipientGateway(event) {
+    const gateway = event.recipientGateway;
+    if (!gateway) {
+        return null;
+    }
+    if (!gateway.webhookUrl || !gateway.notifySecret || !gateway.userId) {
+        return null;
+    }
+    return {
+        webhookUrl: gateway.webhookUrl,
+        notifySecret: gateway.notifySecret,
+        userId: gateway.userId,
+        provider: gateway.provider,
+        region: gateway.region,
+        endpoint: gateway.endpoint,
+        offlineBucket: gateway.offlineBucket,
+        presignDelegation: gateway.presignDelegation,
+        metadata: gateway.metadata || {}
+    };
+}
+
+async function handleDirectMessage(event) {
+    const requestId = event.traceId || event.requestId || generateTraceId();
+    log('INFO', 'Handling direct message dispatch', { requestId });
+
+    const recipientHash = event.recipientHash || event.recipient?.hash;
+    if (!recipientHash) {
+        log('WARN', 'Missing recipient hash for direct dispatch', { requestId });
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'recipientHash missing'
+        };
+    }
+
+    const bucket = event.configBucket || CONFIG_BUCKET;
+    if (!bucket) {
+        log('ERROR', 'CONFIG_BUCKET not configured for direct dispatch', { requestId });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: 'CONFIG_BUCKET missing'
+        };
+    }
+
+    // 去重检查
+    const isDuplicate = await checkDuplicate(bucket, requestId);
+    if (isDuplicate) {
+        log('INFO', 'Duplicate request, returning cached result', { requestId });
+        return {
+            statusCode: 200,
+            deliveredCount: 1,
+            cached: true,
+            results: [
+                {
+                    contactId: recipientHash,
+                    success: true,
+                    cached: true
+                }
+            ]
+        };
+    }
+
+    let contactConfig = extractRecipientGateway(event);
+    if (!contactConfig) {
+        try {
+            contactConfig = await loadContactConfig(bucket, recipientHash);
+        } catch (error) {
+            log('ERROR', 'Failed to load contact config for direct dispatch', {
+                bucket,
+                recipientHash,
+                error: error.message
+            });
+            return {
+                statusCode: 500,
+                deliveredCount: 0,
+                error: error.message
+            };
+        }
+    }
+
+    if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
+        log('WARN', 'Contact config incomplete for direct dispatch', { recipientHash });
+        return {
+            statusCode: 404,
+            deliveredCount: 0,
+            error: 'contact config missing'
+        };
+    }
+
+    const notification = {
+        type: 'new_message',
+        senderId: event.sender?.hash || event.sender?.aci || 'unknown',
+        timestamp: Date.now(),
+        metadata: {
+            delivery: 'direct',
+            traceId: requestId,
+            recipientHash,
+            userId: contactConfig.userId,
+            message: event.message,
+            attachmentsPresigned: event.attachmentsPresigned || [],
+            deliveryHint: event.deliveryHint || {}
+        }
+    };
+
+    if (event.groupId) {
+        notification.metadata.groupId = event.groupId;
+    }
+
+    if (event.recipientGateway) {
+        notification.metadata.recipientGateway = event.recipientGateway;
+    }
+
+    const result = await sendWebhookNotification(
+        contactConfig.webhookUrl,
+        notification,
+        contactConfig.notifySecret
+    );
+
+    // 标记为已处理
+    if (result.success) {
+        await markProcessed(bucket, requestId);
+    }
+
+    if (!result.success) {
+        throw new Error(`Webhook delivery failed: ${result.error || result.statusCode || 'unknown error'}`);
+    }
+
+    return {
+        statusCode: 200,
+        deliveredCount: 1,
+        results: [
+            {
+                contactId: contactConfig.contactId || recipientHash,
+                success: true,
+                statusCode: result.statusCode,
+                error: null
+            }
+        ]
+    };
+}
+
+async function storeOfflineMessage(bucket, recipientHash, groupId, notification) {
+    const timestamp = Date.now();
+    const messageId = notification.metadata.message?.messageId || 'unknown';
+    const offlineKey = `tap-offline/${recipientHash}/group/${groupId}/${timestamp}-${messageId}.json`;
+    
+    try {
+        await s3Client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: offlineKey,
+            Body: JSON.stringify(notification),
+            ContentType: 'application/json',
+            Metadata: {
+                type: 'offline_group_message',
+                groupId: groupId,
+                recipientHash: recipientHash,
+                timestamp: timestamp.toString()
+            }
+        }));
+        log('INFO', 'Stored offline group message', { offlineKey, groupId, recipientHash });
+        return true;
+    } catch (error) {
+        log('ERROR', 'Failed to store offline group message', {
+            offlineKey,
+            groupId,
+            recipientHash,
+            error: error.message
+        });
+        return false;
+    }
+}
+
+async function handleGroupFanout(event) {
+    const requestId = event.traceId || event.requestId || generateTraceId();
+    log('INFO', 'Handling group fanout dispatch', { 
+        requestId,
+        groupId: event.groupId,
+        recipientAci: event.recipient?.aci
+    });
+
+    const groupId = event.groupId;
+    if (!groupId) {
+        log('WARN', 'Missing groupId for group fanout', { requestId });
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'groupId missing'
+        };
+    }
+
+    const recipientHash = event.recipientHash || event.recipient?.hash;
+    if (!recipientHash) {
+        log('WARN', 'Missing recipient hash for group fanout', { requestId, groupId });
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'recipientHash missing'
+        };
+    }
+
+    const bucket = event.configBucket || CONFIG_BUCKET;
+    if (!bucket) {
+        log('ERROR', 'CONFIG_BUCKET not configured', { requestId });
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: 'CONFIG_BUCKET missing'
+        };
+    }
+
+    // 去重检查 (使用 groupId + recipientHash 组合)
+    const dedupKey = `${groupId}:${recipientHash}:${requestId}`;
+    const isDuplicate = await checkDuplicate(bucket, dedupKey);
+    if (isDuplicate) {
+        log('INFO', 'Duplicate group fanout request', { requestId, groupId, recipientHash });
+        return {
+            statusCode: 200,
+            deliveredCount: 1,
+            cached: true,
+            results: [{
+                contactId: recipientHash,
+                success: true,
+                cached: true
+            }]
+        };
+    }
+
+    // 优先使用 event.recipientGateway
+    let contactConfig = extractRecipientGateway(event);
+    if (!contactConfig) {
+        try {
+            contactConfig = await loadContactConfig(bucket, recipientHash);
+        } catch (error) {
+            log('ERROR', 'Failed to load contact config for group fanout', {
+                bucket,
+                recipientHash,
+                groupId,
+                error: error.message
+            });
+            return {
+                statusCode: 500,
+                deliveredCount: 0,
+                error: error.message
+            };
+        }
+    }
+
+    if (!contactConfig || !contactConfig.webhookUrl || !contactConfig.notifySecret) {
+        log('WARN', 'Contact config incomplete for group fanout', { recipientHash, groupId });
+        return {
+            statusCode: 404,
+            deliveredCount: 0,
+            error: 'contact config missing'
+        };
+    }
+
+    // 构建群聊通知
+    const notification = {
+        type: 'new_message',
+        senderId: event.sender?.hash || event.sender?.aci || 'unknown',
+        timestamp: Date.now(),
+        metadata: {
+            delivery: 'group_fanout',
+            traceId: requestId,
+            groupId: groupId,
+            recipientHash: recipientHash,
+            userId: contactConfig.userId,
+            message: event.message,
+            attachmentsPresigned: event.attachmentsPresigned || [],
+            deliveryHint: event.deliveryHint || {}
+        }
+    };
+
+    // 包含 recipientGateway 信息
+    if (event.recipientGateway) {
+        notification.metadata.recipientGateway = event.recipientGateway;
+    }
+
+    const result = await sendWebhookNotification(
+        contactConfig.webhookUrl,
+        notification,
+        contactConfig.notifySecret
+    );
+
+    // 标记为已处理
+    if (result.success) {
+        await markProcessed(bucket, dedupKey);
+    }
+
+    // 离线回退机制
+    if (!result.success) {
+        log('WARN', 'Group fanout webhook failed, falling back to offline storage', {
+            groupId,
+            recipientHash,
+            error: result.error || result.statusCode
+        });
+        
+        const offlineBucket = contactConfig.offlineBucket || bucket;
+        const offlineStored = await storeOfflineMessage(offlineBucket, recipientHash, groupId, notification);
+        
+        if (offlineStored) {
+            await markProcessed(bucket, dedupKey);
+            return {
+                statusCode: 202,
+                deliveredCount: 1,
+                offline: true,
+                results: [{
+                    contactId: contactConfig.contactId || recipientHash,
+                    success: true,
+                    offline: true,
+                    statusCode: 202
+                }]
+            };
+        } else {
+            throw new Error(`Group fanout failed and offline storage failed: ${result.error || result.statusCode || 'unknown error'}`);
+        }
+    }
+
+    return {
+        statusCode: 200,
+        deliveredCount: 1,
+        results: [{
+            contactId: contactConfig.contactId || recipientHash,
+            success: true,
+            statusCode: result.statusCode,
+            error: null
+        }]
+    };
+}
+
+async function handleS3Event(event) {
+    const requestId = generateTraceId();
+    log('INFO', 'S3 event trigger activated', { 
+        requestId,
+        recordCount: event.Records?.length || 0
+    });
+    
+    if (!event.Records || event.Records.length === 0) {
+        log('WARN', 'No S3 records in event', { requestId });
+        return {
+            statusCode: 200,
+            deliveredCount: 0,
+            results: []
+        };
+    }
+    
+    const results = [];
+    
+    for (const record of event.Records) {
+        try {
+            const bucket = record.s3?.bucket?.name;
+            const key = decodeURIComponent((record.s3?.object?.key || '').replace(/\+/g, ' '));
+            
+            log('DEBUG', 'Processing S3 record', { bucket, key });
+            
+            if (!key.startsWith(CHANNEL_PREFIX)) {
+                log('DEBUG', 'Skipping non-channel object', { key });
+                continue;
+            }
+            
+            const senderId = extractSenderIdFromKey(key);
+            if (!senderId) {
+                log('WARN', 'Cannot extract sender ID from key', { key });
+                continue;
+            }
+            
+            const configBucket = CONFIG_BUCKET || bucket;
+            
+            // 列出所有联系人配置
+            let contactConfigs = [];
+            try {
+                const objects = await listContactConfigs(configBucket);
+                
+                for (const obj of objects) {
+                    try {
+                        const config = await getS3Object(configBucket, obj.Key);
+                        contactConfigs.push(config);
+                    } catch (err) {
+                        log('WARN', 'Failed to load contact config', { 
+                            key: obj.Key,
+                            error: err.message
+                        });
+                    }
+                }
+            } catch (err) {
+                log('ERROR', 'Failed to list contact configs', { 
+                    bucket: configBucket,
+                    error: err.message
+                });
+                continue;
+            }
+            
+            // 向所有已配置的联系人发送通知
+            for (const contactConfig of contactConfigs) {
+                if (!contactConfig.webhookUrl || !contactConfig.notifySecret) {
+                    log('DEBUG', 'Skipping contact with incomplete config', { 
+                        contactId: contactConfig.contactId 
+                    });
+                    continue;
+                }
+                
+                // 跳过发送者自己
+                if (contactConfig.contactId === senderId) {
+                    log('DEBUG', 'Skipping sender as recipient', { senderId });
+                    continue;
+                }
+                
+                const notification = {
+                    type: 'new_message',
+                    senderId: senderId,
+                    timestamp: Date.now(),
+                    metadata: {
+                        delivery: 's3_event',
+                        traceId: requestId,
+                        bucket: bucket,
+                        key: key,
+                        userId: contactConfig.userId
+                    }
+                };
+                
+                try {
+                    const result = await sendWebhookNotification(
+                        contactConfig.webhookUrl,
+                        notification,
+                        contactConfig.notifySecret
+                    );
+                    
+                    results.push({
+                        contactId: contactConfig.contactId,
+                        success: result.success,
+                        statusCode: result.statusCode,
+                        error: result.error || null
+                    });
+                } catch (err) {
+                    log('ERROR', 'Webhook notification failed', {
+                        contactId: contactConfig.contactId,
+                        error: err.message
+                    });
+                    results.push({
+                        contactId: contactConfig.contactId,
+                        success: false,
+                        error: err.message
+                    });
+                }
+            }
+        } catch (err) {
+            log('ERROR', 'Failed to process S3 record', {
+                error: err.message,
+                record: JSON.stringify(record).substring(0, 200)
+            });
+        }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    return {
+        statusCode: 200,
+        deliveredCount: successCount,
+        results: results
+    };
+}
+
+exports.handler = async (event) => {
+    const requestId = event.requestId || event.traceId || 'unknown';
+    
+    try {
+        // 优先处理直接调用的操作
+        if (event && event.operation === 'direct_message') {
+            return await handleDirectMessage(event);
+        }
+
+        if (event && event.operation === 'group_fanout') {
+            return await handleGroupFanout(event);
+        }
+
+        // S3 Event 触发（有 Records 数组）
+        if (event && event.Records && Array.isArray(event.Records)) {
+            return await handleS3Event(event);
+        }
+
+        log('WARN', 'Unsupported operation for F_A', {
+            requestId,
+            operation: event?.operation,
+            hasRecords: !!(event?.Records)
+        });
+
+        return {
+            statusCode: 400,
+            deliveredCount: 0,
+            error: 'unsupported operation'
+        };
+        
+    } catch (error) {
+        log('ERROR', 'Handler error', {
+            requestId,
+            error: error.message,
+            stack: error.stack
+        });
+        
+        return {
+            statusCode: 500,
+            deliveredCount: 0,
+            error: error.message
+        };
+    }
+};

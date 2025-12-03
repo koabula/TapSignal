@@ -31,6 +31,7 @@ class GroupMessageDeduplicator private constructor(private val context: Context)
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: GroupMessageDeduplicator(context.applicationContext).also { 
                     INSTANCE = it
+                    it.ensureTableExists()
                     Log.d(TAG, "创建 GroupMessageDeduplicator 实例")
                 }
             }
@@ -406,6 +407,79 @@ class GroupMessageDeduplicator private constructor(private val context: Context)
                 Log.e(TAG, "清空群组去重记录失败", e)
             }
         }
+    }
+    
+    /**
+     * 确保数据库表存在并且结构正确
+     * 在实例初始化时调用，提供自愈能力
+     */
+    private fun ensureTableExists() {
+        try {
+            val database = SignalDatabase.rawDatabase
+            
+            // 检查表是否存在
+            val cursor = database.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='transport_group_processed_messages'",
+                null
+            )
+            
+            val tableExists = cursor.use { it.moveToFirst() }
+            
+            if (!tableExists) {
+                Log.w(TAG, "检测到transport_group_processed_messages表不存在，正在创建...")
+                createTable(database)
+                Log.i(TAG, "transport_group_processed_messages表创建成功")
+            } else {
+                Log.d(TAG, "transport_group_processed_messages表已存在")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "检查/创建群组去重表失败，去重功能可能受影响", e)
+        }
+    }
+    
+    /**
+     * 创建群组去重表及其索引
+     */
+    private fun createTable(database: net.zetetic.database.sqlcipher.SQLiteDatabase) {
+        // 创建主表
+        database.execSQL(
+            "CREATE TABLE IF NOT EXISTS transport_group_processed_messages (" +
+            "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "duplication_key TEXT UNIQUE NOT NULL, " +
+            "message_id TEXT NOT NULL, " +
+            "sender_aci TEXT NOT NULL, " +
+            "group_id TEXT NOT NULL, " +
+            "timestamp INTEGER NOT NULL, " +
+            "processed_at INTEGER NOT NULL, " +
+            "polling_member_aci TEXT, " +
+            "created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)" +
+            ")"
+        )
+        
+        // 创建索引
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_group_processed_messages_key_idx " +
+            "ON transport_group_processed_messages (duplication_key)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_group_processed_messages_timestamp_idx " +
+            "ON transport_group_processed_messages (processed_at)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_group_processed_messages_group_idx " +
+            "ON transport_group_processed_messages (group_id)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_group_processed_messages_sender_idx " +
+            "ON transport_group_processed_messages (sender_aci)"
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS transport_group_processed_messages_message_idx " +
+            "ON transport_group_processed_messages (message_id)"
+        )
+        
+        Log.i(TAG, "transport_group_processed_messages表及索引创建完成")
     }
     
     /**
