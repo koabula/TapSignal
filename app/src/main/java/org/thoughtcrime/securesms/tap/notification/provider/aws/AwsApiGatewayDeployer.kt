@@ -802,7 +802,16 @@ class AwsApiGatewayDeployer(
         try {
             val iam = getIamClient()
             val accountId = getAccountId()
-            val roleName = "TapNotificationLambdaRole"
+            
+            // 使用bucket名称的hash作为后缀，确保每个bucket有唯一的角色
+            // 这样多个用户可以使用各自的角色而不冲突
+            val bucketSuffix = userBucketName?.let { 
+                "-${it.hashCode().toUInt().toString(16).take(8)}" 
+            } ?: ""
+            val roleName = "TapNotificationLambdaRole$bucketSuffix"
+            val policyName = "TapNotificationLambdaPolicy$bucketSuffix"
+            
+            Log.d(TAG, "Using Lambda role: $roleName (bucket: $userBucketName)")
             
             val roleArn = try {
                 val getRole = iam.getRole(
@@ -879,26 +888,26 @@ class AwsApiGatewayDeployer(
                 try {
                     iam.createPolicy(
                         CreatePolicyRequest {
-                            this.policyName = "TapNotificationLambdaPolicy"
+                            this.policyName = policyName
                             this.policyDocument = customPolicyDocument
-                            this.description = "Policy for TAP notification Lambda functions"
+                            this.description = "Policy for TAP notification Lambda functions (bucket: ${userBucketName ?: "default"})"
                         }
                     )
                     
                     iam.attachRolePolicy(
                         AttachRolePolicyRequest {
                             this.roleName = roleName
-                            this.policyArn = "arn:aws:iam::${accountId}:policy/TapNotificationLambdaPolicy"
+                            this.policyArn = "arn:aws:iam::${accountId}:policy/$policyName"
                         }
                     )
-                    Log.d(TAG, "Attached custom TAP policy")
+                    Log.d(TAG, "Attached custom TAP policy: $policyName")
                 } catch (policyError: Exception) {
                     Log.w(TAG, "Custom policy may already exist, trying to attach", policyError)
                     try {
                         iam.attachRolePolicy(
                             AttachRolePolicyRequest {
                                 this.roleName = roleName
-                                this.policyArn = "arn:aws:iam::${accountId}:policy/TapNotificationLambdaPolicy"
+                                this.policyArn = "arn:aws:iam::${accountId}:policy/$policyName"
                             }
                         )
                     } catch (attachError: Exception) {

@@ -17,7 +17,7 @@ Parameters:
   UserName:
     Type: String
     Default: signal-tap-user
-    Description: Name for the IAM user
+    Description: Name for the IAM user (use different names for multiple users)
     MinLength: 1
     MaxLength: 64
     AllowedPattern: ^[a-zA-Z0-9_+=,.@-]+$
@@ -109,6 +109,7 @@ Resources:
             Resource: !Sub 'arn:aws:execute-api:${Region}:${AWS::AccountId}:*/@connections/*'
 
           # IAM Role Management - for Lambda execution roles
+          # Note: Role names include UserName to avoid conflicts between multiple users
           - Sid: IAMRoleManagement
             Effect: Allow
             Action:
@@ -123,6 +124,7 @@ Resources:
               - iam:PutRolePolicy
             Resource:
               - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole-*'
 
           # IAM Policy Management - for Lambda custom policy
           - Sid: IAMPolicyManagement
@@ -135,6 +137,7 @@ Resources:
               - iam:ListPolicyVersions
             Resource:
               - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/TapNotificationLambdaPolicy'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/TapNotificationLambdaPolicy-*'
 
           # IAM PassRole - required to assign roles to Lambda
           - Sid: IAMPassRole
@@ -143,6 +146,7 @@ Resources:
               - iam:PassRole
             Resource:
               - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/TapNotificationLambdaRole-*'
             Condition:
               StringEquals:
                 iam:PassedToService: lambda.amazonaws.com
