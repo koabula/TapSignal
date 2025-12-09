@@ -627,23 +627,11 @@ class TapEnvelopeAdapter private constructor(private val context: Context) {
                 return false
             }
             
-            // 检查时间戳合理性
-            val currentTime = System.currentTimeMillis()
-            val timeDiff = Math.abs(currentTime - timestamp)
-            
-            // 允许1小时的时间偏差，防止重放攻击
-            val MAX_TIME_DRIFT_MS = 60 * 60 * 1000L // 1小时
-            if (timeDiff > MAX_TIME_DRIFT_MS) {
-                Log.w(TAG, "Envelope时间戳偏差过大: envelopeTime=$timestamp, currentTime=$currentTime, diff=${timeDiff}ms")
-                return false
-            }
-            
-            // 检查时间戳是否为未来时间（允许5分钟时钟偏差）
-            val MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000L // 5分钟
-            if (timestamp > currentTime + MAX_FUTURE_DRIFT_MS) {
-                Log.w(TAG, "Envelope时间戳为未来时间: envelopeTime=$timestamp, currentTime=$currentTime")
-                return false
-            }
+            // 时间戳验证已移除:
+            // Signal协议层通过DuplicateMessageException检测重放攻击
+            // libsignal的计数器机制是密码学级别的防护,无法绕过
+            // 数据库UNIQUE约束提供额外的重复消息防护
+            // 离线消息场景下,时间戳偏差是预期行为,不应被拒绝
             
             true
             

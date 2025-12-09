@@ -329,24 +329,10 @@ class TapMessageProcessor private constructor(private val context: Context) {
                 return false
             }
             
-            // 验证时间戳合理性
-            val currentTime = System.currentTimeMillis()
-            val messageTime = message.timestamp
-            val timeDiff = Math.abs(currentTime - messageTime)
-            
-            // 允许1小时的时间偏差，防止重放攻击
-            val MAX_TIME_DRIFT_MS = 60 * 60 * 1000L // 1小时
-            if (timeDiff > MAX_TIME_DRIFT_MS) {
-                Log.w(TAG, "消息时间戳偏差过大: messageTime=$messageTime, currentTime=$currentTime, diff=${timeDiff}ms")
-                return false
-            }
-            
-            // 检查时间戳是否为未来时间（允许5分钟时钟偏差）
-            val MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000L // 5分钟
-            if (messageTime > currentTime + MAX_FUTURE_DRIFT_MS) {
-                Log.w(TAG, "消息时间戳为未来时间: messageTime=$messageTime, currentTime=$currentTime")
-                return false
-            }
+            // 时间戳验证已移除:
+            // Signal协议的Double Ratchet机制通过计数器防止重放攻击,无需额外的时间戳验证
+            // 数据库的UNIQUE约束(DATE_SENT, FROM_RECIPIENT_ID, THREAD_ID)防止重复插入
+            // 对于离线消息,时间戳偏差是正常现象,不应作为拒绝依据
             
             true
             
