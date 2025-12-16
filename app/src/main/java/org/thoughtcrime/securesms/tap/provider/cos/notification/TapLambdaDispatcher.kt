@@ -98,7 +98,7 @@ private class AwsTapLambdaDispatcher(
             )
 
             val payloadBytes = payload.toString().toByteArray(Charsets.UTF_8)
-            
+
             val response = lambdaClient.invoke(
                 InvokeRequest {
                     this.functionName = functionName
@@ -222,7 +222,7 @@ private class TencentTapLambdaDispatcher(
                 put("FunctionName", functionName)
                 put("InvocationType", "RequestResponse")
                 put("Namespace", "default")
-                put("Event", payload.toString())
+                put("ClientContext", payload.toString())
             }
 
             val response = callTencentApi(

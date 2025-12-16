@@ -88,6 +88,9 @@ async function enqueuePush(userId, message) {
 }
 
 function createServer() {
+    // 全局连接池：存储当前实例的所有活跃 WebSocket 连接
+    const clients = new Map(); // userId -> { socket, pollTimer }
+
     const server = http.createServer(async (req, res) => {
         try {
             const parsed = url.parse(req.url, true);
@@ -104,11 +107,30 @@ function createServer() {
                             res.end(JSON.stringify({ success: false, error: 'Missing userId or message' }));
                             return;
                         }
+
+                        // 【核心优化】优先尝试从内存直接推送
+                        const client = clients.get(userId);
+                        if (client && client.socket && client.socket.readyState === WebSocket.OPEN) {
+                            // 直接推送，延迟 <100ms
+                            try {
+                                client.socket.send(message);
+                                log('INFO', 'Direct push success (in-memory)', { userId, method: 'direct' });
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ success: true, method: 'direct' }));
+                                return;
+                            } catch (sendError) {
+                                log('WARN', 'Direct push failed, fallback to queue', { userId, error: sendError.message });
+                                // 直接推送失败，降级为队列
+                            }
+                        }
+
+                        // 降级：写入 COS 队列（用于离线/多实例场景）
                         const key = await enqueuePush(userId, message);
+                        log('INFO', 'Message queued (fallback)', { userId, method: 'queued', key });
                         res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ success: true, key }));
+                        res.end(JSON.stringify({ success: true, method: 'queued', key }));
                     } catch (e) {
-                        log('ERROR', 'Push enqueue error', { error: e.message });
+                        log('ERROR', 'Push handler error', { error: e.message });
                         res.writeHead(500, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ success: false }));
                     }
@@ -125,17 +147,20 @@ function createServer() {
     });
 
     const wss = new WebSocket.Server({ server });
-    const clients = new Map(); // userId -> { socket, pollTimer }
 
     function startPolling(userId, socket) {
-        const intervalMs = 1000; // 快速轮询以近实时推送
+        const intervalMs = 1000; // 轮询间隔（用于兜底离线消息/多实例场景）
         const timer = setInterval(async () => {
             try {
                 const keys = await listQueueKeys(userId, 10);
+                if (keys.length > 0) {
+                    log('DEBUG', 'Polling found queued messages (fallback path)', { userId, count: keys.length });
+                }
                 for (const key of keys) {
                     const content = await getObject(key);
                     if (content && socket.readyState === WebSocket.OPEN) {
                         socket.send(content);
+                        log('DEBUG', 'Queued message delivered', { userId, key });
                     }
                     await deleteObject(key);
                 }

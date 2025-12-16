@@ -1,0 +1,29 @@
+=============================================================================
+腾讯云函数URL部署问题修复 (2025-12-12)
+=============================================================================
+
+问题1: Invoke API参数错误
+  错误: API错误[UnknownParameter]: The parameter Event is not recognized
+  修复: TapLambdaDispatcher.kt 第225行
+        将 put("Event", ...) 改为 put("ClientContext", ...)
+
+问题2: scf_bootstrap文件权限缺失  
+  错误: {"errorMessage":"[./scf_bootstrap] no such file or directory"}
+  修复: TencentApiGatewayDeployer.kt
+        添加 fixScfBootstrapPermissions() 方法
+        在部署时自动设置scf_bootstrap为755权限
+
+已修改文件:
+  - TapLambdaDispatcher.kt
+  - TencentApiGatewayDeployer.kt
+  - package_lambda_functions.ps1
+
+已重新打包所有Lambda函数 (10个zip文件)
+
+详细说明见: doc/fix_tencent_function_url.md
+
+下一步:
+  1. 编译项目: ./gradlew assembleDebug
+  2. 重新部署TAP配置
+  3. 测试消息发送和WebSocket连接
+=============================================================================
