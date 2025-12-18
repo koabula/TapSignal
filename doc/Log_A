@@ -1,0 +1,13 @@
+--------- beginning of main
+--------- beginning of system
+2025-12-18 15:25:19.798  4862-4899  TapV3MessageTransportIm org...ughtcrime.securesms.tapsignal  D  shouldUseTapV3ForRecipient: channel not active for 9725d657...
+2025-12-18 15:25:21.066  4862-4899  PushGroupSendJob        org...ughtcrime.securesms.tapsignal  I  Group x078y7zqL6HzoJfo7liCytxiENr4RztQSkklFFSOKfA= is in Tap v3 mode. Sending via TapV3GroupMessageSender.
+2025-12-18 15:25:21.071  4862-4899  TapV3GroupMessageSender org...ughtcrime.securesms.tapsignal  I  Starting Tap v3 group send for message 319
+2025-12-18 15:25:21.083  4862-4899  TapV3Crypto             org...ughtcrime.securesms.tapsignal  D  Encrypted 1 bytes to 29 bytes
+--------- beginning of kernel
+2025-12-18 15:25:21.174  4862-4899  TapV3MessageCodec       org...ughtcrime.securesms.tapsignal  D  Serialized payload: 310 bytes
+2025-12-18 15:25:21.176  4862-4899  TapV3MessageCodec       org...ughtcrime.securesms.tapsignal  D  Plain data (header + senderId + payload): 349 bytes
+2025-12-18 15:25:21.179  4862-4899  TapV3Crypto             org...ughtcrime.securesms.tapsignal  D  Encrypted 349 bytes to 377 bytes
+2025-12-18 15:25:21.183  4862-4899  TapV3MessageCodec       org...ughtcrime.securesms.tapsignal  D  Encrypted data: 377 bytes
+2025-12-18 15:25:21.185  4862-4899  TapV3MessageCodec       org...ughtcrime.securesms.tapsignal  D  Base64 encoded: 504 chars
+2025-12-18 15:25:22.349  4862-4899  TapV3GroupMessageSender org...ughtcrime.securesms.tapsignal  I  Tap v3 group message sent successfully

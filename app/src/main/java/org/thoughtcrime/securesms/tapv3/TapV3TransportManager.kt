@@ -158,6 +158,14 @@ class TapV3TransportManager private constructor(
                     TapV3Result.Success(ByteArray(0))
                 }
             }
+
+            is TapV3Payload.GroupMessage -> {
+                Log.d(TAG, "Received Group message: groupId=${payload.groupId}")
+                TapV3Result.Failure(
+                    TapV3Error.INVALID_DATA,
+                    "Group message not supported in receiveMessage"
+                )
+            }
         }
     }
     

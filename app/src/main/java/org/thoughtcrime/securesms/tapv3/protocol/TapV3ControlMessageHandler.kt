@@ -21,11 +21,14 @@ import org.thoughtcrime.securesms.tapv3.TapV3Result
 import org.thoughtcrime.securesms.util.JsonUtils
 import org.whispersystems.signalservice.api.push.ServiceId.ACI
 
+import org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager
+
 class TapV3ControlMessageHandler private constructor(
     private val context: Context
 ) {
     
     private val handshakeManager = TapV3HandshakeManager.getInstance(context)
+    private val groupManager = TapV3GroupManager.getInstance(context)
     
     // 存储待确认的握手请求
     private val pendingHandshakeRequests = mutableMapOf<String, PendingHandshakeRequest>()
@@ -55,6 +58,18 @@ class TapV3ControlMessageHandler private constructor(
             }
             messageBody.startsWith("TAP_V3_CLOSE:") -> {
                 handleChannelClose(messageBody.substring(13), senderId)
+            }
+            messageBody.startsWith("TAP_V3_GROUP_OFFER:") -> {
+                handleGroupOffer(messageBody.substring(19), senderId)
+            }
+            messageBody.startsWith("TAP_V3_GROUP_ACCEPT:") -> {
+                handleGroupAccept(messageBody.substring(20), senderId)
+            }
+            messageBody.startsWith("TAP_V3_GROUP_ACTIVATE:") -> {
+                handleGroupActivate(messageBody.substring(22), senderId)
+            }
+            messageBody.startsWith("TAP_V3_GROUP_DISABLE:") -> {
+                handleGroupDisable(messageBody.substring(21), senderId)
             }
             else -> {
                 Log.w(TAG, "Unknown Tap v3 control message type: ${messageBody.take(20)}")
@@ -309,13 +324,105 @@ class TapV3ControlMessageHandler private constructor(
         Log.d(TAG, "Channel close received from ${senderId.take(8)}... (not yet implemented)")
         return TapV3Result.Success(Unit)
     }
+
+    private fun handleGroupOffer(
+        base64Data: String,
+        senderId: String
+    ): TapV3Result<Unit> {
+        return try {
+            val serialized = Base64.decode(base64Data, Base64.NO_WRAP)
+            val message = TapV3ControlMessage.deserialize(serialized)
+
+            if (message !is TapV3ControlMessage.GroupOffer) {
+                Log.e(TAG, "Expected GroupOffer but got ${message::class.simpleName}")
+                return TapV3Result.Success(Unit)
+            }
+
+            Log.i(TAG, "Received group offer for ${message.groupId} from ${senderId.take(8)}...")
+            groupManager.handleGroupOffer(message)
+            TapV3Result.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling group offer", e)
+            TapV3Result.Success(Unit)
+        }
+    }
+
+    private fun handleGroupAccept(
+        base64Data: String,
+        senderId: String
+    ): TapV3Result<Unit> {
+        return try {
+            val serialized = Base64.decode(base64Data, Base64.NO_WRAP)
+            val message = TapV3ControlMessage.deserialize(serialized)
+
+            if (message !is TapV3ControlMessage.GroupAccept) {
+                Log.e(TAG, "Expected GroupAccept but got ${message::class.simpleName}")
+                return TapV3Result.Success(Unit)
+            }
+
+            Log.i(TAG, "Received group accept for ${message.groupId} from ${senderId.take(8)}...")
+            groupManager.handleGroupAccept(message)
+            TapV3Result.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling group accept", e)
+            TapV3Result.Success(Unit)
+        }
+    }
+
+    private fun handleGroupActivate(
+        base64Data: String,
+        senderId: String
+    ): TapV3Result<Unit> {
+        return try {
+            val serialized = Base64.decode(base64Data, Base64.NO_WRAP)
+            val message = TapV3ControlMessage.deserialize(serialized)
+
+            if (message !is TapV3ControlMessage.GroupActivate) {
+                Log.e(TAG, "Expected GroupActivate but got ${message::class.simpleName}")
+                return TapV3Result.Success(Unit)
+            }
+
+            Log.i(TAG, "Received group activate for ${message.groupId} from ${senderId.take(8)}...")
+            groupManager.handleGroupActivate(message)
+            TapV3Result.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling group activate", e)
+            TapV3Result.Success(Unit)
+        }
+    }
+
+    private fun handleGroupDisable(
+        base64Data: String,
+        senderId: String
+    ): TapV3Result<Unit> {
+        return try {
+            val serialized = Base64.decode(base64Data, Base64.NO_WRAP)
+            val message = TapV3ControlMessage.deserialize(serialized)
+
+            if (message !is TapV3ControlMessage.GroupDisable) {
+                Log.e(TAG, "Expected GroupDisable but got ${message::class.simpleName}")
+                return TapV3Result.Success(Unit)
+            }
+
+            Log.i(TAG, "Received group disable for ${message.groupId} from ${senderId.take(8)}...")
+            groupManager.handleGroupDisable(message)
+            TapV3Result.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling group disable", e)
+            TapV3Result.Success(Unit)
+        }
+    }
     
     fun isControlMessage(messageBody: String): Boolean {
         return messageBody.startsWith("TAP_V3_REQ:") ||
                messageBody.startsWith("TAP_V3_RESP:") ||
                messageBody.startsWith("TAP_V3_ACK:") ||
                messageBody.startsWith("TAP_V3_KEY_ROTATION:") ||
-               messageBody.startsWith("TAP_V3_CLOSE:")
+               messageBody.startsWith("TAP_V3_CLOSE:") ||
+               messageBody.startsWith("TAP_V3_GROUP_OFFER:") ||
+               messageBody.startsWith("TAP_V3_GROUP_ACCEPT:") ||
+               messageBody.startsWith("TAP_V3_GROUP_ACTIVATE:") ||
+               messageBody.startsWith("TAP_V3_GROUP_DISABLE:")
     }
     
     companion object {

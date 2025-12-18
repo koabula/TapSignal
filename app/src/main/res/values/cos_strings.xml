@@ -28,8 +28,6 @@
     <!-- 聊天菜单 -->
     <string name="conversation__menu_use_v2_mode">Use v2 mode</string>
     <string name="conversation__menu_disable_v2_mode">Disable v2 mode</string>
-    <string name="conversation__menu_use_v3_mode">Use v3 mode</string>
-    <string name="conversation__menu_disable_v3_mode">Disable v3 mode</string>
     <string name="conversation__enable_v3_mode">Enable Tap v3 Mode</string>
     <string name="conversation__enable_v3_mode_message">Enable decentralized transport using IPFS and UnifiedPush?</string>
     <string name="conversation__disable_v3_mode">Disable Tap v3 Mode</string>

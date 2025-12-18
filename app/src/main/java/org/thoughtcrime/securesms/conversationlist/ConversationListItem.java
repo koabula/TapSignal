@@ -319,12 +319,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
 
   private void setTapV3Indicator(Recipient recipient) {
     if (tapV3Indicator != null) {
-      // Only show indicator for individual recipients, not for groups
-      if (!recipient.isGroup()) {
-        tapV3Indicator.updateStatus(recipient);
-      } else {
-        tapV3Indicator.setVisibility(View.GONE);
-      }
+      tapV3Indicator.updateStatus(recipient);
     }
   }
 

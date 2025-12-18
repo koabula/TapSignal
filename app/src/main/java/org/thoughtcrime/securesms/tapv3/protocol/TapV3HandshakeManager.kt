@@ -428,7 +428,7 @@ class TapV3HandshakeManager private constructor(
         return channel?.status == TapV3ChannelTable.ChannelStatus.ACTIVE
     }
     
-    private fun createMyHandshakeInfo(): TapV3HandshakeInfo {
+    fun createMyHandshakeInfo(): TapV3HandshakeInfo {
         val myEndpoint = pushEndpointManager.getMyEndpoint()
             ?: throw IllegalStateException("UnifiedPush endpoint not registered")
         

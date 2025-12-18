@@ -356,7 +356,7 @@ internal object ConversationOptionsMenu {
     private fun updateTapV3MenuItem(menu: Menu, recipient: Recipient) {
       val v3MenuItem = menu.findItem(R.id.menu_tap_v3_mode)
       if (v3MenuItem != null) {
-        if (recipient.isSelf || recipient.isReleaseNotes || recipient.isGroup) {
+        if (recipient.isSelf || recipient.isReleaseNotes) {
           v3MenuItem.isVisible = false
           return
         }
@@ -372,6 +372,46 @@ internal object ConversationOptionsMenu {
           
           if (!tapV3Manager.isConfigured()) {
             v3MenuItem.isVisible = false
+            return
+          }
+
+          if (recipient.isGroup) {
+            val groupId = recipient.groupId.orElse(null)
+            if (groupId == null) {
+              v3MenuItem.isVisible = false
+              return
+            }
+            
+            val groupIdString = android.util.Base64.encodeToString(
+              groupId.getDecodedId(),
+              android.util.Base64.NO_WRAP
+            )
+            
+            val groupManager = org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager.getInstance(context)
+            val groupStatus = groupManager.getGroupStatus(groupIdString)
+            
+            v3MenuItem.isVisible = true
+            if (groupStatus != null) {
+              when (groupStatus.status) {
+                org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable.GroupStatus.ACTIVE -> {
+                   v3MenuItem.setTitle(R.string.conversation__menu_disable_v3_mode)
+                }
+                org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable.GroupStatus.PROPOSING -> {
+                   val members = groupManager.getGroupMembers(groupIdString)
+                   val total = members.size
+                   val accepted = members.count { it.status == org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupMembersTable.MemberStatus.ACCEPTED }
+                   
+                   val title = "Proposing v3 mode ($accepted/$total)"
+                   v3MenuItem.title = title
+                   v3MenuItem.isEnabled = true
+                }
+                else -> {
+                   v3MenuItem.setTitle(R.string.conversation__menu_use_v3_mode)
+                }
+              }
+            } else {
+              v3MenuItem.setTitle(R.string.conversation__menu_use_v3_mode)
+            }
             return
           }
           

@@ -86,6 +86,8 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
   val groupV2StatusTable: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable = org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, this)
   val tapV3ChannelTable: org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable = org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable(context, this)
   val ipfsContentTable: org.thoughtcrime.securesms.tapv3.database.IpfsContentTable = org.thoughtcrime.securesms.tapv3.database.IpfsContentTable(context, this)
+  val tapV3GroupStatusTable: org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable = org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable(context, this)
+  val tapV3GroupMembersTable: org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupMembersTable = org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupMembersTable(context, this)
 
   override fun onOpen(db: net.zetetic.database.sqlcipher.SQLiteDatabase) {
     db.setForeignKeyConstraintsEnabled(true)
@@ -639,5 +641,15 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     @get:JvmName("ipfsContent")
     val ipfsContent: org.thoughtcrime.securesms.tapv3.database.IpfsContentTable
       get() = instance!!.ipfsContentTable
+
+    @get:JvmStatic
+    @get:JvmName("tapV3GroupStatus")
+    val tapV3GroupStatus: org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable
+      get() = instance!!.tapV3GroupStatusTable
+
+    @get:JvmStatic
+    @get:JvmName("tapV3GroupMembers")
+    val tapV3GroupMembers: org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupMembersTable
+      get() = instance!!.tapV3GroupMembersTable
   }
 }

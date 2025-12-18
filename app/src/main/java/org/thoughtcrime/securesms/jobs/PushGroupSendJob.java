@@ -204,6 +204,20 @@ public final class PushGroupSendJob extends PushSendJob {
 
     Recipient groupRecipient = message.getThreadRecipient().resolve();
 
+    if (groupRecipient.isGroup()) {
+      try {
+        org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager groupManager = org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager.getInstance(context);
+        String groupIdString = android.util.Base64.encodeToString(groupRecipient.requireGroupId().getDecodedId(), android.util.Base64.NO_WRAP);
+        if (groupManager.isGroupV3Active(groupIdString)) {
+           Log.i(TAG, "Group " + groupIdString + " is in Tap v3 mode. Sending via TapV3GroupMessageSender.");
+           org.thoughtcrime.securesms.tapv3.group.TapV3GroupMessageSender.getInstance(context).sendMessageBlocking(messageId);
+           return;
+        }
+      } catch (Exception e) {
+        Log.w(TAG, "Failed to check/send via Tap v3", e);
+      }
+    }
+
     if (!groupRecipient.isPushGroup()) {
       throw new MmsException("Message recipient isn't a group!");
     }

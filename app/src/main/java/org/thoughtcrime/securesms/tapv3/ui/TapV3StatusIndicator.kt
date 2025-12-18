@@ -53,15 +53,37 @@ class TapV3StatusIndicator @JvmOverloads constructor(
     }
 
     fun updateStatus(recipient: Recipient) {
-        if (recipient.isGroup) {
-            visibility = GONE
-            return
-        }
-        
         currentUpdateJob?.cancel()
         
         currentUpdateJob = indicatorScope.launch {
             try {
+                if (recipient.isGroup) {
+                    val groupId = recipient.groupId.orElse(null)
+                    if (groupId == null) {
+                        visibility = GONE
+                        return@launch
+                    }
+                    
+                    val groupIdString = android.util.Base64.encodeToString(
+                        groupId.getDecodedId(),
+                        android.util.Base64.NO_WRAP
+                    )
+                    
+                    val groupManager = org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager.getInstance(context)
+                    val groupStatus = withContext(Dispatchers.IO) {
+                        groupManager.getGroupStatus(groupIdString)
+                    }
+                    
+                    if (groupStatus != null && groupStatus.status == org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable.GroupStatus.ACTIVE) {
+                        visibility = VISIBLE
+                        indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorPrimary))
+                        indicatorText.text = "v3"
+                    } else {
+                        visibility = GONE
+                    }
+                    return@launch
+                }
+                
                 val recipientId = try {
                     recipient.requireAci().toString()
                 } catch (e: Throwable) {

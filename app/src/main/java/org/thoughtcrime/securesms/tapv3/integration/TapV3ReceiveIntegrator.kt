@@ -7,6 +7,7 @@ import org.thoughtcrime.securesms.tapv3.TapV3Error
 import org.thoughtcrime.securesms.tapv3.TapV3Payload
 import org.thoughtcrime.securesms.tapv3.TapV3Result
 import org.thoughtcrime.securesms.tapv3.crypto.KPushManager
+import org.thoughtcrime.securesms.tapv3.crypto.TapV3Crypto
 import org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable
 import org.thoughtcrime.securesms.tapv3.ipfs.IpfsGatewayManager
 import org.thoughtcrime.securesms.tapv3.protocol.TapV3MessageCodec
@@ -27,7 +28,10 @@ class TapV3ReceiveIntegrator private constructor(
         val attachments: List<ReceivedAttachment> = emptyList(),
         val attachmentCids: List<String> = emptyList(),
         val transportMethod: TransportMethod,
-        val senderId: String
+        val senderId: String,
+        val isDecrypted: Boolean = false,
+        val groupId: String? = null,
+        val body: String? = null
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -38,6 +42,9 @@ class TapV3ReceiveIntegrator private constructor(
             if (attachmentCids != other.attachmentCids) return false
             if (transportMethod != other.transportMethod) return false
             if (senderId != other.senderId) return false
+            if (isDecrypted != other.isDecrypted) return false
+            if (groupId != other.groupId) return false
+            if (body != other.body) return false
             return true
         }
 
@@ -47,6 +54,9 @@ class TapV3ReceiveIntegrator private constructor(
             result = 31 * result + attachmentCids.hashCode()
             result = 31 * result + transportMethod.hashCode()
             result = 31 * result + senderId.hashCode()
+            result = 31 * result + isDecrypted.hashCode()
+            result = 31 * result + (groupId?.hashCode() ?: 0)
+            result = 31 * result + (body?.hashCode() ?: 0)
             return result
         }
     }
@@ -116,7 +126,7 @@ class TapV3ReceiveIntegrator private constructor(
             )
         }
         
-        val decoded = (decodeResult as TapV3Result.Success).data
+        val decoded = (decodeResult as TapV3Result.Success<TapV3MessageCodec.DecodedMessage>).data
         val senderId = decoded.senderId
         val payload = decoded.payload
         
@@ -128,6 +138,9 @@ class TapV3ReceiveIntegrator private constructor(
             }
             is TapV3Payload.IpfsRefs -> {
                 receiveIpfsMessage(payload, senderId)
+            }
+            is TapV3Payload.GroupMessage -> {
+                receiveGroupMessage(payload, senderId)
             }
         }
     }
@@ -162,6 +175,61 @@ class TapV3ReceiveIntegrator private constructor(
         )
     }
     
+    private suspend fun receiveGroupMessage(
+        payload: TapV3Payload.GroupMessage,
+        senderId: String
+    ): ReceiveResult {
+        TapV3Logger.d(TAG, "Receiving Group message for group ${payload.groupId}")
+        
+        // 1. Decrypt Body
+        val bodyBytes: ByteArray = if (payload.encryptedContent != null) {
+            TapV3Crypto.decrypt(payload.encryptedContent, payload.encryptionKey).let {
+                if (it is TapV3Result.Success<*>) (it as TapV3Result.Success<ByteArray>).data else return ReceiveResult(false, error = "Body decryption failed")
+            }
+        } else if (payload.contentCid != null) {
+            val downloadResult = ipfsGatewayManager.download(payload.contentCid)
+            if (downloadResult is TapV3Result.Failure) return ReceiveResult(false, error = "Body download failed: ${downloadResult.message}")
+            TapV3Crypto.decrypt((downloadResult as TapV3Result.Success<ByteArray>).data, payload.encryptionKey).let {
+                if (it is TapV3Result.Success<*>) (it as TapV3Result.Success<ByteArray>).data else return ReceiveResult(false, error = "Body decryption failed")
+            }
+        } else {
+            ByteArray(0)
+        }
+        
+        val body = String(bodyBytes, Charsets.UTF_8)
+        
+        // 2. Decrypt Attachments
+        val attachments = mutableListOf<ReceivedAttachment>()
+        val attachmentCids = mutableListOf<String>()
+        
+        for (ref in payload.attachments) {
+            val downloadResult = ipfsGatewayManager.download(ref.cid)
+            if (downloadResult is TapV3Result.Failure) return ReceiveResult(false, error = "Attachment download failed: ${ref.cid}")
+            
+            val decryptedData = TapV3Crypto.decrypt((downloadResult as TapV3Result.Success<ByteArray>).data, payload.encryptionKey).let {
+                 if (it is TapV3Result.Success<*>) (it as TapV3Result.Success<ByteArray>).data else return ReceiveResult(false, error = "Attachment decryption failed")
+            }
+            
+            val attachment = ReceivedAttachment(decryptedData, ref.size, ref.mimeType, ref.cid)
+            attachments.add(attachment)
+            attachmentCids.add(ref.cid)
+            TapV3AttachmentCache.store(ref.cid, decryptedData)
+        }
+        
+        val message = ReceivedMessage(
+            signalEncrypted = ByteArray(0), // No Signal Ciphertext
+            attachments = attachments,
+            attachmentCids = attachmentCids,
+            transportMethod = TransportMethod.IPFS, // Or GROUP?
+            senderId = senderId,
+            isDecrypted = true,
+            groupId = payload.groupId,
+            body = body
+        )
+        
+        return ReceiveResult(true, message)
+    }
+
     private suspend fun receiveIpfsMessage(
         payload: TapV3Payload.IpfsRefs,
         senderId: String
@@ -237,7 +305,7 @@ class TapV3ReceiveIntegrator private constructor(
             )
         }
         
-        val data = (downloadResult as TapV3Result.Success).data
+        val data = (downloadResult as TapV3Result.Success<ByteArray>).data
         
         if (data.size.toLong() != ref.size) {
             TapV3Logger.w(TAG, "Attachment size mismatch: expected ${ref.size}, got ${data.size}")

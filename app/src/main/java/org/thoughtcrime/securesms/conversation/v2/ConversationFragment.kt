@@ -4491,13 +4491,103 @@ class ConversationFragment :
         return
       }
       
-      // v3 模式仅支持私聊
       if (recipient.isGroup) {
-        Toast.makeText(requireContext(), R.string.conversation__v3_not_support_group, Toast.LENGTH_SHORT).show()
-        return
+        handleGroupV3ModeRequest(recipient)
+      } else {
+        handleIndividualV3ModeRequest(recipient)
       }
-      
-      handleIndividualV3ModeRequest(recipient)
+    }
+
+    private fun handleGroupV3ModeRequest(recipient: Recipient) {
+        val groupId = recipient.groupId.orElse(null)
+        if (groupId == null) {
+            Toast.makeText(requireContext(), R.string.conversation__v3_not_support_group, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val groupIdString = android.util.Base64.encodeToString(
+            groupId.getDecodedId(),
+            android.util.Base64.NO_WRAP
+        )
+
+        val groupManager = org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager.getInstance(requireContext())
+        val groupStatus = groupManager.getGroupStatus(groupIdString)
+
+        if (groupStatus != null && groupStatus.status == org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable.GroupStatus.ACTIVE) {
+             com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Disable Tap v3 Mode")
+                .setMessage("Are you sure you want to disable Tap v3 mode for this group? Messages will revert to Signal servers.")
+                .setPositiveButton("Disable") { _, _ ->
+                    if (groupManager.disableV3Mode(groupIdString)) {
+                        Toast.makeText(requireContext(), "Tap v3 mode disabled", Toast.LENGTH_SHORT).show()
+                        requireActivity().invalidateOptionsMenu()
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to disable Tap v3 mode", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } else if (groupStatus != null && groupStatus.status == org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupStatusTable.GroupStatus.PROPOSING) {
+             val members = groupManager.getGroupMembers(groupIdString)
+             val total = members.size
+             val accepted = members.count { it.status == org.thoughtcrime.securesms.tapv3.group.database.TapV3GroupMembersTable.MemberStatus.ACCEPTED }
+             
+             com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Tap v3 Proposal Status")
+                .setMessage("Waiting for members to accept...\n\nStatus: $accepted/$total members accepted.")
+                .setNegativeButton("Cancel Proposal (Disable)") { _, _ ->
+                     com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("Cancel Proposal")
+                        .setMessage("Are you sure you want to cancel the proposal and disable Tap v3 mode?")
+                        .setPositiveButton("Yes") { _, _ ->
+                            if (groupManager.disableV3Mode(groupIdString)) {
+                                Toast.makeText(requireContext(), "Proposal cancelled and v3 mode disabled", Toast.LENGTH_SHORT).show()
+                                requireActivity().invalidateOptionsMenu()
+                            } else {
+                                Toast.makeText(requireContext(), "Failed to disable", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .setNegativeButton("No", null)
+                        .show()
+                }
+                .setPositiveButton("OK", null)
+                .show()
+        } else {
+             showTapV3GroupProposeDialog(recipient, groupIdString)
+        }
+    }
+
+    private fun showTapV3GroupProposeDialog(recipient: Recipient, groupId: String) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.conversation__menu_use_v3_mode)
+            .setMessage("Propose using Tap v3 mode for this group? All members will receive a request.")
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                proposeTapV3GroupMode(groupId)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun proposeTapV3GroupMode(groupId: String) {
+         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                 val groupManager = org.thoughtcrime.securesms.tapv3.group.TapV3GroupManager.getInstance(requireContext())
+                 val success = groupManager.proposeV3Mode(groupId)
+                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                     if (success) {
+                         Toast.makeText(requireContext(), "Tap v3 mode proposed!", Toast.LENGTH_SHORT).show()
+                         requireActivity().invalidateOptionsMenu()
+                     } else {
+                         Toast.makeText(requireContext(), "Failed to propose Tap v3 mode", Toast.LENGTH_SHORT).show()
+                     }
+                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error proposing group v3 mode", e)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    Toast.makeText(requireContext(), R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+         }
     }
     
     private fun handleIndividualV3ModeRequest(recipient: Recipient) {

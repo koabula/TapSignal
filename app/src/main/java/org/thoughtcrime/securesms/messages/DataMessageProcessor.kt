@@ -1009,9 +1009,11 @@ object DataMessageProcessor {
 
     val body = message.body ?: ""
 
-    // 检查是否为Tap v3控制消息（TAP_V3_REQ/RESP/ACK）
+    // 检查是否为Tap v3控制消息（TAP_V3_REQ/RESP/ACK/GROUP）
     if (body.startsWith("TAP_V3_REQ:") || body.startsWith("TAP_V3_RESP:") || body.startsWith("TAP_V3_ACK:") ||
-        body.startsWith("TAP_V3_KEY_ROTATION:") || body.startsWith("TAP_V3_CLOSE:")) {
+        body.startsWith("TAP_V3_KEY_ROTATION:") || body.startsWith("TAP_V3_CLOSE:") ||
+        body.startsWith("TAP_V3_GROUP_OFFER:") || body.startsWith("TAP_V3_GROUP_ACCEPT:") ||
+        body.startsWith("TAP_V3_GROUP_ACTIVATE:") || body.startsWith("TAP_V3_GROUP_DISABLE:")) {
       log(envelope.timestamp!!, "Tap v3 control message detected, processing: bodyLength=${body.length}")
 
       // 异步处理Tap v3控制消息，避免阻塞当前线程

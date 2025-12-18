@@ -29,6 +29,7 @@ object TapV3MessageCodec {
     private const val TYPE_INLINE: Byte = 0x01
     private const val TYPE_IPFS_REFS: Byte = 0x02
     private const val TYPE_CONTROL: Byte = 0x03
+    private const val TYPE_GROUP_MESSAGE: Byte = 0x04
     
     private const val MAX_SENDER_ID_LENGTH = 255
     
@@ -59,6 +60,7 @@ object TapV3MessageCodec {
             val typeFlag = when (payload) {
                 is TapV3Payload.Inline -> TYPE_INLINE
                 is TapV3Payload.IpfsRefs -> TYPE_IPFS_REFS
+                is TapV3Payload.GroupMessage -> TYPE_GROUP_MESSAGE
             }
             
             val senderIdBytes = senderId.toByteArray(Charsets.UTF_8)
@@ -197,6 +199,14 @@ object TapV3MessageCodec {
                             validationResult.error,
                             validationResult.message,
                             validationResult.cause
+                        )
+                    }
+                }
+                TYPE_GROUP_MESSAGE -> {
+                    if (payload !is TapV3Payload.GroupMessage) {
+                        return TapV3Result.Failure(
+                            TapV3Error.INVALID_DATA,
+                            "Type mismatch: expected GroupMessage, got ${payload::class.simpleName}"
                         )
                     }
                 }

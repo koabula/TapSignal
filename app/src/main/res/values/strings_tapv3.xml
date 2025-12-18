@@ -66,4 +66,9 @@
 
     <!-- Tap v3 Recipient Actions -->
     <string name="RecipientBottomSheet_initiate_tap_v3_handshake">Initiate Tap v3 Handshake</string>
+
+    <!-- Tap v3 Menu -->
+    <string name="conversation__menu_use_v3_mode">Use v3 mode</string>
+    <string name="conversation__menu_disable_v3_mode">Disable v3 mode</string>
+    <string name="conversation__menu_group_v3_proposing">Proposing v3 mode</string>
 </resources>

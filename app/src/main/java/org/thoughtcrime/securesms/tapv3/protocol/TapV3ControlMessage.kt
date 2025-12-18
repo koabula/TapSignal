@@ -26,7 +26,11 @@ import org.thoughtcrime.securesms.tapv3.TapV3HandshakeInfo
     JsonSubTypes.Type(value = TapV3ControlMessage.HandshakeResponse::class, name = "handshake_response"),
     JsonSubTypes.Type(value = TapV3ControlMessage.HandshakeAck::class, name = "handshake_ack"),
     JsonSubTypes.Type(value = TapV3ControlMessage.KeyRotation::class, name = "key_rotation"),
-    JsonSubTypes.Type(value = TapV3ControlMessage.ChannelClose::class, name = "channel_close")
+    JsonSubTypes.Type(value = TapV3ControlMessage.ChannelClose::class, name = "channel_close"),
+    JsonSubTypes.Type(value = TapV3ControlMessage.GroupOffer::class, name = "group_offer"),
+    JsonSubTypes.Type(value = TapV3ControlMessage.GroupAccept::class, name = "group_accept"),
+    JsonSubTypes.Type(value = TapV3ControlMessage.GroupActivate::class, name = "group_activate"),
+    JsonSubTypes.Type(value = TapV3ControlMessage.GroupDisable::class, name = "group_disable")
 )
 sealed class TapV3ControlMessage {
     
@@ -94,6 +98,46 @@ sealed class TapV3ControlMessage {
     data class ChannelClose(
         @JsonProperty("reason")
         val reason: String,
+        @JsonProperty("timestamp")
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : TapV3ControlMessage()
+
+    @JsonDeserialize(using = GroupOfferDeserializer::class)
+    data class GroupOffer(
+        @JsonProperty("groupId")
+        val groupId: String,
+        @JsonProperty("proposerAci")
+        val proposerAci: String,
+        @JsonProperty("handshakeInfo")
+        val handshakeInfo: TapV3HandshakeInfo,
+        @JsonProperty("timestamp")
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : TapV3ControlMessage()
+
+    @JsonDeserialize(using = GroupAcceptDeserializer::class)
+    data class GroupAccept(
+        @JsonProperty("groupId")
+        val groupId: String,
+        @JsonProperty("accepterAci")
+        val accepterAci: String,
+        @JsonProperty("handshakeInfo")
+        val handshakeInfo: TapV3HandshakeInfo,
+        @JsonProperty("timestamp")
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : TapV3ControlMessage()
+
+    data class GroupActivate(
+        @JsonProperty("groupId")
+        val groupId: String,
+        @JsonProperty("timestamp")
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : TapV3ControlMessage()
+
+    data class GroupDisable(
+        @JsonProperty("groupId")
+        val groupId: String,
+        @JsonProperty("reason")
+        val reason: String? = null,
         @JsonProperty("timestamp")
         override val timestamp: Long = System.currentTimeMillis()
     ) : TapV3ControlMessage()
@@ -185,6 +229,52 @@ class KeyRotationDeserializer : JsonDeserializer<TapV3ControlMessage.KeyRotation
             newKPush = newKPush,
             newKeyVersion = newKeyVersion,
             timestamp = timestamp
+        )
+    }
+}
+
+class GroupOfferDeserializer : JsonDeserializer<TapV3ControlMessage.GroupOffer>() {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): TapV3ControlMessage.GroupOffer {
+        val node = p.codec.readTree<JsonNode>(p)
+        val handshakeInfoNode = node.get("handshakeInfo")
+
+        val handshakeInfo = TapV3HandshakeInfo.fromJson(
+            version = handshakeInfoNode.get("version").asInt(),
+            unifiedPushEndpoint = handshakeInfoNode.get("unifiedPushEndpoint").asText(),
+            kPushBase64 = handshakeInfoNode.get("kPush").asText(),
+            keyVersion = handshakeInfoNode.get("keyVersion").asInt(),
+            ipfsGateways = handshakeInfoNode.get("ipfsGateways").map { it.asText() },
+            capabilities = handshakeInfoNode.get("capabilities").map { it.asText() }.toSet()
+        )
+
+        return TapV3ControlMessage.GroupOffer(
+            groupId = node.get("groupId").asText(),
+            proposerAci = node.get("proposerAci").asText(),
+            handshakeInfo = handshakeInfo,
+            timestamp = node.get("timestamp")?.asLong() ?: System.currentTimeMillis()
+        )
+    }
+}
+
+class GroupAcceptDeserializer : JsonDeserializer<TapV3ControlMessage.GroupAccept>() {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): TapV3ControlMessage.GroupAccept {
+        val node = p.codec.readTree<JsonNode>(p)
+        val handshakeInfoNode = node.get("handshakeInfo")
+
+        val handshakeInfo = TapV3HandshakeInfo.fromJson(
+            version = handshakeInfoNode.get("version").asInt(),
+            unifiedPushEndpoint = handshakeInfoNode.get("unifiedPushEndpoint").asText(),
+            kPushBase64 = handshakeInfoNode.get("kPush").asText(),
+            keyVersion = handshakeInfoNode.get("keyVersion").asInt(),
+            ipfsGateways = handshakeInfoNode.get("ipfsGateways").map { it.asText() },
+            capabilities = handshakeInfoNode.get("capabilities").map { it.asText() }.toSet()
+        )
+
+        return TapV3ControlMessage.GroupAccept(
+            groupId = node.get("groupId").asText(),
+            accepterAci = node.get("accepterAci").asText(),
+            handshakeInfo = handshakeInfo,
+            timestamp = node.get("timestamp")?.asLong() ?: System.currentTimeMillis()
         )
     }
 }
