@@ -1,14 +1,11 @@
 package org.thoughtcrime.securesms.tapv3
 
-import android.content.Context
 import android.util.Base64
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
-import org.thoughtcrime.securesms.tapv3.crypto.KPushManager
-import org.thoughtcrime.securesms.tapv3.push.PushEndpointManager
 
 data class TapV3HandshakeInfo(
     @JsonProperty("version")
@@ -37,25 +34,6 @@ data class TapV3HandshakeInfo(
     companion object {
         private val objectMapper: ObjectMapper by lazy {
             ObjectMapper().registerKotlinModule()
-        }
-        
-        fun create(context: Context): TapV3HandshakeInfo {
-            val kPushManager = KPushManager.getInstance(context)
-            val pushEndpointManager = PushEndpointManager.getInstance(context)
-
-            val myKPush = kPushManager.getOrCreateMyKPush()
-            val myKPushVersion = kPushManager.getMyKPushVersion()
-            val myEndpoint = pushEndpointManager.getMyEndpoint() ?: ""
-            
-            // TODO: Get configured gateways dynamically
-            val gateways = listOf("https://gateway.pinata.cloud/ipfs/", "https://w3s.link/ipfs/") 
-
-            return TapV3HandshakeInfo(
-                unifiedPushEndpoint = myEndpoint,
-                kPush = myKPush,
-                keyVersion = myKPushVersion,
-                ipfsGateways = gateways
-            )
         }
         
         fun serialize(info: TapV3HandshakeInfo): ByteArray {

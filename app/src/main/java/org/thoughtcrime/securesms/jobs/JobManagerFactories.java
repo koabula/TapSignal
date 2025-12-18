@@ -226,7 +226,6 @@ public final class JobManagerFactories {
       put(ProfileUploadJob.KEY,                        new ProfileUploadJob.Factory());
       put(PushDistributionListSendJob.KEY,             new PushDistributionListSendJob.Factory());
       put(PushGroupSendJob.KEY,                        new PushGroupSendJob.Factory());
-      put(TapV3GroupSendJob.KEY,                       new TapV3GroupSendJob.Factory());
       put(PushGroupSilentUpdateSendJob.KEY,            new PushGroupSilentUpdateSendJob.Factory());
       put(MessageFetchJob.KEY,                         new MessageFetchJob.Factory());
       put(PostRegistrationBackupRedemptionJob.KEY,     new PostRegistrationBackupRedemptionJob.Factory());

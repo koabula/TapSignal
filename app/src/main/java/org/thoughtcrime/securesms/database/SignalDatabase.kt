@@ -85,7 +85,6 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
   val transportTokenTable: org.thoughtcrime.securesms.tap.database.TransportTokenTable = org.thoughtcrime.securesms.tap.database.TransportTokenTable(context, this)
   val groupV2StatusTable: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable = org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable(context, this)
   val tapV3ChannelTable: org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable = org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable(context, this)
-  val tapV3GroupStateTable: org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable = org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable(context, this)
   val ipfsContentTable: org.thoughtcrime.securesms.tapv3.database.IpfsContentTable = org.thoughtcrime.securesms.tapv3.database.IpfsContentTable(context, this)
 
   override fun onOpen(db: net.zetetic.database.sqlcipher.SQLiteDatabase) {
@@ -630,11 +629,6 @@ open class SignalDatabase(private val context: Application, databaseSecret: Data
     @get:JvmName("groupV2Status")
     val groupV2Status: org.thoughtcrime.securesms.tap.group.database.GroupV2StatusTable
       get() = instance!!.groupV2StatusTable
-
-    @get:JvmStatic
-    @get:JvmName("tapV3GroupStates")
-    val tapV3GroupStates: org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable
-      get() = instance!!.tapV3GroupStateTable
 
     @get:JvmStatic
     @get:JvmName("tapV3Channels")

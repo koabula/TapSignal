@@ -571,7 +571,7 @@ class TransportProviderConfigManager private constructor(private val context: Co
                 "platform" to config.platform,
                 "webhookUrl" to config.webhookUrl,
                 "notifySecret" to config.notifySecret,
-                "userId" to (config.userId ?: ""),
+                "userId" to config.userId,
                 "lastUpdated" to config.lastUpdated,
                 "verified" to config.verified,
                 "websocketManagementEndpoint" to (config.websocketManagementEndpoint ?: ""),

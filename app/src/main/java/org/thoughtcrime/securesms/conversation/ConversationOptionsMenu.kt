@@ -356,7 +356,7 @@ internal object ConversationOptionsMenu {
     private fun updateTapV3MenuItem(menu: Menu, recipient: Recipient) {
       val v3MenuItem = menu.findItem(R.id.menu_tap_v3_mode)
       if (v3MenuItem != null) {
-        if (recipient.isSelf || recipient.isReleaseNotes) {
+        if (recipient.isSelf || recipient.isReleaseNotes || recipient.isGroup) {
           v3MenuItem.isVisible = false
           return
         }
@@ -373,26 +373,6 @@ internal object ConversationOptionsMenu {
           if (!tapV3Manager.isConfigured()) {
             v3MenuItem.isVisible = false
             return
-          }
-
-          if (recipient.isGroup) {
-             val groupId = recipient.groupId.orElse(null)
-             if (groupId == null) {
-                v3MenuItem.isVisible = false
-                return
-             }
-             
-             val groupIdString = groupId.toString()
-             val groupStateTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3GroupStates
-             val groupState = groupStateTable.getGroupState(groupIdString)
-             
-             v3MenuItem.isVisible = true
-             if (groupState != null && groupState.status == org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.ACTIVE) {
-                 v3MenuItem.setTitle(R.string.conversation__menu_disable_v3_mode)
-             } else {
-                 v3MenuItem.setTitle(R.string.conversation__menu_use_v3_mode)
-             }
-             return
           }
           
           val recipientAci = try {

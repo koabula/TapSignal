@@ -76,16 +76,8 @@ class PushMessageReceiver : MessagingReceiver() {
             val envelope = try {
                 Envelope.ADAPTER.decode(signalEncrypted)
             } catch (e: Exception) {
-                // If decoding fails, it is raw ciphertext. Construct Envelope manually.
-                Log.w(TAG, "Failed to decode as Envelope, constructing Envelope from raw bytes")
-                Envelope(
-                    type = Envelope.Type.UNIDENTIFIED_SENDER,
-                    sourceServiceId = null,
-                    sourceDevice = null,
-                    timestamp = System.currentTimeMillis(),
-                    content = okio.ByteString.of(*signalEncrypted),
-                    serverGuid = null
-                )
+                Log.e(TAG, "Failed to deserialize Envelope from ${senderId.take(8)}...", e)
+                return
             }
             
             Log.d(TAG, "Envelope parsed: type=${envelope.type}, timestamp=${envelope.timestamp}, " +

@@ -2894,11 +2894,6 @@ public class SignalServiceMessageSender {
    * @param destinations 目标地址列表
    * @return 纯 SenderKey 密文（未包装 Sealed Sender）
    */
-  public byte[] getEncryptedBytesForTapV3(SignalServiceDataMessage message, DistributionId distributionId) throws IOException {
-    Content content = createMessageContent(message);
-    return encryptForGroupWithoutSealedSender(distributionId, content.encode(), Collections.emptyList());
-  }
-
   private byte[] encryptForGroupWithoutSealedSender(DistributionId distributionId,
                                                      byte[] plaintext,
                                                      List<SignalProtocolAddress> destinations) {

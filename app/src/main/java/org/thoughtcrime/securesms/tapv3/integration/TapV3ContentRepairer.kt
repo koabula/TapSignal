@@ -108,10 +108,8 @@ object TapV3ContentRepairer {
         val keyContent = "TAPV3:CID:$cid"
         val encodedKey = keyContent.toByteArray(Charsets.UTF_8)
         
-        // 必须设置 cdnNumber 为 IPFS_CDN_NUMBER，否则 AttachmentDownloadJob 不会拦截
         return pointer.newBuilder()
             .key(ByteString.of(*encodedKey))
-            .cdnNumber(TapV3AttachmentPointerBuilder.IPFS_CDN_NUMBER)
             .build()
     }
     

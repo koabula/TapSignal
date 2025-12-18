@@ -8,14 +8,11 @@ import org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable
 import org.thoughtcrime.securesms.tapv3.protocol.TapV3HandshakeManager
 import org.thoughtcrime.securesms.tapv3.utils.TapV3Logger
 
-import org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable
-
 class TapV3MessageRouter private constructor(
     private val context: Context
 ) {
     
     private val channelTable = SignalDatabase.tapV3Channels
-    private val groupStateTable = SignalDatabase.tapV3GroupStates
     private val handshakeManager = TapV3HandshakeManager.getInstance(context)
     
     data class RoutingDecision(
@@ -32,27 +29,9 @@ class TapV3MessageRouter private constructor(
         }
         
         if (recipient.isGroup) {
-            if (recipient.isPushV2Group) {
-                val groupId = recipient.requireGroupId().toString()
-                val groupState = groupStateTable.getGroupState(groupId)
-                
-                if (groupState != null && groupState.status == TapV3GroupStateTable.GroupStatus.ACTIVE) {
-                    TapV3Logger.d(TAG, "Tap v3 group active: $groupId")
-                    return RoutingDecision(
-                        useTapV3 = true,
-                        reason = "Tap v3 group active"
-                    )
-                }
-                
-                TapV3Logger.d(TAG, "Group $groupId is not in Tap v3 ACTIVE state")
-                return RoutingDecision(
-                    useTapV3 = false,
-                    reason = "Group not in Tap v3 ACTIVE state"
-                )
-            }
             return RoutingDecision(
                 useTapV3 = false,
-                reason = "Only V2 Groups supported in Tap v3"
+                reason = "Group messaging not supported in Tap v3"
             )
         }
         
@@ -159,7 +138,6 @@ class TapV3MessageRouter private constructor(
         @Volatile
         private var INSTANCE: TapV3MessageRouter? = null
         
-        @JvmStatic
         fun getInstance(context: Context): TapV3MessageRouter {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TapV3MessageRouter(context.applicationContext).also {
