@@ -20,7 +20,7 @@ You can download the APK file from the GitHub [Releases page](https://github.com
 
 ## Usage
 Both modes require some configuration in Settings. Configure v2 mode in "Tap Config" and v3 mode in "Tap v3 Configuration".
-![alt text](./doc/image.png)
+![alt text](./readme/image.png)
 
 ### v2 mode
 Currently v2 mode only supports AWS. Tencent support is not yet implemented.

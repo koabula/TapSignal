@@ -24,7 +24,7 @@ TapSignal目前支持两种模式:
 ## Usage
 
 两个模式都需要在设置中配置一些服务,v2 mode在"Tap Config"界面配置,v3 mode在"Tap v3 Configuration"配置
-![alt text](./doc/image.png)
+![alt text](./readme/image.png)
 
 ### v2 mode
 目前v2 mode只支持aws的服务,tencent的支持还待实现
