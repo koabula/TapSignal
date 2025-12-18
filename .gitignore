@@ -39,3 +39,4 @@ release/
 # Cursor IDE
 .cursor/
 .trae/
+.doc/
