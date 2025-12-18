@@ -21,6 +21,9 @@ import org.thoughtcrime.securesms.tapv3.push.PushEndpointManager
 import org.thoughtcrime.securesms.tapv3.push.UnifiedPushProvider
 import org.thoughtcrime.securesms.tapv3.utils.TapV3Logger
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 class TapV3SendIntegrator private constructor(
     private val context: Context
@@ -39,6 +42,14 @@ class TapV3SendIntegrator private constructor(
         val transportMethod: TransportMethod? = null,
         val messageCid: String? = null,
         val attachmentCids: List<String> = emptyList()
+    )
+
+    data class GroupSendResult(
+        val successCount: Int,
+        val failureCount: Int,
+        val failedMembers: Map<String, String>, // memberId -> errorMessage
+        val transportMethod: TransportMethod? = null,
+        val messageCid: String? = null
     )
     
     enum class TransportMethod {
@@ -107,6 +118,195 @@ class TapV3SendIntegrator private constructor(
             sendIpfsMessage(recipientId, signalEncrypted, attachments, peerKPush, channel.pushEndpoint, senderId)
         }
     }
+
+    suspend fun sendGroupMessage(
+        groupId: String,
+        memberIds: List<String>,
+        signalEncrypted: ByteArray,
+        attachments: List<Attachment> = emptyList()
+    ): GroupSendResult {
+        TapV3Logger.i(TAG, "Sending group message: groupId=$groupId, members=${memberIds.size}")
+        
+        val senderId = try {
+            getLocalSenderId()
+        } catch (e: Exception) {
+            TapV3Logger.e(TAG, "Failed to get local sender ID", e)
+            return GroupSendResult(0, memberIds.size, memberIds.associateWith { "Failed to get local sender ID" })
+        }
+
+        val useInline = attachments.isEmpty() && TapV3MessageCodec.shouldUseInline(signalEncrypted.size)
+        
+        val payload: TapV3Payload
+        val transportMethod: TransportMethod
+        var messageCid: String? = null
+        // We track attachmentCids for logging/result, but they are inside payload
+        
+        if (useInline) {
+            TapV3Logger.d(TAG, "Using INLINE transport for group message")
+            payload = TapV3Payload.Inline(encrypted = signalEncrypted)
+            transportMethod = TransportMethod.INLINE
+        } else {
+            TapV3Logger.d(TAG, "Using IPFS transport for group message")
+            transportMethod = TransportMethod.IPFS
+            
+            // Upload content once (using groupId as recipientId for ownership)
+            val ipfsResult = prepareIpfsPayload(groupId, signalEncrypted, attachments)
+            if (ipfsResult.isFailure()) {
+                val failure = ipfsResult as TapV3Result.Failure
+                return GroupSendResult(0, memberIds.size, memberIds.associateWith { "IPFS upload failed: ${failure.message}" })
+            }
+            
+            val ipfsData = (ipfsResult as TapV3Result.Success).data
+            payload = ipfsData.payload
+            messageCid = ipfsData.messageCid
+        }
+
+        // Fan-out
+        var successCount = 0
+        var failureCount = 0
+        val failedMembers = mutableMapOf<String, String>()
+        
+        try {
+            coroutineScope {
+                 val deferreds = memberIds.map { memberId ->
+                     async {
+                         memberId to sendToMember(memberId, payload, senderId)
+                     }
+                 }
+                 
+                 deferreds.forEach { deferred ->
+                     val (memberId, result) = deferred.await()
+                     if (result.success) {
+                         successCount++
+                     } else {
+                         failureCount++
+                         failedMembers[memberId] = result.error ?: "Unknown error"
+                     }
+                 }
+            }
+        } catch (e: Exception) {
+            TapV3Logger.e(TAG, "Error during group fan-out", e)
+             return GroupSendResult(successCount, memberIds.size - successCount, failedMembers.apply { 
+                 memberIds.filter { !this.containsKey(it) }.forEach { put(it, "Fan-out error: ${e.message}") }
+             })
+        }
+
+        return GroupSendResult(
+            successCount = successCount,
+            failureCount = failureCount,
+            failedMembers = failedMembers,
+            transportMethod = transportMethod,
+            messageCid = messageCid
+        )
+    }
+
+    private suspend fun sendToMember(
+        recipientId: String,
+        payload: TapV3Payload,
+        senderId: String
+    ): SendResult {
+        val channel = channelTable.getChannel(recipientId)
+        if (channel == null) {
+            return SendResult(false, "Channel not found")
+        }
+        // Allow sending to GROUP_ONLY channels for group messages
+        if (channel.status != TapV3ChannelTable.ChannelStatus.ACTIVE && 
+            channel.status != TapV3ChannelTable.ChannelStatus.GROUP_ONLY) {
+            return SendResult(false, "Channel not active: ${channel.status}")
+        }
+
+        val peerKPushResult = kPushManager.getPeerKPush(recipientId)
+        if (peerKPushResult.isFailure()) {
+             return SendResult(false, "Peer k_push not found")
+        }
+        val peerKPush = (peerKPushResult as TapV3Result.Success).data
+
+        return dispatchPush(payload, peerKPush, channel.pushEndpoint, senderId)
+    }
+
+    private data class IpfsPreparationData(
+        val payload: TapV3Payload.IpfsRefs,
+        val messageCid: String?,
+        val attachmentCids: List<String>
+    )
+
+    private suspend fun prepareIpfsPayload(
+        recipientId: String, // Can be groupId
+        signalEncrypted: ByteArray,
+        attachments: List<Attachment>
+    ): TapV3Result<IpfsPreparationData> {
+        var messageCid: String? = null
+        val attachmentCids = mutableListOf<String>()
+        val attachmentRefs = mutableListOf<TapV3Payload.AttachmentRef>()
+        
+        try {
+            if (attachments.isNotEmpty()) {
+                for (attachment in attachments) {
+                    val attachmentResult = uploadAttachment(attachment, recipientId)
+                    if (attachmentResult.isFailure()) {
+                        cleanupUploadedContent(messageCid, attachmentCids)
+                        return TapV3Result.Failure((attachmentResult as TapV3Result.Failure).error, attachmentResult.message)
+                    }
+                    val ref = (attachmentResult as TapV3Result.Success).data
+                    attachmentRefs.add(ref)
+                    attachmentCids.add(ref.cid)
+                }
+            }
+            
+            if (signalEncrypted.isNotEmpty()) {
+                val uploadResult = ipfsGatewayManager.upload(signalEncrypted)
+                if (uploadResult.isFailure()) {
+                    cleanupUploadedContent(messageCid, attachmentCids)
+                    return TapV3Result.Failure((uploadResult as TapV3Result.Failure).error, uploadResult.message)
+                }
+                messageCid = (uploadResult as TapV3Result.Success).data
+                
+                val expiresAt = System.currentTimeMillis() + 
+                    TimeUnit.DAYS.toMillis(TapV3Constants.IPFS_PIN_DURATION_DAYS_MESSAGE.toLong())
+                
+                ipfsContentTable.insertContent(
+                    cid = messageCid!!,
+                    contentType = IpfsContentTable.ContentType.MESSAGE,
+                    sizeBytes = signalEncrypted.size.toLong(),
+                    expiresAt = expiresAt,
+                    recipientId = recipientId
+                )
+            }
+            
+            return TapV3Result.Success(IpfsPreparationData(
+                TapV3Payload.IpfsRefs(messageCid, attachmentRefs),
+                messageCid,
+                attachmentCids
+            ))
+        } catch (e: Exception) {
+            cleanupUploadedContent(messageCid, attachmentCids)
+            return TapV3Result.Failure(TapV3Error.UNKNOWN_ERROR, e.message ?: "Unknown error")
+        }
+    }
+
+    private suspend fun dispatchPush(
+        payload: TapV3Payload,
+        peerKPush: ByteArray,
+        endpoint: String,
+        senderId: String
+    ): SendResult {
+        val encodeResult = TapV3MessageCodec.encodeMessage(payload, peerKPush, senderId)
+        if (encodeResult.isFailure()) {
+            return SendResult(false, "Encode failed: ${(encodeResult as TapV3Result.Failure).message}")
+        }
+        val encoded = (encodeResult as TapV3Result.Success).data
+        
+        val sendResult = unifiedPushProvider.send(
+            endpoint = endpoint,
+            payload = encoded.base64Data.toByteArray(Charsets.UTF_8)
+        )
+        
+        return if (sendResult.isSuccess()) {
+            SendResult(true)
+        } else {
+            SendResult(false, "Push failed: ${(sendResult as TapV3Result.Failure).message}")
+        }
+    }
     
     private suspend fun sendInlineMessage(
         recipientId: String,
@@ -119,37 +319,13 @@ class TapV3SendIntegrator private constructor(
         
         val payload = TapV3Payload.Inline(encrypted = signalEncrypted)
         
-        val encodeResult = TapV3MessageCodec.encodeMessage(payload, peerKPush, senderId)
-        if (encodeResult.isFailure()) {
-            val failure = encodeResult as TapV3Result.Failure
-            TapV3Logger.e(TAG, "Failed to encode inline message: ${failure.message}")
-            return SendResult(
-                success = false,
-                error = "Message encoding failed: ${failure.message}"
-            )
-        }
-        
-        val encoded = (encodeResult as TapV3Result.Success).data
-        TapV3Logger.d(TAG, "Encoded inline message: ${encoded.encodedSize} chars")
-        
-        val sendResult = unifiedPushProvider.send(
-            endpoint = endpoint,
-            payload = encoded.base64Data.toByteArray(Charsets.UTF_8)
-        )
-        
-        return if (sendResult.isSuccess()) {
+        val result = dispatchPush(payload, peerKPush, endpoint, senderId)
+        return if (result.success) {
             TapV3Logger.i(TAG, "Inline message sent successfully")
-            SendResult(
-                success = true,
-                transportMethod = TransportMethod.INLINE
-            )
+            SendResult(true, transportMethod = TransportMethod.INLINE)
         } else {
-            val failure = sendResult as TapV3Result.Failure
-            TapV3Logger.e(TAG, "Failed to send inline message: ${failure.message}")
-            SendResult(
-                success = false,
-                error = "Push failed: ${failure.message}"
-            )
+            TapV3Logger.e(TAG, "Failed to send inline message: ${result.error}")
+            result
         }
     }
     
@@ -163,122 +339,29 @@ class TapV3SendIntegrator private constructor(
     ): SendResult {
         TapV3Logger.d(TAG, "Sending IPFS message: ${signalEncrypted.size} bytes, ${attachments.size} attachments")
         
-        var messageCid: String? = null
-        val attachmentCids = mutableListOf<String>()
-        val attachmentRefs = mutableListOf<TapV3Payload.AttachmentRef>()
+        val prepResult = prepareIpfsPayload(recipientId, signalEncrypted, attachments)
+        if (prepResult.isFailure()) {
+             val failure = prepResult as TapV3Result.Failure
+             TapV3Logger.e(TAG, "IPFS preparation failed: ${failure.message}")
+             return SendResult(false, "IPFS preparation failed: ${failure.message}")
+        }
         
-        try {
-            // 先上传附件到 IPFS，获取 CIDs
-            if (attachments.isNotEmpty()) {
-                for (attachment in attachments) {
-                    val attachmentResult = uploadAttachment(attachment, recipientId)
-                    if (attachmentResult.isFailure()) {
-                        val failure = attachmentResult as TapV3Result.Failure
-                        TapV3Logger.e(TAG, "Failed to upload attachment: ${failure.message}")
-                        
-                        cleanupUploadedContent(messageCid, attachmentCids)
-                        
-                        return SendResult(
-                            success = false,
-                            error = "Attachment upload failed: ${failure.message}"
-                        )
-                    }
-                    
-                    val ref = (attachmentResult as TapV3Result.Success).data
-                    attachmentRefs.add(ref)
-                    attachmentCids.add(ref.cid)
-                    
-                    TapV3Logger.d(TAG, "Uploaded attachment to IPFS: ${ref.cid}")
-                }
-            }
-            
-            // 上传 Signal 加密的消息到 IPFS
-            // 注意：signalEncrypted 包含带有占位符的 AttachmentPointer
-            // 真正的 CID 会通过 attachmentRefs 单独传递，接收端在解密后修复 Content
-            if (signalEncrypted.isNotEmpty()) {
-                val uploadResult = ipfsGatewayManager.upload(signalEncrypted)
-                if (uploadResult.isFailure()) {
-                    val failure = uploadResult as TapV3Result.Failure
-                    TapV3Logger.e(TAG, "Failed to upload message to IPFS: ${failure.message}")
-                    
-                    cleanupUploadedContent(null, attachmentCids)
-                    
-                    return SendResult(
-                        success = false,
-                        error = "IPFS upload failed: ${failure.message}"
-                    )
-                }
-                
-                messageCid = (uploadResult as TapV3Result.Success).data
-                TapV3Logger.d(TAG, "Uploaded message to IPFS: $messageCid")
-                
-                val expiresAt = System.currentTimeMillis() + 
-                    TimeUnit.DAYS.toMillis(TapV3Constants.IPFS_PIN_DURATION_DAYS_MESSAGE.toLong())
-                
-                ipfsContentTable.insertContent(
-                    cid = messageCid,
-                    contentType = IpfsContentTable.ContentType.MESSAGE,
-                    sizeBytes = signalEncrypted.size.toLong(),
-                    expiresAt = expiresAt,
-                    recipientId = recipientId
-                )
-            }
-            
-            // 构建 UnifiedPush payload，包含消息 CID 和附件引用
-            // 接收端会根据 attachmentRefs 中的 CID 来修复解密后的 Content
-            val payload = TapV3Payload.IpfsRefs(
-                messageCid = messageCid,
-                attachments = attachmentRefs
+        val ipfsData = (prepResult as TapV3Result.Success).data
+        val result = dispatchPush(ipfsData.payload, peerKPush, endpoint, senderId)
+        
+        return if (result.success) {
+            TapV3Logger.i(TAG, "IPFS message sent successfully: messageCid=${ipfsData.messageCid}, " +
+                         "attachmentCids=${ipfsData.attachmentCids.size}")
+            SendResult(
+                success = true,
+                transportMethod = TransportMethod.IPFS,
+                messageCid = ipfsData.messageCid,
+                attachmentCids = ipfsData.attachmentCids
             )
-            
-            val encodeResult = TapV3MessageCodec.encodeMessage(payload, peerKPush, senderId)
-            if (encodeResult.isFailure()) {
-                val failure = encodeResult as TapV3Result.Failure
-                TapV3Logger.e(TAG, "Failed to encode IPFS message: ${failure.message}")
-                
-                cleanupUploadedContent(messageCid, attachmentCids)
-                
-                return SendResult(
-                    success = false,
-                    error = "Message encoding failed: ${failure.message}"
-                )
-            }
-            
-            val encoded = (encodeResult as TapV3Result.Success).data
-            TapV3Logger.d(TAG, "Encoded IPFS message: ${encoded.encodedSize} chars")
-            
-            val sendResult = unifiedPushProvider.send(
-                endpoint = endpoint,
-                payload = encoded.base64Data.toByteArray(Charsets.UTF_8)
-            )
-            
-            return if (sendResult.isSuccess()) {
-                TapV3Logger.i(TAG, "IPFS message sent successfully: messageCid=$messageCid, " +
-                             "attachmentCids=${attachmentCids.size}")
-                SendResult(
-                    success = true,
-                    transportMethod = TransportMethod.IPFS,
-                    messageCid = messageCid,
-                    attachmentCids = attachmentCids
-                )
-            } else {
-                val failure = sendResult as TapV3Result.Failure
-                TapV3Logger.e(TAG, "Failed to send IPFS message: ${failure.message}")
-                
-                return SendResult(
-                    success = false,
-                    error = "Push failed: ${failure.message}"
-                )
-            }
-        } catch (e: Exception) {
-            TapV3Logger.e(TAG, "Unexpected error during IPFS message send", e)
-            
-            cleanupUploadedContent(messageCid, attachmentCids)
-            
-            return SendResult(
-                success = false,
-                error = "Unexpected error: ${e.message}"
-            )
+        } else {
+            TapV3Logger.e(TAG, "Failed to send IPFS message: ${result.error}")
+            // Original logic did not cleanup on push failure, keeping it consistent.
+            result
         }
     }
     

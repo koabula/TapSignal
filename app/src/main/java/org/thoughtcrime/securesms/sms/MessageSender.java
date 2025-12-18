@@ -571,6 +571,21 @@ public class MessageSender {
   private static void sendGroupPush(@NonNull Context context, @NonNull Recipient recipient, long messageId, @NonNull Set<RecipientId> filterRecipientIds, @NonNull Collection<String> uploadJobIds) {
     JobManager jobManager = AppDependencies.getJobManager();
 
+    // Check if we should route via Tap V3 (Phase 2 Integration)
+    org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter router = org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter.getInstance(context);
+    org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter.RoutingDecision decision = router.shouldUseTapV3(recipient);
+
+    if (decision.getUseTapV3()) {
+      Log.i(TAG, "Routing group message via Tap V3: " + decision.getReason());
+      if (uploadJobIds.size() > 0) {
+        Job groupSend = new org.thoughtcrime.securesms.jobs.TapV3GroupSendJob(messageId, recipient.getId(), filterRecipientIds, !uploadJobIds.isEmpty());
+        jobManager.add(groupSend, uploadJobIds, uploadJobIds.isEmpty() ? null : recipient.getId().toQueueKey());
+      } else {
+        org.thoughtcrime.securesms.jobs.TapV3GroupSendJob.enqueue(context, jobManager, messageId, recipient.getId(), filterRecipientIds);
+      }
+      return;
+    }
+
     if (uploadJobIds.size() > 0) {
       Job groupSend = new PushGroupSendJob(messageId, recipient.getId(), filterRecipientIds, !uploadJobIds.isEmpty(), false);
       jobManager.add(groupSend, uploadJobIds, uploadJobIds.isEmpty() ? null : recipient.getId().toQueueKey());

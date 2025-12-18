@@ -38,6 +38,11 @@ class TapV3MessageTransportImpl(private val context: Context) : TapV3MessageTran
             
             val recipientId = aci.toString()
             
+            if (TapV3ForceSignalManager.shouldForceSignal(recipientId)) {
+                Log.d(TAG, "shouldUseTapV3ForRecipient: forced signal for ${recipientId.take(8)}...")
+                return false
+            }
+            
             val channel = channelTable.getChannel(recipientId)
             if (channel == null) {
                 Log.d(TAG, "shouldUseTapV3ForRecipient: no channel for ${recipientId.take(8)}...")

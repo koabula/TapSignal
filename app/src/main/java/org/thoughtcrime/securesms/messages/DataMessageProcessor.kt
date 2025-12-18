@@ -134,6 +134,30 @@ object DataMessageProcessor {
     localMetrics: SignalLocalMetrics.MessageReceive?
   ) {
     val message: DataMessage = content.dataMessage!!
+
+    // 🔧 Tap v3 Group Control Interception
+    if (message.body != null) {
+      val body = message.body!!
+      val tapV3Sender = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlMessageSender
+      if (body.startsWith(tapV3Sender.PREFIX_OFFER) ||
+          body.startsWith(tapV3Sender.PREFIX_ACCEPT) ||
+          body.startsWith(tapV3Sender.PREFIX_DISABLE)) {
+
+        Log.i(TAG, "Intercepted Tap v3 group control message from ${senderRecipient.id}")
+        val handler = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlHandler(context)
+
+        val groupSecretParams = if (message.hasGroupContext) GroupSecretParams.deriveFromMasterKey(message.groupV2!!.groupMasterKey) else null
+        val resolvedGroupId: GroupId.V2? = if (groupSecretParams != null) GroupId.v2(groupSecretParams.publicParams.groupIdentifier) else null
+
+        handler.handleGroupControlMessage(
+          body,
+          senderRecipient.aci.orElse(null)?.toString() ?: senderRecipient.id.toString(),
+          resolvedGroupId?.toString() ?: threadRecipient.id.toString()
+        )
+        return
+      }
+    }
+
     val groupSecretParams = if (message.hasGroupContext) GroupSecretParams.deriveFromMasterKey(message.groupV2!!.groupMasterKey) else null
     val groupId: GroupId.V2? = if (groupSecretParams != null) GroupId.v2(groupSecretParams.publicParams.groupIdentifier) else null
 

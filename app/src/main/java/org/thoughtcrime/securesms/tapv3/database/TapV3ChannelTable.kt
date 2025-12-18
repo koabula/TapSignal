@@ -81,7 +81,8 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
     enum class ChannelStatus {
         PENDING,
         ACTIVE,
-        FAILED
+        FAILED,
+        GROUP_ONLY
     }
     
     data class ChannelRecord(
@@ -151,6 +152,10 @@ class TapV3ChannelTable(context: Context, databaseHelper: SignalDatabase) :
         val existing = getChannel(recipientId)
         
         return if (existing != null) {
+            // If existing is ACTIVE and new status is GROUP_ONLY, keep ACTIVE (don't downgrade)
+            if (existing.status == ChannelStatus.ACTIVE && status == ChannelStatus.GROUP_ONLY) {
+                values.put(STATUS, ChannelStatus.ACTIVE.name)
+            }
             writableDatabase.update(TABLE_NAME, values, "$RECIPIENT_ID = ?", arrayOf(recipientId))
             Log.d(TAG, "Updated channel for recipient: ${recipientId.take(8)}...")
             existing.id

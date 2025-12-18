@@ -33,6 +33,11 @@
     <string name="please_wait">Please wait…</string>
     <string name="save">Save</string>
     <string name="note_to_self">Note to Self</string>
+    <string name="tap_v3_group_mode">Use Tap v3 Mode</string>
+    <string name="tap_v3_group_mode_summary">Use IPFS/Arweave and UnifiedPush for group messaging</string>
+    <string name="tap_v2_p2p_mode">Use Tap v2 Mode</string>
+    <string name="tap_v2_p2p_mode_summary">Use P2P communication for 1:1 messaging</string>
+
 
     <!-- Alternate label for the Signal Application in the device\'s home screen launcher, as in a weather/climate application. -->
     <string name="app_icon_label_weather">Weather</string>

@@ -2338,7 +2338,7 @@ class CosTransportProvider(
             // 简单验证：检查配置字段是否完整
             val isValid = config.webhookUrl.isNotBlank() &&
                          config.notifySecret.isNotBlank() &&
-                         config.userId.isNotBlank()
+                         !config.userId.isNullOrBlank()
             
             if (!isValid) {
                 Log.w(TAG, "Webhook配置字段不完整")

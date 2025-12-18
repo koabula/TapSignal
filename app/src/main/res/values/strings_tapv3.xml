@@ -48,6 +48,8 @@
     <!-- Tap v3 Handshake Dialog -->
     <string name="TapV3HandshakeDialog__title">Tap v3 Handshake</string>
     <string name="TapV3HandshakeDialog__ready_to_initiate">Ready to initiate handshake</string>
+    <string name="tap_v3_p2p_mode">Use Tap v3 Mode</string>
+    <string name="tap_v3_p2p_mode_summary">Use IPFS/Arweave and UnifiedPush for P2P messaging</string>
     <string name="TapV3HandshakeDialog__initiating">Initiating handshake…</string>
     <string name="TapV3HandshakeDialog__waiting_for_response">Waiting for peer response…</string>
     <string name="TapV3HandshakeDialog__completing">Completing handshake…</string>
@@ -66,4 +68,8 @@
 
     <!-- Tap v3 Recipient Actions -->
     <string name="RecipientBottomSheet_initiate_tap_v3_handshake">Initiate Tap v3 Handshake</string>
+
+    <!-- Tap v3 Group Offer Banner -->
+    <string name="TapV3GroupOfferBanner__received_offer">Received Tap v3 Group Offer from %1$s</string>
+    <string name="TapV3GroupOfferBanner__agree">Agree</string>
 </resources>

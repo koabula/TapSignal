@@ -9,6 +9,7 @@ import org.thoughtcrime.securesms.database.model.StoryViewState
 import org.thoughtcrime.securesms.groups.GroupId
 import org.thoughtcrime.securesms.groups.ui.GroupMemberEntry
 import org.thoughtcrime.securesms.recipients.Recipient
+import org.thoughtcrime.securesms.tap.group.GroupV2Status
 
 data class ConversationSettingsState(
   val threadId: Long = -1,
@@ -23,7 +24,7 @@ data class ConversationSettingsState(
   val displayInternalRecipientDetails: Boolean = false,
   val calls: List<CallPreference.Model> = emptyList(),
   private val sharedMediaLoaded: Boolean = false,
-  private val specificSettingsState: SpecificSettingsState
+  val specificSettingsState: SpecificSettingsState
 ) {
 
   val isLoaded: Boolean = recipient != Recipient.UNKNOWN && sharedMediaLoaded && specificSettingsState.isLoaded
@@ -55,7 +56,9 @@ sealed class SpecificSettingsState {
     val selfHasGroups: Boolean = false,
     val canShowMoreGroupsInCommon: Boolean = false,
     val groupsInCommonExpanded: Boolean = false,
-    val contactLinkState: ContactLinkState = ContactLinkState.NONE
+    val contactLinkState: ContactLinkState = ContactLinkState.NONE,
+    val tapV2Enabled: Boolean = false,
+    val tapV3Enabled: Boolean = false
   ) : SpecificSettingsState() {
 
     override val isLoaded: Boolean = true
@@ -81,8 +84,13 @@ sealed class SpecificSettingsState {
     val groupLinkEnabled: Boolean = false,
     val membershipCountDescription: String = "",
     val legacyGroupState: LegacyGroupPreference.State = LegacyGroupPreference.State.NONE,
-    val isAnnouncementGroup: Boolean = false
+    val isAnnouncementGroup: Boolean = false,
+    val tapV3Enabled: Boolean = false,
+    val tapV2Status: GroupV2Status = GroupV2Status.NATIVE
   ) : SpecificSettingsState() {
+
+    val tapV2Enabled: Boolean
+      get() = tapV2Status != GroupV2Status.NATIVE
 
     override val isLoaded: Boolean = groupTitleLoaded && groupDescriptionLoaded
 

@@ -32,21 +32,6 @@ sealed class TapV3Result<out T> {
     }
 }
 
-enum class TapV3Error {
-    NETWORK_ERROR,
-    TIMEOUT,
-    INVALID_DATA,
-    ENCRYPTION_ERROR,
-    DECRYPTION_ERROR,
-    IPFS_UPLOAD_ERROR,
-    IPFS_DOWNLOAD_ERROR,
-    PUSH_ERROR,
-    KEY_NOT_FOUND,
-    CHANNEL_NOT_FOUND,
-    QUOTA_EXCEEDED,
-    UNKNOWN_ERROR
-}
-
 class TapV3Exception(
     val error: TapV3Error,
     message: String,

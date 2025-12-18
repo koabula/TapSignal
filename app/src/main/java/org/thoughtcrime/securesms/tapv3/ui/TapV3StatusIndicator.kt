@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.R
+import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable
 import org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter
@@ -53,35 +54,46 @@ class TapV3StatusIndicator @JvmOverloads constructor(
     }
 
     fun updateStatus(recipient: Recipient) {
-        if (recipient.isGroup) {
-            visibility = GONE
-            return
-        }
-        
         currentUpdateJob?.cancel()
         
         currentUpdateJob = indicatorScope.launch {
             try {
-                val recipientId = try {
-                    recipient.requireAci().toString()
-                } catch (e: Throwable) {
-                    Log.w(TAG, "Unable to get recipient ACI: ${e.message}")
-                    visibility = GONE
-                    return@launch
-                }
+                val status: TapV3ChannelTable.ChannelStatus?
+                
+                if (recipient.isGroup) {
+                    val groupId = recipient.requireGroupId().toString()
+                    val groupState = withContext(Dispatchers.IO) {
+                        SignalDatabase.tapV3GroupStates.getGroupState(groupId)
+                    }
+                    status = if (groupState != null && groupState.status == org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.ACTIVE) {
+                        TapV3ChannelTable.ChannelStatus.ACTIVE
+                    } else if (groupState != null && groupState.status == org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.PROPOSING) {
+                        TapV3ChannelTable.ChannelStatus.PENDING
+                    } else {
+                        null
+                    }
+                } else {
+                    val recipientId = try {
+                        recipient.requireAci().toString()
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Unable to get recipient ACI: ${e.message}")
+                        visibility = GONE
+                        return@launch
+                    }
 
-                val channelStatus = withContext(Dispatchers.IO) {
-                    messageRouter.getTapV3ChannelStatus(recipientId)
+                    status = withContext(Dispatchers.IO) {
+                        messageRouter.getTapV3ChannelStatus(recipientId)
+                    }
                 }
 
                 withContext(Dispatchers.Main) {
-                    if (channelStatus != null && channelStatus == TapV3ChannelTable.ChannelStatus.ACTIVE) {
+                    if (status != null) {
                         visibility = VISIBLE
-                        updateIndicatorStyle(channelStatus)
-                        Log.d(TAG, "Showing Tap v3 indicator: status=$channelStatus")
+                        updateIndicatorStyle(status)
+                        Log.d(TAG, "Showing Tap v3 indicator: status=$status")
                     } else {
                         visibility = GONE
-                        Log.d(TAG, "Hiding Tap v3 indicator: status=$channelStatus")
+                        Log.d(TAG, "Hiding Tap v3 indicator")
                     }
                 }
             } catch (e: Exception) {
@@ -106,6 +118,10 @@ class TapV3StatusIndicator @JvmOverloads constructor(
             TapV3ChannelTable.ChannelStatus.FAILED -> {
                 indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorError))
                 indicatorText.text = "v3!"
+            }
+            TapV3ChannelTable.ChannelStatus.GROUP_ONLY -> {
+                indicatorText.setTextColor(ContextCompat.getColor(context, R.color.signal_colorSecondary))
+                indicatorText.text = "v3 (G)"
             }
         }
     }

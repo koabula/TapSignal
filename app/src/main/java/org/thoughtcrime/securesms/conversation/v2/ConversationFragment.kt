@@ -89,6 +89,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -984,11 +985,35 @@ class ConversationFragment :
       .distinctUntilChanged { r1, r2 -> r1 === r2 || r1.hasSameContent(r2) }
       .subscribeBy(onNext = this::onRecipientChanged)
 
-    disposables += viewModel.titleViewParticipants
-      .map { createGroupSubtitleString(it) }
+    disposables += io.reactivex.rxjava3.core.Observable.combineLatest(
+      viewModel.titleViewParticipants,
+      viewModel.isTapV3Active
+    ) { participants: List<Recipient>, isActive: Boolean -> kotlin.Pair(participants, isActive) }
+      .map { pair ->
+        val participants = pair.first
+        val isActive = pair.second
+        val subtitle = createGroupSubtitleString(participants)
+        if (isActive) "Tap v3 Active • $subtitle" else subtitle
+      }
       .distinctUntilChanged()
       .observeOn(AndroidSchedulers.mainThread())
       .subscribeBy(onNext = this::presentGroupConversationSubtitle)
+
+    disposables += viewModel.tapV3OfferEvent
+      .subscribeBy { data: ConversationViewModel.TapV3OfferData ->
+          val initiator = data.initiator
+          val groupId = data.groupId
+          val initiatorId = data.initiatorId
+          
+          com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+              .setTitle("Tap V3 Group Offer")
+              .setMessage("Received Tap v3 offer from ${initiator.getDisplayName(requireContext())}")
+              .setPositiveButton("Accept") { _, _ ->
+                  viewModel.acceptTapV3Offer(groupId, initiatorId)
+              }
+              .setNegativeButton("Decline", null)
+              .show()
+      }
 
     disposables += viewModel.scrollButtonState
       .subscribeBy(onNext = this::presentScrollButtons)
@@ -4335,6 +4360,22 @@ class ConversationFragment :
         groupId.getDecodedId(),
         android.util.Base64.NO_WRAP
       )
+
+        // 检查 v3 群组模式是否已启用
+        try {
+           val tapV3GroupTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3GroupStates
+           val v3GroupState = tapV3GroupTable.getGroupState(groupId.toString())
+           if (v3GroupState != null && v3GroupState.status != org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.NATIVE) {
+              com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.conversation__menu_use_v2_mode)
+                .setMessage(R.string.conversation__disable_v3_first)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+              return
+           }
+        } catch (e: Exception) {
+           Log.w(TAG, "Failed to check TapV3 group status", e)
+        }
         
         val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
         
@@ -4430,6 +4471,22 @@ class ConversationFragment :
         // 当前已启用v2模式，显示断开确认对话框
         showCosV2ModeDisconnectDialog(recipient)
       } else {
+        // 检查 v3 模式是否已启用
+        try {
+           val tapV3Channels = org.thoughtcrime.securesms.database.SignalDatabase.tapV3Channels
+           val v3Channel = tapV3Channels.getChannel(recipientAci)
+           if (v3Channel != null && v3Channel.status == org.thoughtcrime.securesms.tapv3.database.TapV3ChannelTable.ChannelStatus.ACTIVE) {
+              com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.conversation__menu_use_v2_mode)
+                .setMessage(R.string.conversation__disable_v3_first)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+              return
+           }
+        } catch (e: Exception) {
+           Log.w(TAG, "Failed to check TapV3 status", e)
+        }
+
         // 当前未启用v2模式，显示启用确认对话框
         showCosV2ModeRequestDialog(recipient)
       }
@@ -4491,14 +4548,157 @@ class ConversationFragment :
         return
       }
       
-      // v3 模式仅支持私聊
       if (recipient.isGroup) {
-        Toast.makeText(requireContext(), R.string.conversation__v3_not_support_group, Toast.LENGTH_SHORT).show()
+        handleGroupV3ModeRequest(recipient)
         return
       }
       
       handleIndividualV3ModeRequest(recipient)
     }
+
+    private fun handleGroupV3ModeRequest(recipient: Recipient) {
+      try {
+        val groupId = recipient.groupId.orElse(null)
+        if (groupId == null) {
+          Toast.makeText(requireContext(), R.string.conversation__invalid_group, Toast.LENGTH_SHORT).show()
+          return
+        }
+        
+        val groupIdString = groupId.toString()
+
+        // Check V2 conflict
+        val groupManager = org.thoughtcrime.securesms.tap.group.GroupTransportManager.getInstance(requireContext())
+        lifecycleScope.launch {
+            try {
+                val v2Result = groupManager.getGroupStatus(groupIdString)
+                if (v2Result is org.thoughtcrime.securesms.tap.group.GroupOperationResult.Success && 
+                    v2Result.data != org.thoughtcrime.securesms.tap.group.GroupV2Status.NATIVE) {
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.conversation__enable_v3_mode)
+                        .setMessage(R.string.conversation__disable_v2_first)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                    return@launch
+                }
+
+                val tapV3GroupTable = org.thoughtcrime.securesms.database.SignalDatabase.tapV3GroupStates
+                val v3State = tapV3GroupTable.getGroupState(groupIdString)
+                val status = v3State?.status ?: org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.NATIVE
+
+                when (status) {
+                    org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.NATIVE -> {
+                        showGroupV3ModeEnableDialog(recipient, groupIdString)
+                    }
+                    org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.PROPOSING -> {
+                         val myAci = org.thoughtcrime.securesms.keyvalue.SignalStore.account.requireAci().toString()
+                         if (v3State?.initiatorId == myAci) {
+                             // Initiator can cancel
+                             showGroupV3ModeDisableDialog(recipient, groupIdString) // Re-use disable dialog or create cancel one
+                         } else {
+                             Toast.makeText(requireContext(), R.string.conversation__group_v2_proposing, Toast.LENGTH_SHORT).show()
+                         }
+                    }
+                    org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.ACTIVE -> {
+                        showGroupV3ModeDisableDialog(recipient, groupIdString)
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to handle group v3 request", e)
+            }
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to handle group v3 request", e)
+      }
+    }
+
+    private fun showGroupV3ModeEnableDialog(recipient: Recipient, groupIdString: String) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.conversation__enable_v3_mode)
+            .setMessage(R.string.conversation__enable_v3_mode_message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                enableGroupTapV3Mode(groupIdString)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showGroupV3ModeDisableDialog(recipient: Recipient, groupIdString: String) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.conversation__disable_v3_mode)
+            .setMessage(R.string.conversation__disable_v3_mode_message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                disableGroupTapV3Mode(groupIdString)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun enableGroupTapV3Mode(groupIdString: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val context = requireContext().applicationContext
+                val sender = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlMessageSender(context)
+                val table = org.thoughtcrime.securesms.database.SignalDatabase.tapV3GroupStates
+                
+                val handshakeInfo = org.thoughtcrime.securesms.tapv3.TapV3HandshakeInfo.create(context)
+                val offer = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControl.Offer(handshakeInfo = handshakeInfo)
+                sender.sendOffer(groupIdString, offer)
+
+                val selfAci = org.thoughtcrime.securesms.recipients.Recipient.self().aci.orElse(null)?.toString() ?: return@launch
+                
+                val current = table.getGroupState(groupIdString)
+                if (current == null) {
+                    val record = org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStateRecord(
+                        groupId = groupIdString,
+                        status = org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.PROPOSING,
+                        initiatorId = selfAci,
+                        agreedMembers = listOf(selfAci),
+                        handshakeInfo = handshakeInfo,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    table.setGroupState(record)
+                } else {
+                    table.updateStatus(groupIdString, org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.PROPOSING)
+                }
+                
+                withContext(Dispatchers.Main) {
+                     Toast.makeText(context, R.string.conversation__v3_handshake_initiated, Toast.LENGTH_SHORT).show()
+                     requireActivity().invalidateOptionsMenu()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enable group Tap V3", e)
+                withContext(Dispatchers.Main) {
+                     Toast.makeText(context, R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun disableGroupTapV3Mode(groupIdString: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val context = requireContext().applicationContext
+                val sender = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlMessageSender(context)
+                val table = org.thoughtcrime.securesms.database.SignalDatabase.tapV3GroupStates
+                
+                val disable = org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControl.Disable(reason = "User disabled")
+                sender.sendDisable(groupIdString, disable)
+                table.updateStatus(groupIdString, org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.NATIVE)
+                
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                     Toast.makeText(context, R.string.conversation__v3_mode_disabled, Toast.LENGTH_SHORT).show()
+                     requireActivity().invalidateOptionsMenu()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to disable group Tap V3", e)
+                 kotlinx.coroutines.withContext(Dispatchers.Main) {
+                     Toast.makeText(context, R.string.conversation__operation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     
     private fun handleIndividualV3ModeRequest(recipient: Recipient) {
       val recipientAci = try {

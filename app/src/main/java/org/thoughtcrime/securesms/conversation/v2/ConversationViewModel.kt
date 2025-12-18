@@ -50,6 +50,7 @@ import org.thoughtcrime.securesms.banner.banners.GroupsV1MigrationSuggestionsBan
 import org.thoughtcrime.securesms.banner.banners.OutdatedBuildBanner
 import org.thoughtcrime.securesms.banner.banners.PendingGroupJoinRequestsBanner
 import org.thoughtcrime.securesms.banner.banners.ServiceOutageBanner
+import org.thoughtcrime.securesms.banner.banners.TapV3GroupOfferBanner
 import org.thoughtcrime.securesms.banner.banners.UnauthorizedBanner
 import org.thoughtcrime.securesms.contactshare.Contact
 import org.thoughtcrime.securesms.conversation.ConversationMessage
@@ -60,6 +61,7 @@ import org.thoughtcrime.securesms.conversation.v2.data.ConversationElementKey
 import org.thoughtcrime.securesms.conversation.v2.items.ChatColorsDrawable
 import org.thoughtcrime.securesms.database.DatabaseObserver
 import org.thoughtcrime.securesms.database.MessageTable
+import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.database.SignalDatabase.Companion.recipients
 import org.thoughtcrime.securesms.database.model.GroupRecord
 import org.thoughtcrime.securesms.database.model.IdentityRecord
@@ -84,7 +86,11 @@ import org.thoughtcrime.securesms.mms.SlideDeck
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.sms.MessageSender
+import org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable
+import org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControl
+import org.thoughtcrime.securesms.tapv3.integration.TapV3MessageRouter
 import org.thoughtcrime.securesms.util.BubbleUtil
+import java.util.Optional
 import org.thoughtcrime.securesms.util.ConversationUtil
 import org.thoughtcrime.securesms.util.TextSecurePreferences
 import org.thoughtcrime.securesms.util.hasGiftBadge
@@ -93,6 +99,8 @@ import org.thoughtcrime.securesms.wallpaper.ChatWallpaper
 import org.whispersystems.signalservice.api.push.ServiceId
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * ConversationViewModel, which operates solely off of a thread id that never changes.
@@ -119,6 +127,76 @@ class ConversationViewModel(
     get() = scrollButtonStateStore.state.unreadCount
 
   val recipient: Observable<Recipient> = recipientRepository.conversationRecipient
+
+  private val conversationUpdates: Observable<Unit> = Observable.create { emitter ->
+    val observer = DatabaseObserver.Observer { emitter.onNext(Unit) }
+    AppDependencies.databaseObserver.registerConversationObserver(threadId, observer)
+    emitter.setCancellable { AppDependencies.databaseObserver.unregisterObserver(observer) }
+  }.startWithItem(Unit)
+
+  val isTapV3Active: Observable<Boolean> = Observable.combineLatest(
+    recipient,
+    conversationUpdates
+  ) { recipient, _ ->
+    if (recipient.isGroup) {
+      val groupId = recipient.groupId.orNull()?.toString()
+      if (groupId != null) {
+        val state = SignalDatabase.tapV3GroupStates.getGroupState(groupId)
+        state != null && state.status == TapV3GroupStateTable.GroupStatus.ACTIVE
+      } else {
+        false
+      }
+    } else {
+      val aci = recipient.aci.orNull()?.toString()
+      if (aci != null) {
+        try {
+          TapV3MessageRouter.getInstance(AppDependencies.application).shouldUseTapV3(aci).useTapV3
+        } catch (e: Exception) {
+          false
+        }
+      } else {
+        false
+      }
+    }
+  }.distinctUntilChanged().observeOn(AndroidSchedulers.mainThread())
+
+  data class TapV3OfferData(
+    val initiator: Recipient,
+    val groupId: String,
+    val initiatorId: String
+  )
+
+  val tapV3OfferEvent: Observable<TapV3OfferData> = Observable.combineLatest(
+    recipient,
+    conversationUpdates
+  ) { recipient, _ ->
+    if (recipient.isGroup) {
+      val groupId = recipient.groupId.orNull()?.toString()
+      if (groupId != null) {
+        val state = SignalDatabase.tapV3GroupStates.getGroupState(groupId)
+        if (state != null && state.status == TapV3GroupStateTable.GroupStatus.PROPOSING) {
+          val selfId = Recipient.self().aci.get().toString()
+          if (!state.agreedMembers.contains(selfId)) {
+            val initiatorId = state.initiatorId
+            if (initiatorId != null) {
+              try {
+                val initiator = Recipient.externalPush(ServiceId.parseOrThrow(initiatorId))
+                return@combineLatest Optional.of(TapV3OfferData(initiator, groupId, initiatorId))
+              } catch (e: Exception) {
+                return@combineLatest Optional.empty<TapV3OfferData>()
+              }
+            }
+          }
+        }
+      }
+    }
+    Optional.empty<TapV3OfferData>()
+  }
+  .filter { it.isPresent }
+  .map { it.get() }
+  .distinctUntilChanged()
+  .observeOn(AndroidSchedulers.mainThread())
+
   val titleViewParticipants: Observable<List<Recipient>> = recipient.filter { it.isGroup }.switchMap { groupRecipient ->
     val firstTenIds = groupRecipient.participantIds
       .take(10)
@@ -318,6 +396,16 @@ class ConversationViewModel(
       })
   }
 
+  fun acceptTapV3Offer(groupId: String, initiatorId: String) {
+    viewModelScope.launch(Dispatchers.IO) {
+        try {
+            org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlHandler(AppDependencies.application).acceptGroupOffer(groupId, initiatorId)
+        } catch (e: Exception) {
+            org.signal.core.util.logging.Log.e("ConversationViewModel", "Failed to accept Tap v3 offer", e)
+        }
+    }
+  }
+
   fun onAvatarDownloadFailed() {
     viewModelScope.launch(Dispatchers.IO) {
       val recipient = recipientSnapshot
@@ -356,11 +444,50 @@ class ConversationViewModel(
         )
       }
 
+    val tapV3OfferFlow: Flow<TapV3GroupOfferBanner> = callbackFlow {
+      val observer = DatabaseObserver.Observer { trySend(Unit) }
+      AppDependencies.databaseObserver.registerConversationObserver(threadId, observer)
+      trySend(Unit)
+      awaitClose { AppDependencies.databaseObserver.unregisterObserver(observer) }
+    }.flowOn(Dispatchers.Main)
+      .combine(groupRecordFlow) { _, groupRecord ->
+        groupRecord
+      }
+      .map { groupRecord ->
+        if (groupRecord.isV2Group) {
+          val groupId = groupRecord.id.requireV2().toString()
+          val table = SignalDatabase.tapV3GroupStates
+          val state = table.getGroupState(groupId)
+
+          if (state != null && state.status == org.thoughtcrime.securesms.tapv3.database.TapV3GroupStateTable.GroupStatus.PROPOSING) {
+            val selfId = Recipient.self().aci.get().toString()
+            if (!state.agreedMembers.contains(selfId)) {
+              val initiatorId = state.initiatorId
+              if (initiatorId != null) {
+                try {
+                  val recipient = Recipient.externalPush(ServiceId.parseOrThrow(initiatorId))
+                  return@map TapV3GroupOfferBanner(recipient) {
+                    viewModelScope.launch(Dispatchers.IO) {
+                        org.thoughtcrime.securesms.tapv3.protocol.TapV3GroupControlHandler(context).acceptGroupOffer(groupId, initiatorId)
+                    }
+                  }
+                } catch (e: Exception) {
+                  null
+                }
+              } else null
+            } else null
+          } else null
+        } else null
+      }
+      .flowOn(Dispatchers.IO)
+      .mapNotNull { it }
+
     return combine(
       listOf(
         flowOf(OutdatedBuildBanner()),
         flowOf(UnauthorizedBanner(context)),
         flowOf(ServiceOutageBanner(context)),
+        // tapV3OfferFlow, /* Removed */ /* Removed */
         pendingGroupJoinFlow,
         groupV1SuggestionsFlow,
         flowOf(BubbleOptOutBanner(inBubble = repository.isInBubble, actionListener = bubbleClickListener))

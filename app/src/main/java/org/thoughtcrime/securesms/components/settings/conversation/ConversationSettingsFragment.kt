@@ -617,6 +617,30 @@ class ConversationSettingsFragment : DSLSettingsFragment(
             }
           )
         }
+
+        if (!state.recipient.isReleaseNotes && !state.recipient.isSelf && !state.recipient.isBlocked) {
+             dividerPref()
+
+             switchPref(
+                title = DSLSettingsText.from(R.string.tap_v2_p2p_mode),
+                summary = DSLSettingsText.from(R.string.tap_v2_p2p_mode_summary),
+                isChecked = state.requireRecipientSettingsState().tapV2Enabled,
+                isEnabled = !state.isDeprecatedOrUnregistered,
+                onClick = {
+                    viewModel.onToggleTapV2(!state.requireRecipientSettingsState().tapV2Enabled)
+                }
+             )
+
+             switchPref(
+                title = DSLSettingsText.from(R.string.tap_v3_p2p_mode),
+                summary = DSLSettingsText.from(R.string.tap_v3_p2p_mode_summary),
+                isChecked = state.requireRecipientSettingsState().tapV3Enabled,
+                isEnabled = !state.isDeprecatedOrUnregistered,
+                onClick = {
+                    viewModel.onToggleTapV3(!state.requireRecipientSettingsState().tapV3Enabled)
+                }
+             )
+        }
       }
 
       if (state.sharedMedia.isNotEmpty()) {
@@ -793,7 +817,43 @@ class ConversationSettingsFragment : DSLSettingsFragment(
         }
 
         if (state.recipient.isPushV2Group) {
+          /*
           dividerPref()
+
+          switchPref(
+            title = DSLSettingsText.from(R.string.conversation__menu_use_v2_mode),
+            summary = DSLSettingsText.from(R.string.cos_request_dialog_message),
+            isChecked = groupState.tapV2Enabled, // Need to make sure tapV2Enabled exists in GroupSettingsState
+            isEnabled = !state.isDeprecatedOrUnregistered && groupState.canEditGroupAttributes,
+            onClick = {
+              viewModel.onToggleTapV2(!groupState.tapV2Enabled)
+            }
+          )
+          */
+
+          // Tap v3 Status (Read-only)
+          val tapV3StatusText = if (groupState.tapV3Enabled) {
+              "Tap v3 Mode: ACTIVE (Using IPFS & UnifiedPush)"
+          } else {
+              "Tap v3 Mode: INACTIVE"
+          }
+          
+          textPref(
+            title = DSLSettingsText.from(R.string.tap_v3_group_mode),
+            summary = DSLSettingsText.from(tapV3StatusText)
+          )
+          
+          /*
+          switchPref(
+            title = DSLSettingsText.from(R.string.tap_v3_group_mode),
+            summary = DSLSettingsText.from(R.string.tap_v3_group_mode_summary),
+            isChecked = groupState.tapV3Enabled,
+            isEnabled = !state.isDeprecatedOrUnregistered && groupState.canEditGroupAttributes,
+            onClick = {
+              viewModel.onToggleTapV3(!groupState.tapV3Enabled)
+            }
+          )
+          */
 
           clickPref(
             title = DSLSettingsText.from(R.string.ConversationSettingsFragment__group_link),
